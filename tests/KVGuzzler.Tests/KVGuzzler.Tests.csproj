@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- xunit v3 test projects are executables. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="xunit.v3" Version="3.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/KVGuzzler.Core/KVGuzzler.Core.csproj" />
+    <ProjectReference Include="../../src/KVGuzzler/KVGuzzler.csproj" />
+  </ItemGroup>
+</Project>

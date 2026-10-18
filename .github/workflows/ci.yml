@@ -1,0 +1,16 @@
+# Build (warnings are errors) and test on every PR and push to main, via KVG_Standards' ci-dotnet.yml.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: gerp93/KVG_Standards/.github/workflows/ci-dotnet.yml@main
+    with:
+      project_path: KVGuzzler.sln
+      run_tests: true

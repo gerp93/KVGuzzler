@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="KVGuzzler.Views.MissingDatabaseWindow"
+        Title="KVGuzzler - database not found"
+        Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="20" Spacing="12">
+    <TextBlock Text="Your database could not be found" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    <TextBlock TextWrapping="Wrap"
+               Text="Using the default location starts fresh there. Your data is not deleted; it is wherever that drive or folder is. If it is on an unplugged drive or a synced folder that has not mounted yet, quit, fix that, and start KVGuzzler again." />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button x:Name="UseDefaultButton" Content="Use the default location" />
+      <Button x:Name="QuitButton" Content="Quit" Classes="accent" />
+    </StackPanel>
+  </StackPanel>
+</Window>

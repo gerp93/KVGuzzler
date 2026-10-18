@@ -1,0 +1,49 @@
+# KVGuzzler
+
+See what your PC costs to run. KVGuzzler is a cross-platform (Windows and Linux) desktop app that
+measures the power your GPU, CPU and other components draw and turns it into an electricity cost per
+hour, day, month and year at your own rate.
+
+> **Status: early scaffold.** The app shell, settings (electricity rate, database location),
+> self-update and a cost estimator for a constant load work today. **Live sensor readings are not
+> built yet**; see [TODO.md](TODO.md) for the plan (NVML, RAPL, LibreHardwareMonitor, smart-plug wall
+> meters).
+
+## Install
+
+Download from the [latest release](https://github.com/gerp93/KVGuzzler/releases/latest):
+
+- **Windows**: the `Setup.exe`. It installs for your user (no admin prompt) and updates itself.
+- **Linux**: the `.AppImage`. Make it executable (`chmod +x *.AppImage`) and run it. It updates itself.
+
+Builds are unsigned, so Windows SmartScreen will warn about an unrecognized publisher; click through
+to launch it.
+
+## Build and test
+
+Needs the current .NET LTS SDK (10.x).
+
+```bash
+dotnet build KVGuzzler.sln -warnaserror
+dotnet test KVGuzzler.sln
+dotnet run --project src/KVGuzzler
+```
+
+A `dotnet run` build is a development run: it keeps its data in a separate `KVGuzzler-dev` folder, so
+it never touches an installed copy's database, and it skips update checks.
+
+Layout: `src/KVGuzzler.Core` (energy and cost logic, no UI), `src/KVGuzzler` (the Avalonia app),
+`tests/KVGuzzler.Tests` (unit tests plus headless UI tests).
+
+## Standards
+
+This repo follows [gerp93/KVG_Standards](https://github.com/gerp93/KVG_Standards): the
+[Avalonia/.NET desktop stack](https://github.com/gerp93/KVG_Standards/blob/main/dotnet-avalonia.md)
+(Velopack release and self-update, a vendored database-location helper, a vendored VisualAssault theme),
+plus AGPL-3.0 licensing, `TODO.md` and `VERSION_BUMP.md`. Releases are cut automatically on every push to
+`main` and manually through the "Cut Release" workflow; both call KVG_Standards'
+`release-avalonia.yml`.
+
+## License
+
+[AGPL-3.0](LICENSE).
