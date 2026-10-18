@@ -1,0 +1,10 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+*.swp
+# Local build/publish output
+publish/
+Releases/
+releases/

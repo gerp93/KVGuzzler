@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>KVGuzzler</AssemblyName>
+    <RootNamespace>KVGuzzler</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.*" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.*" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.*" />
+    <!-- release-avalonia.yml installs the vpk tool that matches this package's resolved version. -->
+    <PackageReference Include="Velopack" Version="1.2.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KVGuzzler.Core/KVGuzzler.Core.csproj" />
+    <InternalsVisibleTo Include="KVGuzzler.Tests" />
+  </ItemGroup>
+</Project>

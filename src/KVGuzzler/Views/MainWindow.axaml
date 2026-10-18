@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="KVGuzzler.Views.MainWindow"
+        Title="KVGuzzler"
+        Width="900" Height="640" MinWidth="640" MinHeight="480">
+  <TabControl x:Name="Tabs" Margin="8">
+
+    <TabItem Header="Dashboard">
+      <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+        <TextBlock Text="Cost estimator" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap"
+                   Text="Live power readings from your GPU, CPU and a wall meter are not wired up yet (see TODO.md). Until then, this shows what a constant load costs at the rate saved in Settings." />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Constant load:" VerticalAlignment="Center" />
+          <TextBox x:Name="WattsBox" Text="400" Width="100" />
+          <TextBlock Text="watts" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock x:Name="EstimateText" TextWrapping="Wrap" />
+      </StackPanel>
+    </TabItem>
+
+    <TabItem Header="Settings">
+      <ScrollViewer>
+        <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Text="Electricity rate" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="Use the all-in price per kWh from your bill (supply and delivery per-kWh charges, not the fixed monthly fee)." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="CurrencyBox" Width="60" MaxLength="3" PlaceholderText="$" />
+            <TextBox x:Name="RateBox" Width="120" PlaceholderText="0.15" />
+            <TextBlock Text="per kWh" VerticalAlignment="Center" />
+            <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
+          </StackPanel>
+          <TextBlock x:Name="RateExampleText" TextWrapping="Wrap" />
+          <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="OrangeRed" IsVisible="False" />
+          <TextBlock x:Name="RateStatusText" TextWrapping="Wrap" />
+
+          <Separator Margin="0,8" />
+
+          <TextBlock Text="Database location" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="Keep your data anywhere, such as a backed-up or cloud-synced folder. Changing the location needs a restart." />
+          <TextBlock x:Name="DbPathText" TextWrapping="Wrap" />
+          <TextBlock x:Name="DbSizeText" />
+          <WrapPanel>
+            <Button x:Name="ChooseExistingButton" Content="Choose an existing file..." Margin="0,0,8,8" />
+            <Button x:Name="ChooseNewButton" Content="Choose a new location..." Margin="0,0,8,8" />
+            <Button x:Name="ResetDbButton" Content="Reset to default" Margin="0,0,8,8" />
+          </WrapPanel>
+          <TextBlock x:Name="DbStatusText" TextWrapping="Wrap" />
+          <Button x:Name="RestartButton" Content="Restart KVGuzzler now" Classes="accent" IsVisible="False" HorizontalAlignment="Left" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Help">
+      <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+        <TextBlock Text="KVGuzzler" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock x:Name="VersionText" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="RepoButton" Content="Project page" />
+          <Button x:Name="IssuesButton" Content="Report an issue" />
+        </StackPanel>
+        <Separator Margin="0,8" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="CheckUpdatesButton" Content="Check for updates" />
+          <Button x:Name="ApplyUpdateButton" Content="Update and restart" Classes="accent" IsVisible="False" />
+        </StackPanel>
+        <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" />
+      </StackPanel>
+    </TabItem>
+
+  </TabControl>
+</Window>
