@@ -1,7 +1,7 @@
 // KvgDbLocation - copy this file into your app (see README.md); do not edit the copy.
 // Source: gerp93/KVG_Standards packages/dotnet/KvgDbLocation. The re-vendor script
 // stamps the source tag into the line below; fix bugs upstream, then re-run it.
-// Vendored-from: gerp93/KVG_Standards claude/fix-datadir-resolution (79fb55034b1ca47b7bbb5c7226a63509825787d6) - do not hand-edit
+// Vendored-from: gerp93/KVG_Standards main (b6c10c11912fb0df6f1dc50864878bd8093a8a7d) - do not hand-edit
 //
 // User-configurable SQLite file location for .NET desktop apps. Mirrors
 // packages/python/kvg_dblocation and Sweeper's src/main/dbLocation.ts: a default
