@@ -19,6 +19,9 @@ public sealed class PowerCollector
     /// Saving adds to the minute's row, so saving a minute in pieces gives the same total.</summary>
     public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(15);
 
+    /// <summary>How often runs still going are saved.</summary>
+    public static readonly TimeSpan RunSaveInterval = TimeSpan.FromSeconds(30);
+
     /// <summary>How often the CPU's and GPU's energy is shared out among programs.</summary>
     public static readonly TimeSpan AttributionInterval = TimeSpan.FromSeconds(2);
 
@@ -28,6 +31,8 @@ public sealed class PowerCollector
     private readonly PowerSampler _sampler;
     private readonly IProgramActivitySource? _programs;
     private readonly IdleBaseline _baseline = new();
+    private readonly RunTracker _runs = new();
+    private DateTimeOffset _lastRunSave = DateTimeOffset.MinValue;
 
     // Energy of the CPU and GPU since programs were last looked at, and the window the idle baseline is learned in.
     private double _pendCpuKwh, _pendGpuKwh, _pendSeconds;
@@ -60,6 +65,7 @@ public sealed class PowerCollector
     /// otherwise "lost power" (it did not get to say goodbye).</summary>
     public void Start(DateTimeOffset now)
     {
+        _store.EndStaleRuns();
         if (_store.LastSeen() is { } lastSeen && now - lastSeen > GapThreshold)
             _store.AddGap(new Gap(lastSeen, now, _store.StoppedCleanly() ? GapReason.Off : GapReason.LostPower));
     }
@@ -96,6 +102,7 @@ public sealed class PowerCollector
     /// <summary>Saves what is pending and marks this as a deliberate stop.</summary>
     public void Stop()
     {
+        foreach (var run in _runs.CloseAll()) _store.SaveRun(run);
         Flush(_last ?? DateTimeOffset.UtcNow);
         _store.MarkCleanStop();
     }
@@ -193,8 +200,19 @@ public sealed class PowerCollector
             .Take(13)
             .ToList());
 
+        TrackRuns(now, rows);
         LearnBaseline(_pendCpuKwh, _pendGpuKwh, seconds);
         ClearPending();
+    }
+
+    /// <summary>Follows each program from its start to its end. Runs that ended are saved at once; runs still
+    /// going are saved every so often, so a crash or power cut leaves them with what they had.</summary>
+    private void TrackRuns(DateTimeOffset now, IReadOnlyList<ProgramEnergy> interval)
+    {
+        foreach (var finished in _runs.Update(now, _programs!.RunningPrograms, interval)) _store.SaveRun(finished);
+        if (now - _lastRunSave < RunSaveInterval) return;
+        _lastRunSave = now;
+        foreach (var current in _runs.Current()) _store.SaveRun(current);
     }
 
     private void LearnBaseline(double cpuKwh, double gpuKwh, double seconds)

@@ -42,6 +42,8 @@ public sealed partial class WindowsProgramActivitySource : IProgramActivitySourc
 
     public string? UnavailableReason { get; }
 
+    public IReadOnlyCollection<string> RunningPrograms { get; private set; } = Array.Empty<string>();
+
     public void Reset() => _previous = null;
 
     public IReadOnlyList<ProgramActivity> Sample()
@@ -49,6 +51,7 @@ public sealed partial class WindowsProgramActivitySource : IProgramActivitySourc
         if (UnavailableReason is not null) return Array.Empty<ProgramActivity>();
 
         var current = Read();
+        RunningPrograms = current.Processes.Values.Select(p => p.Program).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var previous = _previous;
         _previous = current;
         if (previous is null) return Array.Empty<ProgramActivity>();

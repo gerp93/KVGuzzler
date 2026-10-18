@@ -70,6 +70,10 @@ public sealed class HistoryStore : IDisposable
                 minute_start INTEGER NOT NULL, program TEXT NOT NULL COLLATE NOCASE,
                 cpu_kwh REAL NOT NULL, gpu_kwh REAL NOT NULL, active_seconds REAL NOT NULL,
                 PRIMARY KEY (minute_start, program));
+            CREATE TABLE IF NOT EXISTS program_runs (
+                program TEXT NOT NULL COLLATE NOCASE, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
+                cpu_kwh REAL NOT NULL, gpu_kwh REAL NOT NULL, active_seconds REAL NOT NULL, still_running INTEGER NOT NULL,
+                PRIMARY KEY (program, start_ms));
             CREATE TABLE IF NOT EXISTS live_programs (
                 program TEXT PRIMARY KEY COLLATE NOCASE, cpu_w REAL NOT NULL, gpu_w REAL NOT NULL, position INTEGER NOT NULL);
             """);
@@ -293,6 +297,52 @@ public sealed class HistoryStore : IDisposable
         using var r = cmd.ExecuteReader();
         while (r.Read()) rows.Add(new ProgramEnergy(r.GetString(0), r.GetDouble(1), r.GetDouble(2), r.GetDouble(3)));
         return rows;
+    }
+
+    /// <summary>Saves a run, replacing what was saved for it before (a run still going is saved again as it grows).</summary>
+    public void SaveRun(ProgramRun run)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            INSERT OR REPLACE INTO program_runs (program, start_ms, end_ms, cpu_kwh, gpu_kwh, active_seconds, still_running)
+            VALUES ($p, $s, $e, $c, $g, $a, $r)
+            """;
+        cmd.Parameters.AddWithValue("$p", run.Program);
+        cmd.Parameters.AddWithValue("$s", run.Start.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$e", run.End.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$c", run.CpuKwh);
+        cmd.Parameters.AddWithValue("$g", run.GpuKwh);
+        cmd.Parameters.AddWithValue("$a", run.ActiveSeconds);
+        cmd.Parameters.AddWithValue("$r", run.StillRunning ? 1 : 0);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Runs left marked "still running" by a collector that is no longer there were cut off with it.</summary>
+    public void EndStaleRuns()
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "UPDATE program_runs SET still_running = 0 WHERE still_running = 1";
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>The most recent runs, ones still going first.</summary>
+    public IReadOnlyList<ProgramRun> GetRecentRuns(int limit)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT program, start_ms, end_ms, cpu_kwh, gpu_kwh, active_seconds, still_running FROM program_runs
+            ORDER BY still_running DESC, end_ms DESC LIMIT $n
+            """;
+        cmd.Parameters.AddWithValue("$n", limit);
+        var runs = new List<ProgramRun>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            runs.Add(new ProgramRun(r.GetString(0), DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(1)),
+                DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(2)), r.GetDouble(3), r.GetDouble(4), r.GetDouble(5), r.GetInt32(6) == 1));
+        return runs;
     }
 
     public void SetLivePrograms(DateTimeOffset now, IReadOnlyList<ProgramLive> rows)

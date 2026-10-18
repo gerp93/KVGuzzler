@@ -198,6 +198,8 @@ public class ProgramCollectorTests
     private sealed class Activity : IProgramActivitySource
     {
         public IReadOnlyList<ProgramActivity> Current = Array.Empty<ProgramActivity>();
+        public IReadOnlyCollection<string> Running { get; set; } = Array.Empty<string>();
+        public IReadOnlyCollection<string> RunningPrograms => Running;
         public string? Unavailable { get; set; }
         public int Resets { get; private set; }
         public string? UnavailableReason => Unavailable;

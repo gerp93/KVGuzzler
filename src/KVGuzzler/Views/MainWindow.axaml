@@ -110,6 +110,23 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <TextBlock x:Name="ProgramsBaselineText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+
+          <Separator Margin="0,8" />
+
+          <TextBlock Text="Recent runs" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                     Text="What each program is estimated to have caused from when it started until it closed (a program with several processes counts as one run). A run starts when KVGuzzler first sees the program, so one that was already open when recording began starts then. Runs that caused under half a watt-hour are not listed." />
+          <ItemsControl x:Name="RunsList">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="views:HistoryRow">
+                <StackPanel Margin="0,0,0,8">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock x:Name="RunsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
         </StackPanel>
       </ScrollViewer>
     </TabItem>

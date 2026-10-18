@@ -17,6 +17,10 @@ public interface IProgramActivitySource : IDisposable
     /// <summary>Null when it works; otherwise one sentence on why it cannot report here.</summary>
     string? UnavailableReason { get; }
 
+    /// <summary>Every program that had a process at the last <see cref="Sample"/>, busy or not. Used to follow
+    /// runs: a program that is open but idle is still running.</summary>
+    IReadOnlyCollection<string> RunningPrograms { get; }
+
     /// <summary>What each program did since the previous call. The first call (and the first after
     /// <see cref="Reset"/>) returns nothing: a rate needs two readings.</summary>
     IReadOnlyList<ProgramActivity> Sample();

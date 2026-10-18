@@ -59,7 +59,8 @@ public partial class MainWindow
     private sealed record ProgramsRead(
         IReadOnlyList<ProgramEnergy> Totals,
         (DateTimeOffset UpdatedAt, IReadOnlyList<ProgramLive> Rows)? Live,
-        (double? Cpu, double? Gpu) Baseline);
+        (double? Cpu, double? Gpu) Baseline,
+        IReadOnlyList<ProgramRun> Runs);
 
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs);
@@ -90,7 +91,8 @@ public partial class MainWindow
                 var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
                 periods = HistoryReport.Standard(store, now, sleepWatts);
-                programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline());
+                programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline(),
+                    store.GetRecentRuns(20));
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -129,6 +131,8 @@ public partial class MainWindow
             ProgramsList.ItemsSource = Array.Empty<HistoryRow>();
             ProgramsTotalText.Text = "";
             ProgramsBaselineText.Text = "";
+            RunsList.ItemsSource = Array.Empty<HistoryRow>();
+            RunsNoteText.Text = "";
             ProgramsNoteText.Text = "No program history yet. It is recorded by the background collector (turn it on from the Dashboard).";
             ProgramsNoteText.IsVisible = true;
             return;
@@ -151,10 +155,24 @@ public partial class MainWindow
             : $"CPU and GPU together: {FormatEnergy(all)}"
               + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(all, rt))}" : "");
 
+        RunsList.ItemsSource = RunRows(read.Runs, rate, currency);
+        RunsNoteText.Text = read.Runs.Count == 0 ? "No runs recorded yet." : "";
+        RunsNoteText.IsVisible = read.Runs.Count == 0;
+
         ProgramsBaselineText.Text = read.Baseline is ({ } cpu, { } gpu)
             ? $"Idle power learned so far: CPU {cpu.ToString("0.#", CultureInfo.CurrentCulture)} W, GPU {gpu.ToString("0.#", CultureInfo.CurrentCulture)} W (the lowest 30 second average seen). Only power above this is shared out."
             : "Still learning the idle power. Until a quiet moment has been seen, everything counts as baseline.";
     }
+
+    /// <summary>One line per run: what it cost, when it started and how long it ran.</summary>
+    internal static IReadOnlyList<HistoryRow> RunRows(IReadOnlyList<ProgramRun> runs, decimal? rate, string currency) =>
+        runs.Select(r => new HistoryRow(
+            $"{r.Program}: {FormatEnergy(r.TotalKwh)}"
+            + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(r.TotalKwh, rt))}" : "")
+            + (r.StillRunning ? " (still running)" : ""),
+            $"started {r.Start.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · "
+            + (r.StillRunning ? "running for " : "ran ") + FormatSpan(r.End - r.Start)
+            + $" · GPU {FormatEnergy(r.GpuKwh)} · CPU {FormatEnergy(r.CpuKwh)}")).ToList();
 
     internal static IReadOnlyList<HistoryRow> LiveRows(IReadOnlyList<ProgramLive> live) =>
         live.Select(p => new HistoryRow(
@@ -162,6 +180,10 @@ public partial class MainWindow
             p.Program is ProgramAttributor.Baseline
                 ? "idle power of the CPU and GPU, not any program's doing"
                 : $"GPU {p.GpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W · CPU {p.CpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W")).ToList();
+
+    /// <summary>A program that caused less than this (0.05 Wh) over the period is not listed on its own.</summary>
+    internal const double MinListedKwh = 0.00005;
+    internal const int MaxListedPrograms = 25;
 
     /// <summary>Programs biggest first, then the two rows that belong to no program, so the list reads as "who used it".</summary>
     internal static IReadOnlyList<HistoryRow> ProgramRows(IReadOnlyList<ProgramEnergy> totals, decimal? rate, string currency)
@@ -179,9 +201,22 @@ public partial class MainWindow
                  + (p.ActiveSeconds > 0 ? $" · active {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}" : ""),
         };
 
-        return totals.Where(p => !Special(p)).OrderByDescending(p => p.TotalKwh)
-            .Concat(totals.Where(Special))
-            .Select(p => new HistoryRow(Title(p), Detail(p))).ToList();
+        // Dozens of programs each caused a fraction of a watt-hour: list the ones that matter and sum the rest.
+        var programs = totals.Where(p => !Special(p)).OrderByDescending(p => p.TotalKwh).ToList();
+        var shown = programs.Where(p => p.TotalKwh >= MinListedKwh).Take(MaxListedPrograms).ToList();
+        var rest = programs.Skip(shown.Count).ToList();
+
+        var rows = shown.Select(p => new HistoryRow(Title(p), Detail(p))).ToList();
+        if (rest.Count > 0)
+        {
+            var restKwh = rest.Sum(p => p.TotalKwh);
+            rows.Add(new HistoryRow(
+                $"{rest.Count} smaller program{(rest.Count == 1 ? "" : "s")}: {FormatEnergy(restKwh)}"
+                + (rate is { } rr ? $", {currency}{FormatMoney(CostCalculator.Cost(restKwh, rr))}" : ""),
+                "none of them caused enough to list on its own"));
+        }
+        rows.AddRange(totals.Where(Special).Select(p => new HistoryRow(Title(p), Detail(p))));
+        return rows;
     }
 
     private void ShowCollectorStatus(LiveState? live)

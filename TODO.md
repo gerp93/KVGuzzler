@@ -70,8 +70,13 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     adapter, so iGPU use shares the NVIDIA card's power. Needs the adapter LUID mapped to the GPU.
   - Programs are named by executable name only: two different `app.exe` files merge. Memory and fan power
     are not attributed. CPU attribution counts busy time, not clock speed.
-  - Not built: per-run costs ("this game session"), pinning a specific program, Linux (`/proc` and the GPU's
-    own per-process data).
+  - **Runs** (built): the Programs tab's "Recent runs" prices each session, from when a program is first
+    seen running until none of its processes are left (`RunTracker`; runs under half a watt-hour are
+    dropped). A program that is already open when recording starts begins its run then, and a program name
+    that never fully closes (a shell, a browser with a background process) is one long run.
+  - Not built: pinning a specific program (everything is tracked automatically, so not needed yet), an
+    option to name a run (e.g. one game launch inside a launcher), Linux (`/proc` and the GPU's own
+    per-process data).
 - **Live dashboard**: wattage graph (ScottPlot or LiveCharts2; both MIT) and cost-so-far cards;
   per hour/day/week/month totals; per-session cost.
 - **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a
