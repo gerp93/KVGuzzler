@@ -29,8 +29,9 @@ public partial class MainWindow : Window
         VersionText.Text = "Version " + _services.Updates.VersionText;
 
         WattsBox.TextChanged += (_, _) => RefreshEstimate();
-        RateBox.TextChanged += (_, _) => RefreshRateHints();
-        CurrencyBox.TextChanged += (_, _) => RefreshRateHints();
+        // Editing makes the on-screen "Saved." stale: the new value is not saved until Save is pressed.
+        RateBox.TextChanged += (_, _) => { RateStatusText.Text = ""; RefreshRateHints(); };
+        CurrencyBox.TextChanged += (_, _) => { RateStatusText.Text = ""; RefreshRateHints(); };
         SaveRateButton.Click += (_, _) => SaveRate();
 
         ChooseExistingButton.Click += async (_, _) => await ChooseExistingAsync();
