@@ -54,6 +54,7 @@ public partial class MainWindow : Window
         RefreshEstimate();
         RefreshDatabaseInfo();
         StartPowerDisplay();
+        StartCollectorDisplay();
     }
 
     // ----- Live power -------------------------------------------------------------------
@@ -66,7 +67,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        void OnUpdated(PowerSnapshot s) => Dispatcher.UIThread.Post(() => ShowPower(s));
+        // While the collector service is publishing readings, those are shown instead.
+        void OnUpdated(PowerSnapshot s) => Dispatcher.UIThread.Post(() => { if (!_collectorAlive) ShowPower(s); });
         // Subscribe only while the window is open; Start is a no-op after the first call.
         Opened += (_, _) =>
         {
@@ -77,7 +79,7 @@ public partial class MainWindow : Window
         Closed += (_, _) => power.Updated -= OnUpdated;
     }
 
-    private void ShowPower(PowerSnapshot s)
+    private void ShowPower(PowerSnapshot s, bool showSession = true)
     {
         ReadingsList.ItemsSource = s.Readings
             .OrderBy(r => r.Scope)   // components first, their breakdown after
@@ -89,10 +91,10 @@ public partial class MainWindow : Window
             .ToList();
 
         var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
-        PowerStatusText.Text = hasComponents ? "Measured every second." : "No power sensors are reporting on this machine.";
-        PowerTotalText.Text = hasComponents ? $"Total measured: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
+        PowerStatusText.Text = hasComponents ? "Active power, measured every second." : "No power sensors are reporting on this machine.";
+        PowerTotalText.Text = hasComponents ? $"Total active: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
 
-        var session = $"Since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
+        var session = $"Active energy since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
         if (decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out var rate))
         {
@@ -103,7 +105,8 @@ public partial class MainWindow : Window
 
         PowerNotesText.Text = s.Notes.Count == 0 ? "" : "Not reporting:" + Environment.NewLine + string.Join(Environment.NewLine, s.Notes);
         PowerNotesText.IsVisible = s.Notes.Count > 0;
-        PowerTotalText.IsVisible = PowerSessionText.IsVisible = hasComponents;
+        PowerTotalText.IsVisible = hasComponents;
+        PowerSessionText.IsVisible = hasComponents && showSession;
     }
 
     // ----- Rate and estimate ------------------------------------------------------------

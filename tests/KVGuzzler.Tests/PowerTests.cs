@@ -1,5 +1,4 @@
 using KVGuzzler.Core.Power;
-using KVGuzzler.Sensors;
 using Xunit;
 
 namespace KVGuzzler.Tests;

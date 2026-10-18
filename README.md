@@ -7,8 +7,9 @@ hour, day, month and year at your own rate.
 > **Status: early.** The app shell, settings (electricity rate, database location), self-update, a
 > cost estimator for a constant load, and **live power readings** work today: NVIDIA GPUs (NVML), and
 > the CPU package, cores and memory (Windows energy counters; Linux RAPL, not yet tried on real Linux
-> hardware). No admin rights needed on Windows. Not built yet: AMD and Intel GPUs on Windows, AMD CPUs
-> on Windows, a wall meter, history and graphs; see [TODO.md](TODO.md).
+> hardware). A background collector service (Windows, admin install) records history even when nobody is
+> logged in; it is built but has not yet been tried as an installed service. Not built yet: AMD and Intel
+> GPUs on Windows, AMD CPUs on Windows, a wall meter, graphs; see [TODO.md](TODO.md).
 
 ## Install
 

@@ -32,11 +32,18 @@ public sealed class TempData : IDisposable
 {
     public string Dir { get; } = Path.Combine(Path.GetTempPath(), "kvguzzler-test-" + Guid.NewGuid().ToString("N")[..8]);
     public AppServices Services { get; }
+    public string HistoryDir { get; }
 
     public TempData()
     {
         Directory.CreateDirectory(Dir);
-        Services = new AppServices(Dir, null, new UpdateService(AppServices.RepoUrl));
+        // Its own history folder and a pretend service state: a test must never read the real collector's
+        // history under %ProgramData% or ask Windows about the real service.
+        HistoryDir = Path.Combine(Dir, "history");
+        Services = new AppServices(Dir, null, new UpdateService(AppServices.RepoUrl), historyDirectory: HistoryDir)
+        {
+            QueryCollectorService = () => KVGuzzler.Collector.ServiceState.NotInstalled,
+        };
         Services.OpenDatabase();
     }
 

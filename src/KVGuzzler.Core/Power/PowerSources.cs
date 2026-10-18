@@ -1,6 +1,6 @@
-using KVGuzzler.Core.Power;
 
-namespace KVGuzzler.Sensors;
+
+namespace KVGuzzler.Core.Power;
 
 /// <summary>Chooses which power sources to try on this operating system. Every source that cannot run
 /// here stays in the list and says why, so the Dashboard can tell the user what is missing.</summary>

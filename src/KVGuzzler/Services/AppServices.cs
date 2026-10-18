@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using KVGuzzler.Collector;
+using KVGuzzler.Core.History;
 using KVGuzzler.Data;
 using Kvg.Standards;
 
@@ -12,8 +14,15 @@ public sealed class AppServices : IDisposable
 
     private readonly InstanceLock? _instanceLock;
 
-    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates, PowerMonitor? power = null)
+    private HistoryStore? _history;
+
+    /// <param name="historyDirectory">Where the background collector keeps its history. Tests pass a temporary
+    /// folder; the app uses the machine-wide folder.</param>
+    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates, PowerMonitor? power = null,
+        string? historyDirectory = null)
     {
+        HistoryDirectory = historyDirectory ?? HistoryStore.DefaultDirectory(isDevelopment: !updates.IsInstalled);
+        QueryCollectorService = () => ServiceInstaller.Query(development: !updates.IsInstalled);
         DataDir = dataDir;
         _instanceLock = instanceLock;
         Updates = updates;
@@ -28,6 +37,23 @@ public sealed class AppServices : IDisposable
     /// <summary>Live power readings. Null where there is no hardware to read (the UI tests).</summary>
     public PowerMonitor? Power { get; }
     public Database? Database { get; private set; }
+
+    /// <summary>The background collector's folder (machine-wide, written by its service).</summary>
+    public string HistoryDirectory { get; }
+
+    /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
+    public Func<ServiceState> QueryCollectorService { get; set; }
+
+    /// <summary>The collector's history, or null when it has not recorded anything yet on this machine (or
+    /// cannot be opened). Never creates the file: only the collector does that.</summary>
+    public HistoryStore? OpenHistory()
+    {
+        if (_history is not null) return _history;
+        var path = Path.Combine(HistoryDirectory, HistoryStore.FileName);
+        if (!File.Exists(path)) return null;
+        try { return _history = new HistoryStore(path); }
+        catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException) { return null; }
+    }
 
     public void OpenDatabase() => Database = new Database(DbLocation.GetEffectiveDbPath());
 
@@ -52,6 +78,7 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Power?.Dispose();
+        _history?.Dispose();
         CloseDatabase();
         _instanceLock?.Dispose();
     }

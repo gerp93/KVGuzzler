@@ -3,6 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Windows CPU power: the "Energy Meter" performance counters (no driver, no admin rights). -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.*" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="KVGuzzler.Tests" />
   </ItemGroup>
 </Project>

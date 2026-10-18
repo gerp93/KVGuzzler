@@ -17,16 +17,32 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - Still to do:
     - AMD / Intel GPU on Windows (ADLX, or LibreHardwareMonitorLib).
     - AMD CPU on Windows: the Energy Meter counters probably do not exist there; needs
-      LibreHardwareMonitorLib, which needs admin rights and a kernel driver. That brings back the open
-      design question of an elevated helper service with the UI per-user (a per-machine helper
-      conflicts with Velopack's per-user, no-admin install, so it needs its own install/update step).
+      LibreHardwareMonitorLib, which needs admin rights and a kernel driver. The collector service already
+      runs with system rights, so it is the natural place to add it.
     - Laptop battery discharge rate (a whole-system figure while on battery): Windows WMI
       `BatteryStatus`, Linux `/sys/class/power_supply/BAT*/power_now`. Untestable on this desktop.
     - Whole system: a smart plug or wall meter over its local HTTP API (Shelly / Tasmota), the only
       accurate total; calibrate the "rest of system" offset against it. Deferred until a meter is hooked up.
-- **Sampling and history**: sampling every second and integrating the session total with
-  `EnergyMeter` (skipping sleep gaps) works (`PowerMonitor`, `PowerSampler`). Still to do: store samples
-  in the database so history survives a restart.
+- **Background recording** (built, **not yet tried as an installed service**): `KVGuzzler.exe --collector`
+  runs headless as a Windows service and saves one-minute energy per component, the live readings, and
+  gaps with their reason (asleep / off / lost power) to `%ProgramData%\KVGuzzler\history.db`. The window
+  shows live readings, rolling hour / 24 h / 7 d / 30 d totals with measured and estimated energy apart, and
+  has a "Turn on background recording" button (asks Windows for administrator permission, a UAC prompt).
+  Verified here: the collector logic and history in unit tests, and the collector run headless in a console
+  against the real sensors with the window reading its history. **Not verified (needs an admin install):**
+  - `sc.exe` actually creating and starting the service, and that the service starts at boot.
+  - The sensors as the system account (NVML and the Windows energy counters in a service session).
+  - A normal user's window reading a history folder the system account created (the collector grants
+    Users "modify" on it so SQLite can open the WAL file; check it works).
+  - Sleep: detected as a long silence between samples. Not seen on real sleep yet.
+  - Clean stop: whether Windows' shutdown reaches the host as a clean stop (else shutdown shows as "lost
+    power", still counted as 0).
+  - Velopack per-machine install and update: the install hooks (`Program.BuildVelopack`) register, stop,
+    restart and remove the service; the per-machine `--instLocation` value and that an update replacing
+    `current\` works with the service stopped first. See KVG_Standards `dotnet-avalonia.md`.
+  - Linux: no service yet (an AppImage cannot install one); run `KVGuzzler --collector` yourself for now.
+  Still to do: charts; per-day/week/month calendar totals (the windows are rolling); a Windows shutdown
+  hook; an option to estimate time the PC was on but not recorded.
 - **Live dashboard**: wattage graph (ScottPlot or LiveCharts2; both MIT) and cost-so-far cards;
   per hour/day/week/month totals; per-session cost.
 - **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a

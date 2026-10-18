@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
-using KVGuzzler.Core.Power;
 
-namespace KVGuzzler.Sensors;
+
+namespace KVGuzzler.Core.Power;
 
 /// <summary>
 /// CPU and memory power on Windows from the built-in "Energy Meter" performance counters, which Windows

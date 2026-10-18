@@ -22,6 +22,16 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   (KVG_Standards / VisualAssault), then re-run `scripts/update-kvg-dblocation.sh <ref>` /
   `scripts/update-visual-assault-avalonia.sh <tag>`. KVG_Standards has no tags yet, so `main` is the
   documented interim pin; VisualAssault must be a release tag, never `main`.
+- **Background collector (approved exception to the per-user install, see KVG_Standards'
+  `dotnet-avalonia.md`, "Exception: per-machine install").** `KVGuzzler.exe --collector` is the same
+  program running headless, as a Windows service (`KVGuzzlerCollector`; `-dev` for a development run).
+  It writes `history.db` in `%ProgramData%\KVGuzzler[-dev]`; the window only reads it. The service
+  logic is `PowerCollector` in `KVGuzzler.Core` (clock-driven, tested); `Collector/` is the thin host.
+  The window never creates `history.db`, only the collector does. A gap is saved with its reason
+  (asleep / off / lost power) and shown apart from measured energy; sleep is an estimate shown on its own
+  line and never added to the "active" figures (CPU/GPU/memory sensors = active power; the whole-PC
+  total is the wall meter's job, not built yet). A running service locks `KVGuzzler.exe`, so turn background recording off
+  before rebuilding a development copy.
 - **Velopack:** `VelopackApp.Build().Run()` is the first statement in `Main`; the running version comes
   only from Velopack (`UpdateService.VersionText`); `CheckForUpdatesAsync` throws outside an installed
   build, so `UpdateService` guards on `IsInstalled`. The `Velopack` NuGet package must stay a direct
