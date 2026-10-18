@@ -11,6 +11,8 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.*" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.*" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.*" />
+    <!-- Windows CPU power: the "Energy Meter" performance counters (no driver, no admin rights). -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.*" />
     <!-- release-avalonia.yml installs the vpk tool that matches this package's resolved version. -->
     <PackageReference Include="Velopack" Version="1.2.*" />
   </ItemGroup>

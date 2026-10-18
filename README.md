@@ -4,10 +4,11 @@ See what your PC costs to run. KVGuzzler is a cross-platform (Windows and Linux)
 measures the power your GPU, CPU and other components draw and turns it into an electricity cost per
 hour, day, month and year at your own rate.
 
-> **Status: early scaffold.** The app shell, settings (electricity rate, database location),
-> self-update and a cost estimator for a constant load work today. **Live sensor readings are not
-> built yet**; see [TODO.md](TODO.md) for the plan (NVML, RAPL, LibreHardwareMonitor, smart-plug wall
-> meters).
+> **Status: early.** The app shell, settings (electricity rate, database location), self-update, a
+> cost estimator for a constant load, and **live power readings** work today: NVIDIA GPUs (NVML), and
+> the CPU package, cores and memory (Windows energy counters; Linux RAPL, not yet tried on real Linux
+> hardware). No admin rights needed on Windows. Not built yet: AMD and Intel GPUs on Windows, AMD CPUs
+> on Windows, a wall meter, history and graphs; see [TODO.md](TODO.md).
 
 ## Install
 

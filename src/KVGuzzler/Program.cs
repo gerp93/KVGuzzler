@@ -1,5 +1,6 @@
 using Avalonia;
 using Kvg.Standards;
+using KVGuzzler.Sensors;
 using KVGuzzler.Services;
 using Velopack;
 
@@ -24,7 +25,7 @@ public static class Program
         var instanceLock = InstanceLock.TryAcquire(dataDir);
         if (instanceLock is null) return 0;
 
-        Services = new AppServices(dataDir, instanceLock, updates);
+        Services = new AppServices(dataDir, instanceLock, updates, new PowerMonitor(PowerSources.Detect));
         try
         {
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

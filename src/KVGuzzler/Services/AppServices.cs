@@ -4,7 +4,7 @@ using Kvg.Standards;
 
 namespace KVGuzzler.Services;
 
-/// <summary>Everything the windows share: data folder, database location, database, updater.</summary>
+/// <summary>Everything the windows share: data folder, database location, database, updater, power monitor.</summary>
 public sealed class AppServices : IDisposable
 {
     public const string AppName = "KVGuzzler";
@@ -12,17 +12,21 @@ public sealed class AppServices : IDisposable
 
     private readonly InstanceLock? _instanceLock;
 
-    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates)
+    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates, PowerMonitor? power = null)
     {
         DataDir = dataDir;
         _instanceLock = instanceLock;
         Updates = updates;
+        Power = power;
         DbLocation = new DbLocation(dataDir, "kvguzzler.db");
     }
 
     public string DataDir { get; }
     public DbLocation DbLocation { get; }
     public UpdateService Updates { get; }
+
+    /// <summary>Live power readings. Null where there is no hardware to read (the UI tests).</summary>
+    public PowerMonitor? Power { get; }
     public Database? Database { get; private set; }
 
     public void OpenDatabase() => Database = new Database(DbLocation.GetEffectiveDbPath());
@@ -47,6 +51,7 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        Power?.Dispose();
         CloseDatabase();
         _instanceLock?.Dispose();
     }

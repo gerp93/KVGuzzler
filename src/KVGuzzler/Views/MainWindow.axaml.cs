@@ -3,12 +3,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Kvg.Standards;
 using KVGuzzler.Core;
+using KVGuzzler.Core.Power;
 using KVGuzzler.Data;
 using KVGuzzler.Services;
 
 namespace KVGuzzler.Views;
+
+/// <summary>One line of the live power list. Breakdown lines are indented and dimmed: they are part of a
+/// component above them, not added to the total.</summary>
+public sealed record ReadingRow(string Name, string WattsText, Thickness Indent, double Opacity);
 
 public partial class MainWindow : Window
 {
@@ -46,6 +52,57 @@ public partial class MainWindow : Window
         RefreshRateHints();
         RefreshEstimate();
         RefreshDatabaseInfo();
+        StartPowerDisplay();
+    }
+
+    // ----- Live power -------------------------------------------------------------------
+
+    private void StartPowerDisplay()
+    {
+        if (_services.Power is not { } power)
+        {
+            PowerStatusText.Text = "Power sensors are not running.";
+            return;
+        }
+
+        void OnUpdated(PowerSnapshot s) => Dispatcher.UIThread.Post(() => ShowPower(s));
+        // Subscribe only while the window is open; Start is a no-op after the first call.
+        Opened += (_, _) =>
+        {
+            power.Updated += OnUpdated;
+            power.Start();
+            if (power.Latest is { } latest) ShowPower(latest);
+        };
+        Closed += (_, _) => power.Updated -= OnUpdated;
+    }
+
+    private void ShowPower(PowerSnapshot s)
+    {
+        ReadingsList.ItemsSource = s.Readings
+            .OrderBy(r => r.Scope)   // components first, their breakdown after
+            .Select(r => new ReadingRow(
+                r.Name,
+                r.Watts.ToString("0.0", CultureInfo.CurrentCulture) + " W",
+                r.Scope == ReadingScope.Breakdown ? new Thickness(20, 0, 0, 0) : new Thickness(0),
+                r.Scope == ReadingScope.Breakdown ? 0.7 : 1))
+            .ToList();
+
+        var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
+        PowerStatusText.Text = hasComponents ? "Measured every second." : "No power sensors are reporting on this machine.";
+        PowerTotalText.Text = hasComponents ? $"Total measured: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
+
+        var session = $"Since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
+        if (decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var rate))
+        {
+            var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
+            session += $", {currency}{FormatMoney(CostCalculator.Cost(s.SessionKilowattHours, rate))}";
+        }
+        PowerSessionText.Text = hasComponents ? session : "";
+
+        PowerNotesText.Text = s.Notes.Count == 0 ? "" : "Not reporting:" + Environment.NewLine + string.Join(Environment.NewLine, s.Notes);
+        PowerNotesText.IsVisible = s.Notes.Count > 0;
+        PowerTotalText.IsVisible = PowerSessionText.IsVisible = hasComponents;
     }
 
     // ----- Rate and estimate ------------------------------------------------------------

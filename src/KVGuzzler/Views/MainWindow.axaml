@@ -1,22 +1,45 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:KVGuzzler.Views"
         x:Class="KVGuzzler.Views.MainWindow"
         Title="KVGuzzler"
         Width="900" Height="640" MinWidth="640" MinHeight="480">
   <TabControl x:Name="Tabs" Margin="8">
 
     <TabItem Header="Dashboard">
-      <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-        <TextBlock Text="Cost estimator" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock TextWrapping="Wrap"
-                   Text="Live power readings from your GPU, CPU and a wall meter are not wired up yet (see TODO.md). Until then, this shows what a constant load costs at the rate saved in Settings." />
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="Constant load:" VerticalAlignment="Center" />
-          <TextBox x:Name="WattsBox" Text="400" Width="100" />
-          <TextBlock Text="watts" VerticalAlignment="Center" />
+      <ScrollViewer>
+        <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Text="Live power" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock x:Name="PowerStatusText" TextWrapping="Wrap" Text="Looking for power sensors..." />
+          <ItemsControl x:Name="ReadingsList">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="views:ReadingRow">
+                <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}" Opacity="{Binding Opacity}">
+                  <TextBlock Text="{Binding Name}" />
+                  <TextBlock Grid.Column="1" Text="{Binding WattsText}" FontFamily="Consolas,Menlo,monospace" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock x:Name="PowerTotalText" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock x:Name="PowerSessionText" TextWrapping="Wrap" />
+          <TextBlock x:Name="PowerNotesText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                     Text="The total covers the hardware that reports power (CPU, GPU, memory), not fans, drives, the motherboard or power-supply losses. A wall meter is not connected yet, so there is no whole-machine figure." />
+
+          <Separator Margin="0,8" />
+
+          <TextBlock Text="Cost estimator" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="What a constant load costs at the rate saved in Settings." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Constant load:" VerticalAlignment="Center" />
+            <TextBox x:Name="WattsBox" Text="400" Width="100" />
+            <TextBlock Text="watts" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock x:Name="EstimateText" TextWrapping="Wrap" />
         </StackPanel>
-        <TextBlock x:Name="EstimateText" TextWrapping="Wrap" />
-      </StackPanel>
+      </ScrollViewer>
     </TabItem>
 
     <TabItem Header="Settings">
