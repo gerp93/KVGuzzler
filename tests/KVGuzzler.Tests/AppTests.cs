@@ -135,6 +135,23 @@ public class WindowTests
     }
 
     [AvaloniaFact]
+    public void EditingTheRateClearsTheStaleSavedMessage()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        var window = new MainWindow(t.Services);
+        window.Show();
+
+        window.RateBox.Text = "0.15";
+        window.SaveRateButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal("Saved.", window.RateStatusText.Text);
+
+        window.RateBox.Text = "0.20";                      // a different, unsaved value
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal("", window.RateStatusText.Text);
+    }
+
+    [AvaloniaFact]
     public void ACentsRateIsFlagged()
     {
         UseInvariantCulture();
