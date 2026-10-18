@@ -95,7 +95,8 @@ public sealed class LinuxRaplSource : IPowerSource
                 // The counter wraps at max_energy_range_uj; without a known range, skip that one interval.
                 var delta = energy >= last ? energy - last : zone.MaxRange > 0 ? zone.MaxRange - last + energy : 0;
                 if (seconds > 0 && (energy >= last || zone.MaxRange > 0))
-                    readings.Add(new PowerReading(zone.Label, delta / 1_000_000.0 / seconds, zone.Scope));
+                    readings.Add(new PowerReading(zone.Label, delta / 1_000_000.0 / seconds, zone.Scope,
+                        zone.Label.StartsWith("CPU package", StringComparison.Ordinal) ? PowerKind.Cpu : PowerKind.Other));
             }
 
             zone.LastEnergy = energy;

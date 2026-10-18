@@ -15,5 +15,13 @@ public enum ReadingScope
     Wall,
 }
 
+/// <summary>What kind of hardware a reading is, so the per-program estimate knows which power to share out.</summary>
+public enum PowerKind
+{
+    Other,
+    Cpu,
+    Gpu,
+}
+
 /// <summary>One power reading from one piece of hardware.</summary>
-public sealed record PowerReading(string Name, double Watts, ReadingScope Scope);
+public sealed record PowerReading(string Name, double Watts, ReadingScope Scope, PowerKind Kind = PowerKind.Other);

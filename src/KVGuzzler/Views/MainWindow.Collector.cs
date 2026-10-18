@@ -5,6 +5,7 @@ using KVGuzzler.Collector;
 using KVGuzzler.Core;
 using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
+using KVGuzzler.Core.Programs;
 using KVGuzzler.Data;
 
 namespace KVGuzzler.Views;
@@ -31,6 +32,7 @@ public partial class MainWindow
     {
         SleepWattsBox.Text = _services.Database?.GetSetting(SettingKeys.SleepWatts) ?? DefaultSleepWatts.ToString(CultureInfo.InvariantCulture);
         SaveSleepButton.Click += (_, _) => SaveSleepWatts();
+        ProgramPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false);
         InstallCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: true);
         RemoveCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: false);
 
@@ -54,27 +56,41 @@ public partial class MainWindow
         double.TryParse(_services.Database?.GetSetting(SettingKeys.SleepWatts), NumberStyles.Float, CultureInfo.InvariantCulture, out var w) && w >= 0
             ? w : DefaultSleepWatts;
 
-    private sealed record CollectorRead(LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error);
+    private sealed record ProgramsRead(
+        IReadOnlyList<ProgramEnergy> Totals,
+        (DateTimeOffset UpdatedAt, IReadOnlyList<ProgramLive> Rows)? Live,
+        (double? Cpu, double? Gpu) Baseline);
+
+    private sealed record CollectorRead(
+        LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs);
+
+    /// <summary>How long each choice in the Programs tab looks back.</summary>
+    private static readonly TimeSpan[] ProgramPeriods =
+        { TimeSpan.FromHours(1), TimeSpan.FromDays(1), TimeSpan.FromDays(7), TimeSpan.FromDays(30) };
 
     internal async Task RefreshCollectorAsync(bool includeService)
     {
         var sleepWatts = SleepWatts;
-        var read = await Task.Run(() => ReadCollector(includeService, sleepWatts));
+        var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
+        var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack));
         ApplyCollector(read);
     }
 
-    private CollectorRead ReadCollector(bool includeService, double sleepWatts)
+    private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack)
     {
         LiveState? live = null;
         IReadOnlyList<PeriodReport>? periods = null;
+        ProgramsRead? programs = null;
         string? error = null;
 
         if (_services.OpenHistory() is { } store)
         {
             try
             {
+                var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
-                periods = HistoryReport.Standard(store, DateTimeOffset.UtcNow, sleepWatts);
+                periods = HistoryReport.Standard(store, now, sleepWatts);
+                programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline());
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -82,7 +98,7 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs);
     }
 
     private void ApplyCollector(CollectorRead read)
@@ -100,6 +116,72 @@ public partial class MainWindow
 
         ShowCollectorStatus(read.Live);
         ShowHistory(read);
+        ShowPrograms(read.Programs);
+    }
+
+    // ----- Programs ---------------------------------------------------------------------
+
+    private void ShowPrograms(ProgramsRead? read)
+    {
+        if (read is null)
+        {
+            LiveProgramsList.ItemsSource = Array.Empty<HistoryRow>();
+            ProgramsList.ItemsSource = Array.Empty<HistoryRow>();
+            ProgramsTotalText.Text = "";
+            ProgramsBaselineText.Text = "";
+            ProgramsNoteText.Text = "No program history yet. It is recorded by the background collector (turn it on from the Dashboard).";
+            ProgramsNoteText.IsVisible = true;
+            return;
+        }
+
+        var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
+        var rate = decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out var r) ? r : (decimal?)null;
+
+        // Right now: only while the collector is publishing, so a stale list is never shown as current.
+        var fresh = read.Live is { } l && DateTimeOffset.UtcNow - l.UpdatedAt < TimeSpan.FromSeconds(10);
+        LiveProgramsList.ItemsSource = fresh ? LiveRows(read.Live!.Value.Rows) : Array.Empty<HistoryRow>();
+        ProgramsNoteText.IsVisible = !fresh;
+        ProgramsNoteText.Text = fresh ? "" : "Nothing is being recorded right now.";
+
+        ProgramsList.ItemsSource = read.Totals.Count == 0 ? Array.Empty<HistoryRow>() : ProgramRows(read.Totals, rate, currency);
+        var all = read.Totals.Sum(p => p.TotalKwh);
+        ProgramsTotalText.Text = read.Totals.Count == 0
+            ? "Nothing recorded in this period yet."
+            : $"CPU and GPU together: {FormatEnergy(all)}"
+              + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(all, rt))}" : "");
+
+        ProgramsBaselineText.Text = read.Baseline is ({ } cpu, { } gpu)
+            ? $"Idle power learned so far: CPU {cpu.ToString("0.#", CultureInfo.CurrentCulture)} W, GPU {gpu.ToString("0.#", CultureInfo.CurrentCulture)} W (the lowest 30 second average seen). Only power above this is shared out."
+            : "Still learning the idle power. Until a quiet moment has been seen, everything counts as baseline.";
+    }
+
+    internal static IReadOnlyList<HistoryRow> LiveRows(IReadOnlyList<ProgramLive> live) =>
+        live.Select(p => new HistoryRow(
+            $"{p.Program}: {(p.CpuWatts + p.GpuWatts).ToString("0.0", CultureInfo.CurrentCulture)} W",
+            p.Program is ProgramAttributor.Baseline
+                ? "idle power of the CPU and GPU, not any program's doing"
+                : $"GPU {p.GpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W · CPU {p.CpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W")).ToList();
+
+    /// <summary>Programs biggest first, then the two rows that belong to no program, so the list reads as "who used it".</summary>
+    internal static IReadOnlyList<HistoryRow> ProgramRows(IReadOnlyList<ProgramEnergy> totals, decimal? rate, string currency)
+    {
+        static bool Special(ProgramEnergy p) => p.Program is ProgramAttributor.Baseline or ProgramAttributor.Unattributed;
+        string Title(ProgramEnergy p) =>
+            $"{p.Program}: {FormatEnergy(p.TotalKwh)}"
+            + (rate is { } r ? $", {currency}{FormatMoney(CostCalculator.Cost(p.TotalKwh, r))}" : "");
+        string Detail(ProgramEnergy p) => p.Program switch
+        {
+            ProgramAttributor.Baseline => "the CPU's and GPU's idle power, not any program's doing",
+            ProgramAttributor.Unattributed => "power above idle that no program reported using",
+            ProgramAttributor.Others => $"many small programs together · active up to {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}",
+            _ => $"GPU {FormatEnergy(p.GpuKwh)} · CPU {FormatEnergy(p.CpuKwh)}"
+                 + (p.ActiveSeconds > 0 ? $" · active {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}" : ""),
+        };
+
+        return totals.Where(p => !Special(p)).OrderByDescending(p => p.TotalKwh)
+            .Concat(totals.Where(Special))
+            .Select(p => new HistoryRow(Title(p), Detail(p))).ToList();
     }
 
     private void ShowCollectorStatus(LiveState? live)
@@ -218,6 +300,13 @@ public partial class MainWindow
         if (p.LostPower > TimeSpan.Zero) parts.Add($"lost power or crashed {FormatSpan(p.LostPower)}");
         return string.Join(" · ", parts);
     }
+
+    /// <summary>Energy in kWh, or in Wh when it is small, so a program that used a little still reads as something
+    /// ("1.4 Wh") instead of "0 kWh".</summary>
+    internal static string FormatEnergy(double kwh) =>
+        Math.Abs(kwh) < 0.01
+            ? $"{(kwh * 1000).ToString("0.#", CultureInfo.CurrentCulture)} Wh"
+            : $"{kwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh";
 
     internal static string FormatSpan(TimeSpan t) =>
         t.TotalDays >= 1 ? $"{(int)t.TotalDays} d {t.Hours} h"

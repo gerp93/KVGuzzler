@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using KVGuzzler.Core.Power;
+using KVGuzzler.Core.Programs;
 
 namespace KVGuzzler.Core.History;
 
@@ -21,6 +22,9 @@ public sealed record MinuteRow(long MinuteStart, string Name, ReadingScope Scope
 
 public sealed record Gap(DateTimeOffset Start, DateTimeOffset End, GapReason Reason);
 
+/// <summary>What one program is estimated to be drawing right now.</summary>
+public sealed record ProgramLive(string Program, double CpuWatts, double GpuWatts);
+
 /// <summary>What the collector saw on its latest sample.</summary>
 public sealed record LiveState(DateTimeOffset UpdatedAt, IReadOnlyList<PowerReading> Readings, IReadOnlyList<string> Notes);
 
@@ -36,6 +40,9 @@ public sealed class HistoryStore : IDisposable
     private const string LastSeenKey = "last_seen_ms";
     private const string CleanStopKey = "clean_stop_ms";
     private const string NotesKey = "notes";
+    private const string LivePrograms = "live_programs_ms";
+    private const string IdleCpuKey = "idle_cpu_w";
+    private const string IdleGpuKey = "idle_gpu_w";
 
     private readonly string _connectionString;
 
@@ -59,6 +66,12 @@ public sealed class HistoryStore : IDisposable
                 start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS live (name TEXT PRIMARY KEY, scope INTEGER NOT NULL, watts REAL NOT NULL, position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS program_samples (
+                minute_start INTEGER NOT NULL, program TEXT NOT NULL COLLATE NOCASE,
+                cpu_kwh REAL NOT NULL, gpu_kwh REAL NOT NULL, active_seconds REAL NOT NULL,
+                PRIMARY KEY (minute_start, program));
+            CREATE TABLE IF NOT EXISTS live_programs (
+                program TEXT PRIMARY KEY COLLATE NOCASE, cpu_w REAL NOT NULL, gpu_w REAL NOT NULL, position INTEGER NOT NULL);
             """);
     }
 
@@ -234,6 +247,101 @@ public sealed class HistoryStore : IDisposable
         }
 
         return (kwh, TimeSpan.FromSeconds(monitored), gaps);
+    }
+
+    // ----- Per-program estimates --------------------------------------------------------
+
+    /// <summary>Adds estimated energy per program for one minute (adding, so saving a minute in pieces is fine).</summary>
+    public void AddProgramMinutes(long minuteStart, IEnumerable<ProgramEnergy> rows)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        foreach (var r in rows)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = """
+                INSERT INTO program_samples (minute_start, program, cpu_kwh, gpu_kwh, active_seconds)
+                VALUES ($m, $p, $c, $g, $a)
+                ON CONFLICT (minute_start, program) DO UPDATE SET
+                    cpu_kwh = cpu_kwh + excluded.cpu_kwh, gpu_kwh = gpu_kwh + excluded.gpu_kwh,
+                    active_seconds = active_seconds + excluded.active_seconds
+                """;
+            cmd.Parameters.AddWithValue("$m", minuteStart);
+            cmd.Parameters.AddWithValue("$p", r.Program);
+            cmd.Parameters.AddWithValue("$c", r.CpuKwh);
+            cmd.Parameters.AddWithValue("$g", r.GpuKwh);
+            cmd.Parameters.AddWithValue("$a", r.ActiveSeconds);
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
+    /// <summary>Estimated energy per program over a period, biggest first. Program names are matched ignoring case.</summary>
+    public IReadOnlyList<ProgramEnergy> QueryPrograms(DateTimeOffset from, DateTimeOffset to)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT program, SUM(cpu_kwh), SUM(gpu_kwh), SUM(active_seconds) FROM program_samples
+            WHERE minute_start >= $f AND minute_start < $t
+            GROUP BY program ORDER BY SUM(cpu_kwh) + SUM(gpu_kwh) DESC
+            """;
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        var rows = new List<ProgramEnergy>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows.Add(new ProgramEnergy(r.GetString(0), r.GetDouble(1), r.GetDouble(2), r.GetDouble(3)));
+        return rows;
+    }
+
+    public void SetLivePrograms(DateTimeOffset now, IReadOnlyList<ProgramLive> rows)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        Run(c, tx, "DELETE FROM live_programs");
+        for (var i = 0; i < rows.Count; i++)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "INSERT INTO live_programs (program, cpu_w, gpu_w, position) VALUES ($p, $c, $g, $i) ON CONFLICT (program) DO UPDATE SET cpu_w = excluded.cpu_w, gpu_w = excluded.gpu_w";
+            cmd.Parameters.AddWithValue("$p", rows[i].Program);
+            cmd.Parameters.AddWithValue("$c", rows[i].CpuWatts);
+            cmd.Parameters.AddWithValue("$g", rows[i].GpuWatts);
+            cmd.Parameters.AddWithValue("$i", i);
+            cmd.ExecuteNonQuery();
+        }
+        SetMeta(c, tx, LivePrograms, now.ToUnixTimeMilliseconds().ToString());
+        tx.Commit();
+    }
+
+    public (DateTimeOffset UpdatedAt, IReadOnlyList<ProgramLive> Rows)? GetLivePrograms()
+    {
+        using var c = Open();
+        if (!long.TryParse(GetMeta(c, LivePrograms), out var ms)) return null;
+        var rows = new List<ProgramLive>();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT program, cpu_w, gpu_w FROM live_programs ORDER BY position";
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows.Add(new ProgramLive(r.GetString(0), r.GetDouble(1), r.GetDouble(2)));
+        return (DateTimeOffset.FromUnixTimeMilliseconds(ms), rows);
+    }
+
+    /// <summary>The CPU's and GPU's idle draw learned so far (null until a quiet window has been seen).</summary>
+    public (double? Cpu, double? Gpu) GetIdleBaseline()
+    {
+        using var c = Open();
+        static double? Parse(string? v) => double.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+        return (Parse(GetMeta(c, IdleCpuKey)), Parse(GetMeta(c, IdleGpuKey)));
+    }
+
+    public void SetIdleBaseline(double? cpu, double? gpu)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        if (cpu is { } a) SetMeta(c, tx, IdleCpuKey, a.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (gpu is { } b) SetMeta(c, tx, IdleGpuKey, b.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        tx.Commit();
     }
 
     /// <summary>Release the file (pooled connections keep it open, and WAL leaves recent writes in the -wal file).</summary>

@@ -1,5 +1,6 @@
 using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
+using KVGuzzler.Core.Programs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -21,7 +22,8 @@ internal sealed class CollectorWorker : BackgroundService
     {
         using var store = new HistoryStore(Path.Combine(_dataDir, HistoryStore.FileName));
         using var sampler = new PowerSampler(PowerSources.Detect(Path.Combine(_dataDir, WallMeterConfig.FileName)));
-        var collector = new PowerCollector(store, sampler);
+        using var programs = OperatingSystem.IsWindows() ? new WindowsProgramActivitySource() : null;
+        var collector = new PowerCollector(store, sampler, programs);
 
         collector.Start(DateTimeOffset.UtcNow);
         _log.LogInformation("KVGuzzler collector started. History: {Path}", store.Path);

@@ -69,7 +69,7 @@ public sealed partial class LinuxHwmonSource : IPowerSource
         var readings = new List<PowerReading>();
         foreach (var s in _sensors)
         {
-            if (ReadMicrowatts(s.File) is { } uw) readings.Add(new PowerReading(s.Label, uw / 1_000_000.0, s.Scope));
+            if (ReadMicrowatts(s.File) is { } uw) readings.Add(new PowerReading(s.Label, uw / 1_000_000.0, s.Scope, s.Scope == ReadingScope.Component ? PowerKind.Gpu : PowerKind.Other));
         }
         return readings;
     }

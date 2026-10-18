@@ -79,7 +79,7 @@ public sealed partial class WindowsEnergyMeterSource : IPowerSource
         {
             var watts = i.Counter.NextValue() / 1000.0;   // milliwatts
             if (watts > 0) i.EverNonZero = true;
-            if (i.EverNonZero) readings.Add(new PowerReading(i.Label, watts, i.Scope));
+            if (i.EverNonZero) readings.Add(new PowerReading(i.Label, watts, i.Scope, i.Label.StartsWith("CPU package", StringComparison.Ordinal) ? PowerKind.Cpu : PowerKind.Other));
         }
         return readings;
     }

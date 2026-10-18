@@ -38,6 +38,11 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   switch the plug, because the PC is plugged into it. The meter's address lives in
   `wall-meter.json` beside the history (not in the per-user settings: the collector service reads it too).
   Only a plain host or IP is accepted, never a URL or path.
+- **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
+  the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
+  program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).
+  Never present these numbers as measurements, and never add them to the sensor or wall figures: they
+  split the CPU and GPU energy that is already counted.
 - **Velopack:** `VelopackApp.Build().Run()` is the first statement in `Main`; the running version comes
   only from Velopack (`UpdateService.VersionText`); `CheckForUpdatesAsync` throws outside an installed
   build, so `UpdateService` guards on `IsInstalled`. The `Velopack` NuGet package must stay a direct

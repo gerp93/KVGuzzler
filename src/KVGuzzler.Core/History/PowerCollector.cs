@@ -1,4 +1,5 @@
 using KVGuzzler.Core.Power;
+using KVGuzzler.Core.Programs;
 
 namespace KVGuzzler.Core.History;
 
@@ -18,8 +19,23 @@ public sealed class PowerCollector
     /// Saving adds to the minute's row, so saving a minute in pieces gives the same total.</summary>
     public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(15);
 
+    /// <summary>How often the CPU's and GPU's energy is shared out among programs.</summary>
+    public static readonly TimeSpan AttributionInterval = TimeSpan.FromSeconds(2);
+
+    private const double JoulesPerKwh = 3_600_000.0;
+
     private readonly HistoryStore _store;
     private readonly PowerSampler _sampler;
+    private readonly IProgramActivitySource? _programs;
+    private readonly IdleBaseline _baseline = new();
+
+    // Energy of the CPU and GPU since programs were last looked at, and the window the idle baseline is learned in.
+    private double _pendCpuKwh, _pendGpuKwh, _pendSeconds;
+    private double _windowCpuKwh, _windowGpuKwh, _windowSeconds;
+    private DateTimeOffset _lastAttribution = DateTimeOffset.MinValue;
+    private bool _programsPrimed;
+    private string? _programNote;
+    private readonly Dictionary<string, ProgramEnergy> _programBucket = new(StringComparer.OrdinalIgnoreCase);
 
     private DateTimeOffset? _last;
     private Dictionary<string, double> _lastWatts = new();
@@ -27,10 +43,17 @@ public sealed class PowerCollector
     private DateTimeOffset _lastFlush;
     private readonly Dictionary<string, MinuteRow> _bucket = new();
 
-    public PowerCollector(HistoryStore store, PowerSampler sampler)
+    /// <param name="programs">Per-program activity, or null to skip the per-program estimate.</param>
+    public PowerCollector(HistoryStore store, PowerSampler sampler, IProgramActivitySource? programs = null)
     {
         _store = store;
         _sampler = sampler;
+        _programs = programs;
+        if (programs is not null)
+        {
+            var (cpu, gpu) = store.GetIdleBaseline();
+            _baseline = new IdleBaseline(cpu, gpu);
+        }
     }
 
     /// <summary>Records the time since the previous run as a gap: "off" if it stopped on purpose,
@@ -54,17 +77,20 @@ public sealed class PowerCollector
             Flush(now);
             _store.AddGap(new Gap(_last!.Value, now, GapReason.Asleep));
             _lastWatts.Clear();
+            RestartPrograms();
         }
         else if (_last is { } before && now > before)
         {
             Integrate(before, now, readings);
+            if (_programs is not null && now - _lastAttribution >= AttributionInterval) AttributePrograms(now);
             if (now - _lastFlush >= FlushInterval) Flush(now);
         }
 
         _lastWatts = readings.ToDictionary(r => r.Name, r => r.Watts);
         _last = now;
-        _store.SetLive(now, readings, snapshot.Notes);
-        return snapshot with { Readings = readings };
+        var notes = _programNote is null ? snapshot.Notes : snapshot.Notes.Append(_programNote).ToList();
+        _store.SetLive(now, readings, notes);
+        return snapshot with { Readings = readings, Notes = notes };
     }
 
     /// <summary>Saves what is pending and marks this as a deliberate stop.</summary>
@@ -84,12 +110,18 @@ public sealed class PowerCollector
         }
 
         var seconds = (to - from).TotalSeconds;
+        _pendSeconds += seconds;
         foreach (var r in readings)
         {
             // A reading that was not there on the previous tick has nothing to average against yet.
             if (!_lastWatts.TryGetValue(r.Name, out var before)) continue;
 
-            var kwh = (before + r.Watts) / 2.0 * seconds / 3_600_000.0;
+            var kwh = (before + r.Watts) / 2.0 * seconds / JoulesPerKwh;
+            if (r.Scope == ReadingScope.Component)
+            {
+                if (r.Kind == PowerKind.Cpu) _pendCpuKwh += kwh;
+                else if (r.Kind == PowerKind.Gpu) _pendGpuKwh += kwh;
+            }
             _bucket[r.Name] = _bucket.TryGetValue(r.Name, out var row)
                 ? row with { KilowattHours = row.KilowattHours + kwh, Seconds = row.Seconds + seconds, PeakWatts = Math.Max(row.PeakWatts, r.Watts) }
                 : new MinuteRow(minute, r.Name, r.Scope, kwh, seconds, Math.Max(before, r.Watts));
@@ -100,7 +132,92 @@ public sealed class PowerCollector
     {
         if (_bucket.Count > 0) _store.AddMinutes(_bucket.Values.ToList());
         _bucket.Clear();
+        if (_programBucket.Count > 0) _store.AddProgramMinutes(_bucketMinute, ProgramAttributor.Lump(_programBucket.Values));
+        _programBucket.Clear();
         _lastFlush = now;
+    }
+
+    // ----- Per-program estimate ---------------------------------------------------------
+
+    /// <summary>Shares the CPU's and GPU's energy since the last look out among the programs that were busy, keeping
+    /// the idle baseline apart, and learns the baseline from the quietest 30 second stretch seen so far.</summary>
+    private void AttributePrograms(DateTimeOffset now)
+    {
+        if (_programs!.UnavailableReason is { } why)
+        {
+            _programNote = "Per-program power: " + why;
+            return;
+        }
+
+        IReadOnlyList<ProgramActivity> activity;
+        try
+        {
+            activity = _programs.Sample();
+            _programNote = null;
+        }
+        catch (Exception e)
+        {
+            // Optional extra: a failing counter must not stop the energy recording itself.
+            _programNote = "Per-program power: " + e.Message;
+            return;
+        }
+
+        _lastAttribution = now;
+        if (!_programsPrimed)
+        {
+            // The first reading only sets a starting point; the energy up to here has no matching activity.
+            _programsPrimed = true;
+            ClearPending();
+            return;
+        }
+        if (_pendSeconds <= 0) return;
+
+        var seconds = _pendSeconds;
+        // Until a baseline is known everything counts as baseline: better to under-credit programs for a
+        // moment than to blame them for power the idle machine draws.
+        var cpuIdle = _baseline.CpuWatts is { } cw ? cw * seconds / JoulesPerKwh : _pendCpuKwh;
+        var gpuIdle = _baseline.GpuWatts is { } gw ? gw * seconds / JoulesPerKwh : _pendGpuKwh;
+        var rows = ProgramAttributor.Attribute(_pendCpuKwh, cpuIdle, _pendGpuKwh, gpuIdle, seconds, activity);
+
+        foreach (var row in rows)
+        {
+            _programBucket[row.Program] = _programBucket.TryGetValue(row.Program, out var old)
+                ? new ProgramEnergy(row.Program, old.CpuKwh + row.CpuKwh, old.GpuKwh + row.GpuKwh, old.ActiveSeconds + row.ActiveSeconds)
+                : row;
+        }
+
+        _store.SetLivePrograms(now, rows
+            .Select(r => new ProgramLive(r.Program, r.CpuKwh * JoulesPerKwh / seconds, r.GpuKwh * JoulesPerKwh / seconds))
+            .Where(r => r.CpuWatts + r.GpuWatts >= 0.05)
+            .OrderByDescending(r => r.CpuWatts + r.GpuWatts)
+            .Take(13)
+            .ToList());
+
+        LearnBaseline(_pendCpuKwh, _pendGpuKwh, seconds);
+        ClearPending();
+    }
+
+    private void LearnBaseline(double cpuKwh, double gpuKwh, double seconds)
+    {
+        _windowCpuKwh += cpuKwh;
+        _windowGpuKwh += gpuKwh;
+        _windowSeconds += seconds;
+        if (_windowSeconds < IdleBaseline.Window.TotalSeconds) return;
+
+        if (_baseline.Observe(_windowCpuKwh * JoulesPerKwh / _windowSeconds, _windowGpuKwh * JoulesPerKwh / _windowSeconds))
+            _store.SetIdleBaseline(_baseline.CpuWatts, _baseline.GpuWatts);
+        _windowCpuKwh = _windowGpuKwh = _windowSeconds = 0;
+    }
+
+    private void ClearPending() => _pendCpuKwh = _pendGpuKwh = _pendSeconds = 0;
+
+    /// <summary>After a gap the counters' rates would average over the sleep: start the per-program reading over.</summary>
+    private void RestartPrograms()
+    {
+        _programs?.Reset();
+        _programsPrimed = false;
+        ClearPending();
+        _windowCpuKwh = _windowGpuKwh = _windowSeconds = 0;
     }
 
     /// <summary>Two identical GPUs are both called "NVIDIA GeForce ..."; the second becomes "... 2" so each

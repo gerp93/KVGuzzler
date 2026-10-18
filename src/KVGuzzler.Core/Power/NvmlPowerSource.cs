@@ -54,7 +54,7 @@ public sealed class NvmlPowerSource : IPowerSource
         for (var i = 0; i < _names.Length; i++)
         {
             if (_api!.PowerMilliwatts(i) is { } mw)
-                readings.Add(new PowerReading(_names[i], mw / 1000.0, ReadingScope.Component));
+                readings.Add(new PowerReading(_names[i], mw / 1000.0, ReadingScope.Component, PowerKind.Gpu));
         }
         return readings;
     }

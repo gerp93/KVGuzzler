@@ -56,6 +56,22 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - Linux: no service yet (an AppImage cannot install one); run `KVGuzzler --collector` yourself for now.
   Still to do: charts; per-day/week/month calendar totals (the windows are rolling); a Windows shutdown
   hook; an option to estimate time the PC was on but not recorded.
+- **Per-program power** (built, Windows only): the collector estimates which program caused the CPU's and
+  GPU's power and the Programs tab lists energy, cost and active time per executable, plus a live "right
+  now" list. Method: only the power above a learned idle baseline is shared, in proportion to each program's
+  share of CPU time and GPU engine time (Windows "Process" and "GPU Engine" counters; no admin needed);
+  `ProgramAttributor` keeps the rows summing to exactly the energy measured. Checked on this PC with a real
+  CPU load (a 16-process PowerShell burn was the top CPU user; the rows summed to 99.7% of the measured
+  CPU+GPU energy). Known limits and what is not built:
+  - **The idle baseline starts too high** if the PC was never quiet during a run (it is the lowest 30 s
+    average seen so far, kept between runs). It only comes down, so the first day understates heavy
+    users until a truly idle moment is seen. Consider a "reset" button or a manual override.
+  - GPU engines of different adapters (this PC has an NVIDIA GPU and an Intel iGPU) are not separated by
+    adapter, so iGPU use shares the NVIDIA card's power. Needs the adapter LUID mapped to the GPU.
+  - Programs are named by executable name only: two different `app.exe` files merge. Memory and fan power
+    are not attributed. CPU attribution counts busy time, not clock speed.
+  - Not built: per-run costs ("this game session"), pinning a specific program, Linux (`/proc` and the GPU's
+    own per-process data).
 - **Live dashboard**: wattage graph (ScottPlot or LiveCharts2; both MIT) and cost-so-far cards;
   per hour/day/week/month totals; per-session cost.
 - **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a
