@@ -21,8 +21,21 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
       runs with system rights, so it is the natural place to add it.
     - Laptop battery discharge rate (a whole-system figure while on battery): Windows WMI
       `BatteryStatus`, Linux `/sys/class/power_supply/BAT*/power_now`. Untestable on this desktop.
-    - Whole system: a smart plug or wall meter over its local HTTP API (Shelly / Tasmota), the only
-      accurate total; calibrate the "rest of system" offset against it. Deferred until a meter is hooked up.
+    - Whole system (wall meter): **built for a Shelly smart plug (second generation or newer, e.g. the
+      Plug US Gen4), not yet tried on a real plug.** `ShellyPlug` / `WallMeterSource` read
+      `GET /rpc/Switch.GetStatus?id=0` (`apower`, watts) once a second; the address is set in
+      Settings > Wall meter and saved in `%ProgramData%\KVGuzzler[-dev]\wall-meter.json`, which the
+      collector service follows. Tested with a fake plug and against a stand-in Shelly server on this PC.
+      To confirm on the real plug: the field names, whether authentication is off by default, and the
+      reading's accuracy against the Eve plug. Still to do:
+      - **Fill the gaps from the plug's own energy counter** (`aenergy.total`): the plug keeps counting
+        while the PC is asleep or off, which is exactly what the wall meter is for. Needs a real plug to
+        learn whether the counter survives a plug reboot or power cut. Until then, time the collector was
+        not recording has no wall figure.
+      - Other meters behind the same `IPowerSource`: Tasmota plugs (local JSON), and Eve / any Matter plug
+        through a Home Assistant reader (REST `/api/states/<entity>`).
+      - Calibrate a "rest of the system" offset against the wall figure (the Dashboard already shows wall
+        minus sensors as "fans, drives, motherboard and power-supply losses").
 - **Background recording** (built, **not yet tried as an installed service**): `KVGuzzler.exe --collector`
   runs headless as a Windows service and saves one-minute energy per component, the live readings, and
   gaps with their reason (asleep / off / lost power) to `%ProgramData%\KVGuzzler\history.db`. The window

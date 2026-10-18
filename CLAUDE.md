@@ -32,6 +32,12 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   line and never added to the "active" figures (CPU/GPU/memory sensors = active power; the whole-PC
   total is the wall meter's job, not built yet). A running service locks `KVGuzzler.exe`, so turn background recording off
   before rebuilding a development copy.
+- **Wall meter.** A smart plug between the wall and the PC is the whole-PC figure (`ReadingScope.Wall`).
+  It already contains every sensor reading, so it is shown next to them and **never added to them**
+  (`PowerSampler` sums `Component` only). `ShellyPlug` only ever sends `GET`; nothing in the app may
+  switch the plug, because the PC is plugged into it. The meter's address lives in
+  `wall-meter.json` beside the history (not in the per-user settings: the collector service reads it too).
+  Only a plain host or IP is accepted, never a URL or path.
 - **Velopack:** `VelopackApp.Build().Run()` is the first statement in `Main`; the running version comes
   only from Velopack (`UpdateService.VersionText`); `CheckForUpdatesAsync` throws outside an installed
   build, so `UpdateService` guards on `IsInstalled`. The `Velopack` NuGet package must stay a direct

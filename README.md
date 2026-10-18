@@ -9,7 +9,8 @@ hour, day, month and year at your own rate.
 > the CPU package, cores and memory (Windows energy counters; Linux RAPL, not yet tried on real Linux
 > hardware). A background collector service (Windows, admin install) records history even when nobody is
 > logged in; it is built but has not yet been tried as an installed service. Not built yet: AMD and Intel
-> GPUs on Windows, AMD CPUs on Windows, a wall meter, graphs; see [TODO.md](TODO.md).
+> GPUs on Windows, AMD CPUs on Windows, graphs; see [TODO.md](TODO.md). A Shelly smart plug can be set
+> up as a wall meter for the whole-PC figure (written from Shelly's documentation, not yet tried on a real plug).
 
 ## Install
 

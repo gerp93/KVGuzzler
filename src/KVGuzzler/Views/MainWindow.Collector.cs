@@ -191,22 +191,29 @@ public partial class MainWindow
         HistoryNoteText.IsVisible = rate is null;
     }
 
-    /// <summary>The headline is the active (sensor-measured) energy only. Sleep is an estimate and sits on the
-    /// detail line, never in this figure: the whole-PC total is the wall meter's job.</summary>
+    /// <summary>With a wall meter the headline is the whole PC (what the bill is made of). Without one it is the
+    /// active energy the sensors measured. Sleep is an estimate and never goes in either figure.</summary>
     internal static string HistoryTitle(PeriodReport p, decimal? rate, string currency)
     {
-        var title = $"{p.Label}: {p.MeasuredKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh active";
-        if (rate is { } r) title += $", {currency}{FormatMoney(CostCalculator.Cost(p.MeasuredKwh, r))}";
+        var (kwh, what) = p.WallKwh is { } wall ? (wall, "whole PC") : (p.MeasuredKwh, "active");
+        var title = $"{p.Label}: {kwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh {what}";
+        if (rate is { } r) title += $", {currency}{FormatMoney(CostCalculator.Cost(kwh, r))}";
         return title;
     }
 
-    /// <summary>The second line: how long the active figure covers, and every stretch that was not sampled,
-    /// by reason, so nothing is silently missing.</summary>
+    /// <summary>The second line: how long the figure covers, the part the sensors account for when there is a
+    /// wall meter, and every stretch that was not sampled, by reason, so nothing is silently missing.</summary>
     internal static string HistoryDetail(PeriodReport p)
     {
-        var parts = new List<string> { $"active energy over {FormatSpan(p.Monitored)} recorded" };
+        var parts = new List<string>();
+        if (p.WallKwh is not null)
+            parts.Add($"of which CPU, GPU and memory {p.MeasuredKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh");
+        else
+            parts.Add($"active energy over {FormatSpan(p.Monitored)} recorded");
         if (p.Asleep > TimeSpan.Zero)
-            parts.Add($"asleep {FormatSpan(p.Asleep)} (about {p.EstimatedKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh at the sleep wattage, not counted above)");
+            parts.Add($"asleep {FormatSpan(p.Asleep)}" + (p.WallKwh is null
+                ? $" (about {p.EstimatedKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh at the sleep wattage, not counted above)"
+                : ""));
         if (p.Off > TimeSpan.Zero) parts.Add($"off {FormatSpan(p.Off)}");
         if (p.LostPower > TimeSpan.Zero) parts.Add($"lost power or crashed {FormatSpan(p.LostPower)}");
         return string.Join(" · ", parts);

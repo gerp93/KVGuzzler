@@ -9,7 +9,7 @@
     <TabItem Header="Dashboard">
       <ScrollViewer>
         <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-          <TextBlock Text="Live active power" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="Live power" FontSize="20" FontWeight="SemiBold" />
           <TextBlock x:Name="PowerStatusText" TextWrapping="Wrap" Text="Looking for power sensors..." />
           <ItemsControl x:Name="ReadingsList">
             <ItemsControl.ItemTemplate>
@@ -23,9 +23,10 @@
           </ItemsControl>
           <TextBlock x:Name="PowerTotalText" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock x:Name="PowerSessionText" TextWrapping="Wrap" />
+          <TextBlock x:Name="WallPowerText" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="False" />
+          <TextBlock x:Name="WallBreakdownText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" IsVisible="False" />
           <TextBlock x:Name="PowerNotesText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-          <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                     Text="Active power is what the CPU, GPU and memory draw while the PC is on, read from their own sensors. It leaves out fans, drives, the motherboard, power-supply losses and any time the PC sleeps. A wall meter, once connected, will give the whole-PC figure." />
+          <TextBlock x:Name="PowerInfoText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
 
           <Separator Margin="0,8" />
 
@@ -38,7 +39,7 @@
           </WrapPanel>
           <TextBlock x:Name="CollectorResultText" TextWrapping="Wrap" IsVisible="False" />
 
-          <TextBlock Text="Active energy history" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0" />
+          <TextBlock Text="Energy history" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0" />
           <ItemsControl x:Name="HistoryList">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="views:HistoryRow">
@@ -93,6 +94,19 @@
             <Button x:Name="SaveSleepButton" Content="Save" Classes="accent" />
           </StackPanel>
           <TextBlock x:Name="SleepStatusText" TextWrapping="Wrap" />
+
+          <Separator Margin="0,8" />
+
+          <TextBlock Text="Wall meter" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="A Shelly smart plug (second generation or newer, such as the Plug US Gen4) between the wall and the PC measures what the whole PC draws, including everything the sensors cannot see. Set the plug up in the Shelly app, give it a fixed address on your router, and enter that address here. KVGuzzler only reads from the plug; it never switches it." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="WallHostBox" Width="220" PlaceholderText="192.168.1.50" />
+            <Button x:Name="TestWallButton" Content="Test" />
+            <Button x:Name="SaveWallButton" Content="Save" Classes="accent" />
+            <Button x:Name="RemoveWallButton" Content="Remove" />
+          </StackPanel>
+          <TextBlock x:Name="WallStatusText" TextWrapping="Wrap" />
 
           <Separator Margin="0,8" />
 

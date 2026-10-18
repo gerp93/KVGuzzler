@@ -41,6 +41,13 @@ public sealed class AppServices : IDisposable
     /// <summary>The background collector's folder (machine-wide, written by its service).</summary>
     public string HistoryDirectory { get; }
 
+    /// <summary>One reading from a wall meter at the given address, in watts; throws
+    /// <see cref="KVGuzzler.Core.Power.WallMeterException"/> with a message fit to show. Replaceable for tests.</summary>
+    public Func<string, Task<double>> ReadWallMeterAsync { get; set; } =
+        host => KVGuzzler.Core.Power.ShellyPlug.ReadWattsAsync(WallMeterHttp, host);
+
+    private static readonly HttpClient WallMeterHttp = new();
+
     /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
     public Func<ServiceState> QueryCollectorService { get; set; }
 

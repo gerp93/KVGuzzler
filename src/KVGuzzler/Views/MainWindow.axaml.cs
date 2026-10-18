@@ -55,6 +55,7 @@ public partial class MainWindow : Window
         RefreshDatabaseInfo();
         StartPowerDisplay();
         StartCollectorDisplay();
+        StartWallMeterSettings();
     }
 
     // ----- Live power -------------------------------------------------------------------
@@ -81,7 +82,10 @@ public partial class MainWindow : Window
 
     private void ShowPower(PowerSnapshot s, bool showSession = true)
     {
+        // The wall meter is the whole PC, so it is shown on its own line below, not in the list of parts.
+        var wall = s.Readings.FirstOrDefault(r => r.Scope == ReadingScope.Wall);
         ReadingsList.ItemsSource = s.Readings
+            .Where(r => r.Scope != ReadingScope.Wall)
             .OrderBy(r => r.Scope)   // components first, their breakdown after
             .Select(r => new ReadingRow(
                 r.Name,
@@ -91,7 +95,7 @@ public partial class MainWindow : Window
             .ToList();
 
         var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
-        PowerStatusText.Text = hasComponents ? "Active power, measured every second." : "No power sensors are reporting on this machine.";
+        PowerStatusText.Text = hasComponents || wall is not null ? "Power, measured every second." : "No power sensors are reporting on this machine.";
         PowerTotalText.Text = hasComponents ? $"Total active: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
 
         var session = $"Active energy since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
@@ -102,6 +106,23 @@ public partial class MainWindow : Window
             session += $", {currency}{FormatMoney(CostCalculator.Cost(s.SessionKilowattHours, rate))}";
         }
         PowerSessionText.Text = hasComponents ? session : "";
+
+        WallPowerText.IsVisible = wall is not null;
+        WallBreakdownText.IsVisible = false;
+        if (wall is not null)
+        {
+            WallPowerText.Text = $"Whole PC at the wall: {wall.Watts.ToString("0.0", CultureInfo.CurrentCulture)} W";
+            // Only say what the rest is when the sums make sense: the plug and the sensors are read a moment apart.
+            var other = wall.Watts - s.TotalWatts;
+            WallBreakdownText.Text = hasComponents && other >= 0
+                ? $"The sensors above account for {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W. The other {other.ToString("0.0", CultureInfo.CurrentCulture)} W is fans, drives, the motherboard and power-supply losses."
+                : "";
+            WallBreakdownText.IsVisible = WallBreakdownText.Text.Length > 0;
+        }
+
+        PowerInfoText.Text = wall is not null
+            ? "Active power is what the CPU, GPU and memory draw, read from their own sensors. The wall meter measures the whole PC, which is the figure that matches your bill."
+            : "Active power is what the CPU, GPU and memory draw while the PC is on, read from their own sensors. It leaves out fans, drives, the motherboard, power-supply losses and any time the PC sleeps. Set up a wall meter in Settings for the whole-PC figure.";
 
         PowerNotesText.Text = s.Notes.Count == 0 ? "" : "Not reporting:" + Environment.NewLine + string.Join(Environment.NewLine, s.Notes);
         PowerNotesText.IsVisible = s.Notes.Count > 0;

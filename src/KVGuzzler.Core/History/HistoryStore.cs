@@ -39,6 +39,10 @@ public sealed class HistoryStore : IDisposable
 
     private readonly string _connectionString;
 
+    private const string WallMinutesOnly = """
+        AND minute_start IN (SELECT minute_start FROM samples WHERE scope = 2 AND minute_start >= $f AND minute_start < $t)
+        """;
+
     public HistoryStore(string path)
     {
         Path = path;
@@ -174,21 +178,27 @@ public sealed class HistoryStore : IDisposable
         return new LiveState(DateTimeOffset.FromUnixTimeMilliseconds(ms), readings, notes);
     }
 
-    /// <summary>Energy of the measured components between two instants, with the time that was covered
-    /// and the gaps inside the period (clipped to it).</summary>
-    public (double KilowattHours, TimeSpan Monitored, IReadOnlyList<Gap> Gaps) Query(DateTimeOffset from, DateTimeOffset to)
+    /// <summary>Energy between two instants for one kind of reading (by default the measured components, i.e.
+    /// the active energy; <see cref="ReadingScope.Wall"/> for the whole PC), with the time that was covered
+    /// and the gaps inside the period (clipped to it). With <paramref name="onlyWhereWallWasRecorded"/>, only the
+    /// minutes in which the wall meter also recorded count, so a part can be compared fairly with the whole.</summary>
+    public (double KilowattHours, TimeSpan Monitored, IReadOnlyList<Gap> Gaps) Query(
+        DateTimeOffset from, DateTimeOffset to, ReadingScope scope = ReadingScope.Component, bool onlyWhereWallWasRecorded = false)
     {
         using var c = Open();
         var fromMinute = from.ToUnixTimeSeconds() / 60 * 60;
         var toSeconds = to.ToUnixTimeSeconds();
 
+        var wallFilter = onlyWhereWallWasRecorded ? WallMinutesOnly : "";
+
         double kwh, monitored;
         using (var cmd = c.CreateCommand())
         {
-            cmd.CommandText = """
+            cmd.CommandText = $"""
                 SELECT COALESCE(SUM(kwh), 0) FROM samples
-                WHERE scope = 0 AND minute_start >= $f AND minute_start < $t
+                WHERE scope = $scope AND minute_start >= $f AND minute_start < $t {wallFilter}
                 """;
+            cmd.Parameters.AddWithValue("$scope", (int)scope);
             cmd.Parameters.AddWithValue("$f", fromMinute);
             cmd.Parameters.AddWithValue("$t", toSeconds);
             kwh = Convert.ToDouble(cmd.ExecuteScalar());
@@ -196,12 +206,13 @@ public sealed class HistoryStore : IDisposable
         using (var cmd = c.CreateCommand())
         {
             // Time covered = per minute, the longest any one component was sampled.
-            cmd.CommandText = """
+            cmd.CommandText = $"""
                 SELECT COALESCE(SUM(s), 0) FROM (
                     SELECT MAX(seconds) AS s FROM samples
-                    WHERE scope = 0 AND minute_start >= $f AND minute_start < $t
+                    WHERE scope = $scope AND minute_start >= $f AND minute_start < $t {wallFilter}
                     GROUP BY minute_start)
                 """;
+            cmd.Parameters.AddWithValue("$scope", (int)scope);
             cmd.Parameters.AddWithValue("$f", fromMinute);
             cmd.Parameters.AddWithValue("$t", toSeconds);
             monitored = Convert.ToDouble(cmd.ExecuteScalar());

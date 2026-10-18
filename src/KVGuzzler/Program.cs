@@ -1,6 +1,7 @@
 using Avalonia;
 using Kvg.Standards;
 using KVGuzzler.Collector;
+using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Services;
 using Velopack;
@@ -33,7 +34,8 @@ public static class Program
         var instanceLock = InstanceLock.TryAcquire(dataDir);
         if (instanceLock is null) return 0;
 
-        Services = new AppServices(dataDir, instanceLock, updates, new PowerMonitor(PowerSources.Detect));
+        Services = new AppServices(dataDir, instanceLock, updates, new PowerMonitor(() => PowerSources.Detect(
+                Path.Combine(HistoryStore.DefaultDirectory(development), WallMeterConfig.FileName))));
         try
         {
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

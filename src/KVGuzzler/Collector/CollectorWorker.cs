@@ -20,7 +20,7 @@ internal sealed class CollectorWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
         using var store = new HistoryStore(Path.Combine(_dataDir, HistoryStore.FileName));
-        using var sampler = new PowerSampler(PowerSources.Detect());
+        using var sampler = new PowerSampler(PowerSources.Detect(Path.Combine(_dataDir, WallMeterConfig.FileName)));
         var collector = new PowerCollector(store, sampler);
 
         collector.Start(DateTimeOffset.UtcNow);
