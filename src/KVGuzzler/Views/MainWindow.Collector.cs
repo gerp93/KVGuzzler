@@ -114,8 +114,9 @@ public partial class MainWindow
             var readTotals = includeChart
                 && (periodIndex != _programsReadPeriod || !longPeriod || DateTimeOffset.UtcNow - _programsReadAt > LongProgramRefresh);
             var counted = CountedPeripherals();
+            var includePc = IncludePc();
             var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, statsSpan, includeChart ? chartPeriod : null, schedule,
-                includeChart ? statsSpan : null, includeChart, readTotals, SelectedEstimateWindow, counted));
+                includeChart ? statsSpan : null, includeChart, readTotals, SelectedEstimateWindow, counted, includePc));
             if (read.Programs?.Totals is not null)
             {
                 _programsReadAt = DateTimeOffset.UtcNow;
@@ -140,7 +141,7 @@ public partial class MainWindow
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan? programLookBack,
         (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats,
-        bool readProgramTotals, TimeSpan? estimateSpan, IReadOnlyCollection<string> peripherals)
+        bool readProgramTotals, TimeSpan? estimateSpan, IReadOnlyCollection<string> peripherals, bool includePc)
     {
         IReadOnlyList<PeripheralUse>? peripheralUse = null;
         UsageStat? stats = null;
@@ -173,9 +174,9 @@ public partial class MainWindow
                         whole = wallKwh;
                 }
                 programs = new ProgramsRead(totals, whole, store.GetLivePrograms(), store.GetIdleBaseline(), store.GetRecentRuns(20));
-                if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket, peripherals);
-                if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now, peripherals);
-                if (includeStats) use = UsageSummary.AverageDay(store, estimateSpan, now, peripherals);
+                if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket, peripherals, includePc);
+                if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now, peripherals, includePc);
+                if (includeStats) use = UsageSummary.AverageDay(store, estimateSpan, now, peripherals, includePc);
                 if (includeStats) peripheralUse = store.QueryPeripherals(statsSpan is { } sp ? now - sp : DateTimeOffset.UnixEpoch, now);
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
@@ -243,7 +244,7 @@ public partial class MainWindow
             ? "No history yet. The chart fills in once the background collector has recorded some."
             : read.Chart.Series.Count == 0
                 ? "Nothing was recorded in this period."
-                : read.Chart.Series.All(s => s.Kind != ChartSeriesKind.Wall)
+                : IncludePc() && read.Chart.Series.All(s => s.Kind != ChartSeriesKind.Wall)
                     ? "CPU and GPU are the sensors' active power. Set up a wall meter in Settings to add the whole-PC line."
                     : "";
         ChartNoteText.IsVisible = ChartNoteText.Text.Length > 0;

@@ -132,7 +132,8 @@
                   <TextBlock x:Name="PeripheralsPeriodText" Classes="caption" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="Also count:" VerticalAlignment="Center" />
+                  <TextBlock Text="Count:" VerticalAlignment="Center" />
+                  <CheckBox x:Name="CountPcBox" Content="PC" IsChecked="True" Margin="0,0,16,0" />
                   <WrapPanel x:Name="PeripheralFilterPanel" VerticalAlignment="Center" />
                 </StackPanel>
                 <ItemsControl x:Name="PeripheralsList" ItemTemplate="{StaticResource BarRow}" />
@@ -219,6 +220,10 @@
                     <TextBlock Text="Energy history" Classes="h2" />
                     <ItemsControl x:Name="HistoryList" ItemTemplate="{StaticResource BarRow}" />
                     <TextBlock x:Name="HistoryNoteText" Classes="caption" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button x:Name="ExportCsvButton" Content="Export to CSV..." />
+                      <TextBlock x:Name="ExportStatusText" Classes="caption" VerticalAlignment="Center" />
+                    </StackPanel>
                   </StackPanel>
                 </Border>
 

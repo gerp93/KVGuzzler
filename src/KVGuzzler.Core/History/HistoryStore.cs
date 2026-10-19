@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
@@ -36,8 +37,11 @@ public enum ChartSeriesKind
 }
 
 /// <summary>What one extra meter (a monitor's plug) recorded in a period.</summary>
+/// <param name="KilowattHours">Everything it used, including <paramref name="GapKwh"/>.</param>
 /// <param name="PeakWatts">The highest once-a-second reading.</param>
-public sealed record PeripheralUse(string Name, double KilowattHours, double PeakWatts);
+/// <param name="GapKwh">The part of <paramref name="KilowattHours"/> that is time the PC was asleep, off or without power, taken from the
+/// plug's own energy counter rather than sampled.</param>
+public sealed record PeripheralUse(string Name, double KilowattHours, double PeakWatts, double GapKwh = 0);
 
 /// <summary>One minute of one chart series: its energy, how many seconds it covers, and its peak.</summary>
 public sealed record SeriesMinute(long MinuteStart, double KilowattHours, double Seconds, double PeakWatts);
@@ -75,6 +79,7 @@ public sealed class HistoryStore : IDisposable
     private const string IdleCpuKey = "idle_cpu_w";
     private const string IdleGpuKey = "idle_gpu_w";
     private const string WallCounterKey = "wall_counter";
+    private const string PeripheralCountersKey = "peripheral_counters";
 
     private readonly string _connectionString;
 
@@ -103,6 +108,8 @@ public sealed class HistoryStore : IDisposable
             CREATE TABLE IF NOT EXISTS total_peaks (minute_start INTEGER PRIMARY KEY, watts REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS gaps (
                 start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL, plug_kwh REAL);
+            CREATE TABLE IF NOT EXISTS gap_peripherals (
+                start_ms INTEGER NOT NULL, name TEXT NOT NULL, kwh REAL NOT NULL, PRIMARY KEY (start_ms, name));
             CREATE TABLE IF NOT EXISTS live (name TEXT PRIMARY KEY, scope INTEGER NOT NULL, watts REAL NOT NULL, position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS program_samples (
@@ -200,7 +207,9 @@ public sealed class HistoryStore : IDisposable
     /// <summary>Replaces the live readings and records when the collector last saw the machine.</summary>
     /// <param name="wallCounter">The plug's energy counter as last read, kept so that after a restart the collector can still
     /// tell how much the plug counted while it was away. Left as it was when null.</param>
-    public void SetLive(DateTimeOffset now, IReadOnlyList<PowerReading> readings, IReadOnlyList<string> notes, WallCounter? wallCounter = null)
+    /// <param name="peripheralCounters">The same for the extra meters, by label. Left as it was when null or empty.</param>
+    public void SetLive(DateTimeOffset now, IReadOnlyList<PowerReading> readings, IReadOnlyList<string> notes, WallCounter? wallCounter = null,
+        IReadOnlyDictionary<string, WallCounter>? peripheralCounters = null)
     {
         using var c = Open();
         using var tx = c.BeginTransaction();
@@ -221,6 +230,73 @@ public sealed class HistoryStore : IDisposable
         if (wallCounter is not null)
             SetMeta(c, tx, WallCounterKey, string.Create(CultureInfo.InvariantCulture,
                 $"{wallCounter.Host}|{wallCounter.TotalWh:R}|{wallCounter.ReadAt.ToUnixTimeMilliseconds()}"));
+        if (peripheralCounters is { Count: > 0 })
+            SetMeta(c, tx, PeripheralCountersKey, JsonSerializer.Serialize(peripheralCounters.Select(p =>
+                new SavedCounter(p.Key, p.Value.Host, p.Value.TotalWh, p.Value.ReadAt.ToUnixTimeMilliseconds()))));
+        tx.Commit();
+    }
+
+    private sealed record SavedCounter(string Label, string Host, double Wh, long ReadMs);
+
+    /// <summary>The extra meters' energy counters as last saved by <see cref="SetLive"/>, by label (empty if none were).</summary>
+    public IReadOnlyDictionary<string, WallCounter> GetPeripheralCounters()
+    {
+        var found = new Dictionary<string, WallCounter>(StringComparer.OrdinalIgnoreCase);
+        using var c = Open();
+        try
+        {
+            var saved = JsonSerializer.Deserialize<List<SavedCounter>>(GetMeta(c, PeripheralCountersKey) ?? "[]");
+            foreach (var s in saved ?? new List<SavedCounter>())
+                found[s.Label] = new WallCounter(s.Host, s.Wh, DateTimeOffset.FromUnixTimeMilliseconds(s.ReadMs));
+        }
+        catch (JsonException)
+        {
+            // A damaged value is the same as none: the gap is left without the plug's figure.
+        }
+        return found;
+    }
+
+    /// <summary>Records the energy an extra meter's own counter measured across a gap that was saved without it.</summary>
+    public void SetGapPeripheralEnergy(DateTimeOffset gapStart, string name, double kwh)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "INSERT OR REPLACE INTO gap_peripherals (start_ms, name, kwh) VALUES ($s, $n, $k)";
+        cmd.Parameters.AddWithValue("$s", gapStart.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$n", name);
+        cmd.Parameters.AddWithValue("$k", kwh);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Moves everything saved under one extra meter's label to another (a rename), adding to what is already under the new
+    /// label if anything is. Safe to run again: a collector that had not yet followed the rename may still save a few seconds under
+    /// the old label.</summary>
+    public void RenamePeripheral(string oldName, string newName)
+    {
+        if (string.Equals(oldName, newName, StringComparison.Ordinal)) return;
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        void Do(string sql)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("$old", oldName);
+            cmd.Parameters.AddWithValue("$new", newName);
+            cmd.ExecuteNonQuery();
+        }
+        Do("""
+            INSERT INTO samples (minute_start, name, scope, kwh, seconds, peak_watts, kind)
+            SELECT minute_start, $new, scope, kwh, seconds, peak_watts, kind FROM samples WHERE scope = 3 AND name = $old
+            ON CONFLICT (minute_start, name) DO UPDATE SET
+                kwh = kwh + excluded.kwh, seconds = seconds + excluded.seconds, peak_watts = MAX(peak_watts, excluded.peak_watts)
+            """);
+        Do("DELETE FROM samples WHERE scope = 3 AND name = $old");
+        Do("""
+            INSERT INTO gap_peripherals (start_ms, name, kwh) SELECT start_ms, $new, kwh FROM gap_peripherals WHERE name = $old
+            ON CONFLICT (start_ms, name) DO UPDATE SET kwh = kwh + excluded.kwh
+            """);
+        Do("DELETE FROM gap_peripherals WHERE name = $old");
         tx.Commit();
     }
 
@@ -403,8 +479,8 @@ public sealed class HistoryStore : IDisposable
 
     // ----- Extra meters -----------------------------------------------------------------
 
-    /// <summary>What each extra meter recorded between two instants, biggest first. Only what was sampled: unlike the wall meter,
-    /// nothing is filled in for the time the PC was asleep or off.</summary>
+    /// <summary>What each extra meter used between two instants, biggest first: what was sampled, plus (like the wall meter) what its own
+    /// energy counter measured across stretches nothing was sampling, so a monitor left on while the PC slept is not missed.</summary>
     public IReadOnlyList<PeripheralUse> QueryPeripherals(DateTimeOffset from, DateTimeOffset to)
     {
         using var c = Open();
@@ -412,17 +488,23 @@ public sealed class HistoryStore : IDisposable
         cmd.CommandText = """
             SELECT name, SUM(kwh), MAX(peak_watts) FROM samples
             WHERE scope = 3 AND minute_start >= $f AND minute_start < $t
-            GROUP BY name ORDER BY SUM(kwh) DESC
+            GROUP BY name
             """;
         cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
         cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
-        var rows = new List<PeripheralUse>();
-        using var r = cmd.ExecuteReader();
-        while (r.Read()) rows.Add(new PeripheralUse(r.GetString(0), r.GetDouble(1), r.GetDouble(2)));
-        return rows;
+        var rows = new Dictionary<string, PeripheralUse>();
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) rows[r.GetString(0)] = new PeripheralUse(r.GetString(0), r.GetDouble(1), r.GetDouble(2));
+
+        foreach (var (name, gap) in GapPeripheralKwh(c, from, to, null))
+            rows[name] = rows.TryGetValue(name, out var sampled)
+                ? sampled with { KilowattHours = sampled.KilowattHours + gap, GapKwh = gap }
+                : new PeripheralUse(name, gap, 0, gap);
+        return rows.Values.OrderByDescending(u => u.KilowattHours).ToList();
     }
 
-    /// <summary>The energy the named extra meters recorded between two instants. No names is no energy.</summary>
+    /// <summary>The energy the named extra meters used between two instants (sampled, plus what their own counters measured across gaps).
+    /// No names is no energy.</summary>
     public double PeripheralKwh(DateTimeOffset from, DateTimeOffset to, IReadOnlyCollection<string> names)
     {
         if (names.Count == 0) return 0;
@@ -431,7 +513,29 @@ public sealed class HistoryStore : IDisposable
         cmd.CommandText = $"SELECT COALESCE(SUM(kwh), 0) FROM samples WHERE scope = 3 AND minute_start >= $f AND minute_start < $t AND {NameIn(cmd, names)}";
         cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
         cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
-        return Convert.ToDouble(cmd.ExecuteScalar());
+        return Convert.ToDouble(cmd.ExecuteScalar()) + GapPeripheralKwh(c, from, to, names).Values.Sum();
+    }
+
+    /// <summary>What the extra meters' own counters measured across gaps inside a period, by label (all meters when
+    /// <paramref name="names"/> is null). Each gap's energy is spread evenly over its length, so a period that cuts a gap gets its share.</summary>
+    private static Dictionary<string, double> GapPeripheralKwh(SqliteConnection c, DateTimeOffset from, DateTimeOffset to, IReadOnlyCollection<string>? names)
+    {
+        var total = new Dictionary<string, double>();
+        if (names is { Count: 0 }) return total;
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT g.start_ms, g.end_ms, p.name, p.kwh FROM gap_peripherals p JOIN gaps g ON g.start_ms = p.start_ms
+            WHERE g.end_ms > $f AND g.start_ms < $t {(names is null ? "" : "AND " + NameIn(cmd, names, "p.name"))}
+            """;
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeMilliseconds());
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            var share = ShareInside(DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(0)), DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(1)), from, to);
+            total[r.GetString(2)] = total.GetValueOrDefault(r.GetString(2)) + r.GetDouble(3) * share;
+        }
+        return total;
     }
 
     /// <summary>The most the named extra meters could have drawn together: per minute, the sum of each one's own peak, which
@@ -455,7 +559,7 @@ public sealed class HistoryStore : IDisposable
     }
 
     /// <summary>"name IN ($n0, $n1, ...)" with the names bound as parameters, never pasted into the text.</summary>
-    private static string NameIn(SqliteCommand cmd, IReadOnlyCollection<string> names)
+    private static string NameIn(SqliteCommand cmd, IReadOnlyCollection<string> names, string column = "name")
     {
         var markers = new List<string>();
         foreach (var name in names)
@@ -464,7 +568,7 @@ public sealed class HistoryStore : IDisposable
             markers.Add(marker);
             cmd.Parameters.AddWithValue(marker, name);
         }
-        return $"name IN ({string.Join(", ", markers)})";
+        return $"{column} IN ({string.Join(", ", markers)})";
     }
 
     /// <summary>The whole-PC energy between two instants that the plug's own counter measured across gaps (time nothing was

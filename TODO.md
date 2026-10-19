@@ -35,10 +35,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
         real plug: that `aenergy.total` really keeps counting while the PC sleeps, and whether it survives a plug reboot or
         power cut (the code assumes it does not and leaves such a gap alone). Not built: filling a short stretch where only
         the plug was unreachable while the PC stayed awake, and splitting a long gap whose counter reset in the middle.
-      - **Other meters for peripherals (monitor, speakers)**: built, **not tried on real plugs.** Settings > Other meters,
-        `peripheral-meters.json`, Dashboard "Peripherals" card and "Also count" tick boxes (see CLAUDE.md). Not built: renaming a
-        meter without splitting its history, filling time the PC slept or was off from each plug's own counter, a "peripherals
-        only" view, and an exact (not upper-bound) combined max draw.
+      - **Other meters for peripherals (monitor, speakers)**: built, **not tried on real plugs.** Settings > Other meters
+        (add, rename keeping history, remove), `peripheral-meters.json`, Dashboard "Peripherals" card and "Count" tick boxes
+        (PC and each meter, so "peripherals only" works too), one chart line per meter, gaps filled from each plug's own counter,
+        a note when a plug stops answering, and Export to CSV (see CLAUDE.md). Not built: an exact (not upper-bound) combined max
+        draw, and a time-of-use view of the meters.
       - Other meters behind the same `IPowerSource`: Tasmota plugs (local JSON), and Eve / any Matter plug
         through a Home Assistant reader (REST `/api/states/<entity>`).
       - Calibrate a "rest of the system" offset against the wall figure (the Dashboard already shows wall

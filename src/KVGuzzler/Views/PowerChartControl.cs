@@ -142,6 +142,15 @@ public sealed class PowerChartControl : Control
     // Colors come from the active VisualAssault theme, so the chart follows the user's choice.
     private static Color Token(VaToken token) => ThemeManager.Current?[token] ?? Colors.Gray;
 
+    /// <summary>The extra meters share one colour, so each is told apart by how its line is dashed.</summary>
+    private static Pen PenFor(ChartSeries series, double thickness) => new(
+        BrushFor(series.Kind), thickness,
+        dashStyle: series.Kind == ChartSeriesKind.Peripheral
+            ? (series.Variant % 3) switch { 0 => DashStyle.Dash, 1 => DashStyle.Dot, _ => DashStyle.DashDot }
+            : null,
+        lineCap: series.Kind == ChartSeriesKind.Peripheral ? PenLineCap.Flat : PenLineCap.Round,
+        lineJoin: PenLineJoin.Round);
+
     private static IBrush BrushFor(ChartSeriesKind kind) => new SolidColorBrush(Token(kind switch
     {
         // The whole PC is the brightest line of the theme: PrimaryAction is a button fill and vanishes on a dark background.
@@ -233,7 +242,7 @@ public sealed class PowerChartControl : Control
         // The lines.
         foreach (var series in data.Series)
         {
-            var pen = new Pen(BrushFor(series.Kind), series.Kind == ChartSeriesKind.Wall ? 2.5 : 2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+            var pen = PenFor(series, series.Kind == ChartSeriesKind.Wall ? 2.5 : 2);
             foreach (var segment in ChartLayout.Segments(series.Points, data.Bucket))
             {
                 if (segment.Count == 1)
@@ -262,7 +271,7 @@ public sealed class PowerChartControl : Control
         var legendY = plot.Y - 16;
         foreach (var series in data.Series)
         {
-            context.DrawLine(new Pen(BrushFor(series.Kind), 3, lineCap: PenLineCap.Round), new Point(x, legendY), new Point(x + 16, legendY));
+            context.DrawLine(PenFor(series, series.Kind == ChartSeriesKind.Peripheral ? 2 : 3), new Point(x, legendY), new Point(x + 16, legendY));
             var name = Text(series.Name, 12, ink);
             context.DrawText(name, new Point(x + 22, legendY - name.Height / 2));
             x += 22 + name.Width + 18;

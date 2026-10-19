@@ -93,7 +93,7 @@ public class PeripheralUiTests
         window.Show();
         Assert.Equal(2, window.PeripheralFilterPanel.Children.Count);
 
-        var first = window.PeripheralSettingsList.Children.OfType<Grid>().First().Children.OfType<Button>().Single();
+        var first = window.PeripheralSettingsList.Children.OfType<Grid>().First().Children.OfType<Button>().Single(b => (string?)b.Content == "Remove");
         first.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 
         Assert.Equal("Speakers", Assert.Single(PeripheralMetersConfig.Load(ConfigPath(t)).Meters).Label);

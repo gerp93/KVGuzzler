@@ -159,10 +159,21 @@ public partial class MainWindow : Window
         }
 
         // Extra meters the user chose to count are added on top of the PC, in the live figures as in the history.
-        var counted = ShowPeripheralsLive(s.Readings);
+        var counted = ShowPeripheralsLive(s.Readings, s.Notes);
         var extraWatts = counted.Sum(r => r.Watts);
-        _liveDraw = wall is not null ? (wall.Watts + extraWatts, true) : hasComponents ? (s.TotalWatts + extraWatts, false) : null;
-        _liveDrawExtra = counted.Count > 0 ? " plus " + string.Join(", ", counted.Select(r => r.Name)) : "";
+        var includePc = IncludePc();
+        var extraNames = string.Join(", ", counted.Select(r => r.Name));
+        var pcWhat = wall is not null ? "the whole PC at the wall" : "CPU, GPU and memory only";
+        if (!includePc)
+        {
+            _liveDraw = counted.Count > 0 ? (extraWatts, false) : null;
+            _liveDrawWhat = extraNames + " only";
+        }
+        else
+        {
+            _liveDraw = wall is not null ? (wall.Watts + extraWatts, true) : hasComponents ? (s.TotalWatts + extraWatts, false) : null;
+            _liveDrawWhat = pcWhat + (counted.Count > 0 ? " plus " + extraNames : "");
+        }
         if (SelectedEstimateBasis == EstimateBasis.Now) RefreshEstimate();
 
         // The "Right now" card: the whole PC when there is a wall meter, otherwise the sensors.
@@ -187,7 +198,15 @@ public partial class MainWindow : Window
             NowCaptionText.Text = PowerStatusText.Text ?? "";
         }
 
-        if (counted.Count > 0 && (wall is not null || hasComponents))
+        if (!includePc)
+        {
+            NowLabelText.Text = "Right now · peripherals only";
+            NowWattsText.Text = counted.Count > 0 ? Watts(extraWatts) : "-";
+            NowCaptionText.Text = counted.Count > 0
+                ? string.Join(", ", counted.Select(r => $"{r.Name} {Watts(r.Watts)}")) + ". The PC is not counted."
+                : "No peripheral meter is counted.";
+        }
+        else if (counted.Count > 0 && (wall is not null || hasComponents))
         {
             var pc = wall?.Watts ?? s.TotalWatts;
             NowLabelText.Text += " + peripherals";
@@ -311,8 +330,8 @@ public partial class MainWindow : Window
     /// <summary>The live draw: the whole PC at the wall when there is a wall meter, otherwise the sensors.</summary>
     private (double Watts, bool WholePc)? _liveDraw;
 
-    /// <summary>" plus Monitor, Speakers" when extra meters are counted in <see cref="_liveDraw"/>, else empty.</summary>
-    private string _liveDrawExtra = "";
+    /// <summary>What <see cref="_liveDraw"/> is, in words, for the estimator: "the whole PC at the wall plus Monitor".</summary>
+    private string _liveDrawWhat = "";
 
     /// <summary>What the PC really used per day over the chosen window, read with the rest of the history.</summary>
     private AverageUse? _averageUse;
@@ -348,7 +367,7 @@ public partial class MainWindow : Window
                 }
                 kwhPerDay = CostCalculator.KilowattHours(live.Watts, TimeSpan.FromDays(1));
                 EstimateBasisText.Text = $"If the PC kept drawing what it draws right now ({Watts(live.Watts)}, "
-                                         + (live.WholePc ? "the whole PC at the wall" : "CPU, GPU and memory only") + _liveDrawExtra + ") all day, every day.";
+                                         + _liveDrawWhat + ") all day, every day.";
                 break;
 
             default:
@@ -365,8 +384,9 @@ public partial class MainWindow : Window
                     ? $"the {FormatSpan(TimeSpan.FromDays(use.Days))} recorded so far" : window.Label;
                 EstimateBasisText.Text = $"The PC used {FormatEnergy(use.Kwh)} over {covered}: {FormatEnergy(use.KwhPerDay)} a day, "
                                          + $"an average of {Watts(use.AverageWatts)} counting the time it was off or asleep. "
-                                         + (use.WholePc ? "That is the whole PC at the wall" : "That is the CPU, GPU and memory sensors only (a wall meter would show the whole PC)")
-                                         + (use.PeripheralCount > 0 ? $", plus {use.PeripheralCount} peripheral meter{(use.PeripheralCount == 1 ? "" : "s")}." : ".");
+                                         + (!use.IncludesPc ? $"That is the {use.PeripheralCount} peripheral meter{(use.PeripheralCount == 1 ? "" : "s")} only, not the PC."
+                                            : (use.WholePc ? "That is the whole PC at the wall" : "That is the CPU, GPU and memory sensors only (a wall meter would show the whole PC)")
+                                              + (use.PeripheralCount > 0 ? $", plus {use.PeripheralCount} peripheral meter{(use.PeripheralCount == 1 ? "" : "s")}." : "."));
                 break;
         }
 
