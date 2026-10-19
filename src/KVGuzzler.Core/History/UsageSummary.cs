@@ -10,7 +10,10 @@ namespace KVGuzzler.Core.History;
 /// <param name="CountedSince">When the wall meter started recording, if that was after the period began (so the figure
 /// covers less than the whole period); null otherwise.</param>
 /// <param name="PriceEstimated">Part of the cost used a stand-in price (days after your latest bill).</param>
-public sealed record UsageStat(double Kwh, decimal? Cost, bool WholePc, DateTimeOffset? CountedSince, bool PriceEstimated, DateTimeOffset From);
+/// <param name="Peak">The highest power drawn in the period (whole PC at the wall when <paramref name="WholePc"/>, otherwise the sensors'
+/// total), or null when nothing was recorded.</param>
+public sealed record UsageStat(double Kwh, decimal? Cost, bool WholePc, DateTimeOffset? CountedSince, bool PriceEstimated, DateTimeOffset From,
+    PeakWatts? Peak = null);
 
 /// <summary>What the PC actually used per day, from real history, for projecting a bill.</summary>
 /// <param name="Kwh">Energy used over the stretch measured.</param>
@@ -60,6 +63,6 @@ public static class UsageSummary
         if (wholePc && store.FirstRecorded(ReadingScope.Wall) is { } firstWall && firstWall > from.AddMinutes(10)) since = firstWall;
 
         var cost = schedule.Cost((a, b) => store.EnergyKwh(a, b, scope), from, now);
-        return new UsageStat(cost.Kwh, cost.Unpriced ? null : cost.Cost, wholePc, since, cost.Estimated, from);
+        return new UsageStat(cost.Kwh, cost.Unpriced ? null : cost.Cost, wholePc, since, cost.Estimated, from, store.QueryPeak(from, now, scope));
     }
 }

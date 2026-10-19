@@ -75,6 +75,11 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   list rows share the `BarRow` template. One period picker (`StatsPeriodPanel`) drives the Dashboard stats, chart and program lists.
   A component's power is shown as a **share of the whole PC at the wall** when a wall meter exists (else of the sensor total, and
   the header says so); the chart's whole-PC line uses the theme's `Text` colour because `PrimaryAction` is invisible on dark themes.
+- **Four cards across the top of the Dashboard**: energy, cost, right now, and **Max draw** (`HistoryStore.QueryPeak`): the highest
+  once-a-second reading in the period, of the whole PC at the wall when there is a meter, else of the sensors' *total*. The total's peak is
+  its own per-minute row (`total_peaks`, written by `PowerCollector`) because the sensors' own peaks never all land in the same second;
+  minutes from before that table existed only give an upper bound (the sum of their peaks), shown as "≤". The big numbers sit in a
+  `Viewbox` that only shrinks, so a long figure still fits the narrower cards at the minimum window width.
 - **Cost estimator** (Dashboard, under Energy history) has three bases: a typed constant load, the live draw (wall figure if there is a
   wall meter, else the sensors), and "My usage" - real kWh per day over a window, counting off/asleep time, via
   `UsageSummary.AverageDay`. **Sleep power** is only used for the history detail line when there is no wall meter, so Settings hides it once a

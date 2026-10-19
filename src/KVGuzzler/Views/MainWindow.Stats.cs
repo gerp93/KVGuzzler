@@ -67,6 +67,9 @@ public partial class MainWindow
             StatCostText.Text = "-";
             StatEnergyCaption.Text = "No history yet. It is recorded by the background collector.";
             StatCostCaption.Text = "";
+            StatMaxLabel.Text = "Max draw";
+            StatMaxText.Text = "-";
+            StatMaxCaption.Text = "";
             return;
         }
 
@@ -78,9 +81,28 @@ public partial class MainWindow
             ? "whole PC at the wall" + (stat.CountedSince is { } since ? $", counted since the meter was connected ({since.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)})" : "")
             : "CPU, GPU and memory sensors (active power; a wall meter would show the whole PC)");
 
+        ShowMax(stat, period);
+
         StatCostText.Text = stat.Cost is { } cost ? currency + FormatMoney(cost) : "-";
         StatCostCaption.Text = stat.Cost is null ? "Set your electricity rate (or a bill) in Settings."
             : stat.PriceEstimated ? "Part of this uses an estimated price, until you enter your next bill."
             : "Priced at the rate for each day.";
+    }
+
+    /// <summary>The fourth card: the highest power drawn in the period and when. The whole PC at the wall when there is a meter,
+    /// otherwise the CPU, GPU and memory sensors together.</summary>
+    private void ShowMax(UsageStat stat, string period)
+    {
+        StatMaxLabel.Text = "Max draw · " + (stat.WholePc ? "whole PC at the wall" : "CPU, GPU and memory");
+        if (stat.Peak is not { } peak)
+        {
+            StatMaxText.Text = "-";
+            StatMaxCaption.Text = period + " · nothing recorded yet";
+            return;
+        }
+
+        StatMaxText.Text = (peak.Exact ? "" : "≤ ") + Watts(peak.Watts);
+        StatMaxCaption.Text = period + " · " + peak.At.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+            + (peak.Exact ? "" : " · at most: history from before the total was tracked can only be bounded");
     }
 }

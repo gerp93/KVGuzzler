@@ -35,6 +35,11 @@ public enum ChartSeriesKind
 /// <summary>One minute of one chart series: its energy, how many seconds it covers, and its peak.</summary>
 public sealed record SeriesMinute(long MinuteStart, double KilowattHours, double Seconds, double PeakWatts);
 
+/// <summary>The highest power drawn in a period, and the minute it happened in.</summary>
+/// <param name="Exact">False when it is only an upper bound: some minutes were saved before the total's peak was tracked, and
+/// the best that can be said for them is the sum of each sensor's own peak, which never all happen in the same second.</param>
+public sealed record PeakWatts(double Watts, DateTimeOffset At, bool Exact);
+
 /// <summary>A stretch nothing was sampling.</summary>
 /// <param name="PlugKwh">The whole-PC energy the smart plug's own counter says was used in the stretch (it keeps counting while the PC is
 /// asleep or off), or null when that is not known. Not a sampled figure, and never part of the sensors' energy. When the gap is
@@ -88,6 +93,7 @@ public sealed class HistoryStore : IDisposable
                 minute_start INTEGER NOT NULL, name TEXT NOT NULL, scope INTEGER NOT NULL,
                 kwh REAL NOT NULL, seconds REAL NOT NULL, peak_watts REAL NOT NULL, kind INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (minute_start, name));
+            CREATE TABLE IF NOT EXISTS total_peaks (minute_start INTEGER PRIMARY KEY, watts REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS gaps (
                 start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL, plug_kwh REAL);
             CREATE TABLE IF NOT EXISTS live (name TEXT PRIMARY KEY, scope INTEGER NOT NULL, watts REAL NOT NULL, position INTEGER NOT NULL);
@@ -144,6 +150,21 @@ public sealed class HistoryStore : IDisposable
             cmd.ExecuteNonQuery();
         }
         tx.Commit();
+    }
+
+    /// <summary>Keeps the highest the sensors' total reached in a minute (the per-sensor peaks cannot give it: they do not
+    /// all happen in the same second).</summary>
+    public void AddTotalPeak(long minuteStart, double watts)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO total_peaks (minute_start, watts) VALUES ($m, $w)
+            ON CONFLICT (minute_start) DO UPDATE SET watts = MAX(watts, excluded.watts)
+            """;
+        cmd.Parameters.AddWithValue("$m", minuteStart);
+        cmd.Parameters.AddWithValue("$w", watts);
+        cmd.ExecuteNonQuery();
     }
 
     public void AddGap(Gap gap)
@@ -312,6 +333,50 @@ public sealed class HistoryStore : IDisposable
         }
 
         return (kwh, TimeSpan.FromSeconds(monitored), gaps);
+    }
+
+    // ----- Peak -------------------------------------------------------------------------
+
+    /// <summary>The highest power between two instants: of the whole PC at the wall for <see cref="ReadingScope.Wall"/>, otherwise of
+    /// the sensors' total (CPU, GPU and memory together). Null when nothing was recorded. Highest of the once-a-second readings, so a
+    /// spike shorter than that is not seen.</summary>
+    public PeakWatts? QueryPeak(DateTimeOffset from, DateTimeOffset to, ReadingScope scope = ReadingScope.Component)
+    {
+        using var c = Open();
+        var f = from.ToUnixTimeSeconds() / 60 * 60;
+        var t = to.ToUnixTimeSeconds();
+
+        PeakWatts? Top(string sql, bool exact)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("$scope", (int)scope);
+            cmd.Parameters.AddWithValue("$f", f);
+            cmd.Parameters.AddWithValue("$t", t);
+            using var r = cmd.ExecuteReader();
+            return r.Read() && !r.IsDBNull(1) ? new PeakWatts(r.GetDouble(1), DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(0)), exact) : null;
+        }
+
+        if (scope == ReadingScope.Wall)
+            return Top("""
+                SELECT minute_start, MAX(peak_watts) FROM samples
+                WHERE scope = $scope AND minute_start >= $f AND minute_start < $t
+                GROUP BY minute_start ORDER BY 2 DESC LIMIT 1
+                """, exact: true);
+
+        var recorded = Top("""
+            SELECT minute_start, watts FROM total_peaks
+            WHERE minute_start >= $f AND minute_start < $t
+            ORDER BY watts DESC LIMIT 1
+            """, exact: true);
+        // Minutes saved before the total's peak was tracked: the sum of the sensors' own peaks is the most they can have reached.
+        var bound = Top("""
+            SELECT minute_start, SUM(peak_watts) FROM samples
+            WHERE scope = $scope AND minute_start >= $f AND minute_start < $t
+              AND minute_start NOT IN (SELECT minute_start FROM total_peaks)
+            GROUP BY minute_start ORDER BY 2 DESC LIMIT 1
+            """, exact: false);
+        return bound is null ? recorded : recorded is null || bound.Watts > recorded.Watts ? bound : recorded;
     }
 
     // ----- Totals -----------------------------------------------------------------------

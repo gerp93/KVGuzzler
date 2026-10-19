@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Headless.XUnit;
 using KVGuzzler.Collector;
 using KVGuzzler.Core.Billing;
@@ -364,5 +365,47 @@ public class StatsCardsUiTests
         Assert.Equal("2.5 kWh", window.StatEnergyText.Text);
         Assert.Equal("-", window.StatCostText.Text);
         Assert.Contains("Settings", window.StatCostCaption.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task TheFourthCardShowsTheMaxAfterTheOtherThreeAndFollowsThePeriod()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        t.Services.QueryCollectorService = () => ServiceState.Running;
+        Seed(t);
+        using (var store = new HistoryStore(Path.Combine(t.HistoryDir, HistoryStore.FileName)))
+        {
+            store.AddTotalPeak(DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds() / 60 * 60, 120);
+            store.AddTotalPeak(DateTimeOffset.UtcNow.AddDays(-3).ToUnixTimeSeconds() / 60 * 60, 340);
+        }
+
+        var window = new MainWindow(t.Services);
+        window.Show();
+        await window.RefreshCollectorAsync(includeService: true);
+
+        var card = window.StatMaxText.FindAncestorOfType<Border>()!;
+        var row = (Grid)card.Parent!;
+        Assert.Equal(4, row.ColumnDefinitions.Count);
+        Assert.Equal(3, Grid.GetColumn(card));                                   // the last of the four
+        Assert.Equal("Max draw · CPU, GPU and memory", window.StatMaxLabel.Text);
+        Assert.Equal("340.0 W", window.StatMaxText.Text);                       // all time
+        Assert.Contains("All time", window.StatMaxCaption.Text);
+
+        Cards(window).Single(c => c.Content!.ToString() == "Last 24 hours").IsChecked = true;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        await window.RefreshCollectorAsync(includeService: false);
+        Assert.Equal("120.0 W", window.StatMaxText.Text);                       // only the recent minute
+    }
+
+    [AvaloniaFact]
+    public async Task WithNoHistoryTheMaxIsADash()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        var window = new MainWindow(t.Services);
+        window.Show();
+        await window.RefreshCollectorAsync(includeService: true);
+        Assert.Equal("-", window.StatMaxText.Text);
     }
 }
