@@ -1,3 +1,4 @@
+using KVGuzzler.Core.Carbon;
 using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
@@ -25,6 +26,9 @@ internal sealed class CollectorWorker : BackgroundService
             Path.Combine(_dataDir, WallMeterConfig.FileName), Path.Combine(_dataDir, PeripheralMetersConfig.FileName)));
         using var programs = OperatingSystem.IsWindows() ? new WindowsProgramActivitySource() : null;
         var collector = new PowerCollector(store, sampler, programs);
+        // The grid's carbon intensity, fetched on its own timer so a slow network never holds up the once-a-second sampling.
+        var carbon = new CarbonFeed(store, Path.Combine(_dataDir, CarbonConfig.FileName));
+        var carbonTask = carbon.RunAsync(stop);
 
         collector.Start(DateTimeOffset.UtcNow);
         _log.LogInformation("KVGuzzler collector started. History: {Path}", store.Path);
@@ -53,6 +57,7 @@ internal sealed class CollectorWorker : BackgroundService
         finally
         {
             collector.Stop();
+            try { await carbonTask; } catch (OperationCanceledException) { /* stopping */ }
             _log.LogInformation("KVGuzzler collector stopped.");
         }
     }

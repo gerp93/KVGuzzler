@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         StartBillsUi();
         StartStatsUi();
         StartPeripheralsUi();
+        StartCarbonUi();
         StartEstimator();
     }
 

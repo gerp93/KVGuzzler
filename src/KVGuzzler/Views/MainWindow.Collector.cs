@@ -81,7 +81,7 @@ public partial class MainWindow
 
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
-        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats, AverageUse? Use, IReadOnlyList<PeripheralUse>? Peripherals = null);
+        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats, AverageUse? Use, IReadOnlyList<PeripheralUse>? Peripherals = null, CarbonStatus? CarbonStatus = null);
 
     /// <summary>The chart shows at most the last 30 days, so the two longest choices show that and say so.</summary>
     private static (string Label, TimeSpan Span, TimeSpan Bucket) ChartPeriodFor(int periodIndex) =>
@@ -144,6 +144,7 @@ public partial class MainWindow
         bool readProgramTotals, TimeSpan? estimateSpan, IReadOnlyCollection<string> peripherals, bool includePc)
     {
         IReadOnlyList<PeripheralUse>? peripheralUse = null;
+        CarbonStatus? carbonStatus = null;
         UsageStat? stats = null;
         AverageUse? use = null;
         RateInfo? rates = null;
@@ -159,6 +160,7 @@ public partial class MainWindow
             {
                 var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
+                carbonStatus = store.GetCarbonStatus();
                 periods = HistoryReport.Standard(store, now, sleepWatts);
                 // "All time" for the programs starts at the first thing recorded.
                 var programFrom = programLookBack is { } back ? now - back : store.FirstRecorded() ?? now;
@@ -186,7 +188,7 @@ public partial class MainWindow
         }
 
         return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats, use,
-            peripheralUse);
+            peripheralUse, carbonStatus);
     }
 
     /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
@@ -222,6 +224,7 @@ public partial class MainWindow
         }
 
         ShowCollectorStatus(read.Live);
+        ShowCarbonFeed(read.CarbonStatus);
         ShowHistory(read);
         ShowPrograms(read.Programs, read.Rates);
         if (includeChart)

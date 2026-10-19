@@ -66,6 +66,17 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   meter that stops answering is named in the live notes (`IPowerSourceNotes`). Export (Dashboard > Energy history) is
   `HistoryExport.DailyCsv`, one row per local day; labels that could run as a spreadsheet formula are written as text. Removing a meter
   leaves its history but stops counting it.
+- **Carbon footprint (Electricity Maps).** `carbon.json` in the machine-wide data folder holds a free personal Electricity Maps key and a
+  place (zone code or "lat, lon"), set in Settings > Carbon footprint; the key is plain text there and is shown nowhere after saving.
+  The **collector service** fetches (`CarbonFeed`, every 30 minutes, own timer, follows the file) `GET /v3/carbon-intensity/latest` with the
+  key in the `auth-token` header and saves it per hour in `carbon_intensity`, plus its last outcome in `meta` (`CarbonStatus`, shown in
+  Settings). The key goes only to `CarbonConfig.ApiBase` (a constant, never read from the file) and the place is validated and encoded,
+  so nothing typed can change the request. The free key has no history, so hours before it was set up or while the collector was off
+  have no figure: `CarbonCalculator` values them at the average of the hours that do (and says how much, `EstimatedShare`), and values
+  the plugs' counter energy across gaps (no hour of its own) at the period average. Carbon follows the same Count choice as energy
+  (`UsageStat.Carbon`), is a grid *average* (location based), never "what one more kWh would cause", and is always shown as "≈".
+  **Not checked against the real service** (the docs could not be read when this was written; written from the v3 interface as seen in
+  examples, parsing is tolerant). If the API moves (v4), change `CarbonConfig.ApiBase` and `ElectricityMapsClient.ParseLatest`.
 - **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
   the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).

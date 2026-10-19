@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using KVGuzzler.Core.Billing;
+using KVGuzzler.Core.Carbon;
 using KVGuzzler.Core.Power;
 
 namespace KVGuzzler.Core.History;
@@ -12,6 +13,7 @@ public static class HistoryExport
     /// One row per local day between two instants: the whole PC at the wall (when the wall meter recorded; it includes time the PC slept
     /// or was off where the plug's counter knew), what the CPU, GPU and memory sensors measured, then a column for each extra meter that
     /// recorded anything, and the day's cost of the PC and of the extra meters at the price on that day (blank when no price is known).
+    /// When grid carbon intensity has been saved, two more columns give the day's estimated CO2 in kg for the PC and for the extra meters.
     /// Numbers use a dot and no thousands separator whatever the computer's language, so any spreadsheet reads them.
     /// </summary>
     /// <param name="schedule">The prices, or null for no cost columns' figures.</param>
@@ -25,6 +27,8 @@ public static class HistoryExport
         var header = new List<string> { "date", "whole_pc_kwh", "sensors_kwh" };
         header.AddRange(meters.Select(m => m + " (kwh)"));
         header.AddRange(new[] { "pc_cost", "peripherals_cost" });
+        var hasCarbon = store.AverageCarbonEver() is not null;
+        if (hasCarbon) header.AddRange(new[] { "pc_co2_kg", "peripherals_co2_kg" });
         csv.AppendLine(string.Join(",", header.Select(Cell)));
 
         var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(from, timeZone).DateTime);
@@ -48,6 +52,11 @@ public static class HistoryExport
             row.AddRange(perMeter.Select(Number));
             row.Add(Cost(wall ?? sensors));
             row.Add(Cost(perMeter.Sum()));
+            if (hasCarbon)
+            {
+                row.Add(CarbonCalculator.Compute(store, a, b, includePc: true) is { } pc ? Number(pc.Kg) : "");
+                row.Add(meters.Count > 0 && CarbonCalculator.Compute(store, a, b, includePc: false, meters) is { } extra ? Number(extra.Kg) : "0");
+            }
             csv.AppendLine(string.Join(",", row.Select(Cell)));
         }
         return csv.ToString();
