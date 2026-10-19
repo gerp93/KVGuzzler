@@ -15,6 +15,22 @@ public partial class App : Application
     {
         // The saved choice lives in the database, which may not be open yet: start on the default.
         ThemeManager.Apply(ThemeChoice.DefaultId);
+        // A monitor that sits in the background should not die over one failed button or refresh. Anything
+        // unexpected on the window's thread is written to a log file next to the data and the app carries on.
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            e.Handled = true;
+            try
+            {
+                var dir = Program.Services?.DataDir;
+                if (dir is not null)
+                    File.AppendAllText(Path.Combine(dir, "errors.log"), $"{DateTimeOffset.Now:u} {e.Exception}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch (Exception)
+            {
+                // Nothing more can be done about a log that cannot be written.
+            }
+        };
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

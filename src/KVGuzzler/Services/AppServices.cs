@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using KVGuzzler.Collector;
+using KVGuzzler.Core.History;
 using KVGuzzler.Data;
 using Kvg.Standards;
 
 namespace KVGuzzler.Services;
 
-/// <summary>Everything the windows share: data folder, database location, database, updater.</summary>
+/// <summary>Everything the windows share: data folder, database location, database, updater, power monitor.</summary>
 public sealed class AppServices : IDisposable
 {
     public const string AppName = "KVGuzzler";
@@ -12,18 +14,53 @@ public sealed class AppServices : IDisposable
 
     private readonly InstanceLock? _instanceLock;
 
-    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates)
+    private HistoryStore? _history;
+
+    /// <param name="historyDirectory">Where the background collector keeps its history. Tests pass a temporary
+    /// folder; the app uses the machine-wide folder.</param>
+    public AppServices(string dataDir, InstanceLock? instanceLock, UpdateService updates, PowerMonitor? power = null,
+        string? historyDirectory = null)
     {
+        HistoryDirectory = historyDirectory ?? HistoryStore.DefaultDirectory(isDevelopment: !updates.IsInstalled);
+        QueryCollectorService = () => ServiceInstaller.Query(development: !updates.IsInstalled);
         DataDir = dataDir;
         _instanceLock = instanceLock;
         Updates = updates;
+        Power = power;
         DbLocation = new DbLocation(dataDir, "kvguzzler.db");
     }
 
     public string DataDir { get; }
     public DbLocation DbLocation { get; }
     public UpdateService Updates { get; }
+
+    /// <summary>Live power readings. Null where there is no hardware to read (the UI tests).</summary>
+    public PowerMonitor? Power { get; }
     public Database? Database { get; private set; }
+
+    /// <summary>The background collector's folder (machine-wide, written by its service).</summary>
+    public string HistoryDirectory { get; }
+
+    /// <summary>One reading from a wall meter at the given address, in watts; throws
+    /// <see cref="KVGuzzler.Core.Power.WallMeterException"/> with a message fit to show. Replaceable for tests.</summary>
+    public Func<string, Task<double>> ReadWallMeterAsync { get; set; } =
+        host => KVGuzzler.Core.Power.ShellyPlug.ReadWattsAsync(WallMeterHttp, host);
+
+    private static readonly HttpClient WallMeterHttp = new();
+
+    /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
+    public Func<ServiceState> QueryCollectorService { get; set; }
+
+    /// <summary>The collector's history, or null when it has not recorded anything yet on this machine (or
+    /// cannot be opened). Never creates the file: only the collector does that.</summary>
+    public HistoryStore? OpenHistory()
+    {
+        if (_history is not null) return _history;
+        var path = Path.Combine(HistoryDirectory, HistoryStore.FileName);
+        if (!File.Exists(path)) return null;
+        try { return _history = new HistoryStore(path); }
+        catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException) { return null; }
+    }
 
     public void OpenDatabase() => Database = new Database(DbLocation.GetEffectiveDbPath());
 
@@ -47,6 +84,8 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        Power?.Dispose();
+        _history?.Dispose();
         CloseDatabase();
         _instanceLock?.Dispose();
     }
