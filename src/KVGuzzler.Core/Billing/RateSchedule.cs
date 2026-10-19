@@ -7,6 +7,10 @@ public enum RateMode
 
     /// <summary>Each bill gives the price for the dates it covers.</summary>
     FromBills,
+
+    /// <summary>A utility's published tariff, looked up from OpenEI, gives the price of each hour; a day's price is that, weighted by
+    /// the hours the power is really used.</summary>
+    Lookup,
 }
 
 /// <summary>A stretch of time with one price. <see cref="Rate"/> is null when no price is known at all.</summary>
@@ -25,22 +29,41 @@ public sealed class RateSchedule
 {
     private readonly TimeZoneInfo _zone;
 
-    public RateSchedule(RateMode mode, decimal? flatRate, IEnumerable<Bill> bills, TimeZoneInfo? zone = null)
+    /// <param name="tariff">The looked-up tariff, used in <see cref="RateMode.Lookup"/>. Without one, that mode falls back on the single rate.</param>
+    /// <param name="profile">When the power is used, to weight a time-of-use tariff into one price per day; even through the day when null.</param>
+    public RateSchedule(RateMode mode, decimal? flatRate, IEnumerable<Bill> bills, TimeZoneInfo? zone = null, Tariff? tariff = null,
+        UsageProfile? profile = null)
     {
         Mode = mode;
         FlatRate = flatRate;
         Bills = bills.OrderBy(b => b.Start).ToList();
         _zone = zone ?? TimeZoneInfo.Local;
+        Tariff = tariff;
+        Profile = profile ?? UsageProfile.Uniform;
     }
 
     public RateMode Mode { get; }
     public decimal? FlatRate { get; }
     public IReadOnlyList<Bill> Bills { get; }
+    public Tariff? Tariff { get; }
+    public UsageProfile Profile { get; }
 
     private bool UsesBills => Mode == RateMode.FromBills && Bills.Count > 0;
+    private bool UsesTariff => Mode == RateMode.Lookup && Tariff is not null;
+
+    /// <summary>The price of a day under the looked-up tariff: each hour's price times the share of the day's usage that falls in that hour.</summary>
+    private decimal TariffRate(DateOnly day)
+    {
+        var weekend = day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+        var share = weekend ? Profile.Weekend : Profile.Weekday;
+        var price = 0.0;
+        for (var hour = 0; hour < 24; hour++) price += share[hour] * Tariff!.Price(day.Month - 1, weekend, hour);
+        return (decimal)price;
+    }
 
     public decimal? RateAt(DateOnly day)
     {
+        if (UsesTariff) return TariffRate(day);
         if (!UsesBills) return FlatRate;
 
         if (Bills.FirstOrDefault(b => b.Start <= day && day <= b.End) is { } inside) return inside.PricePerKwh;

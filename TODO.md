@@ -35,6 +35,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
         real plug: that `aenergy.total` really keeps counting while the PC sleeps, and whether it survives a plug reboot or
         power cut (the code assumes it does not and leaves such a gap alone). Not built: filling a short stretch where only
         the plug was unreachable while the PC stayed awake, and splitting a long gap whose counter reset in the middle.
+      - **Rates looked up from OpenEI** (a third "Price from" choice beside one rate and My bills): built, **not tried against the real
+        service or with a real key.** To confirm: that `address=<ZIP>` + `sector=Residential` + `effective_on_date` returns the utility's
+        current rates with `detail=full` (and is not too slow), the real field shapes (`energyratestructure`, the schedules, `unit`), and
+        that `getpage=<label>` returns one rate. Not built: usage tiers (the first tier is used), holidays (the weekend schedule applies to
+        them), demand and fixed charges, the tariff's history (today's is applied to past days), and Xcel-specific bill add-ons.
       - **Carbon footprint**: built (Electricity Maps, see CLAUDE.md), **not tried against the real service or with a real key.**
         To confirm: the v3 `latest` path and `auth-token` header, the field names, the free-tier limits, and that the zone code or
         "lat, lon" the free key was set up for is accepted. Not built: carbon per program and per run, a grid-intensity line on the

@@ -21,6 +21,13 @@ public static class SettingKeys
     /// <summary>"1" when the PC itself is unticked in the Dashboard's "Count" row, so only the extra meters are totalled.
     /// Only applies while there are extra meters.</summary>
     public const string PcOff = "pc_off";
+    /// <summary>The OpenEI API key used to look up the utility's rates (saved once a search worked; never shown again).</summary>
+    public const string OpenEiKey = "openei_key";
+    /// <summary>The chosen looked-up tariff, as <see cref="Core.Billing.Tariff"/> JSON.</summary>
+    public const string RateLookupTariff = "rate_lookup_tariff";
+    /// <summary>When the hours-of-use profile was last worked out, and the profile itself (<see cref="Core.Billing.UsageProfile"/> JSON).</summary>
+    public const string RateLookupProfileAt = "rate_lookup_profile_at";
+    public const string RateLookupProfile = "rate_lookup_profile";
 }
 
 /// <summary>The app's SQLite file, in WAL mode. Short-lived pooled connections per call.</summary>
@@ -154,12 +161,18 @@ public sealed class Database : IDisposable
         tx.Commit();
     }
 
-    /// <summary>The prices to use for each day: one saved rate, or the bills, as the user chose.</summary>
+    /// <summary>The prices to use for each day: one saved rate, the bills, or the looked-up tariff, as the user chose.</summary>
     public RateSchedule LoadRateSchedule()
     {
-        var mode = GetSetting(SettingKeys.RateMode) == "bills" ? Core.Billing.RateMode.FromBills : Core.Billing.RateMode.OneRate;
+        var mode = GetSetting(SettingKeys.RateMode) switch
+        {
+            "bills" => Core.Billing.RateMode.FromBills,
+            "lookup" => Core.Billing.RateMode.Lookup,
+            _ => Core.Billing.RateMode.OneRate,
+        };
         decimal? flat = decimal.TryParse(GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var r) ? r : null;
-        return new RateSchedule(mode, flat, GetBills());
+        return new RateSchedule(mode, flat, GetBills(), null, Core.Billing.Tariff.FromJson(GetSetting(SettingKeys.RateLookupTariff)),
+            Core.Billing.UsageProfile.FromJson(GetSetting(SettingKeys.RateLookupProfile)));
     }
 
     /// <summary>Release the file. Required before relocating it: the connection pool keeps it open,

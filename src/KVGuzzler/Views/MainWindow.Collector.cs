@@ -160,6 +160,7 @@ public partial class MainWindow
             {
                 var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
+                RefreshUsageProfile(store, now);
                 carbonStatus = store.GetCarbonStatus();
                 periods = HistoryReport.Standard(store, now, sleepWatts);
                 // "All time" for the programs starts at the first thing recorded.

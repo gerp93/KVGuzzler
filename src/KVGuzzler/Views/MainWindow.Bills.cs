@@ -20,7 +20,7 @@ public partial class MainWindow
 
     private void StartBillsUi()
     {
-        RateModeBox.SelectedIndex = _services.Database?.GetSetting(SettingKeys.RateMode) == "bills" ? 1 : 0;
+        RateModeBox.SelectedIndex = _services.Database?.GetSetting(SettingKeys.RateMode) switch { "bills" => 1, "lookup" => 2, _ => 0 };
         ApplyRateMode();
 
         RateModeBox.SelectionChanged += (_, _) => OnRateModeChanged();
@@ -36,11 +36,13 @@ public partial class MainWindow
     }
 
     private bool UsingBills => RateModeBox.SelectedIndex == 1;
+    private bool UsingLookup => RateModeBox.SelectedIndex == 2;
 
     private void ApplyRateMode()
     {
-        OneRatePanel.IsVisible = !UsingBills;
+        OneRatePanel.IsVisible = !UsingBills && !UsingLookup;
         BillsPanel.IsVisible = UsingBills;
+        LookupPanel.IsVisible = UsingLookup;
     }
 
     private void OnRateModeChanged()
@@ -48,7 +50,7 @@ public partial class MainWindow
         ApplyRateMode();
         if (_restartRequired || _services.Database is null) return;
 
-        _services.Database.SetSetting(SettingKeys.RateMode, UsingBills ? "bills" : "one");
+        _services.Database.SetSetting(SettingKeys.RateMode, UsingBills ? "bills" : UsingLookup ? "lookup" : "one");
         _services.Database.SetSetting(SettingKeys.Currency, Currency);
         RefreshEstimate();
         _ = RefreshBillsAsync();
