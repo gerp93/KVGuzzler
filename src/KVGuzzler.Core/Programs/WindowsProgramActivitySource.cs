@@ -9,7 +9,8 @@ namespace KVGuzzler.Core.Programs;
 /// Per-program CPU and GPU use on Windows, from the performance counters Task Manager itself uses:
 /// "Process" (CPU time per process) and "GPU Engine" (time each process kept each GPU engine busy). No
 /// administrator rights and no driver are needed. Processes are grouped by program name, so all of one
-/// browser's processes count as one program.
+/// browser's processes count as one program. An interpreter's name (python.exe) says nothing about what it is
+/// running, so those are labelled with the script or app behind them (<see cref="ProgramLabeler"/>).
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowsProgramActivitySource : IProgramActivitySource
@@ -27,8 +28,11 @@ public sealed partial class WindowsProgramActivitySource : IProgramActivitySourc
     private readonly int _processors = Math.Max(Environment.ProcessorCount, 1);
     private Snapshot? _previous;
 
-    public WindowsProgramActivitySource()
+    private readonly ProgramNamer _namer;
+
+    public WindowsProgramActivitySource(IProcessInspector? inspector = null)
     {
+        _namer = new ProgramNamer(inspector ?? new WindowsProcessInspector());
         try
         {
             if (!PerformanceCounterCategory.Exists("Process"))
@@ -87,7 +91,7 @@ public sealed partial class WindowsProgramActivitySource : IProgramActivitySourc
 
     private Snapshot Read()
     {
-        var processes = new Dictionary<int, (string, CounterSample)>();
+        var named = new Dictionary<int, (string Name, CounterSample Cpu)>();
         var process = new PerformanceCounterCategory("Process").ReadCategory();
         var ids = process["ID Process"];
         var cpu = process["% Processor Time"];
@@ -97,8 +101,13 @@ public sealed partial class WindowsProgramActivitySource : IProgramActivitySourc
             if (ProgramName(instance) is not { } name) continue;
             var pid = (int)((InstanceData)entry.Value!).Sample.RawValue;
             if (pid <= 0 || !cpu.Contains(instance)) continue;
-            processes[pid] = (name, cpu[instance].Sample);
+            named[pid] = (name, cpu[instance].Sample);
         }
+
+        // Interpreters get a label naming what they run; the parent's executable name is one of the clues.
+        string? ProgramOf(int pid) => named.TryGetValue(pid, out var p) ? p.Name : null;
+        var processes = named.ToDictionary(kv => kv.Key, kv => (_namer.Name(kv.Key, kv.Value.Name, ProgramOf), kv.Value.Cpu));
+        _namer.Retain(named.Keys);
 
         var gpu = new Dictionary<string, (int, CounterSample)>();
         if (PerformanceCounterCategory.Exists("GPU Engine"))

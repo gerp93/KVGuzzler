@@ -56,6 +56,11 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).
   Never present these numbers as measurements, and never add them to the sensor or wall figures: they
   split the CPU and GPU energy that is already counted.
+  **Program names:** an executable is the program (`chrome.exe`), except interpreters (`ProgramLabeler.IsGeneric`:
+  python, node, java, dotnet, pwsh...), which are labelled with what they run, `python.exe (ComfyUI)`, from the
+  command line, else the parent program, else the venv folder. Looked up once per process id (`ProgramNamer`, via
+  `WindowsProcessInspector`, limited-access handle, no admin); only the short label is kept, never the command
+  line (arguments can hold secrets). Labels are history keys, so changing the label rules splits old and new rows.
 - **Prices come from `RateSchedule`, never from reading the single rate setting directly.** In "My bills" mode each
   bill's price (total minus its flat fees, over its kWh) applies to the dates it covers; cost of a period is its
   energy priced stretch by stretch (`RateSchedule.Cost`), so a period spanning two bills is right. Bill dates are
