@@ -88,7 +88,7 @@
             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
               <Border Classes="card" Grid.Column="0">
                 <StackPanel Spacing="2">
-                  <TextBlock Text="Energy used" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="Energy used" Classes="caption" /><Arc x:Name="StatEnergySpinner" Classes="spinner" Grid.Column="1" /></Grid>
                   <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
                     <TextBlock x:Name="StatEnergyText" Text="-" Classes="hero" />
                   </Viewbox>
@@ -97,7 +97,7 @@
               </Border>
               <Border Classes="card" Grid.Column="1">
                 <StackPanel Spacing="2">
-                  <TextBlock Text="Cost" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="Cost" Classes="caption" /><Arc x:Name="StatCostSpinner" Classes="spinner" Grid.Column="1" /></Grid>
                   <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
                     <TextBlock x:Name="StatCostText" Text="-" Classes="hero" />
                   </Viewbox>
@@ -115,7 +115,7 @@
               </Border>
               <Border Classes="card" Grid.Column="3">
                 <StackPanel Spacing="2">
-                  <TextBlock x:Name="StatMaxLabel" Text="Max draw" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatMaxLabel" Text="Max draw" Classes="caption" /><Arc x:Name="StatMaxSpinner" Classes="spinner" Grid.Column="1" /></Grid>
                   <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
                     <TextBlock x:Name="StatMaxText" Text="-" Classes="hero" />
                   </Viewbox>
@@ -128,10 +128,13 @@
             <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
               <Border Classes="card" Grid.Column="0">
                 <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
-                  <StackPanel Spacing="2">
-                    <TextBlock Text="Power over time" Classes="h2" />
-                    <TextBlock x:Name="ChartPeriodText" Classes="caption" />
-                  </StackPanel>
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="Power over time" Classes="h2" />
+                      <TextBlock x:Name="ChartPeriodText" Classes="caption" />
+                    </StackPanel>
+                    <Arc x:Name="ChartSpinner" Classes="spinner" Grid.Column="1" VerticalAlignment="Top" />
+                  </Grid>
                   <views:PowerChartControl x:Name="PowerChartView" Grid.Row="1" />
                   <TextBlock x:Name="ChartNoteText" Grid.Row="2" Classes="caption" />
                 </Grid>
@@ -177,10 +180,13 @@
             <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
               <Border Classes="card" Grid.Column="0">
                 <StackPanel Spacing="10">
-                  <StackPanel Spacing="2">
-                    <TextBlock Text="Where the power went" Classes="h2" />
-                    <TextBlock x:Name="DashboardProgramsSummaryText" Classes="caption" />
-                  </StackPanel>
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="Where the power went" Classes="h2" />
+                      <TextBlock x:Name="DashboardProgramsSummaryText" Classes="caption" />
+                    </StackPanel>
+                    <Arc x:Name="DashboardProgramsSpinner" Classes="spinner" Grid.Column="1" VerticalAlignment="Top" />
+                  </Grid>
                   <Border CornerRadius="6" ClipToBounds="True" Height="14">
                     <Grid x:Name="DashboardProgramsSplitBar" />
                   </Border>
@@ -261,10 +267,13 @@
             <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
               <Border Classes="card" Grid.Column="0">
                 <StackPanel Spacing="10">
-                  <StackPanel Spacing="2">
-                    <TextBlock Text="Who used the power" Classes="h2" />
-                    <TextBlock x:Name="ProgramsPeriodText" Classes="caption" />
-                  </StackPanel>
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="Who used the power" Classes="h2" />
+                      <TextBlock x:Name="ProgramsPeriodText" Classes="caption" />
+                    </StackPanel>
+                    <Arc x:Name="ProgramsSpinner" Classes="spinner" Grid.Column="1" VerticalAlignment="Top" />
+                  </Grid>
                   <TextBlock x:Name="ProgramsTotalText" FontWeight="SemiBold" Classes="body" />
                   <Border CornerRadius="6" ClipToBounds="True" Height="14">
                     <Grid x:Name="ProgramsSplitBar" />

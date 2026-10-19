@@ -54,9 +54,16 @@ public partial class MainWindow
             {
                 if (buttons[index].IsChecked != true) return;
                 _services.Database?.SetSetting(SettingKeys.StatsPeriod, index.ToString(CultureInfo.InvariantCulture));
-                _ = RefreshCollectorAsync(includeService: false, includeChart: true);
+                _ = RefreshCollectorAsync(includeService: false, includeChart: true, showBusy: true);
             };
         }
+    }
+
+    /// <summary>Spins the spinners beside every title whose numbers follow the chosen period while they are being recalculated.</summary>
+    private void SetPeriodBusy(bool busy)
+    {
+        foreach (var spinner in new[] { StatEnergySpinner, StatCostSpinner, StatMaxSpinner, ChartSpinner, DashboardProgramsSpinner, ProgramsSpinner })
+            spinner.Classes.Set("busy", busy);
     }
 
     private void ShowStats(UsageStat? stat)
