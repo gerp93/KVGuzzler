@@ -83,6 +83,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   Checked on this PC's real history: axes, lines, shaded gaps and the hover guide line show correctly; the
   hover readout box itself was not seen on screen (the scripted pointer test lost the window), only unit-tested
   for its maths. Still to do: per-day/week/month totals as bars, and a per-program stacked view.
+- **Totals cards** (built): the top of the Dashboard shows two big numbers, the energy used and what it cost, for a
+  period chosen from a row of block-style buttons (last hour, 24 hours, 7 days, 30 days, year, all time; the choice
+  is remembered, the first time it is "All time"). It is the whole PC from the wall meter if that recorded in the
+  period (noting when it began part-way through), otherwise the CPU/GPU sensors; the cost is priced day by day.
+  Not built: a comparison with the previous period, or a per-day bar view.
 - **Rates from bills** (built): Settings > Electricity rate can switch from "One rate" to "My bills". Each bill is
   its dates, total and kWh, plus zero or more flat fees to leave out (a basic charge, a credit); the price per kWh is
   (total - fees) / kWh and applies to everything recorded on those dates, so an old month keeps its own price.

@@ -4,11 +4,70 @@
         x:Class="KVGuzzler.Views.MainWindow"
         Title="KVGuzzler"
         Width="900" Height="640" MinWidth="640" MinHeight="480">
+  <Window.Styles>
+    <!-- A block with a surface colour, a border and rounded corners. -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource VaSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource VaBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+    <!-- A radio button drawn as a selectable block: the chosen one gets the accent border. -->
+    <Style Selector="RadioButton.period">
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border x:Name="PART_Card" Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}"
+                  BorderThickness="1" CornerRadius="8" Padding="14,10" MinWidth="104">
+            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.period:checked">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="RadioButton.period:checked /template/ Border#PART_Card">
+      <Setter Property="BorderBrush" Value="{DynamicResource VaPrimaryActionBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="RadioButton.period:pointerover /template/ Border#PART_Card">
+      <Setter Property="BorderBrush" Value="{DynamicResource VaPrimaryActionHoverBrush}" />
+    </Style>
+  </Window.Styles>
   <TabControl x:Name="Tabs" Margin="8">
 
     <TabItem Header="Dashboard">
       <ScrollViewer>
         <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+          <Grid ColumnDefinitions="*,*">
+            <Border Classes="card" Grid.Column="0" Margin="0,0,6,0">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Energy used" FontSize="12" Foreground="{DynamicResource VaTextMutedBrush}" />
+                <TextBlock x:Name="StatEnergyText" Text="-" FontSize="34" FontWeight="Bold" />
+                <TextBlock x:Name="StatEnergyCaption" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="card" Grid.Column="1" Margin="6,0,0,0">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Cost" FontSize="12" Foreground="{DynamicResource VaTextMutedBrush}" />
+                <TextBlock x:Name="StatCostText" Text="-" FontSize="34" FontWeight="Bold" />
+                <TextBlock x:Name="StatCostCaption" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
+              </StackPanel>
+            </Border>
+          </Grid>
+          <WrapPanel x:Name="StatsPeriodPanel">
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last hour" />
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 24 hours" />
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 7 days" />
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 30 days" />
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last year" />
+            <RadioButton Classes="period" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
+          </WrapPanel>
+
+          <Separator Margin="0,4" />
+
           <TextBlock Text="Live power" FontSize="20" FontWeight="SemiBold" />
           <TextBlock x:Name="PowerStatusText" TextWrapping="Wrap" Text="Looking for power sensors..." />
           <ItemsControl x:Name="ReadingsList">

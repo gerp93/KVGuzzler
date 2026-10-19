@@ -71,7 +71,7 @@ public partial class MainWindow
 
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
-        PowerChartData? Chart, RateInfo? Rates);
+        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats);
 
     /// <summary>How long each choice in the Programs tab looks back.</summary>
     private static readonly TimeSpan[] ProgramPeriods =
@@ -85,7 +85,9 @@ public partial class MainWindow
             var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
             var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
             var schedule = _services.Database?.LoadRateSchedule();
-            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null, schedule));
+            var statsSpan = StatsPeriods[Math.Clamp(SelectedStatsIndex, 0, StatsPeriods.Length - 1)].Span;
+            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null, schedule,
+                includeChart ? statsSpan : null, includeChart));
             ApplyCollector(read, includeChart);
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -97,8 +99,9 @@ public partial class MainWindow
     }
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack,
-        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule)
+        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats)
     {
+        UsageStat? stats = null;
         RateInfo? rates = null;
         LiveState? live = null;
         IReadOnlyList<PeriodReport>? periods = null;
@@ -117,6 +120,7 @@ public partial class MainWindow
                 programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline(),
                     store.GetRecentRuns(20));
                 if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
+                if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now);
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -124,7 +128,7 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats);
     }
 
     /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
@@ -162,7 +166,11 @@ public partial class MainWindow
         ShowCollectorStatus(read.Live);
         ShowHistory(read);
         ShowPrograms(read.Programs, read.Rates);
-        if (includeChart) ShowChart(read);
+        if (includeChart)
+        {
+            ShowChart(read);
+            ShowStats(read.Stats);
+        }
     }
 
     private void ShowChart(CollectorRead read)

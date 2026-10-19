@@ -272,6 +272,30 @@ public sealed class HistoryStore : IDisposable
         return (kwh, TimeSpan.FromSeconds(monitored), gaps);
     }
 
+    // ----- Totals -----------------------------------------------------------------------
+
+    /// <summary>Energy of one kind of reading between two instants: just the sum, so it stays quick over a year of minutes.</summary>
+    public double EnergyKwh(DateTimeOffset from, DateTimeOffset to, ReadingScope scope = ReadingScope.Component)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(SUM(kwh), 0) FROM samples WHERE scope = $scope AND minute_start >= $f AND minute_start < $t";
+        cmd.Parameters.AddWithValue("$scope", (int)scope);
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        return Convert.ToDouble(cmd.ExecuteScalar());
+    }
+
+    /// <summary>When the earliest saved reading is (of one kind, or of any), or null if nothing was recorded.</summary>
+    public DateTimeOffset? FirstRecorded(ReadingScope? scope = null)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = scope is null ? "SELECT MIN(minute_start) FROM samples" : "SELECT MIN(minute_start) FROM samples WHERE scope = $scope";
+        if (scope is { } s) cmd.Parameters.AddWithValue("$scope", (int)s);
+        return cmd.ExecuteScalar() is long seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
+    }
+
     // ----- Chart series -----------------------------------------------------------------
 
     /// <summary>The minutes of one chart series between two instants, oldest first. A series can be several saved
