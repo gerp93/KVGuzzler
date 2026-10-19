@@ -256,16 +256,21 @@ public class PeripheralHistoryTests
     }
 
     [Fact]
-    public void TheChartGetsAPeripheralsLineOnlyForChosenMeters()
+    public void TheChartGetsALineForEachChosenMeterToldApartByVariant()
     {
         using var h = Seeded();
         var none = PowerChart.Build(h.Store, T0, T0.AddHours(1), TimeSpan.FromMinutes(1));
         Assert.DoesNotContain(none.Series, s => s.Kind == ChartSeriesKind.Peripheral);
 
         var some = PowerChart.Build(h.Store, T0, T0.AddHours(1), TimeSpan.FromMinutes(1), new[] { "Monitor", "Speakers" });
-        var line = Assert.Single(some.Series, s => s.Kind == ChartSeriesKind.Peripheral);
-        Assert.Equal("Peripherals", line.Name);
-        Assert.Equal(0.007 * 3_600_000 / 60, line.Points[0].Watts, precision: 6);   // first minute: both meters, as watts
+        var lines = some.Series.Where(s => s.Kind == ChartSeriesKind.Peripheral).ToList();
+        Assert.Equal(new[] { "Monitor", "Speakers" }, lines.Select(l => l.Name));
+        Assert.Equal(new[] { 0, 1 }, lines.Select(l => l.Variant));
+        Assert.Equal(0.005 * 3_600_000 / 60, lines[0].Points[0].Watts, precision: 6);   // first minute, as watts
+        Assert.Equal(0.002 * 3_600_000 / 60, lines[1].Points[0].Watts, precision: 6);
+
+        var only = PowerChart.Build(h.Store, T0, T0.AddHours(1), TimeSpan.FromMinutes(1), new[] { "Monitor" }, includePc: false);
+        Assert.Equal(new[] { "Monitor" }, only.Series.Select(s => s.Name));   // no whole-PC line without the PC
     }
 
     [Fact]

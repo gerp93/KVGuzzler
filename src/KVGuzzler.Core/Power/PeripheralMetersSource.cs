@@ -7,8 +7,9 @@ namespace KVGuzzler.Core.Power;
 /// <see cref="WallMeterSource"/>, so adding or removing a meter in the window takes effect within a few seconds.
 /// </summary>
 /// <remarks>Never added to the sensors or the wall figure; see <see cref="ReadingScope.Peripheral"/>. A plug that does not answer
-/// is simply missing from the readings, and nothing is recorded for it, rather than a made-up zero.</remarks>
-public sealed class PeripheralMetersSource : IPowerSource
+/// is simply missing from the readings, and nothing is recorded for it, rather than a made-up zero. It is named in
+/// <see cref="Notes"/> so the Dashboard can say which one is silent.</remarks>
+public sealed class PeripheralMetersSource : IPowerSource, IPeripheralEnergyCounters, IPowerSourceNotes
 {
     /// <summary>A reading older than this is not shown as current.</summary>
     public static readonly TimeSpan Fresh = TimeSpan.FromSeconds(5);
@@ -31,6 +32,7 @@ public sealed class PeripheralMetersSource : IPowerSource
         public double Watts;
         public long? ReadAt;
         public string? Error;
+        public WallCounter? Counter;
     }
 
     public PeripheralMetersSource(string configPath, HttpMessageHandler? handler = null, TimeSpan? pollInterval = null, TimeProvider? time = null)
@@ -53,9 +55,25 @@ public sealed class PeripheralMetersSource : IPowerSource
         {
             FollowConfig();
             return _polled
-                .Where(p => p.Value.ReadAt is { } at && _time.GetElapsedTime(at) < Fresh)
+                .Where(p => IsFresh(p.Value))
                 .Select(p => new PowerReading(p.Key.Label, p.Value.Watts, ReadingScope.Peripheral))
                 .ToList();
+        }
+    }
+
+    /// <summary>One line for each meter that has stopped answering and why ("Monitor (192.168.1.51): Could not reach ..."). A meter
+    /// still waiting for its first answer, or whose last good answer is recent, is not listed: a single missed poll is not worth a notice.</summary>
+    public IReadOnlyList<string> Notes
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _polled
+                    .Where(p => p.Value.Error is not null && !IsFresh(p.Value))
+                    .Select(p => $"{p.Key.Label} ({p.Key.Host}): {p.Value.Error}")
+                    .ToList();
+            }
         }
     }
 
@@ -69,6 +87,19 @@ public sealed class PeripheralMetersSource : IPowerSource
         }
     }
 
+    public IReadOnlyDictionary<string, WallCounter> LatestCounters
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _polled
+                    .Where(p => p.Value.Counter is not null)
+                    .ToDictionary(p => p.Key.Label, p => p.Value.Counter!, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
@@ -78,6 +109,8 @@ public sealed class PeripheralMetersSource : IPowerSource
         }
         _http.Dispose();
     }
+
+    private bool IsFresh(Polled p) => p.ReadAt is { } at && _time.GetElapsedTime(at) < Fresh;
 
     /// <summary>Re-reads the config file when it changed (checked at most every couple of seconds), stops polling meters that are
     /// gone or changed, and starts polling new ones. Caller holds the lock.</summary>
@@ -121,6 +154,7 @@ public sealed class PeripheralMetersSource : IPowerSource
                         if (cancel.IsCancellationRequested) return;
                         state.Watts = status.Watts;
                         state.ReadAt = _time.GetTimestamp();
+                        state.Counter = status.EnergyWh is { } wh ? new WallCounter(meter.Host, wh, _time.GetUtcNow()) : null;
                         state.Error = null;
                     }
                 }

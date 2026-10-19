@@ -7,6 +7,20 @@ namespace KVGuzzler.Core.Power;
 /// <param name="ReadAt">When the plug was asked (UTC).</param>
 public sealed record WallCounter(string Host, double TotalWh, DateTimeOffset ReadAt);
 
+/// <summary>A source that can tell the energy totals of several plugs, by the label the user gave each (see <see cref="WallCounter"/>).</summary>
+public interface IPeripheralEnergyCounters
+{
+    /// <summary>The counter from each meter's latest answer. Meters that have not answered, or answered without a counter, are left out.</summary>
+    IReadOnlyDictionary<string, WallCounter> LatestCounters { get; }
+}
+
+/// <summary>A source with things to tell the user that are not "I cannot run here": one meter out of several that is not answering.
+/// Shown with the notes of the sources that are unavailable.</summary>
+public interface IPowerSourceNotes
+{
+    IReadOnlyList<string> Notes { get; }
+}
+
 /// <summary>A source that can also tell the plug's energy total (see <see cref="WallCounter"/>).</summary>
 public interface IWallEnergyCounter
 {

@@ -61,6 +61,11 @@ public sealed class PowerCollector
 
     private sealed record PendingFill(Gap Gap, WallCounter Before, DateTimeOffset GiveUpAt);
 
+    // The same for each extra meter (monitor, speakers), by label: their plugs keep counting too while the PC sleeps.
+    private readonly IPeripheralEnergyCounters? _peripheralCounters;
+    private readonly Dictionary<string, WallCounter> _lastPeripheralCounters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, PendingFill> _pendingPeripheralFills = new(StringComparer.OrdinalIgnoreCase);
+
     private DateTimeOffset? _last;
     private Dictionary<string, double> _lastWatts = new();
     private long _bucketMinute = -1;
@@ -75,6 +80,7 @@ public sealed class PowerCollector
         _sampler = sampler;
         _programs = programs;
         _counterSource = sampler.Sources.OfType<IWallEnergyCounter>().FirstOrDefault();
+        _peripheralCounters = sampler.Sources.OfType<IPeripheralEnergyCounters>().FirstOrDefault();
         if (programs is not null)
         {
             var (cpu, gpu) = store.GetIdleBaseline();
@@ -93,6 +99,7 @@ public sealed class PowerCollector
             _store.AddGap(gap);
             // The plug's counter as saved with the last sample: the plug has kept counting since.
             WaitForPlug(gap, _store.GetWallCounter(), now);
+            WaitForPeripheralPlugs(gap, _store.GetPeripheralCounters(), now);
         }
     }
 
@@ -110,6 +117,7 @@ public sealed class PowerCollector
             var gap = new Gap(_last!.Value, now, GapReason.Asleep);
             _store.AddGap(gap);
             WaitForPlug(gap, _lastCounter, now);
+            WaitForPeripheralPlugs(gap, _lastPeripheralCounters, now);
             _lastWatts.Clear();
             RestartPrograms();
         }
@@ -131,8 +139,16 @@ public sealed class PowerCollector
         FillGapFromPlug(now, counter);
         if (fresh is not null) _lastCounter = fresh;
 
+        if (_peripheralCounters is not null)
+        {
+            var latest = _peripheralCounters.LatestCounters;
+            FillGapsFromPeripheralPlugs(now, latest);
+            foreach (var (label, c) in latest)
+                if (IsCurrent(c, now)) _lastPeripheralCounters[label] = c;
+        }
+
         var notes = _programNote is null ? snapshot.Notes : snapshot.Notes.Append(_programNote).ToList();
-        _store.SetLive(now, readings, notes, fresh);
+        _store.SetLive(now, readings, notes, fresh, _lastPeripheralCounters);
         return snapshot with { Readings = readings, Notes = notes };
     }
 
@@ -168,12 +184,47 @@ public sealed class PowerCollector
         // An answer from before the PC woke (still held by the plug source) says nothing about the gap's end.
         if (counter is null || counter.ReadAt < pending.Gap.End.AddSeconds(-2)) return;
         _pendingFill = null;
-        if (!string.Equals(counter.Host, pending.Before.Host, StringComparison.OrdinalIgnoreCase)) return;   // a different plug
+        if (PlugEnergyKwh(pending.Before, counter) is { } kwh) _store.SetGapPlugEnergy(pending.Gap.Start, kwh);
+    }
 
-        var wh = counter.TotalWh - pending.Before.TotalWh;
-        var hours = (counter.ReadAt - pending.Before.ReadAt).TotalHours;
-        if (wh < 0 || hours <= 0 || wh / hours > MaxPlugWatts) return;
-        _store.SetGapPlugEnergy(pending.Gap.Start, wh / 1000.0);
+    /// <summary>The difference of a plug's counter between two readings, in kWh, or null when it cannot be believed: a different
+    /// plug, a counter that went down (the plug restarted), or more power than a plug can carry.</summary>
+    private static double? PlugEnergyKwh(WallCounter before, WallCounter after)
+    {
+        if (!string.Equals(after.Host, before.Host, StringComparison.OrdinalIgnoreCase)) return null;
+        var wh = after.TotalWh - before.TotalWh;
+        var hours = (after.ReadAt - before.ReadAt).TotalHours;
+        if (wh < 0 || hours <= 0 || wh / hours > MaxPlugWatts) return null;
+        return wh / 1000.0;
+    }
+
+    /// <summary>Only an answer from just now counts as the counter "as of this tick".</summary>
+    private static bool IsCurrent(WallCounter counter, DateTimeOffset now) =>
+        now - counter.ReadAt <= GapThreshold / 2 && counter.ReadAt <= now.AddSeconds(1);
+
+    /// <summary>After a gap, remembers what each extra meter's counter said before it. A meter with no counter, or one not close
+    /// enough to where sampling stopped, is left out (it will not be filled).</summary>
+    private void WaitForPeripheralPlugs(Gap gap, IReadOnlyDictionary<string, WallCounter> before, DateTimeOffset now)
+    {
+        _pendingPeripheralFills.Clear();
+        if (_peripheralCounters is null) return;
+        foreach (var (label, counter) in before)
+            if ((gap.Start - counter.ReadAt).Duration() <= CounterNearGap)
+                _pendingPeripheralFills[label] = new PendingFill(gap, counter, now + CounterWait);
+    }
+
+    /// <summary>When an extra meter's plug answers again after a gap, saves the difference of its counter as that meter's energy
+    /// for the gap, with the same cautions as for the wall meter.</summary>
+    private void FillGapsFromPeripheralPlugs(DateTimeOffset now, IReadOnlyDictionary<string, WallCounter> latest)
+    {
+        if (_pendingPeripheralFills.Count == 0) return;
+        foreach (var (label, pending) in _pendingPeripheralFills.ToList())
+        {
+            if (now > pending.GiveUpAt) { _pendingPeripheralFills.Remove(label); continue; }
+            if (!latest.TryGetValue(label, out var counter) || counter.ReadAt < pending.Gap.End.AddSeconds(-2)) continue;
+            _pendingPeripheralFills.Remove(label);
+            if (PlugEnergyKwh(pending.Before, counter) is { } kwh) _store.SetGapPeripheralEnergy(pending.Gap.Start, label, kwh);
+        }
     }
 
     private void Integrate(DateTimeOffset from, DateTimeOffset to, IReadOnlyList<PowerReading> readings)

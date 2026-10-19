@@ -18,6 +18,9 @@ public static class SettingKeys
     /// <summary>The extra meters (monitor, speakers) the user switched off in the Dashboard's "Also count" filter, one label per line.
     /// Kept as the ones left out, so a meter added later counts until it is switched off.</summary>
     public const string PeripheralsOff = "peripherals_off";
+    /// <summary>"1" when the PC itself is unticked in the Dashboard's "Count" row, so only the extra meters are totalled.
+    /// Only applies while there are extra meters.</summary>
+    public const string PcOff = "pc_off";
 }
 
 /// <summary>The app's SQLite file, in WAL mode. Short-lived pooled connections per call.</summary>

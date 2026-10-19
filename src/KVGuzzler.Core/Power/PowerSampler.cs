@@ -48,6 +48,7 @@ public sealed class PowerSampler : IDisposable
                     if (double.IsNaN(r.Watts) || double.IsInfinity(r.Watts) || r.Watts < 0) continue;
                     readings.Add(r);
                 }
+                if (source is IPowerSourceNotes extra) notes.AddRange(extra.Notes);
             }
             catch (Exception e)
             {
