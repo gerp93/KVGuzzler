@@ -85,6 +85,29 @@
     <Setter Property="BorderThickness" Value="2" />
   </Style>
 
+  <!-- A small spinning arc shown beside a title while that card's numbers are being recalculated. The animation only exists
+       while the "busy" class is set, so a hidden spinner costs nothing. -->
+  <Style Selector="Arc.spinner">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="StrokeThickness" Value="2.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="Stroke" Value="{DynamicResource VaTextMutedBrush}" />
+    <Setter Property="StartAngle" Value="0" />
+    <Setter Property="SweepAngle" Value="270" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Arc.spinner.busy">
+    <Setter Property="IsVisible" Value="True" />
+    <Style.Animations>
+      <Animation Duration="0:0:0.9" IterationCount="INFINITE">
+        <KeyFrame Cue="0%"><Setter Property="Arc.StartAngle" Value="0" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Arc.StartAngle" Value="360" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
   <!-- A thin proportion bar: the track is the border colour, the fill is set per row. -->
   <Style Selector="ProgressBar.bar">
     <Setter Property="MinHeight" Value="6" />

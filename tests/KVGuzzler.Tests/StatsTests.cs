@@ -338,6 +338,32 @@ public class StatsCardsUiTests
     }
 
     [AvaloniaFact]
+    public async Task ChangingThePeriodSpinsTheSpinnersUntilTheNumbersAreShown()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        var window = new MainWindow(t.Services);
+        window.Show();
+        await window.RefreshCollectorAsync(includeService: true, showBusy: true);
+        Assert.DoesNotContain("busy", window.ChartSpinner.Classes);
+
+        // Choosing a period starts the read in the background: the spinners spin until it has been shown.
+        Cards(window).Single(c => c.Content!.ToString() == "Last 24 hours").IsChecked = true;
+        Assert.Contains("busy", window.ChartSpinner.Classes);
+        Assert.Contains("busy", window.StatEnergySpinner.Classes);
+        Assert.Contains("busy", window.DashboardProgramsSpinner.Classes);
+
+        for (var i = 0; i < 200 && window.ChartSpinner.Classes.Contains("busy"); i++)
+        {
+            await Task.Delay(25);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+        Assert.DoesNotContain("busy", window.ChartSpinner.Classes);
+        Assert.DoesNotContain("busy", window.StatEnergySpinner.Classes);
+        Assert.Contains("Last 24 hours", window.StatEnergyCaption.Text + window.ChartPeriodText.Text);
+    }
+
+    [AvaloniaFact]
     public async Task WithNoHistoryTheNumbersAreDashesAndTheCaptionSaysWhy()
     {
         UseInvariantCulture();

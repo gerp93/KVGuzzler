@@ -38,7 +38,7 @@ public partial class MainWindow
 
         Opened += async (_, _) =>
         {
-            await RefreshCollectorAsync(includeService: true);
+            await RefreshCollectorAsync(includeService: true, showBusy: true);
             _collectorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _collectorTimer.Tick += async (_, _) =>
             {
@@ -46,7 +46,16 @@ public partial class MainWindow
                 // so those run less often than the one-second live readings.
                 _ticks++;
                 // The chart reads up to 30 days of history, so it is redrawn every ten seconds, not every second.
-                await RefreshCollectorAsync(includeService: _ticks % 10 == 0, includeChart: _ticks % 10 == 0);
+                var slow = _ticks % 10 == 0 || _slowPartDue;
+                // The timer must not pile new reads on top of a slow one (a year of history can take longer than a second):
+                // a tick that finds a read still running is skipped, and the slow part it would have read stays due.
+                if (_readsRunning > 0)
+                {
+                    _slowPartDue = slow;
+                    return;
+                }
+                _slowPartDue = false;
+                await RefreshCollectorAsync(includeService: slow, includeChart: slow);
             };
             _collectorTimer.Start();
         };
@@ -83,8 +92,17 @@ public partial class MainWindow
     private DateTimeOffset _programsReadAt;
     private int _programsReadPeriod = -1;
 
-    internal async Task RefreshCollectorAsync(bool includeService, bool includeChart = true)
+    private int _refreshGeneration;
+    private int _readsRunning;
+    private bool _slowPartDue;
+
+    /// <param name="showBusy">Spin the spinners on the period-driven cards until this read is shown (the user changed the period).</param>
+    internal async Task RefreshCollectorAsync(bool includeService, bool includeChart = true, bool showBusy = false)
     {
+        // A read the user asked for (a new period) makes any older read's answer stale.
+        var generation = showBusy ? ++_refreshGeneration : _refreshGeneration;
+        _readsRunning++;
+        if (showBusy) SetPeriodBusy(true);
         try
         {
             var sleepWatts = SleepWatts;
@@ -102,6 +120,8 @@ public partial class MainWindow
                 _programsReadAt = DateTimeOffset.UtcNow;
                 _programsReadPeriod = periodIndex;
             }
+            // The period was changed again while this was being read: the newer read shows its own answer.
+            if (generation != _refreshGeneration) return;
             ApplyCollector(read, includeChart);
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -109,6 +129,11 @@ public partial class MainWindow
             // This runs every second from a timer: a problem reading the history must show as a message, not close the app.
             CollectorResultText.Text = "Could not refresh the Dashboard: " + e.Message;
             CollectorResultText.IsVisible = true;
+        }
+        finally
+        {
+            _readsRunning--;
+            if (generation == _refreshGeneration) SetPeriodBusy(false);
         }
     }
 
