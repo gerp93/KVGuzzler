@@ -15,7 +15,12 @@ public partial class MainWindow
         TestWallButton.Click += async (_, _) => await TestWallMeterAsync();
         SaveWallButton.Click += async (_, _) => await SaveWallMeterAsync();
         RemoveWallButton.Click += (_, _) => RemoveWallMeter();
+        RefreshSleepCard();
     }
+
+    /// <summary>The sleep wattage only fills the history lines when there is no wall meter (with one, the headline is the plug's
+    /// own figure and the estimate is not used), so the setting is only offered without one.</summary>
+    private void RefreshSleepCard() => SleepCard.IsVisible = WallMeterConfig.Load(WallConfigPath) is null;
 
     /// <summary>The address typed in the box, or null (with the reason in the status line) if it is not one.</summary>
     private string? TypedHost()
@@ -79,6 +84,7 @@ public partial class MainWindow
         {
             new WallMeterConfig(host).Save(WallConfigPath);
             WallStatusText.Text = "Saved. The whole-PC reading appears on the Dashboard within a few seconds.";
+            RefreshSleepCard();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -93,6 +99,7 @@ public partial class MainWindow
             WallMeterConfig.Remove(WallConfigPath);
             WallHostBox.Text = "";
             WallStatusText.Text = "Removed. KVGuzzler no longer reads a wall meter.";
+            RefreshSleepCard();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

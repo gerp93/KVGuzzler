@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Kvg.Standards;
 using KVGuzzler.Core;
+using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Data;
 using KVGuzzler.Services;
@@ -58,6 +59,7 @@ public partial class MainWindow : Window
         StartWallMeterSettings();
         StartBillsUi();
         StartStatsUi();
+        StartEstimator();
     }
 
     // ----- Live power -------------------------------------------------------------------
@@ -153,6 +155,9 @@ public partial class MainWindow : Window
                 : "";
             WallBreakdownText.IsVisible = WallBreakdownText.Text.Length > 0;
         }
+
+        _liveDraw = wall is not null ? (wall.Watts, true) : hasComponents ? (s.TotalWatts, false) : null;
+        if (SelectedEstimateBasis == EstimateBasis.Now) RefreshEstimate();
 
         // The "Right now" card: the whole PC when there is a wall meter, otherwise the sensors.
         if (wall is not null)
@@ -254,29 +259,116 @@ public partial class MainWindow : Window
     /// <summary>What a kWh costs today: the single rate, or the price of the bill covering today (or the latest bill's).</summary>
     private decimal? CurrentRate() => _services.Database?.LoadRateSchedule().RateAt(DateOnly.FromDateTime(DateTime.Now));
 
+    /// <summary>The estimator's three bases: a load typed in, what the PC draws right now, what it really used per day.</summary>
+    private enum EstimateBasis { Constant, Now, History }
+
+    // Kept from the button that was just chosen: while it is being checked its group-mates may not have been unchecked yet.
+    private EstimateBasis _estimateBasis = EstimateBasis.Constant;
+
+    private EstimateBasis SelectedEstimateBasis => _estimateBasis;
+
+    /// <summary>How far back each choice of "My usage" averages. Null is everything recorded.</summary>
+    private static readonly (string Label, TimeSpan? Span)[] EstimateWindows =
+    {
+        ("the last 24 hours", TimeSpan.FromDays(1)),
+        ("the last 7 days", TimeSpan.FromDays(7)),
+        ("the last 30 days", TimeSpan.FromDays(30)),
+        ("all recorded time", null),
+    };
+
+    private TimeSpan? SelectedEstimateWindow => EstimateWindows[Math.Clamp(EstimateWindowBox.SelectedIndex, 0, EstimateWindows.Length - 1)].Span;
+
+    private void StartEstimator()
+    {
+        var buttons = EstimateModePanel.Children.OfType<RadioButton>().ToList();
+        for (var i = 0; i < buttons.Count; i++)
+        {
+            var basis = (EstimateBasis)i;
+            buttons[i].IsCheckedChanged += (_, _) =>
+            {
+                if (buttons[(int)basis].IsChecked != true) return;
+                _estimateBasis = basis;
+                RefreshEstimate();
+            };
+        }
+        EstimateWindowBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false, includeChart: true);
+    }
+
+    /// <summary>The live draw: the whole PC at the wall when there is a wall meter, otherwise the sensors.</summary>
+    private (double Watts, bool WholePc)? _liveDraw;
+
+    /// <summary>What the PC really used per day over the chosen window, read with the rest of the history.</summary>
+    private AverageUse? _averageUse;
+
     private void RefreshEstimate()
     {
-        if (!double.TryParse(WattsBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out var watts)
-            || watts < 0)
+        var basis = SelectedEstimateBasis;
+        EstimateConstantPanel.IsVisible = basis == EstimateBasis.Constant;
+        EstimateHistoryPanel.IsVisible = basis == EstimateBasis.History;
+
+        // Each basis gives energy per day (the figures below are scaled from it) and a sentence saying where it comes from.
+        double kwhPerDay;
+        bool perHour = true;
+        switch (basis)
         {
-            EstimateText.Text = "Enter a number of watts, for example 400.";
-            return;
-        }
-        if (CurrentRate() is not { } rate)
-        {
-            EstimateText.Text = $"{watts:0.#} W uses {CostCalculator.KilowattHours(watts, TimeSpan.FromHours(1)):0.###} kWh per hour. " +
-                                "Save your electricity rate in Settings to see the cost.";
-            return;
+            case EstimateBasis.Constant:
+                if (!double.TryParse(WattsBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out var typed) || typed < 0)
+                {
+                    EstimateBasisText.Text = "";
+                    EstimateText.Text = "Enter a number of watts, for example 400.";
+                    return;
+                }
+                kwhPerDay = CostCalculator.KilowattHours(typed, TimeSpan.FromDays(1));
+                EstimateBasisText.Text = $"If the PC drew {typed:0.#} W all day, every day.";
+                break;
+
+            case EstimateBasis.Now:
+                if (_liveDraw is not { } live)
+                {
+                    EstimateBasisText.Text = "";
+                    EstimateText.Text = "Waiting for a power reading. Live readings need the sensors or the background recording.";
+                    return;
+                }
+                kwhPerDay = CostCalculator.KilowattHours(live.Watts, TimeSpan.FromDays(1));
+                EstimateBasisText.Text = $"If the PC kept drawing what it draws right now ({Watts(live.Watts)}, "
+                                         + (live.WholePc ? "the whole PC at the wall" : "CPU, GPU and memory only") + ") all day, every day.";
+                break;
+
+            default:
+                perHour = false;
+                if (_averageUse is not { } use)
+                {
+                    EstimateBasisText.Text = "";
+                    EstimateText.Text = "Not enough history yet: this needs at least an hour recorded by the background collector.";
+                    return;
+                }
+                kwhPerDay = use.KwhPerDay;
+                var window = EstimateWindows[Math.Clamp(EstimateWindowBox.SelectedIndex, 0, EstimateWindows.Length - 1)];
+                var covered = window.Span is { } wanted && use.Days < wanted.TotalDays * 0.95 || window.Span is null
+                    ? $"the {FormatSpan(TimeSpan.FromDays(use.Days))} recorded so far" : window.Label;
+                EstimateBasisText.Text = $"The PC used {FormatEnergy(use.Kwh)} over {covered}: {FormatEnergy(use.KwhPerDay)} a day, "
+                                         + $"an average of {Watts(use.AverageWatts)} counting the time it was off or asleep. "
+                                         + (use.WholePc ? "That is the whole PC at the wall." : "That is the CPU, GPU and memory sensors only (a wall meter would show the whole PC).");
+                break;
         }
 
+        var rate = CurrentRate();
         var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
-        string Line(string label, TimeSpan span) =>
-            $"{label}: {currency}{FormatMoney(CostCalculator.CostOfConstantLoad(watts, span, rate))}";
-        EstimateText.Text = string.Join(Environment.NewLine,
-            Line("Per hour", TimeSpan.FromHours(1)),
-            Line("Per day", TimeSpan.FromDays(1)),
-            Line("Per 30 days", TimeSpan.FromDays(30)),
-            Line("Per year", TimeSpan.FromDays(365)));
+        string Line(string label, double days)
+        {
+            var kwh = kwhPerDay * days;
+            return rate is { } r
+                ? $"{label}: {currency}{FormatMoney(CostCalculator.Cost(kwh, r))} · {FormatEnergy(kwh)}"
+                : $"{label}: {FormatEnergy(kwh)}";
+        }
+
+        var lines = new List<string>();
+        if (perHour) lines.Add(Line("Per hour", 1.0 / 24));
+        lines.Add(Line("Per day", 1));
+        lines.Add(Line("Per 30 days", 30));
+        lines.Add(Line("Per year", 365));
+        if (rate is null) lines.Add("Save your electricity rate in Settings to see the cost.");
+        EstimateText.Text = string.Join(Environment.NewLine, lines);
     }
 
     // ----- Database location ------------------------------------------------------------

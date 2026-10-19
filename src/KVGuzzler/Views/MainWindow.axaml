@@ -62,19 +62,27 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
               <TextBlock Text="Dashboard" Classes="h1" VerticalAlignment="Center" />
               <Panel x:Name="DashboardPeriodHost" Grid.Column="1">
-  <Border x:Name="PeriodBar" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="3"
-          Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
-    <StackPanel x:Name="StatsPeriodPanel" Orientation="Horizontal" Spacing="2">
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last hour" />
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 24 hours" />
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 7 days" />
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 30 days" />
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last year" />
-      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
-    </StackPanel>
-  </Border>
+                  <Border x:Name="PeriodBar" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="3"
+                          Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <StackPanel x:Name="StatsPeriodPanel" Orientation="Horizontal" Spacing="2">
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last hour" />
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 24 hours" />
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 7 days" />
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 30 days" />
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last year" />
+                      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
+                    </StackPanel>
+                  </Border>
               </Panel>
             </Grid>
+
+            <!-- Only shown while nothing records in the background: the controls live in Settings. -->
+            <Border x:Name="RecordingHint" Classes="card" IsVisible="False" Padding="16,12">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <TextBlock x:Name="RecordingHintText" Classes="body" VerticalAlignment="Center" />
+                <Button x:Name="OpenRecordingSettingsButton" Grid.Column="1" Content="Open Settings" />
+              </Grid>
+            </Border>
 
             <!-- The three numbers that matter: what was used, what it cost, and what is being drawn now. -->
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
@@ -169,7 +177,7 @@
                 </StackPanel>
               </Border>
 
-              <StackPanel Grid.Column="1" Spacing="16">
+              <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="16">
                 <Border Classes="card">
                   <StackPanel Spacing="10">
                     <TextBlock Text="Energy history" Classes="h2" />
@@ -177,14 +185,42 @@
                     <TextBlock x:Name="HistoryNoteText" Classes="caption" />
                   </StackPanel>
                 </Border>
-                <!-- Only shown while nothing records in the background: the controls live in Settings. -->
-                <Border x:Name="RecordingHint" Classes="card" IsVisible="False" Padding="16,12">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                    <TextBlock x:Name="RecordingHintText" Classes="body" VerticalAlignment="Center" />
-                    <Button x:Name="OpenRecordingSettingsButton" Grid.Column="1" Content="Open Settings" />
-                  </Grid>
+
+                <!-- What it would cost to run: at a load you type, at what the PC draws now, or at what it really used per day. -->
+                <Border Classes="card" Grid.Row="1">
+                  <StackPanel Spacing="12">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="Cost estimator" Classes="h2" />
+                      <TextBlock Classes="caption" Text="What running the PC would cost at the rate saved in Settings." />
+                    </StackPanel>
+                    <Border Padding="3" HorizontalAlignment="Left" Background="{DynamicResource VaBgBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
+                      <StackPanel x:Name="EstimateModePanel" Orientation="Horizontal" Spacing="2">
+                        <RadioButton Classes="seg" GroupName="EstimateMode" Content="Constant load" IsChecked="True" />
+                        <RadioButton Classes="seg" GroupName="EstimateMode" Content="Right now" />
+                        <RadioButton Classes="seg" GroupName="EstimateMode" Content="My usage" />
+                      </StackPanel>
+                    </Border>
+
+                    <StackPanel x:Name="EstimateConstantPanel" Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="Load:" VerticalAlignment="Center" />
+                      <TextBox x:Name="WattsBox" Text="400" Width="100" />
+                      <TextBlock Text="watts, all the time" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel x:Name="EstimateHistoryPanel" Orientation="Horizontal" Spacing="8" IsVisible="False">
+                      <TextBlock Text="Average over:" VerticalAlignment="Center" />
+                      <ComboBox x:Name="EstimateWindowBox" SelectedIndex="1" MinWidth="150">
+                        <ComboBoxItem Content="Last 24 hours" />
+                        <ComboBoxItem Content="Last 7 days" />
+                        <ComboBoxItem Content="Last 30 days" />
+                        <ComboBoxItem Content="All recorded time" />
+                      </ComboBox>
+                    </StackPanel>
+                    <TextBlock x:Name="EstimateBasisText" Classes="caption" />
+
+                    <TextBlock x:Name="EstimateText" Classes="body" />
+                  </StackPanel>
                 </Border>
-              </StackPanel>
+              </Grid>
             </Grid>
 
           </StackPanel>
@@ -250,26 +286,6 @@
                 </StackPanel>
                 <ItemsControl x:Name="RunsList" ItemTemplate="{StaticResource BarRow}" Margin="0,6,0,0" />
                 <TextBlock x:Name="RunsNoteText" Classes="note" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ===================================== Cost estimator ===================================== -->
-      <TabItem Header="Cost estimator">
-        <ScrollViewer>
-          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="820" HorizontalAlignment="Center">
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <TextBlock Text="Cost estimator" Classes="h1" />
-                <TextBlock Classes="note" Text="What a constant load costs at the rate saved in Settings." />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="Constant load:" VerticalAlignment="Center" />
-                  <TextBox x:Name="WattsBox" Text="400" Width="100" />
-                  <TextBlock Text="watts" VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock x:Name="EstimateText" Classes="body" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -352,11 +368,11 @@
               </StackPanel>
             </Border>
 
-            <Border Classes="card">
+            <Border x:Name="SleepCard" Classes="card">
               <StackPanel Spacing="12">
                 <TextBlock Text="Sleep power" Classes="h2" />
                 <TextBlock Classes="note"
-                           Text="While the PC sleeps nothing can be measured. Time the collector saw it asleep is estimated at this many watts (a desktop in sleep typically draws 1 to 5 W). The estimate is shown on its own line and is not added to the active figures." />
+                           Text="Without a wall meter nothing can be measured while the PC sleeps. Time the collector saw it asleep is estimated at this many watts (a desktop in sleep typically draws 1 to 5 W). The estimate is shown on its own line and is not added to the active figures. Only used when no wall meter is set up, so it is hidden once one is." />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBox x:Name="SleepWattsBox" Width="100" PlaceholderText="2" />
                   <TextBlock Text="watts" VerticalAlignment="Center" />

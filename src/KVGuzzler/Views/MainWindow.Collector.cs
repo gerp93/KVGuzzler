@@ -72,7 +72,7 @@ public partial class MainWindow
 
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
-        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats);
+        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats, AverageUse? Use);
 
     /// <summary>The chart shows at most the last 30 days, so the two longest choices show that and say so.</summary>
     private static (string Label, TimeSpan Span, TimeSpan Bucket) ChartPeriodFor(int periodIndex) =>
@@ -96,7 +96,7 @@ public partial class MainWindow
             var readTotals = includeChart
                 && (periodIndex != _programsReadPeriod || !longPeriod || DateTimeOffset.UtcNow - _programsReadAt > LongProgramRefresh);
             var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, statsSpan, includeChart ? chartPeriod : null, schedule,
-                includeChart ? statsSpan : null, includeChart, readTotals));
+                includeChart ? statsSpan : null, includeChart, readTotals, SelectedEstimateWindow));
             if (read.Programs?.Totals is not null)
             {
                 _programsReadAt = DateTimeOffset.UtcNow;
@@ -114,9 +114,10 @@ public partial class MainWindow
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan? programLookBack,
         (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats,
-        bool readProgramTotals)
+        bool readProgramTotals, TimeSpan? estimateSpan)
     {
         UsageStat? stats = null;
+        AverageUse? use = null;
         RateInfo? rates = null;
         LiveState? live = null;
         IReadOnlyList<PeriodReport>? periods = null;
@@ -147,6 +148,7 @@ public partial class MainWindow
                 programs = new ProgramsRead(totals, whole, store.GetLivePrograms(), store.GetIdleBaseline(), store.GetRecentRuns(20));
                 if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
                 if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now);
+                if (includeStats) use = UsageSummary.AverageDay(store, estimateSpan, now);
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -154,7 +156,7 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats, use);
     }
 
     /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
@@ -196,6 +198,8 @@ public partial class MainWindow
         {
             ShowChart(read);
             ShowStats(read.Stats);
+            _averageUse = read.Use;
+            RefreshEstimate();
         }
     }
 
