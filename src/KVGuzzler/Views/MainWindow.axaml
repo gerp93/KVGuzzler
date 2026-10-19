@@ -366,6 +366,7 @@
                   <ComboBox x:Name="RateModeBox" SelectedIndex="0" MinWidth="170">
                     <ComboBoxItem Content="One rate" />
                     <ComboBoxItem Content="My bills" />
+                    <ComboBoxItem Content="Looked up (OpenEI)" />
                   </ComboBox>
                 </StackPanel>
 
@@ -380,6 +381,25 @@
                   <TextBlock x:Name="RateExampleText" Classes="body" />
                   <TextBlock x:Name="RateWarningText" Classes="error" IsVisible="False" />
                   <TextBlock x:Name="RateStatusText" Classes="body" />
+                </StackPanel>
+
+                <StackPanel x:Name="LookupPanel" Spacing="10" IsVisible="False">
+                  <TextBlock Classes="note"
+                             Text="Looks up your utility's published residential rates from the OpenEI Utility Rate Database and prices everything with the one you choose, including time-of-use hours. Enter your ZIP code or address and a free OpenEI API key, pick your rate from the list, and use it. Only the energy price per kWh is used: fixed monthly charges are left out, as with bills. It is the published tariff, so riders, taxes and fees on your bill are not in it, and today's tariff is applied to the past too. Your bills (the My bills choice) are the exact figure." />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBox x:Name="OpenEiKeyBox" Width="240" PasswordChar="•" PlaceholderText="OpenEI API key" />
+                    <TextBox x:Name="RateAddressBox" Width="220" PlaceholderText="ZIP code or address" />
+                  </StackPanel>
+                  <WrapPanel>
+                    <Button x:Name="FindRatesButton" Content="Find rates" Margin="0,0,8,8" />
+                    <Button x:Name="OpenEiKeyLinkButton" Content="Get a free key..." Margin="0,0,8,8" />
+                  </WrapPanel>
+                  <ComboBox x:Name="RateResultsBox" MinWidth="420" IsVisible="False" />
+                  <TextBlock x:Name="RateResultDetailText" Classes="caption" TextWrapping="Wrap" />
+                  <Button x:Name="UseFoundRateButton" Content="Use this rate" Classes="accent" HorizontalAlignment="Left" IsVisible="False" />
+                  <TextBlock x:Name="LookupCurrentText" Classes="body" TextWrapping="Wrap" />
+                  <Button x:Name="RefreshTariffButton" Content="Refresh from OpenEI" HorizontalAlignment="Left" IsVisible="False" />
+                  <TextBlock x:Name="LookupStatusText" Classes="body" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel x:Name="BillsPanel" Spacing="10" IsVisible="False">

@@ -56,6 +56,11 @@ public sealed class AppServices : IDisposable
 
     private static readonly HttpClient CarbonHttp = new();
 
+    /// <summary>Finds the electricity rates for a place (OpenEI). Replaceable for tests.</summary>
+    public KVGuzzler.Core.Billing.IRateLookup RateLookup { get; set; } = new KVGuzzler.Core.Billing.OpenEiClient(OpenEiHttp);
+
+    private static readonly HttpClient OpenEiHttp = new();
+
     /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
     public Func<ServiceState> QueryCollectorService { get; set; }
 

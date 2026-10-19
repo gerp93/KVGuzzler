@@ -66,6 +66,17 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   meter that stops answering is named in the live notes (`IPowerSourceNotes`). Export (Dashboard > Energy history) is
   `HistoryExport.DailyCsv`, one row per local day; labels that could run as a spreadsheet formula are written as text. Removing a meter
   leaves its history but stops counting it.
+- **Rate source is a choice of three** (Settings > Electricity rate > "Price from"; `SettingKeys.RateMode`: `one`, `bills`, `lookup`;
+  `RateMode`): one fixed rate, per-bill prices, or a **looked-up tariff** from the OpenEI Utility Rate Database (`OpenEiClient`, window only,
+  free key typed once, saved in the settings database and never shown again; the key is a query parameter because that is how OpenEI
+  documents it, so it only goes to `api.openei.org`). A tariff is reduced to a 12 months x weekday/weekend x 24 hours grid of $/kWh
+  (`Tariff`: the first tier's rate + adj + the month's fuel adjustment; fixed and demand charges are left out, tiers beyond the first are
+  ignored and the Settings text says so; rates that cannot be priced per kWh are left out, never guessed). Everything else prices **per
+  day** (`RateSchedule.RateAt`), so in lookup mode a day's price is the grid weighted by `UsageProfile` (the share of usage in each hour,
+  weekday/weekend, learned from the last 60 days of history on the background read, at most hourly, only for a tariff that varies by
+  time). Today's tariff is applied to the past as well; bills are the exact figure. A saved tariff over a week old is fetched again by its
+  label when the window opens (the old one is kept if that fails). **Not checked against the real service**: written from OpenEI's
+  documented field list (the docs give no full sample answer), parsing leaves out what it cannot make sense of.
 - **Carbon footprint (Electricity Maps).** `carbon.json` in the machine-wide data folder holds a free personal Electricity Maps key and a
   place (zone code or "lat, lon"), set in Settings > Carbon footprint; the key is plain text there and is shown nowhere after saving.
   The **collector service** fetches (`CarbonFeed`, every 30 minutes, own timer, follows the file) `GET /v3/carbon-intensity/latest` with the
