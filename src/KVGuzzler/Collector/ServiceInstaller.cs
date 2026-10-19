@@ -6,6 +6,9 @@ namespace KVGuzzler.Collector;
 
 public enum ServiceState { NotInstalled, Stopped, Running, Other, Unsupported }
 
+/// <summary>What the elevated copy of the program is asked to do to the collector service.</summary>
+public enum ServiceChange { Install, Uninstall, StopForUpdate }
+
 /// <summary>
 /// Installs, removes and queries the collector's Windows service through <c>sc.exe</c>. Changing a service
 /// needs administrator rights, so the window starts a second copy of itself elevated
@@ -16,6 +19,21 @@ public static class ServiceInstaller
 {
     public const string InstallArgument = "--install-service";
     public const string UninstallArgument = "--uninstall-service";
+    public const string StopArgument = "--stop-service";
+
+    public static string ArgumentFor(ServiceChange change) => change switch
+    {
+        ServiceChange.Install => InstallArgument,
+        ServiceChange.Uninstall => UninstallArgument,
+        _ => StopArgument,
+    };
+
+    /// <summary>The service's permissions: Windows' defaults, plus start and stop for the logged-in user. The program lives in the
+    /// user's own folder and the service runs from it, so an update has to stop the service before it can replace those files; without
+    /// this the update needs administrator rights and silently fails ("one or more running processes prevented it"). Changing what the
+    /// service runs still needs administrator rights, and the user could already replace the program files the service runs.</summary>
+    internal const string ServiceSecurity =
+        "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPWPLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
 
     public static string ServiceName(bool development) => development ? "KVGuzzlerCollector-dev" : "KVGuzzlerCollector";
 
@@ -32,6 +50,7 @@ public static class ServiceInstaller
         exists
             ? new[] { "config", name, "binPath=", BinaryPathValue(exePath), "start=", "auto" }
             : new[] { "create", name, "binPath=", BinaryPathValue(exePath), "start=", "auto", "DisplayName=", "KVGuzzler power collector" },
+        new[] { "sdset", name, ServiceSecurity },
         new[] { "description", name, "Records this PC's CPU and GPU power use for KVGuzzler, even when nobody is logged in." },
         // If it ever dies, bring it back: after 5 s, 30 s, then a minute; forget the count after a day.
         new[] { "failure", name, "reset=", "86400", "actions=", "restart/5000/restart/30000/restart/60000" },
@@ -59,7 +78,7 @@ public static class ServiceInstaller
     // ----- Changes (administrator rights) -----------------------------------------------
 
     /// <summary>Entry point of the elevated copy: install or remove, and say what happened in the log.</summary>
-    public static int RunElevated(bool install, bool development)
+    public static int RunElevated(ServiceChange change, bool development)
     {
         var dataDir = HistoryStore.DefaultDirectory(development);
         Directory.CreateDirectory(dataDir);
@@ -67,7 +86,12 @@ public static class ServiceInstaller
 
         try
         {
-            var message = install ? Install(development) : Uninstall(development);
+            var message = change switch
+            {
+                ServiceChange.Install => Install(development),
+                ServiceChange.Uninstall => Uninstall(development),
+                _ => StopForUpdate(development, elevated: true),
+            };
             File.WriteAllText(log, $"{DateTimeOffset.Now:u} OK: {message}{Environment.NewLine}");
             return 0;
         }
@@ -106,10 +130,46 @@ public static class ServiceInstaller
         return $"Service {name} removed.";
     }
 
-    /// <summary>Stops the service so its files can be replaced by an update. Best effort.</summary>
-    public static void StopForUpdate(bool development)
+    /// <summary>How long to wait for the service to finish stopping: its files stay locked until the process has exited.</summary>
+    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Stops the service and waits until it has, so its files can be replaced by an update. Returns a message saying
+    /// what happened. As administrator it also makes sure the service's permissions let the user stop and start it, which a
+    /// service installed by an older version lacks (so the next update needs no prompt).</summary>
+    public static string StopForUpdate(bool development, bool elevated = false)
     {
-        if (Query(development) == ServiceState.Running) Sc("stop", ServiceName(development));
+        var name = ServiceName(development);
+        if (Query(development) == ServiceState.NotInstalled) return $"Service {name} is not installed.";
+        if (elevated) Sc("sdset", name, ServiceSecurity);
+        if (Query(development) == ServiceState.Running) Sc("stop", name);
+
+        var until = DateTime.UtcNow + StopTimeout;
+        while (Query(development) is ServiceState.Running or ServiceState.Other && DateTime.UtcNow < until)
+            Thread.Sleep(250);
+        if (Query(development) is ServiceState.Running or ServiceState.Other)
+            throw new InvalidOperationException($"Service {name} did not stop.");
+        return $"Service {name} stopped.";
+    }
+
+    /// <summary>Gets the service out of the way of an update, trying first without administrator rights (works once the
+    /// service's permissions allow the user to stop it) and then through Windows' permission prompt. Returns null when the files
+    /// are free to replace, otherwise a sentence for the user.</summary>
+    public static async Task<string?> EnsureStoppedForUpdateAsync(bool development)
+    {
+        if (Query(development) is ServiceState.NotInstalled or ServiceState.Stopped or ServiceState.Unsupported) return null;
+        try
+        {
+            await Task.Run(() => StopForUpdate(development));
+            return null;
+        }
+        catch (Exception)
+        {
+            // Not allowed to stop it (or it would not stop): ask Windows for permission.
+        }
+
+        var (started, message) = await RequestElevatedAsync(ServiceChange.StopForUpdate, development);
+        if (!started) return "The update needs to pause background recording first, and Windows was not allowed to. Nothing was changed.";
+        return message.Contains("FAILED", StringComparison.Ordinal) ? "Could not pause background recording for the update: " + message : null;
     }
 
     /// <summary>Starts it again after an update. Best effort.</summary>
@@ -120,9 +180,9 @@ public static class ServiceInstaller
 
     /// <summary>Starts an elevated copy of this program to install or remove the service. Windows shows
     /// its "allow this app to make changes to your device" question (UAC). Returns false if the user said no.</summary>
-    public static async Task<(bool Started, string Message)> RequestElevatedAsync(bool install, bool development)
+    public static async Task<(bool Started, string Message)> RequestElevatedAsync(ServiceChange change, bool development)
     {
-        var info = new ProcessStartInfo(ExecutablePath, install ? InstallArgument : UninstallArgument)
+        var info = new ProcessStartInfo(ExecutablePath, ArgumentFor(change))
         {
             UseShellExecute = true,
             Verb = "runas",

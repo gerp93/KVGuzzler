@@ -92,6 +92,24 @@ public class CollectorUiTests
     }
 
     [AvaloniaFact]
+    public async Task AnUpdateIsNotStartedWhileTheRecorderStillHoldsTheProgramFiles()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        // The running collector service locks KVGuzzler.exe; applying an update over it fails after the window has closed.
+        t.Services.StopCollectorForUpdateAsync = () => Task.FromResult<string?>("Could not pause background recording for the update.");
+        var window = new MainWindow(t.Services);
+        window.Show();
+
+        window.ApplyUpdateButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Task.Delay(50);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Could not pause background recording for the update.", window.UpdateStatusText.Text);
+        Assert.True(window.ApplyUpdateButton.IsEnabled);   // the user can try again
+    }
+
+    [AvaloniaFact]
     public void SleepWattsAreValidatedAndSaved()
     {
         UseInvariantCulture();

@@ -413,7 +413,7 @@ public partial class MainWindow
         CollectorResultText.IsVisible = true;
         try
         {
-            var (_, message) = await ServiceInstaller.RequestElevatedAsync(install, development: !_services.Updates.IsInstalled);
+            var (_, message) = await ServiceInstaller.RequestElevatedAsync(install ? ServiceChange.Install : ServiceChange.Uninstall, development: !_services.Updates.IsInstalled);
             CollectorResultText.Text = message;
         }
         catch (Exception e)

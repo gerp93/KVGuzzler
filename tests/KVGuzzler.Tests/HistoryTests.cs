@@ -278,6 +278,28 @@ public class ServiceInstallerTests
     }
 
     [Fact]
+    public void TheLoggedInUserMayStopAndStartTheServiceSoAnUpdateCanReplaceItsFiles()
+    {
+        var cmds = KVGuzzler.Collector.ServiceInstaller.CreateCommands("KVGuzzlerCollector", @"C:\x\KVGuzzler.exe", exists: false);
+        var sdset = Assert.Single(cmds, c => c[0] == "sdset");
+        Assert.Equal(KVGuzzler.Collector.ServiceInstaller.ServiceSecurity, sdset[2]);
+
+        // The text must be valid SDDL, and the interactive user must hold start and stop but not delete or reconfigure.
+        if (OperatingSystem.IsWindows()) CheckInteractiveUserRights();
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static void CheckInteractiveUserRights()
+    {
+        var descriptor = new System.Security.AccessControl.RawSecurityDescriptor(KVGuzzler.Collector.ServiceInstaller.ServiceSecurity);
+        var interactive = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.InteractiveSid, null);
+        var rule = descriptor.DiscretionaryAcl!.OfType<System.Security.AccessControl.CommonAce>().Single(a => a.SecurityIdentifier == interactive);
+        Assert.Equal(0x0010 | 0x0020, rule.AccessMask & (0x0010 | 0x0020));   // SERVICE_START | SERVICE_STOP
+        Assert.Equal(0, rule.AccessMask & 0x0002);                              // not SERVICE_CHANGE_CONFIG
+        Assert.Equal(0, rule.AccessMask & 0x00010000);                          // not DELETE
+    }
+
+    [Fact]
     public void AnExistingServiceIsReconfiguredNotRecreated()
     {
         var cmds = KVGuzzler.Collector.ServiceInstaller.CreateCommands("KVGuzzlerCollector", @"C:\x\KVGuzzler.exe", exists: true);
