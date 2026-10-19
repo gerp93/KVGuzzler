@@ -3,12 +3,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Kvg.Standards;
 using KVGuzzler.Core;
+using KVGuzzler.Core.Power;
 using KVGuzzler.Data;
 using KVGuzzler.Services;
 
 namespace KVGuzzler.Views;
+
+/// <summary>One line of the live power list. Breakdown lines are indented and dimmed: they are part of a
+/// component above them, not added to the total.</summary>
+public sealed record ReadingRow(string Name, string WattsText, Thickness Indent, double Opacity);
 
 public partial class MainWindow : Window
 {
@@ -47,6 +53,81 @@ public partial class MainWindow : Window
         RefreshRateHints();
         RefreshEstimate();
         RefreshDatabaseInfo();
+        StartPowerDisplay();
+        StartCollectorDisplay();
+        StartWallMeterSettings();
+        StartBillsUi();
+    }
+
+    // ----- Live power -------------------------------------------------------------------
+
+    private void StartPowerDisplay()
+    {
+        if (_services.Power is not { } power)
+        {
+            PowerStatusText.Text = "Power sensors are not running.";
+            return;
+        }
+
+        // While the collector service is publishing readings, those are shown instead.
+        void OnUpdated(PowerSnapshot s) => Dispatcher.UIThread.Post(() => { if (!_collectorAlive) ShowPower(s); });
+        // Subscribe only while the window is open; Start is a no-op after the first call.
+        Opened += (_, _) =>
+        {
+            power.Updated += OnUpdated;
+            power.Start();
+            if (power.Latest is { } latest) ShowPower(latest);
+        };
+        Closed += (_, _) => power.Updated -= OnUpdated;
+    }
+
+    private void ShowPower(PowerSnapshot s, bool showSession = true)
+    {
+        // The wall meter is the whole PC, so it is shown on its own line below, not in the list of parts.
+        var wall = s.Readings.FirstOrDefault(r => r.Scope == ReadingScope.Wall);
+        ReadingsList.ItemsSource = s.Readings
+            .Where(r => r.Scope != ReadingScope.Wall)
+            .OrderBy(r => r.Scope)   // components first, their breakdown after
+            .Select(r => new ReadingRow(
+                r.Name,
+                r.Watts.ToString("0.0", CultureInfo.CurrentCulture) + " W",
+                r.Scope == ReadingScope.Breakdown ? new Thickness(20, 0, 0, 0) : new Thickness(0),
+                r.Scope == ReadingScope.Breakdown ? 0.7 : 1))
+            .ToList();
+
+        var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
+        PowerStatusText.Text = hasComponents || wall is not null ? "Power, measured every second." : "No power sensors are reporting on this machine.";
+        PowerTotalText.Text = hasComponents ? $"Total active: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
+
+        var session = $"Active energy since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
+        if (CurrentRate() is { } rate)
+        {
+            var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
+            session += $", {currency}{FormatMoney(CostCalculator.Cost(s.SessionKilowattHours, rate))}";
+        }
+        PowerSessionText.Text = hasComponents ? session : "";
+
+        WallPowerText.IsVisible = wall is not null;
+        WallBreakdownText.IsVisible = false;
+        if (wall is not null)
+        {
+            WallPowerText.Text = $"Whole PC at the wall: {wall.Watts.ToString("0.0", CultureInfo.CurrentCulture)} W";
+            // Only say what the rest is when the sums make sense: the plug and the sensors are read a moment apart.
+            var other = wall.Watts - s.TotalWatts;
+            WallBreakdownText.Text = hasComponents && other >= 0
+                ? $"The sensors above account for {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W. The other {other.ToString("0.0", CultureInfo.CurrentCulture)} W is fans, drives, the motherboard and power-supply losses."
+                : "";
+            WallBreakdownText.IsVisible = WallBreakdownText.Text.Length > 0;
+        }
+
+        PowerInfoText.Text = wall is not null
+            ? "Active power is what the CPU, GPU and memory draw, read from their own sensors. The wall meter measures the whole PC, which is the figure that matches your bill."
+            : "Active power is what the CPU, GPU and memory draw while the PC is on, read from their own sensors. It leaves out fans, drives, the motherboard, power-supply losses and any time the PC sleeps. Set up a wall meter in Settings for the whole-PC figure.";
+
+        PowerNotesText.Text = s.Notes.Count == 0 ? "" : "Not reporting:" + Environment.NewLine + string.Join(Environment.NewLine, s.Notes);
+        PowerNotesText.IsVisible = s.Notes.Count > 0;
+        PowerTotalText.IsVisible = hasComponents;
+        PowerSessionText.IsVisible = hasComponents && showSession;
     }
 
     // ----- Rate and estimate ------------------------------------------------------------
@@ -90,16 +171,18 @@ public partial class MainWindow : Window
         RefreshEstimate();
     }
 
+    /// <summary>What a kWh costs today: the single rate, or the price of the bill covering today (or the latest bill's).</summary>
+    private decimal? CurrentRate() => _services.Database?.LoadRateSchedule().RateAt(DateOnly.FromDateTime(DateTime.Now));
+
     private void RefreshEstimate()
     {
-        var saved = _services.Database?.GetSetting(SettingKeys.RatePerKwh);
         if (!double.TryParse(WattsBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out var watts)
             || watts < 0)
         {
             EstimateText.Text = "Enter a number of watts, for example 400.";
             return;
         }
-        if (!decimal.TryParse(saved, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rate))
+        if (CurrentRate() is not { } rate)
         {
             EstimateText.Text = $"{watts:0.#} W uses {CostCalculator.KilowattHours(watts, TimeSpan.FromHours(1)):0.###} kWh per hour. " +
                                 "Save your electricity rate in Settings to see the cost.";

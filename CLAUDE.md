@@ -22,6 +22,31 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   (KVG_Standards / VisualAssault), then re-run `scripts/update-kvg-dblocation.sh <ref>` /
   `scripts/update-visual-assault-avalonia.sh <tag>`. KVG_Standards has no tags yet, so `main` is the
   documented interim pin; VisualAssault must be a release tag, never `main`.
+- **Background collector (approved exception to the per-user install, see KVG_Standards'
+  `dotnet-avalonia.md`, "Exception: per-machine install").** `KVGuzzler.exe --collector` is the same
+  program running headless, as a Windows service (`KVGuzzlerCollector`; `-dev` for a development run).
+  It writes `history.db` in `%ProgramData%\KVGuzzler[-dev]`; the window only reads it. The service
+  logic is `PowerCollector` in `KVGuzzler.Core` (clock-driven, tested); `Collector/` is the thin host.
+  The window never creates `history.db`, only the collector does. A gap is saved with its reason
+  (asleep / off / lost power) and shown apart from measured energy; sleep is an estimate shown on its own
+  line and never added to the "active" figures (CPU/GPU/memory sensors = active power; the whole-PC
+  total is the wall meter's job, not built yet). A running service locks `KVGuzzler.exe`, so turn background recording off
+  before rebuilding a development copy.
+- **Wall meter.** A smart plug between the wall and the PC is the whole-PC figure (`ReadingScope.Wall`).
+  It already contains every sensor reading, so it is shown next to them and **never added to them**
+  (`PowerSampler` sums `Component` only). `ShellyPlug` only ever sends `GET`; nothing in the app may
+  switch the plug, because the PC is plugged into it. The meter's address lives in
+  `wall-meter.json` beside the history (not in the per-user settings: the collector service reads it too).
+  Only a plain host or IP is accepted, never a URL or path.
+- **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
+  the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
+  program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).
+  Never present these numbers as measurements, and never add them to the sensor or wall figures: they
+  split the CPU and GPU energy that is already counted.
+- **Prices come from `RateSchedule`, never from reading the single rate setting directly.** In "My bills" mode each
+  bill's price (total minus its flat fees, over its kWh) applies to the dates it covers; cost of a period is its
+  energy priced stretch by stretch (`RateSchedule.Cost`), so a period spanning two bills is right. Bill dates are
+  local calendar days. Money is `decimal`, kept as text in the database. Two bills may not share a day.
 - **Velopack:** `VelopackApp.Build().Run()` is the first statement in `Main`; the running version comes
   only from Velopack (`UpdateService.VersionText`); `CheckForUpdatesAsync` throws outside an installed
   build, so `UpdateService` guards on `IsInstalled`. The `Velopack` NuGet package must stay a direct
