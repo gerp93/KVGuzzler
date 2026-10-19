@@ -4,5 +4,6 @@
              RequestedThemeVariant="Default">
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://KVGuzzler/Views/UiStyles.axaml" />
   </Application.Styles>
 </Application>

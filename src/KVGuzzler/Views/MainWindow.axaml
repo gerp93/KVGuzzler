@@ -3,328 +3,431 @@
         xmlns:views="using:KVGuzzler.Views"
         x:Class="KVGuzzler.Views.MainWindow"
         Title="KVGuzzler"
-        Width="900" Height="640" MinWidth="640" MinHeight="480">
-  <Window.Styles>
-    <!-- A block with a surface colour, a border and rounded corners. -->
-    <Style Selector="Border.card">
-      <Setter Property="Background" Value="{DynamicResource VaSurfaceBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource VaBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="Padding" Value="16" />
-    </Style>
-    <!-- A radio button drawn as a selectable block: the chosen one gets the accent border. -->
-    <Style Selector="RadioButton.period">
-      <Setter Property="Margin" Value="0,0,8,8" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border x:Name="PART_Card" Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}"
-                  BorderThickness="1" CornerRadius="8" Padding="14,10" MinWidth="104">
-            <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-        </ControlTemplate>
-      </Setter>
-    </Style>
-    <Style Selector="RadioButton.period:checked">
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector="RadioButton.period:checked /template/ Border#PART_Card">
-      <Setter Property="BorderBrush" Value="{DynamicResource VaPrimaryActionBrush}" />
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
-    <Style Selector="RadioButton.period:pointerover /template/ Border#PART_Card">
-      <Setter Property="BorderBrush" Value="{DynamicResource VaPrimaryActionHoverBrush}" />
-    </Style>
-  </Window.Styles>
-  <TabControl x:Name="Tabs" Margin="8">
-
-    <TabItem Header="Dashboard">
-      <ScrollViewer>
-        <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-          <Grid ColumnDefinitions="*,*">
-            <Border Classes="card" Grid.Column="0" Margin="0,0,6,0">
-              <StackPanel Spacing="2">
-                <TextBlock Text="Energy used" FontSize="12" Foreground="{DynamicResource VaTextMutedBrush}" />
-                <TextBlock x:Name="StatEnergyText" Text="-" FontSize="34" FontWeight="Bold" />
-                <TextBlock x:Name="StatEnergyCaption" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
-              </StackPanel>
-            </Border>
-            <Border Classes="card" Grid.Column="1" Margin="6,0,0,0">
-              <StackPanel Spacing="2">
-                <TextBlock Text="Cost" FontSize="12" Foreground="{DynamicResource VaTextMutedBrush}" />
-                <TextBlock x:Name="StatCostText" Text="-" FontSize="34" FontWeight="Bold" />
-                <TextBlock x:Name="StatCostCaption" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
-              </StackPanel>
-            </Border>
-          </Grid>
-          <WrapPanel x:Name="StatsPeriodPanel">
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last hour" />
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 24 hours" />
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 7 days" />
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last 30 days" />
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="Last year" />
-            <RadioButton Classes="period" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
-          </WrapPanel>
-
-          <Separator Margin="0,4" />
-
-          <TextBlock Text="Live power" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock x:Name="PowerStatusText" TextWrapping="Wrap" Text="Looking for power sensors..." />
-          <ItemsControl x:Name="ReadingsList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="views:ReadingRow">
-                <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}" Opacity="{Binding Opacity}">
-                  <TextBlock Text="{Binding Name}" />
-                  <TextBlock Grid.Column="1" Text="{Binding WattsText}" FontFamily="Consolas,Menlo,monospace" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock x:Name="PowerTotalText" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock x:Name="PowerSessionText" TextWrapping="Wrap" />
-          <TextBlock x:Name="WallPowerText" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="False" />
-          <TextBlock x:Name="WallBreakdownText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" IsVisible="False" />
-          <TextBlock x:Name="PowerNotesText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-          <TextBlock x:Name="PowerInfoText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-          <Separator Margin="0,8" />
-
-          <StackPanel Orientation="Horizontal" Spacing="12">
-            <TextBlock Text="Power over time" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <ComboBox x:Name="ChartPeriodBox" SelectedIndex="1" MinWidth="150">
-              <ComboBoxItem Content="Last hour" />
-              <ComboBoxItem Content="Last 24 hours" />
-              <ComboBoxItem Content="Last 7 days" />
-              <ComboBoxItem Content="Last 30 days" />
-            </ComboBox>
-          </StackPanel>
-          <views:PowerChartControl x:Name="PowerChartView" />
-          <TextBlock x:Name="ChartNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Background recording" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock x:Name="CollectorStatusText" TextWrapping="Wrap" Text="Checking the collector service..." />
-          <TextBlock x:Name="CollectorLastSeenText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" IsVisible="False" />
-          <WrapPanel x:Name="CollectorButtons" IsVisible="False">
-            <Button x:Name="InstallCollectorButton" Content="Turn on background recording" Classes="accent" IsVisible="False" Margin="0,0,8,8" />
-            <Button x:Name="RemoveCollectorButton" Content="Turn off background recording" IsVisible="False" Margin="0,0,8,8" />
-          </WrapPanel>
-          <TextBlock x:Name="CollectorResultText" TextWrapping="Wrap" IsVisible="False" />
-
-          <TextBlock Text="Energy history" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0" />
-          <ItemsControl x:Name="HistoryList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="views:HistoryRow">
-                <StackPanel Margin="0,0,0,8">
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock x:Name="HistoryNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Cost estimator" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap"
-                     Text="What a constant load costs at the rate saved in Settings." />
+        Width="1240" Height="860" MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <!-- Fluent draws an Expander's header as a dark slab; here it is plain text that lights up on hover. -->
+    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderContentBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
+    <!-- One line of any list: name (with a small qualifier), amount and price on the right, an optional proportion bar, and a
+         smaller line of detail. Used for the energy history, the programs and the runs, so they all read alike. -->
+    <DataTemplate x:Key="BarRow" x:DataType="views:HistoryRow">
+      <StackPanel Margin="0,0,0,12" Spacing="4">
+        <Grid ColumnDefinitions="*,96,76,40" ColumnSpacing="8">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Constant load:" VerticalAlignment="Center" />
-            <TextBox x:Name="WattsBox" Text="400" Width="100" />
-            <TextBlock Text="watts" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" MaxWidth="240" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding Qualifier}" IsVisible="{Binding HasQualifier}" Classes="caption" VerticalAlignment="Center" />
           </StackPanel>
-          <TextBlock x:Name="EstimateText" TextWrapping="Wrap" />
-        </StackPanel>
-      </ScrollViewer>
-    </TabItem>
-
-    <TabItem Header="Programs">
-      <ScrollViewer>
-        <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-          <TextBlock Text="Programs" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                     Text="These are estimates, not measurements. The CPU and GPU only report their total power; Windows reports how much of the CPU and GPU each program used. The power above idle is shared out in proportion to that. The idle power itself belongs to no program. Every program is tracked automatically, grouped by executable name." />
-
-          <TextBlock Text="Right now" FontWeight="SemiBold" />
-          <ItemsControl x:Name="LiveProgramsList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="views:HistoryRow">
-                <StackPanel Margin="0,0,0,6">
-                  <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock x:Name="ProgramsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-          <Separator Margin="0,8" />
-
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Over:" VerticalAlignment="Center" FontWeight="SemiBold" />
-            <ComboBox x:Name="ProgramPeriodBox" SelectedIndex="1" MinWidth="160">
-              <ComboBoxItem Content="Last hour" />
-              <ComboBoxItem Content="Last 24 hours" />
-              <ComboBoxItem Content="Last 7 days" />
-              <ComboBoxItem Content="Last 30 days" />
-            </ComboBox>
-          </StackPanel>
-          <TextBlock x:Name="ProgramsTotalText" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <ItemsControl x:Name="ProgramsList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="views:HistoryRow">
-                <StackPanel Margin="0,0,0,8">
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock x:Name="ProgramsBaselineText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Recent runs" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                     Text="What each program is estimated to have caused from when it started until it closed (a program with several processes counts as one run). A run starts when KVGuzzler first sees the program, so one that was already open when recording began starts then. Runs that caused under half a watt-hour are not listed." />
-          <ItemsControl x:Name="RunsList">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="views:HistoryRow">
-                <StackPanel Margin="0,0,0,8">
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock x:Name="RunsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-        </StackPanel>
-      </ScrollViewer>
-    </TabItem>
-
-    <TabItem Header="Settings">
-      <ScrollViewer>
-        <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-          <TextBlock Text="Electricity rate" FontSize="20" FontWeight="SemiBold" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Currency symbol:" VerticalAlignment="Center" />
-            <TextBox x:Name="CurrencyBox" Width="60" MaxLength="3" PlaceholderText="$" />
-            <TextBlock Text="Price from:" VerticalAlignment="Center" Margin="12,0,0,0" />
-            <ComboBox x:Name="RateModeBox" SelectedIndex="0" MinWidth="170">
-              <ComboBoxItem Content="One rate" />
-              <ComboBoxItem Content="My bills" />
-            </ComboBox>
-          </StackPanel>
-
-          <StackPanel x:Name="OneRatePanel" Spacing="12">
-            <TextBlock TextWrapping="Wrap"
-                       Text="Use the all-in price per kWh from your bill (supply and delivery per-kWh charges, not the fixed monthly fee). One price is used for everything, whenever it was recorded." />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBox x:Name="RateBox" Width="120" PlaceholderText="0.15" />
-              <TextBlock Text="per kWh" VerticalAlignment="Center" />
-              <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
-            </StackPanel>
-            <TextBlock x:Name="RateExampleText" TextWrapping="Wrap" />
-            <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="{DynamicResource VaAccentRedBrush}" IsVisible="False" />
-            <TextBlock x:Name="RateStatusText" TextWrapping="Wrap" />
-          </StackPanel>
-
-          <StackPanel x:Name="BillsPanel" Spacing="10" IsVisible="False">
-            <TextBlock TextWrapping="Wrap"
-                       Text="Enter each bill's ELECTRICITY part only: if the bill also has gas or other services, or an overall total covering all of them, use just the electricity charges and the electricity kWh. For each bill enter the dates it covers, the electricity total, and the kWh it charged for. The price per kWh is worked out for you (total divided by kWh) and used for everything KVGuzzler recorded on those dates, so an old month keeps its own price when the rate changes. Dates after your latest bill use its price as an estimate until you enter the next bill. Flat fees that do not depend on usage (a basic service charge, a monthly credit) can be left out, so the price is that of one more kWh." />
-            <StackPanel x:Name="BillsList" Spacing="8" />
-            <TextBlock x:Name="BillsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-
-            <Border BorderThickness="1" BorderBrush="{DynamicResource VaBorderBrush}" CornerRadius="4" Padding="12">
-              <StackPanel Spacing="8">
-                <TextBlock x:Name="BillFormTitle" Text="Add a bill" FontWeight="SemiBold" />
-                <WrapPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="First day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillStartPicker" /></StackPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Last day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillEndPicker" /></StackPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity total" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillTotalBox" Width="110" PlaceholderText="206.32" /></StackPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity kWh" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillKwhBox" Width="110" PlaceholderText="1036" /></StackPanel>
-                </WrapPanel>
-                <TextBlock Text="Flat electricity fees to leave out (optional, as many as you like)" FontSize="12" Opacity="0.7" />
-                <StackPanel x:Name="FeesPanel" Spacing="6" />
-                <Button x:Name="AddFeeButton" Content="Add a flat fee" HorizontalAlignment="Left" />
-                <TextBlock x:Name="BillPriceText" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock x:Name="BillWarningText" TextWrapping="Wrap" Foreground="{DynamicResource VaAccentRedBrush}" IsVisible="False" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button x:Name="SaveBillButton" Content="Save bill" Classes="accent" />
-                  <Button x:Name="CancelBillButton" Content="Clear" />
-                </StackPanel>
-                <TextBlock x:Name="BillStatusText" TextWrapping="Wrap" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Sleep power" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap"
-                     Text="While the PC sleeps nothing can be measured. Time the collector saw it asleep is estimated at this many watts (a desktop in sleep typically draws 1 to 5 W). The estimate is shown on its own line and is not added to the active figures." />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBox x:Name="SleepWattsBox" Width="100" PlaceholderText="2" />
-            <TextBlock Text="watts" VerticalAlignment="Center" />
-            <Button x:Name="SaveSleepButton" Content="Save" Classes="accent" />
-          </StackPanel>
-          <TextBlock x:Name="SleepStatusText" TextWrapping="Wrap" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Wall meter" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap"
-                     Text="A Shelly smart plug (second generation or newer, such as the Plug US Gen4) between the wall and the PC measures what the whole PC draws, including everything the sensors cannot see. Set the plug up in the Shelly app, give it a fixed address on your router, and enter that address here. KVGuzzler only reads from the plug; it never switches it." />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBox x:Name="WallHostBox" Width="220" PlaceholderText="192.168.1.50" />
-            <Button x:Name="TestWallButton" Content="Test" />
-            <Button x:Name="SaveWallButton" Content="Save" Classes="accent" />
-            <Button x:Name="RemoveWallButton" Content="Remove" />
-          </StackPanel>
-          <TextBlock x:Name="WallStatusText" TextWrapping="Wrap" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Database location" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap"
-                     Text="Keep your settings anywhere, such as a backed-up or cloud-synced folder. Changing the location needs a restart. Power history is kept by the background collector in its own machine-wide folder and does not move." />
-          <TextBlock x:Name="DbPathText" TextWrapping="Wrap" />
-          <TextBlock x:Name="DbSizeText" />
-          <WrapPanel>
-            <Button x:Name="ChooseExistingButton" Content="Choose an existing file..." Margin="0,0,8,8" />
-            <Button x:Name="ChooseNewButton" Content="Choose a new location..." Margin="0,0,8,8" />
-            <Button x:Name="ResetDbButton" Content="Reset to default" Margin="0,0,8,8" />
-          </WrapPanel>
-          <TextBlock x:Name="DbStatusText" TextWrapping="Wrap" />
-          <Button x:Name="RestartButton" Content="Restart KVGuzzler now" Classes="accent" IsVisible="False" HorizontalAlignment="Left" />
-
-          <Separator Margin="0,8" />
-
-          <TextBlock Text="Appearance" FontSize="20" FontWeight="SemiBold" />
-          <ComboBox x:Name="ThemeBox" MinWidth="240" />
-          <TextBlock x:Name="ThemeDescriptionText" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
-        </StackPanel>
-      </ScrollViewer>
-    </TabItem>
-
-    <TabItem Header="Help">
-      <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
-        <TextBlock Text="KVGuzzler" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock x:Name="VersionText" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button x:Name="RepoButton" Content="Project page" />
-          <Button x:Name="IssuesButton" Content="Report an issue" />
-        </StackPanel>
-        <Separator Margin="0,8" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button x:Name="CheckUpdatesButton" Content="Check for updates" />
-          <Button x:Name="ApplyUpdateButton" Content="Update and restart" Classes="accent" IsVisible="False" />
-        </StackPanel>
-        <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" />
+          <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="mono" TextAlignment="Right" />
+          <TextBlock Grid.Column="2" Text="{Binding Cost}" Classes="mono" FontWeight="SemiBold" TextAlignment="Right" />
+          <TextBlock Grid.Column="3" Text="{Binding ShareText}" IsVisible="{Binding HasBar}" Classes="caption" TextAlignment="Right" VerticalAlignment="Center" />
+        </Grid>
+        <ProgressBar Classes="bar" IsVisible="{Binding HasBar}" Minimum="0" Maximum="1" Value="{Binding Share}" Foreground="{Binding BarBrush}" />
+        <TextBlock Text="{Binding Detail}" IsVisible="{Binding HasDetail}" Classes="caption" />
       </StackPanel>
-    </TabItem>
+    </DataTemplate>
 
-  </TabControl>
+    <!-- One live power reading: name, watts, and its share of the whole PC, with a bar. -->
+    <DataTemplate x:Key="ReadingRow" x:DataType="views:ReadingRow">
+      <StackPanel Margin="0,0,0,10">
+        <StackPanel Margin="{Binding Indent}" Opacity="{Binding Opacity}" Spacing="4">
+          <Grid ColumnDefinitions="*,Auto,64" ColumnSpacing="8">
+            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Text="{Binding WattsText}" Classes="mono" />
+            <TextBlock Grid.Column="2" Text="{Binding ShareText}" Classes="mono" TextAlignment="Right" />
+          </Grid>
+          <ProgressBar Classes="bar" Minimum="0" Maximum="1" Value="{Binding Share}" Foreground="{Binding BarBrush}" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </Window.Resources>
+
+  <Grid>
+    <TabControl x:Name="Tabs" Margin="12,8,12,0">
+
+      <!-- ===================================== Dashboard ===================================== -->
+      <TabItem Header="Dashboard">
+        <ScrollViewer>
+          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="1200" HorizontalAlignment="Stretch">
+
+            <!-- The three numbers that matter: what was used, what it cost, and what is being drawn now. -->
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+              <Border Classes="card" Grid.Column="0">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Energy used" Classes="caption" />
+                  <TextBlock x:Name="StatEnergyText" Text="-" Classes="hero" />
+                  <TextBlock x:Name="StatEnergyCaption" Classes="caption" />
+                </StackPanel>
+              </Border>
+              <Border Classes="card" Grid.Column="1">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Cost" Classes="caption" />
+                  <TextBlock x:Name="StatCostText" Text="-" Classes="hero" />
+                  <TextBlock x:Name="StatCostCaption" Classes="caption" />
+                </StackPanel>
+              </Border>
+              <Border Classes="card" Grid.Column="2">
+                <StackPanel Spacing="2">
+                  <TextBlock x:Name="NowLabelText" Text="Right now" Classes="caption" />
+                  <TextBlock x:Name="NowWattsText" Text="-" Classes="hero" />
+                  <TextBlock x:Name="NowCaptionText" Classes="caption" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <!-- The chart, and live power beside it. -->
+            <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
+              <Border Classes="card" Grid.Column="0">
+                <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="Power over time" Classes="h2" />
+                    <TextBlock x:Name="ChartPeriodText" Classes="caption" />
+                  </StackPanel>
+                  <views:PowerChartControl x:Name="PowerChartView" Grid.Row="1" />
+                  <TextBlock x:Name="ChartNoteText" Grid.Row="2" Classes="caption" />
+                </Grid>
+              </Border>
+
+              <Border Classes="card" Grid.Column="1">
+                <StackPanel Spacing="10">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="Live power" Classes="h2" />
+                    <TextBlock x:Name="PowerStatusText" Classes="caption" Text="Looking for power sensors..." />
+                  </StackPanel>
+
+                  <!-- Whole PC split into its parts, so the share of each is visible at a glance. -->
+                  <Border CornerRadius="6" ClipToBounds="True" Height="14">
+                    <Grid x:Name="LiveSplitBar" />
+                  </Border>
+                  <WrapPanel x:Name="LiveSplitLegend" />
+
+                  <Grid x:Name="ReadingsHeader" ColumnDefinitions="*,Auto,64" ColumnSpacing="8" IsVisible="False">
+                    <TextBlock Text="Component" Classes="caption" />
+                    <TextBlock Grid.Column="1" Text="Power" Classes="caption" />
+                    <TextBlock x:Name="ReadingsShareHeader" Grid.Column="2" Classes="caption" TextAlignment="Right" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                  <ItemsControl x:Name="ReadingsList" ItemTemplate="{StaticResource ReadingRow}" />
+
+                  <TextBlock x:Name="PowerTotalText" FontWeight="SemiBold" Classes="body" />
+                  <TextBlock x:Name="WallPowerText" FontWeight="SemiBold" Classes="body" IsVisible="False" />
+                  <TextBlock x:Name="WallBreakdownText" Classes="caption" IsVisible="False" />
+                  <TextBlock x:Name="PowerSessionText" Classes="caption" />
+                  <TextBlock x:Name="PowerNotesText" Classes="caption" />
+
+                  <TextBlock x:Name="DashboardLiveProgramsHeader" Text="Right now, by program" Classes="h2" Margin="0,8,0,0" IsVisible="False" />
+                  <ItemsControl x:Name="DashboardLiveProgramsList" ItemTemplate="{StaticResource BarRow}" />
+
+                  <Expander Header="What do these numbers mean?" Padding="0,8" Margin="-8,0,0,0">
+                    <TextBlock x:Name="PowerInfoText" Classes="caption" />
+                  </Expander>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <!-- Programs rolled up, and the history by period. -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+              <Border Classes="card" Grid.Column="0">
+                <StackPanel Spacing="10">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="Where the power went" Classes="h2" />
+                    <TextBlock x:Name="DashboardProgramsSummaryText" Classes="caption" />
+                  </StackPanel>
+                  <Border CornerRadius="6" ClipToBounds="True" Height="14">
+                    <Grid x:Name="DashboardProgramsSplitBar" />
+                  </Border>
+                  <WrapPanel x:Name="DashboardProgramsSplitLegend" />
+                  <TextBlock x:Name="DashboardProgramsShareNoteText" Classes="caption" />
+                  <TextBlock x:Name="DashboardProgramsNoteText" Classes="note" />
+                  <ItemsControl x:Name="DashboardProgramsList" ItemTemplate="{StaticResource BarRow}" Margin="0,6,0,0" />
+                  <TextBlock Classes="caption" Text="Estimates, not measurements. The Programs tab has the full list and how it is worked out." />
+                </StackPanel>
+              </Border>
+
+              <StackPanel Grid.Column="1" Spacing="16">
+                <Border Classes="card">
+                  <StackPanel Spacing="10">
+                    <TextBlock Text="Energy history" Classes="h2" />
+                    <ItemsControl x:Name="HistoryList" ItemTemplate="{StaticResource BarRow}" />
+                    <TextBlock x:Name="HistoryNoteText" Classes="caption" />
+                  </StackPanel>
+                </Border>
+                <!-- Only shown while nothing records in the background: the controls live in Settings. -->
+                <Border x:Name="RecordingHint" Classes="card" IsVisible="False" Padding="16,12">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                    <TextBlock x:Name="RecordingHintText" Classes="body" VerticalAlignment="Center" />
+                    <Button x:Name="OpenRecordingSettingsButton" Grid.Column="1" Content="Open Settings" />
+                  </Grid>
+                </Border>
+              </StackPanel>
+            </Grid>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================================== Programs ===================================== -->
+      <TabItem Header="Programs">
+        <ScrollViewer>
+          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="1200" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="4">
+              <TextBlock Text="Programs" Classes="h1" />
+              <TextBlock Classes="note" Text="Which programs the CPU's and GPU's power went to. These are estimates, not measurements." />
+              <Expander Header="How this is worked out" Padding="0,8" Margin="-8,0,0,0">
+                <TextBlock Classes="note"
+                           Text="The CPU and GPU only report their total power; Windows reports how much of the CPU and GPU each program used. The power above idle is shared out in proportion to that. The idle power itself belongs to no program. Every program is tracked automatically, grouped by executable name." />
+              </Expander>
+            </StackPanel>
+
+            <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
+              <Border Classes="card" Grid.Column="0">
+                <StackPanel Spacing="10">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="Who used the power" Classes="h2" />
+                    <TextBlock x:Name="ProgramsPeriodText" Classes="caption" />
+                  </StackPanel>
+                  <TextBlock x:Name="ProgramsTotalText" FontWeight="SemiBold" Classes="body" />
+                  <Border CornerRadius="6" ClipToBounds="True" Height="14">
+                    <Grid x:Name="ProgramsSplitBar" />
+                  </Border>
+                  <WrapPanel x:Name="ProgramsSplitLegend" />
+                  <TextBlock x:Name="ProgramsShareNoteText" Classes="caption" />
+                  <ItemsControl x:Name="ProgramsList" ItemTemplate="{StaticResource BarRow}" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+
+              <StackPanel Grid.Column="1" Spacing="16">
+                <Border Classes="card">
+                  <StackPanel Spacing="10">
+                    <TextBlock Text="Right now" Classes="h2" />
+                    <ItemsControl x:Name="LiveProgramsList" ItemTemplate="{StaticResource BarRow}" />
+                    <TextBlock x:Name="ProgramsNoteText" Classes="note" />
+                  </StackPanel>
+                </Border>
+                <Border Classes="card">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="Idle power" Classes="h2" />
+                    <TextBlock x:Name="ProgramsBaselineText" Classes="note" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Grid>
+
+            <Border Classes="card">
+              <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Recent runs" Classes="h2" />
+                  <TextBlock Classes="caption"
+                             Text="What each program is estimated to have caused from when it started until it closed (a program with several processes counts as one run). A run starts when KVGuzzler first sees the program, so one that was already open when recording began starts then. Runs that caused under half a watt-hour are not listed." />
+                </StackPanel>
+                <ItemsControl x:Name="RunsList" ItemTemplate="{StaticResource BarRow}" Margin="0,6,0,0" />
+                <TextBlock x:Name="RunsNoteText" Classes="note" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================================== Cost estimator ===================================== -->
+      <TabItem Header="Cost estimator">
+        <ScrollViewer>
+          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="820" HorizontalAlignment="Center">
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Cost estimator" Classes="h1" />
+                <TextBlock Classes="note" Text="What a constant load costs at the rate saved in Settings." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Constant load:" VerticalAlignment="Center" />
+                  <TextBox x:Name="WattsBox" Text="400" Width="100" />
+                  <TextBlock Text="watts" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="EstimateText" Classes="body" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================================== Settings ===================================== -->
+      <TabItem Header="Settings">
+        <ScrollViewer>
+          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="820" HorizontalAlignment="Center">
+            <TextBlock Text="Settings" Classes="h1" />
+
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Background recording" Classes="h2" />
+                <TextBlock x:Name="CollectorStatusText" Classes="body" Text="Checking the collector service..." />
+                <TextBlock x:Name="CollectorLastSeenText" Classes="caption" IsVisible="False" />
+                <WrapPanel x:Name="CollectorButtons" IsVisible="False" Margin="0,4,0,0">
+                  <Button x:Name="InstallCollectorButton" Content="Turn on background recording" Classes="accent" IsVisible="False" Margin="0,0,8,8" />
+                  <Button x:Name="RemoveCollectorButton" Content="Turn off background recording" IsVisible="False" Margin="0,0,8,8" />
+                </WrapPanel>
+                <TextBlock x:Name="CollectorResultText" Classes="body" IsVisible="False" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Electricity rate" Classes="h2" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Currency symbol:" VerticalAlignment="Center" />
+                  <TextBox x:Name="CurrencyBox" Width="60" MaxLength="3" PlaceholderText="$" />
+                  <TextBlock Text="Price from:" VerticalAlignment="Center" Margin="12,0,0,0" />
+                  <ComboBox x:Name="RateModeBox" SelectedIndex="0" MinWidth="170">
+                    <ComboBoxItem Content="One rate" />
+                    <ComboBoxItem Content="My bills" />
+                  </ComboBox>
+                </StackPanel>
+
+                <StackPanel x:Name="OneRatePanel" Spacing="12">
+                  <TextBlock Classes="note"
+                             Text="Use the all-in price per kWh from your bill (supply and delivery per-kWh charges, not the fixed monthly fee). One price is used for everything, whenever it was recorded." />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBox x:Name="RateBox" Width="120" PlaceholderText="0.15" />
+                    <TextBlock Text="per kWh" VerticalAlignment="Center" />
+                    <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
+                  </StackPanel>
+                  <TextBlock x:Name="RateExampleText" Classes="body" />
+                  <TextBlock x:Name="RateWarningText" Classes="error" IsVisible="False" />
+                  <TextBlock x:Name="RateStatusText" Classes="body" />
+                </StackPanel>
+
+                <StackPanel x:Name="BillsPanel" Spacing="10" IsVisible="False">
+                  <TextBlock Classes="note"
+                             Text="Enter each bill's ELECTRICITY part only: if the bill also has gas or other services, or an overall total covering all of them, use just the electricity charges and the electricity kWh. For each bill enter the dates it covers, the electricity total, and the kWh it charged for. The price per kWh is worked out for you (total divided by kWh) and used for everything KVGuzzler recorded on those dates, so an old month keeps its own price when the rate changes. Dates after your latest bill use its price as an estimate until you enter the next bill. Flat fees that do not depend on usage (a basic service charge, a monthly credit) can be left out, so the price is that of one more kWh." />
+                  <StackPanel x:Name="BillsList" Spacing="8" />
+                  <TextBlock x:Name="BillsNoteText" Classes="caption" />
+
+                  <Border BorderThickness="1" BorderBrush="{DynamicResource VaBorderBrush}" CornerRadius="8" Padding="14">
+                    <StackPanel Spacing="8">
+                      <TextBlock x:Name="BillFormTitle" Text="Add a bill" FontWeight="SemiBold" />
+                      <WrapPanel>
+                        <StackPanel Margin="0,0,12,8"><TextBlock Text="First day" Classes="caption" /><CalendarDatePicker x:Name="BillStartPicker" /></StackPanel>
+                        <StackPanel Margin="0,0,12,8"><TextBlock Text="Last day" Classes="caption" /><CalendarDatePicker x:Name="BillEndPicker" /></StackPanel>
+                        <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity total" Classes="caption" /><TextBox x:Name="BillTotalBox" Width="110" PlaceholderText="206.32" /></StackPanel>
+                        <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity kWh" Classes="caption" /><TextBox x:Name="BillKwhBox" Width="110" PlaceholderText="1036" /></StackPanel>
+                      </WrapPanel>
+                      <TextBlock Text="Flat electricity fees to leave out (optional, as many as you like)" Classes="caption" />
+                      <StackPanel x:Name="FeesPanel" Spacing="6" />
+                      <Button x:Name="AddFeeButton" Content="Add a flat fee" HorizontalAlignment="Left" />
+                      <TextBlock x:Name="BillPriceText" FontWeight="SemiBold" Classes="body" />
+                      <TextBlock x:Name="BillWarningText" Classes="error" IsVisible="False" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="SaveBillButton" Content="Save bill" Classes="accent" />
+                        <Button x:Name="CancelBillButton" Content="Clear" />
+                      </StackPanel>
+                      <TextBlock x:Name="BillStatusText" Classes="body" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Sleep power" Classes="h2" />
+                <TextBlock Classes="note"
+                           Text="While the PC sleeps nothing can be measured. Time the collector saw it asleep is estimated at this many watts (a desktop in sleep typically draws 1 to 5 W). The estimate is shown on its own line and is not added to the active figures." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox x:Name="SleepWattsBox" Width="100" PlaceholderText="2" />
+                  <TextBlock Text="watts" VerticalAlignment="Center" />
+                  <Button x:Name="SaveSleepButton" Content="Save" Classes="accent" />
+                </StackPanel>
+                <TextBlock x:Name="SleepStatusText" Classes="body" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Wall meter" Classes="h2" />
+                <TextBlock Classes="note"
+                           Text="A Shelly smart plug (second generation or newer, such as the Plug US Gen4) between the wall and the PC measures what the whole PC draws, including everything the sensors cannot see. Set the plug up in the Shelly app, give it a fixed address on your router, and enter that address here. KVGuzzler only reads from the plug; it never switches it." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox x:Name="WallHostBox" Width="220" PlaceholderText="192.168.1.50" />
+                  <Button x:Name="TestWallButton" Content="Test" />
+                  <Button x:Name="SaveWallButton" Content="Save" Classes="accent" />
+                  <Button x:Name="RemoveWallButton" Content="Remove" />
+                </StackPanel>
+                <TextBlock x:Name="WallStatusText" Classes="body" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Database location" Classes="h2" />
+                <TextBlock Classes="note"
+                           Text="Keep your settings anywhere, such as a backed-up or cloud-synced folder. Changing the location needs a restart. Power history is kept by the background collector in its own machine-wide folder and does not move." />
+                <TextBlock x:Name="DbPathText" Classes="body" />
+                <TextBlock x:Name="DbSizeText" />
+                <WrapPanel>
+                  <Button x:Name="ChooseExistingButton" Content="Choose an existing file..." Margin="0,0,8,8" />
+                  <Button x:Name="ChooseNewButton" Content="Choose a new location..." Margin="0,0,8,8" />
+                  <Button x:Name="ResetDbButton" Content="Reset to default" Margin="0,0,8,8" />
+                </WrapPanel>
+                <TextBlock x:Name="DbStatusText" Classes="body" />
+                <Button x:Name="RestartButton" Content="Restart KVGuzzler now" Classes="accent" IsVisible="False" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Appearance" Classes="h2" />
+                <ComboBox x:Name="ThemeBox" MinWidth="240" />
+                <TextBlock x:Name="ThemeDescriptionText" Classes="note" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================================== Help ===================================== -->
+      <TabItem Header="Help">
+        <ScrollViewer>
+          <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="820" HorizontalAlignment="Center">
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="KVGuzzler" Classes="h1" />
+                <TextBlock x:Name="VersionText" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="RepoButton" Content="Project page" />
+                  <Button x:Name="IssuesButton" Content="Report an issue" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Updates" Classes="h2" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="CheckUpdatesButton" Content="Check for updates" />
+                  <Button x:Name="ApplyUpdateButton" Content="Update and restart" Classes="accent" IsVisible="False" />
+                </StackPanel>
+                <TextBlock x:Name="UpdateStatusText" Classes="body" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+
+    <!-- The period picker sits on the tab strip's right edge, shared by the Dashboard and Programs. -->
+    <Border x:Name="PeriodBar" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,28,0" Padding="3"
+            Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
+      <StackPanel x:Name="StatsPeriodPanel" Orientation="Horizontal" Spacing="2">
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last hour" />
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 24 hours" />
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 7 days" />
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 30 days" />
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last year" />
+        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
+      </StackPanel>
+    </Border>
+  </Grid>
 </Window>

@@ -2,6 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Kvg.Standards;
@@ -12,10 +13,6 @@ using KVGuzzler.Services;
 using VisualAssault;
 
 namespace KVGuzzler.Views;
-
-/// <summary>One line of the live power list. Breakdown lines are indented and dimmed: they are part of a
-/// component above them, not added to the total.</summary>
-public sealed record ReadingRow(string Name, string WattsText, Thickness Indent, double Opacity);
 
 public partial class MainWindow : Window
 {
@@ -85,23 +82,56 @@ public partial class MainWindow : Window
         Closed += (_, _) => power.Updated -= OnUpdated;
     }
 
+    private static string Watts(double w) => w.ToString("0.0", CultureInfo.CurrentCulture) + " W";
+
+    /// <summary>The colour a component's bar and chart line share: CPU blue, GPU green, anything else muted. The collector's
+    /// live readings carry no hardware kind, so it falls back on the name.</summary>
+    private static IBrush ComponentBrush(PowerReading r)
+    {
+        var name = r.Name;
+        if (r.Kind == PowerKind.Cpu || name.StartsWith("CPU", StringComparison.OrdinalIgnoreCase)) return UiColors.Cpu;
+        if (r.Kind == PowerKind.Gpu || new[] { "GPU", "NVIDIA", "GeForce", "Radeon", "Arc" }.Any(k => name.Contains(k, StringComparison.OrdinalIgnoreCase)))
+            return UiColors.Gpu;
+        return UiColors.Brush(VaToken.AccentMuted);
+    }
+
     private void ShowPower(PowerSnapshot s, bool showSession = true)
     {
         // The wall meter is the whole PC, so it is shown on its own line below, not in the list of parts.
         var wall = s.Readings.FirstOrDefault(r => r.Scope == ReadingScope.Wall);
-        ReadingsList.ItemsSource = s.Readings
+        var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
+
+        // Every component is shown as a share of the whole PC at the wall. With no wall meter the only whole there is
+        // is the sum of the sensors, so the shares are of that, and the header says so.
+        var whole = wall is { Watts: > 0 } ? wall.Watts : s.TotalWatts;
+        var rest = wall is not null && hasComponents ? wall.Watts - s.TotalWatts : -1;
+        double ShareOf(double watts) => whole > 0 ? Math.Clamp(watts / whole, 0, 1) : 0;
+
+        var rows = s.Readings
             .Where(r => r.Scope != ReadingScope.Wall)
             .OrderBy(r => r.Scope)   // components first, their breakdown after
             .Select(r => new ReadingRow(
                 r.Name,
-                r.Watts.ToString("0.0", CultureInfo.CurrentCulture) + " W",
+                Watts(r.Watts),
                 r.Scope == ReadingScope.Breakdown ? new Thickness(20, 0, 0, 0) : new Thickness(0),
-                r.Scope == ReadingScope.Breakdown ? 0.7 : 1))
+                r.Scope == ReadingScope.Breakdown ? 0.7 : 1,
+                ShareOf(r.Watts),
+                whole > 0 ? UiColors.Percent(ShareOf(r.Watts)) : "",
+                r.Scope == ReadingScope.Breakdown ? UiColors.Rest : ComponentBrush(r)))
             .ToList();
+        if (rest > 0.05)
+            rows.Add(new ReadingRow("Everything else", Watts(rest), new Thickness(0), 1, ShareOf(rest), UiColors.Percent(ShareOf(rest)), UiColors.Rest));
+        ReadingsList.ItemsSource = rows;
+        ReadingsShareHeader.Text = wall is not null ? "% of PC" : "% of sensors";
+        ReadingsHeader.IsVisible = rows.Count > 0;
 
-        var hasComponents = s.Readings.Any(r => r.Scope == ReadingScope.Component);
-        PowerStatusText.Text = hasComponents || wall is not null ? "Power, measured every second." : "No power sensors are reporting on this machine.";
-        PowerTotalText.Text = hasComponents ? $"Total active: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
+        var parts = s.Readings.Where(r => r.Scope == ReadingScope.Component)
+            .Select(r => new SplitBar.Part(r.Name, r.Watts, ComponentBrush(r))).ToList();
+        if (rest > 0.05) parts.Add(new SplitBar.Part("Everything else", rest, UiColors.Rest));
+        SplitBar.Fill(LiveSplitBar, LiveSplitLegend, parts);
+
+        PowerStatusText.Text = hasComponents || wall is not null ? "Measured every second." : "No power sensors are reporting on this machine.";
+        PowerTotalText.Text = hasComponents ? $"Total active: {Watts(s.TotalWatts)}" : "";
 
         var session = $"Active energy since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
         if (CurrentRate() is { } rate)
@@ -115,13 +145,35 @@ public partial class MainWindow : Window
         WallBreakdownText.IsVisible = false;
         if (wall is not null)
         {
-            WallPowerText.Text = $"Whole PC at the wall: {wall.Watts.ToString("0.0", CultureInfo.CurrentCulture)} W";
+            WallPowerText.Text = $"Whole PC at the wall: {Watts(wall.Watts)}";
             // Only say what the rest is when the sums make sense: the plug and the sensors are read a moment apart.
             var other = wall.Watts - s.TotalWatts;
             WallBreakdownText.Text = hasComponents && other >= 0
-                ? $"The sensors above account for {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W. The other {other.ToString("0.0", CultureInfo.CurrentCulture)} W is fans, drives, the motherboard and power-supply losses."
+                ? $"The sensors above account for {Watts(s.TotalWatts)}. The other {Watts(other)} is fans, drives, the motherboard and power-supply losses."
                 : "";
             WallBreakdownText.IsVisible = WallBreakdownText.Text.Length > 0;
+        }
+
+        // The "Right now" card: the whole PC when there is a wall meter, otherwise the sensors.
+        if (wall is not null)
+        {
+            NowLabelText.Text = "Right now · whole PC at the wall";
+            NowWattsText.Text = Watts(wall.Watts);
+            NowCaptionText.Text = hasComponents && whole > 0
+                ? $"The sensors account for {UiColors.Percent(ShareOf(s.TotalWatts))} of it; the other {UiColors.Percent(ShareOf(Math.Max(rest, 0)))} is fans, drives and power-supply losses."
+                : "";
+        }
+        else if (hasComponents)
+        {
+            NowLabelText.Text = "Right now · CPU, GPU and memory";
+            NowWattsText.Text = Watts(s.TotalWatts);
+            NowCaptionText.Text = "Add a wall meter in Settings to see the whole PC.";
+        }
+        else
+        {
+            NowLabelText.Text = "Right now";
+            NowWattsText.Text = "-";
+            NowCaptionText.Text = PowerStatusText.Text ?? "";
         }
 
         PowerInfoText.Text = wall is not null

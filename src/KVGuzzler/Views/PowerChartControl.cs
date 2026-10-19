@@ -102,8 +102,9 @@ public sealed class PowerChartControl : Control
     public static readonly StyledProperty<PowerChartData?> DataProperty =
         AvaloniaProperty.Register<PowerChartControl, PowerChartData?>(nameof(Data));
 
-    private const double ChartHeight = 240;
-    private const double LeftMargin = 46, RightMargin = 10, TopMargin = 10, BottomMargin = 24;
+    // The legend takes a strip above the plot, so it never covers a line.
+    private const double PreferredHeight = 300;
+    private const double LeftMargin = 52, RightMargin = 12, TopMargin = 34, BottomMargin = 28;
 
     private Point? _hover;
 
@@ -122,7 +123,7 @@ public sealed class PowerChartControl : Control
     }
 
     protected override Size MeasureOverride(Size availableSize) =>
-        new(double.IsInfinity(availableSize.Width) ? 480 : availableSize.Width, ChartHeight);
+        new(double.IsInfinity(availableSize.Width) ? 480 : availableSize.Width, PreferredHeight);
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
@@ -143,7 +144,8 @@ public sealed class PowerChartControl : Control
 
     private static IBrush BrushFor(ChartSeriesKind kind) => new SolidColorBrush(Token(kind switch
     {
-        ChartSeriesKind.Wall => VaToken.PrimaryAction,
+        // The whole PC is the brightest line of the theme: PrimaryAction is a button fill and vanishes on a dark background.
+        ChartSeriesKind.Wall => VaToken.Text,
         ChartSeriesKind.Cpu => VaToken.AccentBlue,
         _ => VaToken.AccentGreen,
     }));
@@ -153,7 +155,14 @@ public sealed class PowerChartControl : Control
         GapReason.Asleep => VaToken.AccentMuted,
         GapReason.Off => VaToken.TextMuted,
         _ => VaToken.AccentRed,
-    }), reason == GapReason.LostPower ? 0.25 : 0.18);
+    }), reason == GapReason.LostPower ? 0.16 : 0.14);
+
+    private static string ReasonName(GapReason reason) => reason switch
+    {
+        GapReason.Asleep => "asleep",
+        GapReason.Off => "off",
+        _ => "lost power or crashed",
+    };
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -200,7 +209,7 @@ public sealed class PowerChartControl : Control
         foreach (var w in ChartLayout.YTicks(top))
         {
             context.DrawLine(grid, new Point(plot.X, Y(w)), new Point(plot.Right, Y(w)));
-            var label = Text($"{w:0} W", 11, faint);
+            var label = Text($"{w:0} W", 12, faint);
             context.DrawText(label, new Point(plot.X - label.Width - 6, Y(w) - label.Height / 2));
         }
 
@@ -208,8 +217,8 @@ public sealed class PowerChartControl : Control
         foreach (var t in ChartLayout.TimeTicks(data.From, data.To))
         {
             context.DrawLine(grid, new Point(X(t), plot.Y), new Point(X(t), plot.Bottom));
-            var label = Text(ChartLayout.TimeLabel(t, span), 11, faint);
-            context.DrawText(label, new Point(Math.Clamp(X(t) - label.Width / 2, 0, Bounds.Width - label.Width), plot.Bottom + 5));
+            var label = Text(ChartLayout.TimeLabel(t, span), 12, faint);
+            context.DrawText(label, new Point(Math.Clamp(X(t) - label.Width / 2, 0, Bounds.Width - label.Width), plot.Bottom + 7));
         }
 
         // Stretches nothing was recorded: asleep, off, lost power.
@@ -223,7 +232,7 @@ public sealed class PowerChartControl : Control
         // The lines.
         foreach (var series in data.Series)
         {
-            var pen = new Pen(BrushFor(series.Kind), 2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+            var pen = new Pen(BrushFor(series.Kind), series.Kind == ChartSeriesKind.Wall ? 2.5 : 2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
             foreach (var segment in ChartLayout.Segments(series.Points, data.Bucket))
             {
                 if (segment.Count == 1)
@@ -247,19 +256,22 @@ public sealed class PowerChartControl : Control
             }
         }
 
-        // Legend, top left inside the plot.
-        var x = plot.X + 8;
+        // Legend in the strip above the plot: the lines first, then what the shaded stretches mean (only the reasons present).
+        var x = plot.X;
+        var legendY = plot.Y - 16;
         foreach (var series in data.Series)
         {
-            context.DrawLine(new Pen(BrushFor(series.Kind), 3), new Point(x, plot.Y + 10), new Point(x + 14, plot.Y + 10));
-            var name = Text(series.Name, 11, ink);
-            context.DrawText(name, new Point(x + 19, plot.Y + 10 - name.Height / 2));
-            x += 19 + name.Width + 14;
+            context.DrawLine(new Pen(BrushFor(series.Kind), 3, lineCap: PenLineCap.Round), new Point(x, legendY), new Point(x + 16, legendY));
+            var name = Text(series.Name, 12, ink);
+            context.DrawText(name, new Point(x + 22, legendY - name.Height / 2));
+            x += 22 + name.Width + 18;
         }
-        if (data.Gaps.Count > 0)
+        foreach (var reason in data.Gaps.Select(g => g.Reason).Distinct().OrderBy(r => r))
         {
-            var note = Text("shaded: not recorded (asleep, off, lost power)", 10, faint);
-            context.DrawText(note, new Point(plot.Right - note.Width - 6, plot.Y + 4));
+            context.FillRectangle(BandFor(reason), new Rect(x, legendY - 6, 12, 12));
+            var label = Text("not recorded: " + ReasonName(reason), 12, faint);
+            context.DrawText(label, new Point(x + 18, legendY - label.Height / 2));
+            x += 18 + label.Width + 18;
         }
 
         DrawHover(context, data, plot, X, Y, ink);
