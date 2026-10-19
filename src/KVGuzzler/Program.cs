@@ -24,8 +24,9 @@ public static class Program
         // Headless modes, before any window or the settings database: the background collector, and the
         // elevated copy that installs or removes its service.
         if (args.Contains(CollectorHost.Argument)) return CollectorHost.Run(args, development);
-        if (args.Contains(ServiceInstaller.InstallArgument)) return ServiceInstaller.RunElevated(install: true, development);
-        if (args.Contains(ServiceInstaller.UninstallArgument)) return ServiceInstaller.RunElevated(install: false, development);
+        if (args.Contains(ServiceInstaller.InstallArgument)) return ServiceInstaller.RunElevated(ServiceChange.Install, development);
+        if (args.Contains(ServiceInstaller.UninstallArgument)) return ServiceInstaller.RunElevated(ServiceChange.Uninstall, development);
+        if (args.Contains(ServiceInstaller.StopArgument)) return ServiceInstaller.RunElevated(ServiceChange.StopForUpdate, development);
 
         // A development run gets its own data folder, so it can never share a database with an installed copy.
         var dataDir = DbLocation.ResolveDataDirectory(AppServices.AppName, isDevelopment: development);
@@ -58,8 +59,10 @@ public static class Program
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static VelopackApp WithServiceHooks(VelopackApp app) => app
         .OnAfterInstallFastCallback(_ => Quietly(() => ServiceInstaller.Install(development: false)))
+        // The window already paused the service before applying (it needs administrator rights the first time); this covers an
+        // update started some other way. Afterwards the service is started again, which the user is allowed to do.
         .OnBeforeUpdateFastCallback(_ => Quietly(() => ServiceInstaller.StopForUpdate(development: false)))
-        .OnAfterUpdateFastCallback(_ => Quietly(() => ServiceInstaller.Install(development: false)))
+        .OnAfterUpdateFastCallback(_ => Quietly(() => ServiceInstaller.StartAfterUpdate(development: false)))
         .OnBeforeUninstallFastCallback(_ => Quietly(() => ServiceInstaller.Uninstall(development: false)));
 
     /// <summary>Install hooks must never fail the installer or updater over an optional service.</summary>

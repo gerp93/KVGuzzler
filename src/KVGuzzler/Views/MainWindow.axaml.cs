@@ -365,6 +365,15 @@ public partial class MainWindow : Window
     private async Task ApplyUpdateAsync()
     {
         ApplyUpdateButton.IsEnabled = false;
+        // The background recorder runs from the install folder: while it runs, the update cannot replace the files and fails
+        // after the window has closed, leaving the old version. Pause it first (Windows may ask for permission).
+        UpdateStatusText.Text = "Pausing background recording so the update can replace its files...";
+        if (await _services.StopCollectorForUpdateAsync() is { } problem)
+        {
+            UpdateStatusText.Text = problem;
+            ApplyUpdateButton.IsEnabled = true;
+            return;
+        }
         UpdateStatusText.Text = "Downloading the update...";
         try
         {

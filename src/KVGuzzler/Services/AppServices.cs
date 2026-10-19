@@ -23,6 +23,7 @@ public sealed class AppServices : IDisposable
     {
         HistoryDirectory = historyDirectory ?? HistoryStore.DefaultDirectory(isDevelopment: !updates.IsInstalled);
         QueryCollectorService = () => ServiceInstaller.Query(development: !updates.IsInstalled);
+        StopCollectorForUpdateAsync = () => ServiceInstaller.EnsureStoppedForUpdateAsync(development: !updates.IsInstalled);
         DataDir = dataDir;
         _instanceLock = instanceLock;
         Updates = updates;
@@ -50,6 +51,10 @@ public sealed class AppServices : IDisposable
 
     /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
     public Func<ServiceState> QueryCollectorService { get; set; }
+
+    /// <summary>Gets the collector service out of the way of an update; null when the program files are free to replace, otherwise
+    /// what to tell the user. Replaceable for tests.</summary>
+    public Func<Task<string?>> StopCollectorForUpdateAsync { get; set; }
 
     /// <summary>The collector's history, or null when it has not recorded anything yet on this machine (or
     /// cannot be opened). Never creates the file: only the collector does that.</summary>
