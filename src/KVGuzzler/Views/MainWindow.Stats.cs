@@ -33,8 +33,14 @@ public partial class MainWindow
 
     private void StartStatsUi()
     {
-        // The period applies to the Dashboard and Programs; Settings and Help have nothing to filter.
-        Tabs.SelectionChanged += (_, _) => PeriodBar.IsVisible = Tabs.SelectedIndex is 0 or 1;
+        // The period applies to the Dashboard and Programs: the one picker sits in the header of whichever is showing.
+        Tabs.SelectionChanged += (_, _) =>
+        {
+            var host = Tabs.SelectedIndex switch { 0 => DashboardPeriodHost, 1 => ProgramsPeriodHost, _ => null };
+            if (host is null || ReferenceEquals(PeriodBar.Parent, host)) return;
+            (PeriodBar.Parent as Panel)?.Children.Remove(PeriodBar);
+            host.Children.Add(PeriodBar);
+        };
 
         var buttons = StatsButtons;
         // The choice is remembered between runs; the first time it is "All time".
