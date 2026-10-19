@@ -13,6 +13,8 @@ public static class SettingKeys
     public const string SleepWatts = "sleep_watts";
     /// <summary>"one" (a single price per kWh) or "bills" (the price comes from each bill's dates).</summary>
     public const string RateMode = "rate_mode";
+    /// <summary>Which period the two big numbers at the top of the Dashboard show (an index; 5 is "All time").</summary>
+    public const string StatsPeriod = "stats_period";
 }
 
 /// <summary>The app's SQLite file, in WAL mode. Short-lived pooled connections per call.</summary>

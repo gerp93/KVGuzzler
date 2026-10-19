@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         StartCollectorDisplay();
         StartWallMeterSettings();
         StartBillsUi();
+        StartStatsUi();
     }
 
     // ----- Live power -------------------------------------------------------------------
