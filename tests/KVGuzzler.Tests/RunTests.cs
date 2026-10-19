@@ -283,6 +283,23 @@ public class ProgramListTests
     }
 }
 
+public class ProgramShareTests
+{
+    [Fact]
+    public void ProgramSharesAreOfTheWholePcWhenItIsKnownAndOfTheCpuAndGpuOtherwise()
+    {
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        var totals = new[] { new ProgramEnergy("a.exe", 0.1, 0.1, 60), new ProgramEnergy(ProgramAttributor.Baseline, 0.3, 0.5, 0) };
+
+        Assert.Equal("20%", MainWindow.ProgramRows(totals, null, "$", wholeKwh: 1.0)[0].ShareText);   // 0.2 of the 1 kWh at the wall
+        Assert.Equal("20%", MainWindow.ProgramRows(totals, null, "$")[0].ShareText);                  // 0.2 of the 1 kWh the CPU and GPU used
+
+        var parts = MainWindow.SplitParts(totals, wholeKwh: 2.0);
+        Assert.Equal(new[] { "Programs", "Idle baseline", "Everything else" }, parts.Where(p => p.Value > 0).Select(p => p.Label));
+        Assert.Equal(1.0, parts.Single(p => p.Label == "Everything else").Value, 6);                  // 2 kWh at the wall minus 1 kWh of CPU and GPU
+    }
+}
+
 public class RunRowsTests
 {
     [Fact]

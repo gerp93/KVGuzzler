@@ -136,6 +136,14 @@ public class WallMeterUiTests
         var rows = Assert.IsAssignableFrom<IEnumerable<ReadingRow>>(window.ReadingsList.ItemsSource).ToList();
         Assert.DoesNotContain(rows, r => r.Name.Contains("Whole PC"));                     // it has its own line
         Assert.Contains("matches your bill", window.PowerInfoText.Text);
+
+        // Each component is a share of the whole PC at the wall (200 W), and what the sensors miss is its own row.
+        Assert.Equal("40%", rows.Single(r => r.Name.StartsWith("NVIDIA")).ShareText);
+        Assert.Equal("33%", rows.Single(r => r.Name == "CPU package").ShareText);
+        var rest = rows.Single(r => r.Name == "Everything else");
+        Assert.Equal("55.0 W", rest.WattsText);
+        Assert.Equal(0.275, rest.Share, 3);
+        Assert.Equal("% of PC", window.ReadingsShareHeader.Text);
     }
 
     [AvaloniaFact]
@@ -164,7 +172,7 @@ public class WallMeterUiTests
 
         Assert.Equal("Last 24 hours: 4.1 kWh whole PC, $0.82", MainWindow.HistoryTitle(p, 0.20m, "$"));
         // The sleep estimate is dropped from the detail: the wall meter measured the sleeping hours itself.
-        Assert.Equal("of which CPU, GPU and memory 2.4 kWh · asleep 10 h 0 min · off 30 min · lost power or crashed 3 min",
+        Assert.Equal("of which CPU, GPU and memory 2.4 kWh (59% of the whole PC) · asleep 10 h 0 min · off 30 min · lost power or crashed 3 min",
             MainWindow.HistoryDetail(p));
     }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using KVGuzzler.Collector;
 using KVGuzzler.Core.History;
@@ -252,11 +253,15 @@ public class ChartUiTests
 
         var data = window.PowerChartView.Data!;
         Assert.Equal(new[] { "CPU", "GPU" }, data.Series.Select(s => s.Name));
-        Assert.Equal(TimeSpan.FromDays(1), data.To - data.From);                       // the default is the last 24 hours
+        Assert.Equal(TimeSpan.FromDays(30), data.To - data.From);                      // the default is all time: the chart shows 30 days at most
+        Assert.Contains("does not go back further", window.ChartPeriodText.Text);
         Assert.Contains("Set up a wall meter", window.ChartNoteText.Text);              // no whole-PC line yet
 
-        window.ChartPeriodBox.SelectedIndex = 0;                                        // last hour
+        // The chart follows the period picker shared with the rest of the Dashboard.
+        window.StatsPeriodPanel.Children.OfType<RadioButton>().Single(b => b.Content!.ToString() == "Last hour").IsChecked = true;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         await window.RefreshCollectorAsync(includeService: false);
+        Assert.Equal("Last hour", window.ChartPeriodText.Text);
         Assert.Equal(TimeSpan.FromHours(1), window.PowerChartView.Data!.To - window.PowerChartView.Data.From);
         Assert.Equal(TimeSpan.FromMinutes(1), window.PowerChartView.Data.Bucket);
     }

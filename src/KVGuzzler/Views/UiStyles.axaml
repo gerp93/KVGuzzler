@@ -1,0 +1,95 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- The shared look of the window: cards, text sizes and the segmented period picker. Colours all come from the
+       active VisualAssault theme (Va*Brush), so every theme styles it. -->
+
+  <!-- A block with a surface colour, a border and rounded corners. -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource VaSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource VaBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <!-- Type scale: page title 24, card title 16, body 14, caption 12, hero number 34. -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource VaTextMutedBrush}" />
+  </Style>
+  <Style Selector="TextBlock.note">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource VaTextMutedBrush}" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- A message line with no text takes no room (and no stack spacing). Code that sets IsVisible itself overrides this. -->
+  <Style Selector="TextBlock.body, TextBlock.note, TextBlock.caption, TextBlock.error">
+    <Setter Property="IsVisible" Value="{ReflectionBinding Text, RelativeSource={RelativeSource Self}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </Style>
+  <Style Selector="TextBlock.hero">
+    <Setter Property="FontSize" Value="34" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="TextBlock.mono">
+    <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource VaAccentRedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Tabs: a little larger than the Fluent default, so they read as the app's navigation. -->
+  <Style Selector="TabItem">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="Padding" Value="16,8" />
+  </Style>
+
+  <!-- A radio button drawn as a segment of a pill-shaped picker. The chosen segment is filled. -->
+  <Style Selector="RadioButton.seg">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border x:Name="PART_Seg" Background="Transparent" CornerRadius="7" Padding="14,7" MinWidth="64">
+          <ContentPresenter x:Name="PART_Text" Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Foreground="{DynamicResource VaTextMutedBrush}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="RadioButton.seg:pointerover /template/ Border#PART_Seg">
+    <Setter Property="Background" Value="{DynamicResource VaBgHoverBrush}" />
+  </Style>
+  <Style Selector="RadioButton.seg:pointerover /template/ ContentPresenter#PART_Text">
+    <Setter Property="Foreground" Value="{DynamicResource VaTextBrush}" />
+  </Style>
+  <Style Selector="RadioButton.seg:checked /template/ Border#PART_Seg">
+    <Setter Property="Background" Value="{DynamicResource VaPrimaryActionBrush}" />
+  </Style>
+  <Style Selector="RadioButton.seg:checked /template/ ContentPresenter#PART_Text">
+    <Setter Property="Foreground" Value="{DynamicResource VaPrimaryActionTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="RadioButton.seg:focus-visible /template/ Border#PART_Seg">
+    <Setter Property="BorderBrush" Value="{DynamicResource VaAccentBlueBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <!-- A thin proportion bar: the track is the border colour, the fill is set per row. -->
+  <Style Selector="ProgressBar.bar">
+    <Setter Property="MinHeight" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource VaBorderBrush}" />
+  </Style>
+</Styles>

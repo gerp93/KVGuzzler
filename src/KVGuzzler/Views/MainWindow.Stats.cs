@@ -5,8 +5,8 @@ using KVGuzzler.Data;
 
 namespace KVGuzzler.Views;
 
-// The two big numbers at the top of the Dashboard (energy used, and what it cost) for a period chosen from a row of
-// block-style buttons.
+// The period picker shared by the Dashboard and Programs tabs, and the two big numbers at the top of the Dashboard (energy used,
+// and what it cost) for the chosen period. The chart and the program lists follow the same choice.
 public partial class MainWindow
 {
     /// <summary>The choices, in the order of the buttons. A null span means everything ever recorded.</summary>
@@ -33,6 +33,9 @@ public partial class MainWindow
 
     private void StartStatsUi()
     {
+        // The period applies to the Dashboard and Programs; Settings and Help have nothing to filter.
+        Tabs.SelectionChanged += (_, _) => PeriodBar.IsVisible = Tabs.SelectedIndex is 0 or 1;
+
         var buttons = StatsButtons;
         // The choice is remembered between runs; the first time it is "All time".
         if (int.TryParse(_services.Database?.GetSetting(SettingKeys.StatsPeriod), out var saved) && saved >= 0 && saved < buttons.Count)

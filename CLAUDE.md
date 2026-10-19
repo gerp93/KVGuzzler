@@ -57,6 +57,11 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   and call `ClearAllPools()` (`AppServices.CloseDatabase`) or recent writes sit in the `-wal` file and the
   copy is unreadable. Dev runs use the `KVGuzzler-dev` folder; one running copy per data folder
   (`InstanceLock`); a configured-but-missing database path asks the user, it never creates an empty file.
+- **Window layout.** Default 1240x860, minimum 960x640; page content is capped at 1200 wide (820 for Settings/Help/Estimator).
+  Shared look (cards, text classes `h1/h2/caption/note/hero/mono`, the `seg` period picker, `bar`) is `Views/UiStyles.axaml`;
+  list rows share the `BarRow` template. One period picker (`StatsPeriodPanel`) drives the Dashboard stats, chart and program lists.
+  A component's power is shown as a **share of the whole PC at the wall** when a wall meter exists (else of the sensor total, and
+  the header says so); the chart's whole-PC line uses the theme's `Text` colour because `PrimaryAction` is invisible on dark themes.
 - **No menu bar.** Help/About lives in the window (Help tab). No DevTools in release builds.
 - **Logo:** none yet and none is to be fabricated. See TODO.md.
 - Commit `packages.lock.json` files; package versions float within a major, the lock files pin them.

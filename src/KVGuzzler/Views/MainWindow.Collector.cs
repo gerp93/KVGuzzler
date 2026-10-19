@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using KVGuzzler.Collector;
 using KVGuzzler.Core;
@@ -8,11 +9,9 @@ using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
 using KVGuzzler.Data;
+using VisualAssault;
 
 namespace KVGuzzler.Views;
-
-/// <summary>One period of history on the Dashboard: a headline and a smaller line of detail.</summary>
-public sealed record HistoryRow(string Title, string Detail);
 
 // The Dashboard's view of the background collector: whether it is running, the readings it publishes,
 // and the history it has saved.
@@ -33,8 +32,7 @@ public partial class MainWindow
     {
         SleepWattsBox.Text = _services.Database?.GetSetting(SettingKeys.SleepWatts) ?? DefaultSleepWatts.ToString(CultureInfo.InvariantCulture);
         SaveSleepButton.Click += (_, _) => SaveSleepWatts();
-        ProgramPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false, includeChart: false);
-        ChartPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false, includeChart: true);
+        OpenRecordingSettingsButton.Click += (_, _) => Tabs.SelectedItem = Tabs.Items.OfType<TabItem>().First(t => (string?)t.Header == "Settings");
         InstallCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: true);
         RemoveCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: false);
 
@@ -59,8 +57,11 @@ public partial class MainWindow
         double.TryParse(_services.Database?.GetSetting(SettingKeys.SleepWatts), NumberStyles.Float, CultureInfo.InvariantCulture, out var w) && w >= 0
             ? w : DefaultSleepWatts;
 
+    /// <param name="Totals">What each program caused over the chosen period; null when not read this time (the long periods are
+    /// only read now and then), in which case the lists already on screen stay.</param>
+    /// <param name="WholeKwh">The whole PC at the wall over the same period, when the wall meter covered all of it; null otherwise.</param>
     private sealed record ProgramsRead(
-        IReadOnlyList<ProgramEnergy> Totals,
+        IReadOnlyList<ProgramEnergy>? Totals, double? WholeKwh,
         (DateTimeOffset UpdatedAt, IReadOnlyList<ProgramLive> Rows)? Live,
         (double? Cpu, double? Gpu) Baseline,
         IReadOnlyList<ProgramRun> Runs);
@@ -73,21 +74,34 @@ public partial class MainWindow
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
         PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats);
 
-    /// <summary>How long each choice in the Programs tab looks back.</summary>
-    private static readonly TimeSpan[] ProgramPeriods =
-        { TimeSpan.FromHours(1), TimeSpan.FromDays(1), TimeSpan.FromDays(7), TimeSpan.FromDays(30) };
+    /// <summary>The chart shows at most the last 30 days, so the two longest choices show that and say so.</summary>
+    private static (string Label, TimeSpan Span, TimeSpan Bucket) ChartPeriodFor(int periodIndex) =>
+        PowerChart.Periods[Math.Clamp(periodIndex, 0, PowerChart.Periods.Count - 1)];
+
+    /// <summary>Adding up the programs over a year reads millions of rows, so the long periods are read once a minute at most.</summary>
+    private static readonly TimeSpan LongProgramRefresh = TimeSpan.FromMinutes(1);
+    private DateTimeOffset _programsReadAt;
+    private int _programsReadPeriod = -1;
 
     internal async Task RefreshCollectorAsync(bool includeService, bool includeChart = true)
     {
         try
         {
             var sleepWatts = SleepWatts;
-            var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
-            var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
+            var periodIndex = Math.Clamp(SelectedStatsIndex, 0, StatsPeriods.Length - 1);
+            var statsSpan = StatsPeriods[periodIndex].Span;
+            var chartPeriod = ChartPeriodFor(periodIndex);
             var schedule = _services.Database?.LoadRateSchedule();
-            var statsSpan = StatsPeriods[Math.Clamp(SelectedStatsIndex, 0, StatsPeriods.Length - 1)].Span;
-            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null, schedule,
-                includeChart ? statsSpan : null, includeChart));
+            var longPeriod = statsSpan is null || statsSpan > TimeSpan.FromDays(7);
+            var readTotals = includeChart
+                && (periodIndex != _programsReadPeriod || !longPeriod || DateTimeOffset.UtcNow - _programsReadAt > LongProgramRefresh);
+            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, statsSpan, includeChart ? chartPeriod : null, schedule,
+                includeChart ? statsSpan : null, includeChart, readTotals));
+            if (read.Programs?.Totals is not null)
+            {
+                _programsReadAt = DateTimeOffset.UtcNow;
+                _programsReadPeriod = periodIndex;
+            }
             ApplyCollector(read, includeChart);
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -98,8 +112,9 @@ public partial class MainWindow
         }
     }
 
-    private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack,
-        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats)
+    private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan? programLookBack,
+        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats,
+        bool readProgramTotals)
     {
         UsageStat? stats = null;
         RateInfo? rates = null;
@@ -116,9 +131,20 @@ public partial class MainWindow
                 var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
                 periods = HistoryReport.Standard(store, now, sleepWatts);
-                if (schedule is not null) rates = PriceThePeriods(store, schedule, periods, now, programLookBack);
-                programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline(),
-                    store.GetRecentRuns(20));
+                // "All time" for the programs starts at the first thing recorded.
+                var programFrom = programLookBack is { } back ? now - back : store.FirstRecorded() ?? now;
+                if (schedule is not null) rates = PriceThePeriods(store, schedule, periods, now, programFrom);
+                IReadOnlyList<ProgramEnergy>? totals = null;
+                double? whole = null;
+                if (readProgramTotals)
+                {
+                    totals = store.QueryPrograms(programLookBack is null ? DateTimeOffset.UnixEpoch : programFrom, now);
+                    // The whole PC is the yardstick for the programs' shares, but only when the wall meter covers the whole period.
+                    if (store.FirstRecorded(ReadingScope.Wall) is { } firstWall && firstWall <= programFrom.AddMinutes(10)
+                        && store.EnergyKwh(programFrom, now, ReadingScope.Wall) is > 0 and var wallKwh)
+                        whole = wallKwh;
+                }
+                programs = new ProgramsRead(totals, whole, store.GetLivePrograms(), store.GetIdleBaseline(), store.GetRecentRuns(20));
                 if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
                 if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now);
             }
@@ -133,7 +159,7 @@ public partial class MainWindow
 
     /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
     private static RateInfo PriceThePeriods(HistoryStore store, RateSchedule schedule, IReadOnlyList<PeriodReport> periods,
-        DateTimeOffset now, TimeSpan programLookBack)
+        DateTimeOffset now, DateTimeOffset programFrom)
     {
         var spans = new[] { TimeSpan.FromHours(1), TimeSpan.FromDays(1), TimeSpan.FromDays(7), TimeSpan.FromDays(30) };
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -147,7 +173,7 @@ public partial class MainWindow
             decimal? rate = cost.Unpriced ? null : cost.Kwh > 0 ? cost.Cost / (decimal)cost.Kwh : schedule.RateAt(today);
             periodRates.Add((rate, cost.Estimated));
         }
-        return new RateInfo(schedule, periodRates, schedule.AverageRate(now - programLookBack, now));
+        return new RateInfo(schedule, periodRates, schedule.AverageRate(programFrom, now));
     }
 
     private void ApplyCollector(CollectorRead read, bool includeChart)
@@ -160,7 +186,7 @@ public partial class MainWindow
             var live = read.Live!;
             var total = live.Readings.Where(r => r.Scope == ReadingScope.Component).Sum(r => r.Watts);
             ShowPower(new PowerSnapshot(live.UpdatedAt, live.Readings, total, 0, live.Notes), showSession: false);
-            PowerStatusText.Text = "Active power, measured every second by the background collector.";
+            PowerStatusText.Text = "Measured every second by the background collector.";
         }
 
         ShowCollectorStatus(read.Live);
@@ -176,6 +202,9 @@ public partial class MainWindow
     private void ShowChart(CollectorRead read)
     {
         PowerChartView.Data = read.Chart;
+        var period = StatsPeriods[Math.Clamp(SelectedStatsIndex, 0, StatsPeriods.Length - 1)].Label;
+        // The chart is built from minute data and goes back 30 days at most; the two longest choices show that and say so.
+        ChartPeriodText.Text = SelectedStatsIndex >= PowerChart.Periods.Count ? "Last 30 days (the chart does not go back further)" : period;
         ChartNoteText.Text = read.Chart is null
             ? "No history yet. The chart fills in once the background collector has recorded some."
             : read.Chart.Series.Count == 0
@@ -188,36 +217,63 @@ public partial class MainWindow
 
     // ----- Programs ---------------------------------------------------------------------
 
+    /// <summary>How many programs the Dashboard lists before rolling the rest into one line; the Programs tab lists more.</summary>
+    internal const int DashboardPrograms = 5;
+
     private void ShowPrograms(ProgramsRead? read, RateInfo? rates)
     {
         if (read is null)
         {
-            LiveProgramsList.ItemsSource = Array.Empty<HistoryRow>();
-            ProgramsList.ItemsSource = Array.Empty<HistoryRow>();
-            ProgramsTotalText.Text = "";
+            var none = Array.Empty<HistoryRow>();
+            LiveProgramsList.ItemsSource = DashboardLiveProgramsList.ItemsSource = none;
+            ProgramsList.ItemsSource = DashboardProgramsList.ItemsSource = none;
+            ProgramsTotalText.Text = DashboardProgramsSummaryText.Text = "";
             ProgramsBaselineText.Text = "";
-            RunsList.ItemsSource = Array.Empty<HistoryRow>();
+            SplitBar.Fill(ProgramsSplitBar, ProgramsSplitLegend, Array.Empty<SplitBar.Part>());
+            SplitBar.Fill(DashboardProgramsSplitBar, DashboardProgramsSplitLegend, Array.Empty<SplitBar.Part>());
+            RunsList.ItemsSource = none;
             RunsNoteText.Text = "";
-            ProgramsNoteText.Text = "No program history yet. It is recorded by the background collector (turn it on from the Dashboard).";
-            ProgramsNoteText.IsVisible = true;
+            ProgramsNoteText.Text = DashboardProgramsNoteText.Text = "No program history yet. It is recorded by the background collector (turn it on from the Dashboard).";
+            ProgramsNoteText.IsVisible = DashboardProgramsNoteText.IsVisible = true;
             return;
         }
 
         var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
         var rate = rates?.ProgramRate;
+        var period = StatsPeriods[Math.Clamp(SelectedStatsIndex, 0, StatsPeriods.Length - 1)].Label;
+
+        ProgramsPeriodText.Text = period;
 
         // Right now: only while the collector is publishing, so a stale list is never shown as current.
         var fresh = read.Live is { } l && DateTimeOffset.UtcNow - l.UpdatedAt < TimeSpan.FromSeconds(10);
-        LiveProgramsList.ItemsSource = fresh ? LiveRows(read.Live!.Value.Rows) : Array.Empty<HistoryRow>();
+        var live = fresh ? LiveRows(read.Live!.Value.Rows) : Array.Empty<HistoryRow>();
+        LiveProgramsList.ItemsSource = live;
+        DashboardLiveProgramsList.ItemsSource = live.Take(DashboardPrograms).ToList();
+        DashboardLiveProgramsHeader.IsVisible = live.Count > 0;
         ProgramsNoteText.IsVisible = !fresh;
         ProgramsNoteText.Text = fresh ? "" : "Nothing is being recorded right now.";
 
-        ProgramsList.ItemsSource = read.Totals.Count == 0 ? Array.Empty<HistoryRow>() : ProgramRows(read.Totals, rate, currency);
-        var all = read.Totals.Sum(p => p.TotalKwh);
-        ProgramsTotalText.Text = read.Totals.Count == 0
-            ? "Nothing recorded in this period yet."
-            : $"CPU and GPU together: {FormatEnergy(all)}"
-              + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(all, rt))}" : "");
+        // The totals are not read every second (the long periods are costly), so they are only redrawn when they were read.
+        if (read.Totals is { } totals)
+        {
+            ProgramsList.ItemsSource = totals.Count == 0 ? Array.Empty<HistoryRow>() : ProgramRows(totals, rate, currency, MaxListedPrograms, read.WholeKwh);
+            DashboardProgramsList.ItemsSource = totals.Count == 0 ? Array.Empty<HistoryRow>() : ProgramRows(totals, rate, currency, DashboardPrograms, read.WholeKwh);
+
+            var all = totals.Sum(p => p.TotalKwh);
+            ProgramsTotalText.Text = totals.Count == 0
+                ? "Nothing recorded in this period yet."
+                : $"CPU and GPU together: {FormatEnergy(all)}"
+                  + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(all, rt))}" : "");
+            DashboardProgramsSummaryText.Text = period + " · " + (totals.Count == 0 ? "nothing recorded yet" : ProgramsTotalText.Text);
+
+            var split = SplitParts(totals, read.WholeKwh);
+            SplitBar.Fill(ProgramsSplitBar, ProgramsSplitLegend, split);
+            SplitBar.Fill(DashboardProgramsSplitBar, DashboardProgramsSplitLegend, split);
+            var yardstick = read.WholeKwh is null ? "Percentages are of the energy the CPU and GPU used." : "Percentages are of the whole PC at the wall.";
+            ProgramsShareNoteText.Text = DashboardProgramsShareNoteText.Text = totals.Count == 0 ? "" : yardstick;
+            DashboardProgramsNoteText.IsVisible = totals.Count == 0;
+            DashboardProgramsNoteText.Text = totals.Count == 0 ? "Nothing recorded in this period yet." : "";
+        }
 
         // A run is priced at the price on the day it ended.
         RunsList.ItemsSource = RunRows(read.Runs, run => rates?.Schedule.RateAt(DateOnly.FromDateTime(run.End.ToLocalTime().DateTime)), currency);
@@ -229,6 +285,27 @@ public partial class MainWindow
             : "Still learning the idle power. Until a quiet moment has been seen, everything counts as baseline.";
     }
 
+    private static bool IsSpecial(ProgramEnergy p) => p.Program is ProgramAttributor.Baseline or ProgramAttributor.Unattributed;
+
+    /// <summary>The CPU and GPU energy split into the programs, the idle baseline and what no program claimed. With the whole
+    /// PC known, the part of it that is neither CPU nor GPU (fans, drives, memory, power-supply losses) is the last piece.</summary>
+    internal static IReadOnlyList<SplitBar.Part> SplitParts(IReadOnlyList<ProgramEnergy> totals, double? wholeKwh)
+    {
+        var programs = totals.Where(p => !IsSpecial(p)).Sum(p => p.TotalKwh);
+        var baseline = totals.Where(p => p.Program == ProgramAttributor.Baseline).Sum(p => p.TotalKwh);
+        var unattributed = totals.Where(p => p.Program == ProgramAttributor.Unattributed).Sum(p => p.TotalKwh);
+        var parts = new List<SplitBar.Part>
+        {
+            new("Programs", programs, UiColors.Programs),
+            new("Idle baseline", baseline, UiColors.Brush(VaToken.AccentMuted)),
+            new("Not attributed", unattributed, UiColors.NoProgram),
+        };
+        // The sensors and the plug are read a moment apart, so the rest can come out a hair negative: show it only when it is real.
+        if (wholeKwh is { } whole && whole - (programs + baseline + unattributed) is > 0 and var rest)
+            parts.Add(new SplitBar.Part("Everything else", rest, UiColors.Rest));
+        return parts;
+    }
+
     /// <summary>One line per run: what it cost, when it started and how long it ran.</summary>
     internal static IReadOnlyList<HistoryRow> RunRows(IReadOnlyList<ProgramRun> runs, decimal? rate, string currency) =>
         RunRows(runs, _ => rate, currency);
@@ -236,55 +313,68 @@ public partial class MainWindow
     /// <summary>One line per run, each priced at the price on the day it ended.</summary>
     internal static IReadOnlyList<HistoryRow> RunRows(IReadOnlyList<ProgramRun> runs, Func<ProgramRun, decimal?> rateOf, string currency) =>
         runs.Select(r => new HistoryRow(
-            $"{r.Program}: {FormatEnergy(r.TotalKwh)}"
-            + (rateOf(r) is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(r.TotalKwh, rt))}" : "")
-            + (r.StillRunning ? " (still running)" : ""),
+            r.Program,
+            FormatEnergy(r.TotalKwh),
+            rateOf(r) is { } rt ? $"{currency}{FormatMoney(CostCalculator.Cost(r.TotalKwh, rt))}" : "",
             $"started {r.Start.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · "
             + (r.StillRunning ? "running for " : "ran ") + FormatSpan(r.End - r.Start)
-            + $" · GPU {FormatEnergy(r.GpuKwh)} · CPU {FormatEnergy(r.CpuKwh)}")).ToList();
+            + $" · GPU {FormatEnergy(r.GpuKwh)} · CPU {FormatEnergy(r.CpuKwh)}",
+            Note: r.StillRunning ? "still running" : "")).ToList();
 
-    internal static IReadOnlyList<HistoryRow> LiveRows(IReadOnlyList<ProgramLive> live) =>
-        live.Select(p => new HistoryRow(
-            $"{p.Program}: {(p.CpuWatts + p.GpuWatts).ToString("0.0", CultureInfo.CurrentCulture)} W",
+    /// <summary>What each program is drawing right now, with its part of the CPU and GPU power at this moment.</summary>
+    internal static IReadOnlyList<HistoryRow> LiveRows(IReadOnlyList<ProgramLive> live)
+    {
+        var total = live.Sum(p => p.CpuWatts + p.GpuWatts);
+        return live.Select(p => new HistoryRow(
+            p.Program,
+            (p.CpuWatts + p.GpuWatts).ToString("0.0", CultureInfo.CurrentCulture) + " W",
+            "",
             p.Program is ProgramAttributor.Baseline
                 ? "idle power of the CPU and GPU, not any program's doing"
-                : $"GPU {p.GpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W · CPU {p.CpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W")).ToList();
+                : $"GPU {p.GpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W · CPU {p.CpuWatts.ToString("0.0", CultureInfo.CurrentCulture)} W",
+            Share: total > 0 ? (p.CpuWatts + p.GpuWatts) / total : 0,
+            Bar: p.Program is ProgramAttributor.Baseline ? UiColors.Brush(VaToken.AccentMuted) : UiColors.Programs)).ToList();
+    }
 
     /// <summary>A program that caused less than this (0.05 Wh) over the period is not listed on its own.</summary>
     internal const double MinListedKwh = 0.00005;
     internal const int MaxListedPrograms = 25;
 
-    /// <summary>Programs biggest first, then the two rows that belong to no program, so the list reads as "who used it".</summary>
-    internal static IReadOnlyList<HistoryRow> ProgramRows(IReadOnlyList<ProgramEnergy> totals, decimal? rate, string currency)
+    /// <summary>Programs biggest first, then the two rows that belong to no program, so the list reads as "who used it".
+    /// Each row's share is of the whole PC when <paramref name="wholeKwh"/> is known, otherwise of the CPU and GPU energy.</summary>
+    internal static IReadOnlyList<HistoryRow> ProgramRows(IReadOnlyList<ProgramEnergy> totals, decimal? rate, string currency,
+        int maxPrograms = MaxListedPrograms, double? wholeKwh = null)
     {
-        static bool Special(ProgramEnergy p) => p.Program is ProgramAttributor.Baseline or ProgramAttributor.Unattributed;
-        string Title(ProgramEnergy p) =>
-            $"{p.Program}: {FormatEnergy(p.TotalKwh)}"
-            + (rate is { } r ? $", {currency}{FormatMoney(CostCalculator.Cost(p.TotalKwh, r))}" : "");
-        string Detail(ProgramEnergy p) => p.Program switch
-        {
-            ProgramAttributor.Baseline => "the CPU's and GPU's idle power, not any program's doing",
-            ProgramAttributor.Unattributed => "power above idle that no program reported using",
-            ProgramAttributor.Others => $"many small programs together · active up to {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}",
-            _ => $"GPU {FormatEnergy(p.GpuKwh)} · CPU {FormatEnergy(p.CpuKwh)}"
-                 + (p.ActiveSeconds > 0 ? $" · active {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}" : ""),
-        };
+        var yardstick = wholeKwh is > 0 ? wholeKwh.Value : totals.Sum(p => p.TotalKwh);
+        double ShareOf(double kwh) => yardstick > 0 ? Math.Clamp(kwh / yardstick, 0, 1) : 0;
+        string Cost(double kwh) => rate is { } r ? $"{currency}{FormatMoney(CostCalculator.Cost(kwh, r))}" : "";
+        HistoryRow Row(ProgramEnergy p) => new(
+            p.Program, FormatEnergy(p.TotalKwh), Cost(p.TotalKwh),
+            p.Program switch
+            {
+                ProgramAttributor.Baseline => "the CPU's and GPU's idle power, not any program's doing",
+                ProgramAttributor.Unattributed => "power above idle that no program reported using",
+                ProgramAttributor.Others => $"many small programs together · active up to {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}",
+                _ => $"GPU {FormatEnergy(p.GpuKwh)} · CPU {FormatEnergy(p.CpuKwh)}"
+                     + (p.ActiveSeconds > 0 ? $" · active {FormatSpan(TimeSpan.FromSeconds(p.ActiveSeconds))}" : ""),
+            },
+            Share: ShareOf(p.TotalKwh),
+            Bar: p.Program == ProgramAttributor.Baseline ? UiColors.Brush(VaToken.AccentMuted) : IsSpecial(p) ? UiColors.NoProgram : UiColors.Programs);
 
         // Dozens of programs each caused a fraction of a watt-hour: list the ones that matter and sum the rest.
-        var programs = totals.Where(p => !Special(p)).OrderByDescending(p => p.TotalKwh).ToList();
-        var shown = programs.Where(p => p.TotalKwh >= MinListedKwh).Take(MaxListedPrograms).ToList();
+        var programs = totals.Where(p => !IsSpecial(p)).OrderByDescending(p => p.TotalKwh).ToList();
+        var shown = programs.Where(p => p.TotalKwh >= MinListedKwh).Take(maxPrograms).ToList();
         var rest = programs.Skip(shown.Count).ToList();
 
-        var rows = shown.Select(p => new HistoryRow(Title(p), Detail(p))).ToList();
+        var rows = shown.Select(Row).ToList();
         if (rest.Count > 0)
         {
             var restKwh = rest.Sum(p => p.TotalKwh);
             rows.Add(new HistoryRow(
-                $"{rest.Count} smaller program{(rest.Count == 1 ? "" : "s")}: {FormatEnergy(restKwh)}"
-                + (rate is { } rr ? $", {currency}{FormatMoney(CostCalculator.Cost(restKwh, rr))}" : ""),
-                "none of them caused enough to list on its own"));
+                $"{rest.Count} smaller program{(rest.Count == 1 ? "" : "s")}", FormatEnergy(restKwh), Cost(restKwh),
+                "none of them caused enough to list on its own", Share: ShareOf(restKwh), Bar: UiColors.Programs));
         }
-        rows.AddRange(totals.Where(Special).Select(p => new HistoryRow(Title(p), Detail(p))));
+        rows.AddRange(totals.Where(IsSpecial).Select(Row));
         return rows;
     }
 
@@ -302,6 +392,11 @@ public partial class MainWindow
         };
 
         CollectorStatusText.Text = text;
+        // The controls are in Settings; the Dashboard only points there while nothing is recording in the background.
+        RecordingHint.IsVisible = !_collectorAlive && state is not (ServiceState.Unsupported or null);
+        RecordingHintText.Text = state == ServiceState.Stopped
+            ? "Background recording is stopped, so nothing is being counted. Start it in Settings."
+            : "Background recording is off, so time when this window is closed is not counted. Turn it on in Settings.";
         InstallCollectorButton.IsVisible = canInstall;
         InstallCollectorButton.Content = state == ServiceState.Stopped ? "Start background recording" : "Turn on background recording";
         RemoveCollectorButton.IsVisible = canRemove;
@@ -370,8 +465,8 @@ public partial class MainWindow
         var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
         var priced = read.Rates?.PeriodRates;
 
-        HistoryList.ItemsSource = read.Periods.Select((p, i) => new HistoryRow(
-            HistoryTitle(p, priced?[i].Rate, currency, priced?[i].Estimated ?? false), HistoryDetail(p))).ToList();
+        HistoryList.ItemsSource = read.Periods.Select((p, i) => HistoryRowFor(
+            p, priced?[i].Rate, currency, priced?[i].Estimated ?? false)).ToList();
         var anyPrice = priced is not null && priced.Any(x => x.Rate is not null);
         HistoryNoteText.Text = anyPrice ? "" : "Save your electricity rate (or a bill) in Settings to see costs.";
         HistoryNoteText.IsVisible = !anyPrice;
@@ -379,13 +474,16 @@ public partial class MainWindow
 
     /// <summary>With a wall meter the headline is the whole PC (what the bill is made of). Without one it is the
     /// active energy the sensors measured. Sleep is an estimate and never goes in either figure.</summary>
-    internal static string HistoryTitle(PeriodReport p, decimal? rate, string currency, bool estimated = false)
+    internal static HistoryRow HistoryRowFor(PeriodReport p, decimal? rate, string currency, bool estimated = false)
     {
         var (kwh, what) = p.WallKwh is { } wall ? (wall, "whole PC") : (p.MeasuredKwh, "active");
-        var title = $"{p.Label}: {kwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh {what}";
-        if (rate is { } r) title += $", {currency}{FormatMoney(CostCalculator.Cost(kwh, r))}" + (estimated ? " (price estimated)" : "");
-        return title;
+        return new HistoryRow(p.Label, $"{kwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh",
+            rate is { } r ? $"{currency}{FormatMoney(CostCalculator.Cost(kwh, r))}" : "",
+            HistoryDetail(p), Tag: what, Note: rate is not null && estimated ? "price estimated" : "");
     }
+
+    internal static string HistoryTitle(PeriodReport p, decimal? rate, string currency, bool estimated = false) =>
+        HistoryRowFor(p, rate, currency, estimated).Title;
 
     /// <summary>The second line: how long the figure covers, the part the sensors account for when there is a
     /// wall meter, and every stretch that was not sampled, by reason, so nothing is silently missing.</summary>
@@ -393,7 +491,8 @@ public partial class MainWindow
     {
         var parts = new List<string>();
         if (p.WallKwh is not null)
-            parts.Add($"of which CPU, GPU and memory {p.MeasuredKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh");
+            parts.Add($"of which CPU, GPU and memory {p.MeasuredKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh"
+                      + (p.WallKwh > 0 ? $" ({UiColors.Percent(p.MeasuredKwh / p.WallKwh.Value)} of the whole PC)" : ""));
         else
             parts.Add($"active energy over {FormatSpan(p.Monitored)} recorded");
         if (p.Asleep > TimeSpan.Zero)
