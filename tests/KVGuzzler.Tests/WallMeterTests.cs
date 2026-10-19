@@ -42,6 +42,15 @@ public class ShellyPlugTests
     public void ReadsTheWattsFromARealisticAnswer() =>
         Assert.Equal(52.1, ShellyPlug.ParseWatts(FakePlug.Answer));
 
+    [Fact]
+    public void ReadsTheAnswerOfARealPlugUsGen4()
+    {
+        // Captured from a real Shelly Plug US Gen4 (firmware 1.7.99), with nothing plugged into it: spacing and all.
+        const string real = """{"id":0, "source":"init", "output":false, "apower":0.0, "voltage":122.0, "freq":60.1, "current":0.000, "aenergy":{"total":0.000,"by_minute":[0.000,0.000,0.000],"minute_ts":1792369140}, "ret_aenergy":{"total":0.000,"by_minute":[0.000,0.000,0.000],"minute_ts":1792369140},"temperature":{"tC":35.0, "tF":95.0}}""";
+        Assert.Equal(0.0, ShellyPlug.ParseWatts(real));
+        Assert.Equal(187.4, ShellyPlug.ParseWatts(real.Replace("\"apower\":0.0", "\"apower\":187.4")));
+    }
+
     [Theory]
     [InlineData("""{"id":0,"output":true}""")]            // no power reading
     [InlineData("""{"apower":"52.1"}""")]                 // a string, not a number

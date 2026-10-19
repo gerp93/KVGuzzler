@@ -25,7 +25,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
       Plug US Gen4), not yet tried on a real plug.** `ShellyPlug` / `WallMeterSource` read
       `GET /rpc/Switch.GetStatus?id=0` (`apower`, watts) once a second; the address is set in
       Settings > Wall meter and saved in `%ProgramData%\KVGuzzler[-dev]\wall-meter.json`, which the
-      collector service follows. Tested with a fake plug and against a stand-in Shelly server on this PC.
+      collector service follows. Tested with a fake plug, a stand-in Shelly server, and the real answer of a Plug US Gen4 (field names confirmed).
       To confirm on the real plug: the field names, whether authentication is off by default, and the
       reading's accuracy against the Eve plug. Still to do:
       - **Fill the gaps from the plug's own energy counter** (`aenergy.total`): the plug keeps counting
