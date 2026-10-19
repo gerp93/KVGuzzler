@@ -57,6 +57,25 @@
         <ScrollViewer>
           <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="1200" HorizontalAlignment="Stretch">
 
+            <!-- One period picker serves the Dashboard and Programs: it is moved into whichever of the two is showing
+                 (see StartStatsUi), so it always sits in the page's own header and never over the tabs. -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+              <TextBlock Text="Dashboard" Classes="h1" VerticalAlignment="Center" />
+              <Panel x:Name="DashboardPeriodHost" Grid.Column="1">
+  <Border x:Name="PeriodBar" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="3"
+          Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
+    <StackPanel x:Name="StatsPeriodPanel" Orientation="Horizontal" Spacing="2">
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last hour" />
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 24 hours" />
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 7 days" />
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 30 days" />
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last year" />
+      <RadioButton Classes="seg" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
+    </StackPanel>
+  </Border>
+              </Panel>
+            </Grid>
+
             <!-- The three numbers that matter: what was used, what it cost, and what is being drawn now. -->
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
               <Border Classes="card" Grid.Column="0">
@@ -176,8 +195,11 @@
       <TabItem Header="Programs">
         <ScrollViewer>
           <StackPanel Margin="20,16,20,32" Spacing="16" MaxWidth="1200" HorizontalAlignment="Stretch">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+              <TextBlock Text="Programs" Classes="h1" VerticalAlignment="Center" />
+              <Panel x:Name="ProgramsPeriodHost" Grid.Column="1" />
+            </Grid>
             <StackPanel Spacing="4">
-              <TextBlock Text="Programs" Classes="h1" />
               <TextBlock Classes="note" Text="Which programs the CPU's and GPU's power went to. These are estimates, not measurements." />
               <Expander Header="How this is worked out" Padding="0,8" Margin="-8,0,0,0">
                 <TextBlock Classes="note"
@@ -417,17 +439,5 @@
 
     </TabControl>
 
-    <!-- The period picker sits on the tab strip's right edge, shared by the Dashboard and Programs. -->
-    <Border x:Name="PeriodBar" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,28,0" Padding="3"
-            Background="{DynamicResource VaSurfaceBrush}" BorderBrush="{DynamicResource VaBorderBrush}" BorderThickness="1" CornerRadius="10">
-      <StackPanel x:Name="StatsPeriodPanel" Orientation="Horizontal" Spacing="2">
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last hour" />
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 24 hours" />
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 7 days" />
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last 30 days" />
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="Last year" />
-        <RadioButton Classes="seg" GroupName="StatsPeriod" Content="All time" IsChecked="True" />
-      </StackPanel>
-    </Border>
   </Grid>
 </Window>

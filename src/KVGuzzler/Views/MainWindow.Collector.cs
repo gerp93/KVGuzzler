@@ -227,7 +227,8 @@ public partial class MainWindow
             var none = Array.Empty<HistoryRow>();
             LiveProgramsList.ItemsSource = DashboardLiveProgramsList.ItemsSource = none;
             ProgramsList.ItemsSource = DashboardProgramsList.ItemsSource = none;
-            ProgramsTotalText.Text = DashboardProgramsSummaryText.Text = "";
+            ProgramsTotalText.Text = "Nothing recorded yet.";
+            DashboardProgramsSummaryText.Text = "";
             ProgramsBaselineText.Text = "";
             SplitBar.Fill(ProgramsSplitBar, ProgramsSplitLegend, Array.Empty<SplitBar.Part>());
             SplitBar.Fill(DashboardProgramsSplitBar, DashboardProgramsSplitLegend, Array.Empty<SplitBar.Part>());

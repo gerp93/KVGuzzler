@@ -152,6 +152,27 @@ public class StatsCardsUiTests
     private static IReadOnlyList<RadioButton> Cards(MainWindow w) => w.StatsPeriodPanel.Children.OfType<RadioButton>().ToList();
 
     [AvaloniaFact]
+    public void ThePeriodPickerSitsInTheHeaderOfTheDashboardAndProgramsPages()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        var window = new MainWindow(t.Services);
+        window.Show();
+
+        Assert.Same(window.DashboardPeriodHost, window.PeriodBar.Parent);       // never over the tab strip
+        window.Tabs.SelectedIndex = 1;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.ProgramsPeriodHost, window.PeriodBar.Parent);
+        Assert.Empty(window.DashboardPeriodHost.Children);
+        window.Tabs.SelectedIndex = 3;                                          // Settings has nothing to filter: it stays where it was
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.ProgramsPeriodHost, window.PeriodBar.Parent);
+        window.Tabs.SelectedIndex = 0;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.DashboardPeriodHost, window.PeriodBar.Parent);
+    }
+
+    [AvaloniaFact]
     public void ThereAreSixBlocksAndAllTimeIsChosenFirst()
     {
         UseInvariantCulture();
