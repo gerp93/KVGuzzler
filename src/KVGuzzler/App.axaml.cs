@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using KVGuzzler.Services;
+using VisualAssault;
 using KVGuzzler.Views;
 
 namespace KVGuzzler;
@@ -11,6 +13,9 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // The saved choice lives in the database, which may not be open yet: start on the default.
+        ThemeManager.Apply(ThemeChoice.DefaultId);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = Program.Services;
@@ -41,6 +46,7 @@ public partial class App : Application
     {
         var services = Program.Services;
         services.OpenDatabase();
+        ThemeChoice.ApplySaved(services.Database);
         var previous = desktop.MainWindow;
         var main = new MainWindow(services);
         desktop.MainWindow = main;

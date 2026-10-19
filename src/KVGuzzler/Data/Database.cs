@@ -6,6 +6,7 @@ public static class SettingKeys
 {
     public const string RatePerKwh = "rate_per_kwh";
     public const string Currency = "currency_symbol";
+    public const string Theme = "theme_id";
 }
 
 /// <summary>The app's SQLite file, in WAL mode. Short-lived pooled connections per call.</summary>

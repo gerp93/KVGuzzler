@@ -22,9 +22,6 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
 - **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a
   date range so changing it does not reprice history. A "last bill total / kWh used" helper to get
   the all-in rate.
-- **Wire the VisualAssault theme**: once VisualAssault's `v0.3.0` tag exists, run
-  `scripts/update-visual-assault-avalonia.sh v0.3.0`, call `ThemeManager.Apply(id)` in
-  `App.OnFrameworkInitializationCompleted`, add a theme picker to Settings, persist the choice.
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /
   `icon_png` in both release workflows; add the logo to the README header and the app header.

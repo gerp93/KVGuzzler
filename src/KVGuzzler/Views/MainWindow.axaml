@@ -32,7 +32,7 @@
             <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
           </StackPanel>
           <TextBlock x:Name="RateExampleText" TextWrapping="Wrap" />
-          <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="OrangeRed" IsVisible="False" />
+          <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="{DynamicResource VaAccentRedBrush}" IsVisible="False" />
           <TextBlock x:Name="RateStatusText" TextWrapping="Wrap" />
 
           <Separator Margin="0,8" />
@@ -49,6 +49,12 @@
           </WrapPanel>
           <TextBlock x:Name="DbStatusText" TextWrapping="Wrap" />
           <Button x:Name="RestartButton" Content="Restart KVGuzzler now" Classes="accent" IsVisible="False" HorizontalAlignment="Left" />
+
+          <Separator Margin="0,8" />
+
+          <TextBlock Text="Appearance" FontSize="20" FontWeight="SemiBold" />
+          <ComboBox x:Name="ThemeBox" MinWidth="240" />
+          <TextBlock x:Name="ThemeDescriptionText" TextWrapping="Wrap" Foreground="{DynamicResource VaTextMutedBrush}" />
         </StackPanel>
       </ScrollViewer>
     </TabItem>
