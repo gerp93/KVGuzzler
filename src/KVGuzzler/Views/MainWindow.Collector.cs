@@ -478,7 +478,8 @@ public partial class MainWindow
     }
 
     /// <summary>With a wall meter the headline is the whole PC (what the bill is made of). Without one it is the
-    /// active energy the sensors measured. Sleep is an estimate and never goes in either figure.</summary>
+    /// active energy the sensors measured. The sleep wattage is an estimate and never goes in either figure; with a wall
+    /// meter the plug's own counter fills time asleep or off in the whole-PC figure, and the detail line says how much.</summary>
     internal static HistoryRow HistoryRowFor(PeriodReport p, decimal? rate, string currency, bool estimated = false)
     {
         var (kwh, what) = p.WallKwh is { } wall ? (wall, "whole PC") : (p.MeasuredKwh, "active");
@@ -504,6 +505,8 @@ public partial class MainWindow
             parts.Add($"asleep {FormatSpan(p.Asleep)}" + (p.WallKwh is null
                 ? $" (about {p.EstimatedKwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh at the sleep wattage, not counted above)"
                 : ""));
+        if (p.PlugGapKwh > 0)
+            parts.Add($"{FormatEnergy(p.PlugGapKwh)} of the whole PC is from the plug's own energy counter, for time the PC was asleep or off");
         if (p.Off > TimeSpan.Zero) parts.Add($"off {FormatSpan(p.Off)}");
         if (p.LostPower > TimeSpan.Zero) parts.Add($"lost power or crashed {FormatSpan(p.LostPower)}");
         return string.Join(" · ", parts);

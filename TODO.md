@@ -28,10 +28,13 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
       collector service follows. Tested with a fake plug, a stand-in Shelly server, and the real answer of a Plug US Gen4 (field names confirmed).
       To confirm on the real plug: the field names, whether authentication is off by default, and the
       reading's accuracy against the Eve plug. Still to do:
-      - **Fill the gaps from the plug's own energy counter** (`aenergy.total`): the plug keeps counting
-        while the PC is asleep or off, which is exactly what the wall meter is for. Needs a real plug to
-        learn whether the counter survives a plug reboot or power cut. Until then, time the collector was
-        not recording has no wall figure.
+      - **Gaps filled from the plug's own energy counter** (`aenergy.total`): built, **not tried on a real plug or a real
+        sleep.** The difference of the counter across a sleep / stop / power cut is saved as the gap's whole-PC energy
+        (`plug_kwh` on the gap row) and shown under the whole-PC figure, marked "from the plug's own energy counter". Left
+        unfilled when the counter is missing, went down (plug restart) or implies more than a plug can carry. To confirm on a
+        real plug: that `aenergy.total` really keeps counting while the PC sleeps, and whether it survives a plug reboot or
+        power cut (the code assumes it does not and leaves such a gap alone). Not built: filling a short stretch where only
+        the plug was unreachable while the PC stayed awake, and splitting a long gap whose counter reset in the middle.
       - Other meters behind the same `IPowerSource`: Tasmota plugs (local JSON), and Eve / any Matter plug
         through a Home Assistant reader (REST `/api/states/<entity>`).
       - Calibrate a "rest of the system" offset against the wall figure (the Dashboard already shows wall

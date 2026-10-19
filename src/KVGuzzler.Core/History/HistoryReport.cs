@@ -12,6 +12,8 @@ namespace KVGuzzler.Core.History;
 /// <param name="WallKwh">What the wall meter measured for the whole PC in the period, or null if it recorded nothing.
 /// When present this is the headline figure; <paramref name="MeasuredKwh"/> is then the part the CPU, GPU and
 /// memory sensors account for.</param>
+/// <param name="PlugGapKwh">The part of <paramref name="WallKwh"/> that is time nothing was sampling (asleep, off, lost power),
+/// taken from the difference of the smart plug's own energy counter. Zero when the plug's counter could not be used for any gap.</param>
 public sealed record PeriodReport(
     string Label,
     double MeasuredKwh,
@@ -20,7 +22,8 @@ public sealed record PeriodReport(
     TimeSpan Asleep,
     TimeSpan Off,
     TimeSpan LostPower,
-    double? WallKwh = null)
+    double? WallKwh = null,
+    double PlugGapKwh = 0)
 {
     public double TotalKwh => MeasuredKwh + EstimatedKwh;
 }
@@ -30,7 +33,9 @@ public static class HistoryReport
     public static PeriodReport Build(HistoryStore store, string label, DateTimeOffset from, DateTimeOffset to, double sleepWatts)
     {
         var wall = store.Query(from, to, ReadingScope.Wall);
-        var hasWall = wall.Monitored > TimeSpan.Zero;
+        // A period that was entirely asleep has no sampled wall minutes, but the plug's counter still measured it.
+        var plugGap = store.PlugGapKwh(from, to);
+        var hasWall = wall.Monitored > TimeSpan.Zero || plugGap > 0;
         // With a wall meter, the sensors' share is counted only over the minutes the wall meter also recorded:
         // sensors that ran before the plug was set up would otherwise look like more than the whole PC.
         var (kwh, monitored, gaps) = store.Query(from, to, ReadingScope.Component, onlyWhereWallWasRecorded: hasWall);
@@ -41,7 +46,7 @@ public static class HistoryReport
         var asleep = Sum(GapReason.Asleep);
         return new PeriodReport(label, kwh, CostCalculator.KilowattHours(sleepWatts, asleep),
             monitored, asleep, Sum(GapReason.Off), Sum(GapReason.LostPower),
-            hasWall ? wall.KilowattHours : null);
+            hasWall ? wall.KilowattHours : null, hasWall ? plugGap : 0);
     }
 
     /// <summary>The rolling periods the Dashboard shows.</summary>

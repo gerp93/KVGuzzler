@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
@@ -34,7 +35,11 @@ public enum ChartSeriesKind
 /// <summary>One minute of one chart series: its energy, how many seconds it covers, and its peak.</summary>
 public sealed record SeriesMinute(long MinuteStart, double KilowattHours, double Seconds, double PeakWatts);
 
-public sealed record Gap(DateTimeOffset Start, DateTimeOffset End, GapReason Reason);
+/// <summary>A stretch nothing was sampling.</summary>
+/// <param name="PlugKwh">The whole-PC energy the smart plug's own counter says was used in the stretch (it keeps counting while the PC is
+/// asleep or off), or null when that is not known. Not a sampled figure, and never part of the sensors' energy. When the gap is
+/// clipped to a period this is the clipped share, spread evenly over the gap.</param>
+public sealed record Gap(DateTimeOffset Start, DateTimeOffset End, GapReason Reason, double? PlugKwh = null);
 
 /// <summary>What one program is estimated to be drawing right now.</summary>
 public sealed record ProgramLive(string Program, double CpuWatts, double GpuWatts);
@@ -57,6 +62,7 @@ public sealed class HistoryStore : IDisposable
     private const string LivePrograms = "live_programs_ms";
     private const string IdleCpuKey = "idle_cpu_w";
     private const string IdleGpuKey = "idle_gpu_w";
+    private const string WallCounterKey = "wall_counter";
 
     private readonly string _connectionString;
 
@@ -75,13 +81,15 @@ public sealed class HistoryStore : IDisposable
         // existed are upgraded in place (their old rows are read as "unknown" and found by name instead).
         if (!HasColumn(c, "samples", "kind") && TableExists(c, "samples"))
             Exec(c, "ALTER TABLE samples ADD COLUMN kind INTEGER NOT NULL DEFAULT 0;");
+        if (!HasColumn(c, "gaps", "plug_kwh") && TableExists(c, "gaps"))
+            Exec(c, "ALTER TABLE gaps ADD COLUMN plug_kwh REAL;");
         Exec(c, """
             CREATE TABLE IF NOT EXISTS samples (
                 minute_start INTEGER NOT NULL, name TEXT NOT NULL, scope INTEGER NOT NULL,
                 kwh REAL NOT NULL, seconds REAL NOT NULL, peak_watts REAL NOT NULL, kind INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (minute_start, name));
             CREATE TABLE IF NOT EXISTS gaps (
-                start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL);
+                start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL, plug_kwh REAL);
             CREATE TABLE IF NOT EXISTS live (name TEXT PRIMARY KEY, scope INTEGER NOT NULL, watts REAL NOT NULL, position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS program_samples (
@@ -142,15 +150,29 @@ public sealed class HistoryStore : IDisposable
     {
         using var c = Open();
         using var cmd = c.CreateCommand();
-        cmd.CommandText = "INSERT OR REPLACE INTO gaps (start_ms, end_ms, reason) VALUES ($s, $e, $r)";
+        cmd.CommandText = "INSERT OR REPLACE INTO gaps (start_ms, end_ms, reason, plug_kwh) VALUES ($s, $e, $r, $k)";
         cmd.Parameters.AddWithValue("$s", gap.Start.ToUnixTimeMilliseconds());
         cmd.Parameters.AddWithValue("$e", gap.End.ToUnixTimeMilliseconds());
         cmd.Parameters.AddWithValue("$r", (int)gap.Reason);
+        cmd.Parameters.AddWithValue("$k", gap.PlugKwh is { } k ? k : DBNull.Value);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Records the energy the plug's own counter measured across a gap that was saved without it.</summary>
+    public void SetGapPlugEnergy(DateTimeOffset gapStart, double kwh)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "UPDATE gaps SET plug_kwh = $k WHERE start_ms = $s";
+        cmd.Parameters.AddWithValue("$k", kwh);
+        cmd.Parameters.AddWithValue("$s", gapStart.ToUnixTimeMilliseconds());
         cmd.ExecuteNonQuery();
     }
 
     /// <summary>Replaces the live readings and records when the collector last saw the machine.</summary>
-    public void SetLive(DateTimeOffset now, IReadOnlyList<PowerReading> readings, IReadOnlyList<string> notes)
+    /// <param name="wallCounter">The plug's energy counter as last read, kept so that after a restart the collector can still
+    /// tell how much the plug counted while it was away. Left as it was when null.</param>
+    public void SetLive(DateTimeOffset now, IReadOnlyList<PowerReading> readings, IReadOnlyList<string> notes, WallCounter? wallCounter = null)
     {
         using var c = Open();
         using var tx = c.BeginTransaction();
@@ -168,6 +190,9 @@ public sealed class HistoryStore : IDisposable
         }
         SetMeta(c, tx, LastSeenKey, now.ToUnixTimeMilliseconds().ToString());
         SetMeta(c, tx, NotesKey, string.Join("\n", notes));
+        if (wallCounter is not null)
+            SetMeta(c, tx, WallCounterKey, string.Create(CultureInfo.InvariantCulture,
+                $"{wallCounter.Host}|{wallCounter.TotalWh:R}|{wallCounter.ReadAt.ToUnixTimeMilliseconds()}"));
         tx.Commit();
     }
 
@@ -195,6 +220,18 @@ public sealed class HistoryStore : IDisposable
         using var c = Open();
         var last = GetMeta(c, LastSeenKey);
         return last is not null && last == GetMeta(c, CleanStopKey);
+    }
+
+    /// <summary>The plug's energy counter as last saved by <see cref="SetLive"/>, or null if none was.</summary>
+    public WallCounter? GetWallCounter()
+    {
+        using var c = Open();
+        var parts = GetMeta(c, WallCounterKey)?.Split('|');
+        return parts is { Length: 3 }
+            && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var wh)
+            && long.TryParse(parts[2], out var ms)
+            ? new WallCounter(parts[0], wh, DateTimeOffset.FromUnixTimeMilliseconds(ms))
+            : null;
     }
 
     public LiveState? GetLive()
@@ -239,6 +276,8 @@ public sealed class HistoryStore : IDisposable
             cmd.Parameters.AddWithValue("$t", toSeconds);
             kwh = Convert.ToDouble(cmd.ExecuteScalar());
         }
+        // The whole PC also used power while nothing was sampling; where the plug's own counter knew how much, it counts.
+        if (scope == ReadingScope.Wall) kwh += GapPlugKwh(c, from, to);
         using (var cmd = c.CreateCommand())
         {
             // Time covered = per minute, the longest any one component was sampled.
@@ -257,7 +296,7 @@ public sealed class HistoryStore : IDisposable
         var gaps = new List<Gap>();
         using (var cmd = c.CreateCommand())
         {
-            cmd.CommandText = "SELECT start_ms, end_ms, reason FROM gaps WHERE end_ms > $f AND start_ms < $t ORDER BY start_ms";
+            cmd.CommandText = "SELECT start_ms, end_ms, reason, plug_kwh FROM gaps WHERE end_ms > $f AND start_ms < $t ORDER BY start_ms";
             cmd.Parameters.AddWithValue("$f", from.ToUnixTimeMilliseconds());
             cmd.Parameters.AddWithValue("$t", to.ToUnixTimeMilliseconds());
             using var r = cmd.ExecuteReader();
@@ -265,7 +304,10 @@ public sealed class HistoryStore : IDisposable
             {
                 var start = DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(0));
                 var end = DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(1));
-                gaps.Add(new Gap(start < from ? from : start, end > to ? to : end, (GapReason)r.GetInt32(2)));
+                var clippedStart = start < from ? from : start;
+                var clippedEnd = end > to ? to : end;
+                double? plug = r.IsDBNull(3) ? null : r.GetDouble(3) * ShareInside(start, end, from, to);
+                gaps.Add(new Gap(clippedStart, clippedEnd, (GapReason)r.GetInt32(2), plug));
             }
         }
 
@@ -283,7 +325,40 @@ public sealed class HistoryStore : IDisposable
         cmd.Parameters.AddWithValue("$scope", (int)scope);
         cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
         cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
-        return Convert.ToDouble(cmd.ExecuteScalar());
+        var kwh = Convert.ToDouble(cmd.ExecuteScalar());
+        return scope == ReadingScope.Wall ? kwh + GapPlugKwh(c, from, to) : kwh;
+    }
+
+    /// <summary>The whole-PC energy between two instants that the plug's own counter measured across gaps (time nothing was
+    /// sampling: asleep, off, or lost power). Each gap's energy is spread evenly over its length, so a period that cuts a gap
+    /// gets its share. This is part of <see cref="ReadingScope.Wall"/> energy, never of the sensors'.</summary>
+    public double PlugGapKwh(DateTimeOffset from, DateTimeOffset to)
+    {
+        using var c = Open();
+        return GapPlugKwh(c, from, to);
+    }
+
+    private static double GapPlugKwh(SqliteConnection c, DateTimeOffset from, DateTimeOffset to)
+    {
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT start_ms, end_ms, plug_kwh FROM gaps WHERE plug_kwh IS NOT NULL AND end_ms > $f AND start_ms < $t";
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeMilliseconds());
+        using var r = cmd.ExecuteReader();
+        var total = 0.0;
+        while (r.Read())
+            total += r.GetDouble(2) * ShareInside(
+                DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(0)), DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(1)), from, to);
+        return total;
+    }
+
+    /// <summary>The fraction of a gap that lies inside a period.</summary>
+    private static double ShareInside(DateTimeOffset start, DateTimeOffset end, DateTimeOffset from, DateTimeOffset to)
+    {
+        var length = (end - start).TotalMilliseconds;
+        if (length <= 0) return 0;
+        var inside = ((end < to ? end : to) - (start > from ? start : from)).TotalMilliseconds;
+        return Math.Clamp(inside / length, 0, 1);
     }
 
     /// <summary>When the earliest saved reading is (of one kind, or of any), or null if nothing was recorded.</summary>
