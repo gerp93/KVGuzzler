@@ -15,6 +15,9 @@ public static class SettingKeys
     public const string RateMode = "rate_mode";
     /// <summary>Which period the two big numbers at the top of the Dashboard show (an index; 5 is "All time").</summary>
     public const string StatsPeriod = "stats_period";
+    /// <summary>The extra meters (monitor, speakers) the user switched off in the Dashboard's "Also count" filter, one label per line.
+    /// Kept as the ones left out, so a meter added later counts until it is switched off.</summary>
+    public const string PeripheralsOff = "peripherals_off";
 }
 
 /// <summary>The app's SQLite file, in WAL mode. Short-lived pooled connections per call.</summary>

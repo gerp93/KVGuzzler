@@ -13,6 +13,11 @@ public enum ReadingScope
     /// <summary>The whole PC measured at the wall by a smart plug. It already includes every component
     /// and everything the sensors cannot see, so it is reported next to them and never added to them.</summary>
     Wall,
+
+    /// <summary>Something plugged in next to the PC (a monitor, speakers) and measured by its own smart plug. It is a
+    /// separate device, so it is not part of the PC's total or of the wall figure: it is only added to them when the user
+    /// asks for the whole setup.</summary>
+    Peripheral,
 }
 
 /// <summary>What kind of hardware a reading is, so the per-program estimate knows which power to share out.</summary>

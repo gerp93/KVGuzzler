@@ -8,7 +8,8 @@ public static class PowerSources
 {
     /// <param name="wallMeterConfigPath">The wall-meter config file, or null to leave the wall meter out. The
     /// source is always added when a path is given: it says "not set up" until the user sets one up.</param>
-    public static IReadOnlyList<IPowerSource> Detect(string? wallMeterConfigPath = null)
+    /// <param name="peripheralMetersConfigPath">The extra meters' config file, or null to leave them out.</param>
+    public static IReadOnlyList<IPowerSource> Detect(string? wallMeterConfigPath = null, string? peripheralMetersConfigPath = null)
     {
         var sources = new List<IPowerSource> { new NvmlPowerSource() };
 
@@ -23,6 +24,8 @@ public static class PowerSources
         }
 
         if (wallMeterConfigPath is not null) sources.Add(new WallMeterSource(wallMeterConfigPath));
+
+        if (peripheralMetersConfigPath is not null) sources.Add(new PeripheralMetersSource(peripheralMetersConfigPath));
 
         return sources;
     }

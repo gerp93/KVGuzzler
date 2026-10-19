@@ -124,6 +124,21 @@
               </Border>
             </Grid>
 
+            <!-- Extra meters (monitor, speakers): each on its own, and a checkbox per meter to count it on top of the PC above. -->
+            <Border x:Name="PeripheralsCard" Classes="card" IsVisible="False">
+              <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Peripherals" Classes="h2" />
+                  <TextBlock x:Name="PeripheralsPeriodText" Classes="caption" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Also count:" VerticalAlignment="Center" />
+                  <WrapPanel x:Name="PeripheralFilterPanel" VerticalAlignment="Center" />
+                </StackPanel>
+                <ItemsControl x:Name="PeripheralsList" ItemTemplate="{StaticResource BarRow}" />
+              </StackPanel>
+            </Border>
+
             <!-- The chart, and live power beside it. -->
             <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
               <Border Classes="card" Grid.Column="0">
@@ -418,6 +433,23 @@
                   <Button x:Name="RemoveWallButton" Content="Remove" />
                 </StackPanel>
                 <TextBlock x:Name="WallStatusText" Classes="body" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Other meters" Classes="h2" />
+                <TextBlock Classes="note"
+                           Text="A smart plug of its own for a monitor, speakers or anything else next to the PC. Each is recorded separately under the name you give it, and the Dashboard can count any of them on top of the PC. They are never mixed into the wall meter's whole-PC figure, which is why a separate plug is needed: this one measures only what is plugged into it. Same plugs as above (Shelly, second generation or newer); KVGuzzler only reads from them." />
+                <TextBlock x:Name="PeripheralSettingsEmptyText" Classes="caption" Text="No other meters yet." />
+                <StackPanel x:Name="PeripheralSettingsList" Spacing="6" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox x:Name="PeripheralLabelBox" Width="160" PlaceholderText="Monitor" MaxLength="40" />
+                  <TextBox x:Name="PeripheralHostBox" Width="200" PlaceholderText="192.168.1.51" />
+                  <Button x:Name="TestPeripheralButton" Content="Test" />
+                  <Button x:Name="AddPeripheralButton" Content="Add" Classes="accent" />
+                </StackPanel>
+                <TextBlock x:Name="PeripheralStatusText" Classes="body" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
 

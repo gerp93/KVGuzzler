@@ -86,7 +86,10 @@ public partial class MainWindow
         StatEnergyText.Text = FormatEnergy(stat.Kwh);
         StatEnergyCaption.Text = period + " · " + (stat.WholePc
             ? "whole PC at the wall" + (stat.CountedSince is { } since ? $", counted since the meter was connected ({since.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)})" : "")
-            : "CPU, GPU and memory sensors (active power; a wall meter would show the whole PC)");
+            : "CPU, GPU and memory sensors (active power; a wall meter would show the whole PC)")
+            + (stat.PeripheralCount > 0
+                ? $", plus {FormatEnergy(stat.PeripheralKwh)} from {stat.PeripheralCount} peripheral meter{(stat.PeripheralCount == 1 ? "" : "s")}"
+                : "");
 
         ShowMax(stat, period);
 
@@ -100,7 +103,7 @@ public partial class MainWindow
     /// otherwise the CPU, GPU and memory sensors together.</summary>
     private void ShowMax(UsageStat stat, string period)
     {
-        StatMaxLabel.Text = "Max draw · " + (stat.WholePc ? "whole PC at the wall" : "CPU, GPU and memory");
+        StatMaxLabel.Text = "Max draw · " + (stat.WholePc ? "whole PC at the wall" : "CPU, GPU and memory") + (stat.PeripheralCount > 0 ? " + peripherals" : "");
         if (stat.Peak is not { } peak)
         {
             StatMaxText.Text = "-";
