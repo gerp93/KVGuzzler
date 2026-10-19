@@ -6,6 +6,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
 using KVGuzzler.Core.History;
+using VisualAssault;
 
 namespace KVGuzzler.Views;
 
@@ -101,13 +102,6 @@ public sealed class PowerChartControl : Control
     public static readonly StyledProperty<PowerChartData?> DataProperty =
         AvaloniaProperty.Register<PowerChartControl, PowerChartData?>(nameof(Data));
 
-    private static readonly IBrush WallBrush = new SolidColorBrush(Color.Parse("#F59E0B"));
-    private static readonly IBrush CpuBrush = new SolidColorBrush(Color.Parse("#3B82F6"));
-    private static readonly IBrush GpuBrush = new SolidColorBrush(Color.Parse("#22C55E"));
-    private static readonly IBrush AsleepBand = new SolidColorBrush(Color.FromArgb(46, 100, 116, 139));
-    private static readonly IBrush OffBand = new SolidColorBrush(Color.FromArgb(46, 148, 163, 184));
-    private static readonly IBrush LostBand = new SolidColorBrush(Color.FromArgb(56, 239, 68, 68));
-
     private const double ChartHeight = 240;
     private const double LeftMargin = 46, RightMargin = 10, TopMargin = 10, BottomMargin = 24;
 
@@ -144,12 +138,36 @@ public sealed class PowerChartControl : Control
         InvalidateVisual();
     }
 
-    private static IBrush BrushFor(ChartSeriesKind kind) => kind switch
+    // Colors come from the active VisualAssault theme, so the chart follows the user's choice.
+    private static Color Token(VaToken token) => ThemeManager.Current?[token] ?? Colors.Gray;
+
+    private static IBrush BrushFor(ChartSeriesKind kind) => new SolidColorBrush(Token(kind switch
     {
-        ChartSeriesKind.Wall => WallBrush,
-        ChartSeriesKind.Cpu => CpuBrush,
-        _ => GpuBrush,
-    };
+        ChartSeriesKind.Wall => VaToken.PrimaryAction,
+        ChartSeriesKind.Cpu => VaToken.AccentBlue,
+        _ => VaToken.AccentGreen,
+    }));
+
+    private static IBrush BandFor(GapReason reason) => new SolidColorBrush(Token(reason switch
+    {
+        GapReason.Asleep => VaToken.AccentMuted,
+        GapReason.Off => VaToken.TextMuted,
+        _ => VaToken.AccentRed,
+    }), reason == GapReason.LostPower ? 0.25 : 0.18);
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        ThemeManager.ThemeChanged += OnThemeChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        ThemeManager.ThemeChanged -= OnThemeChanged;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnThemeChanged(object? sender, VaTheme theme) => InvalidateVisual();
 
     private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal) =>
         new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, weight), size, brush);
@@ -197,7 +215,7 @@ public sealed class PowerChartControl : Control
         // Stretches nothing was recorded: asleep, off, lost power.
         foreach (var gap in data.Gaps)
         {
-            var band = gap.Reason switch { GapReason.Asleep => AsleepBand, GapReason.Off => OffBand, _ => LostBand };
+            var band = BandFor(gap.Reason);
             var left = X(gap.Start);
             context.FillRectangle(band, new Rect(left, plot.Y, Math.Max(X(gap.End) - left, 1), plot.Height));
         }
@@ -252,7 +270,7 @@ public sealed class PowerChartControl : Control
         if (_hover is not { } pointer || !plot.Contains(pointer)) return;
 
         var at = data.From + (data.To - data.From) * ((pointer.X - plot.X) / plot.Width);
-        var lines = new List<(string Text, IBrush Brush)> { (at.ToLocalTime().ToString("g", CultureInfo.CurrentCulture), Brushes.White) };
+        var lines = new List<(string Text, IBrush Brush)> { (at.ToLocalTime().ToString("g", CultureInfo.CurrentCulture), new SolidColorBrush(Token(VaToken.Text))) };
         foreach (var series in data.Series)
         {
             var i = ChartLayout.Nearest(series.Points, at);
@@ -271,7 +289,7 @@ public sealed class PowerChartControl : Control
         var height = texts.Sum(t => t.Height) + 10;
         var left = pointer.X + 12 + width > plot.Right ? pointer.X - 12 - width : pointer.X + 12;
         var box = new Rect(left, Math.Clamp(pointer.Y - height / 2, plot.Y, plot.Bottom - height), width, height);
-        context.DrawRectangle(new SolidColorBrush(Color.FromArgb(235, 24, 24, 27)), null, box, 4, 4);
+        context.DrawRectangle(new SolidColorBrush(Token(VaToken.Surface), 0.94), new Pen(new SolidColorBrush(Token(VaToken.Border)), 1), box, 4, 4);
         var y0 = box.Y + 5;
         foreach (var t in texts)
         {

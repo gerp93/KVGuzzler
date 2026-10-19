@@ -9,6 +9,7 @@ using KVGuzzler.Core;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Data;
 using KVGuzzler.Services;
+using VisualAssault;
 
 namespace KVGuzzler.Views;
 
@@ -49,6 +50,8 @@ public partial class MainWindow : Window
         IssuesButton.Click += async (_, _) => await OpenLinkAsync(AppServices.RepoUrl + "/issues");
         CheckUpdatesButton.Click += async (_, _) => await CheckForUpdatesAsync();
         ApplyUpdateButton.Click += async (_, _) => await ApplyUpdateAsync();
+
+        SetUpThemePicker();
 
         RefreshRateHints();
         RefreshEstimate();
@@ -128,6 +131,30 @@ public partial class MainWindow : Window
         PowerNotesText.IsVisible = s.Notes.Count > 0;
         PowerTotalText.IsVisible = hasComponents;
         PowerSessionText.IsVisible = hasComponents && showSession;
+    }
+
+    // ----- Appearance -------------------------------------------------------------------
+
+    private void SetUpThemePicker()
+    {
+        ThemeBox.ItemsSource = VisualAssaultThemes.All.Select(t => t.Name).ToList();
+        ThemeBox.SelectedIndex = IndexOfTheme(ThemeManager.Current?.Id ?? ThemeChoice.DefaultId);
+        ThemeDescriptionText.Text = ThemeManager.Current?.Description;
+        ThemeBox.SelectionChanged += (_, _) =>
+        {
+            if (ThemeBox.SelectedIndex < 0) return;
+            var theme = VisualAssaultThemes.All[ThemeBox.SelectedIndex];
+            ThemeManager.Apply(theme);
+            ThemeDescriptionText.Text = theme.Description;
+            ThemeChoice.Save(_services.Database, theme.Id);
+        };
+    }
+
+    private static int IndexOfTheme(string id)
+    {
+        for (var i = 0; i < VisualAssaultThemes.All.Count; i++)
+            if (VisualAssaultThemes.All[i].Id == id) return i;
+        return 0;
     }
 
     // ----- Rate and estimate ------------------------------------------------------------

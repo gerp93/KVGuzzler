@@ -8,6 +8,7 @@ public static class SettingKeys
 {
     public const string RatePerKwh = "rate_per_kwh";
     public const string Currency = "currency_symbol";
+    public const string Theme = "theme_id";
     /// <summary>Watts a sleeping PC is assumed to draw, for estimating the time the collector saw it asleep.</summary>
     public const string SleepWatts = "sleep_watts";
     /// <summary>"one" (a single price per kWh) or "bills" (the price comes from each bill's dates).</summary>

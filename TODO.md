@@ -92,9 +92,6 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   sensors' active power) and what that cost. Dashboard history, the Programs list and runs are priced by date.
   Not built: time-of-use or tiered rates (this bill has neither), a "work out my rate" helper for plain totals,
   per-program prices that follow the bill by day (a program's period uses one time-weighted average price).
-- **Wire the VisualAssault theme**: once VisualAssault's `v0.3.0` tag exists, run
-  `scripts/update-visual-assault-avalonia.sh v0.3.0`, call `ThemeManager.Apply(id)` in
-  `App.OnFrameworkInitializationCompleted`, add a theme picker to Settings, persist the choice.
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /
   `icon_png` in both release workflows; add the logo to the README header and the app header.
