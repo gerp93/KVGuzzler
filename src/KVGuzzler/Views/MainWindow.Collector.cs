@@ -32,7 +32,8 @@ public partial class MainWindow
     {
         SleepWattsBox.Text = _services.Database?.GetSetting(SettingKeys.SleepWatts) ?? DefaultSleepWatts.ToString(CultureInfo.InvariantCulture);
         SaveSleepButton.Click += (_, _) => SaveSleepWatts();
-        ProgramPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false);
+        ProgramPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false, includeChart: false);
+        ChartPeriodBox.SelectionChanged += (_, _) => _ = RefreshCollectorAsync(includeService: false, includeChart: true);
         InstallCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: true);
         RemoveCollectorButton.Click += async (_, _) => await ChangeCollectorAsync(install: false);
 
@@ -45,7 +46,8 @@ public partial class MainWindow
                 // History sums over up to 30 days and asking Windows about the service starts a process,
                 // so those run less often than the one-second live readings.
                 _ticks++;
-                await RefreshCollectorAsync(includeService: _ticks % 10 == 0);
+                // The chart reads up to 30 days of history, so it is redrawn every ten seconds, not every second.
+                await RefreshCollectorAsync(includeService: _ticks % 10 == 0, includeChart: _ticks % 10 == 0);
             };
             _collectorTimer.Start();
         };
@@ -63,25 +65,29 @@ public partial class MainWindow
         IReadOnlyList<ProgramRun> Runs);
 
     private sealed record CollectorRead(
-        LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs);
+        LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
+        PowerChartData? Chart);
 
     /// <summary>How long each choice in the Programs tab looks back.</summary>
     private static readonly TimeSpan[] ProgramPeriods =
         { TimeSpan.FromHours(1), TimeSpan.FromDays(1), TimeSpan.FromDays(7), TimeSpan.FromDays(30) };
 
-    internal async Task RefreshCollectorAsync(bool includeService)
+    internal async Task RefreshCollectorAsync(bool includeService, bool includeChart = true)
     {
         var sleepWatts = SleepWatts;
         var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
-        var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack));
-        ApplyCollector(read);
+        var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
+        var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null));
+        ApplyCollector(read, includeChart);
     }
 
-    private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack)
+    private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack,
+        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod)
     {
         LiveState? live = null;
         IReadOnlyList<PeriodReport>? periods = null;
         ProgramsRead? programs = null;
+        PowerChartData? chart = null;
         string? error = null;
 
         if (_services.OpenHistory() is { } store)
@@ -93,6 +99,7 @@ public partial class MainWindow
                 periods = HistoryReport.Standard(store, now, sleepWatts);
                 programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline(),
                     store.GetRecentRuns(20));
+                if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -100,10 +107,10 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart);
     }
 
-    private void ApplyCollector(CollectorRead read)
+    private void ApplyCollector(CollectorRead read, bool includeChart)
     {
         if (read.Service is { } state) _serviceState = state;
         _collectorAlive = read.Live is { } l && DateTimeOffset.UtcNow - l.UpdatedAt < Fresh;
@@ -119,6 +126,20 @@ public partial class MainWindow
         ShowCollectorStatus(read.Live);
         ShowHistory(read);
         ShowPrograms(read.Programs);
+        if (includeChart) ShowChart(read);
+    }
+
+    private void ShowChart(CollectorRead read)
+    {
+        PowerChartView.Data = read.Chart;
+        ChartNoteText.Text = read.Chart is null
+            ? "No history yet. The chart fills in once the background collector has recorded some."
+            : read.Chart.Series.Count == 0
+                ? "Nothing was recorded in this period."
+                : read.Chart.Series.All(s => s.Kind != ChartSeriesKind.Wall)
+                    ? "CPU and GPU are the sensors' active power. Set up a wall meter in Settings to add the whole-PC line."
+                    : "";
+        ChartNoteText.IsVisible = ChartNoteText.Text.Length > 0;
     }
 
     // ----- Programs ---------------------------------------------------------------------

@@ -131,7 +131,7 @@ public sealed class PowerCollector
             }
             _bucket[r.Name] = _bucket.TryGetValue(r.Name, out var row)
                 ? row with { KilowattHours = row.KilowattHours + kwh, Seconds = row.Seconds + seconds, PeakWatts = Math.Max(row.PeakWatts, r.Watts) }
-                : new MinuteRow(minute, r.Name, r.Scope, kwh, seconds, Math.Max(before, r.Watts));
+                : new MinuteRow(minute, r.Name, r.Scope, kwh, seconds, Math.Max(before, r.Watts), r.Kind);
         }
     }
 

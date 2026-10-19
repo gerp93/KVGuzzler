@@ -77,8 +77,12 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - Not built: pinning a specific program (everything is tracked automatically, so not needed yet), an
     option to name a run (e.g. one game launch inside a launcher), Linux (`/proc` and the GPU's own
     per-process data).
-- **Live dashboard**: wattage graph (ScottPlot or LiveCharts2; both MIT) and cost-so-far cards;
-  per hour/day/week/month totals; per-session cost.
+- **Live dashboard**: the Dashboard's "Power over time" chart is built (whole PC from the wall meter, CPU and
+  GPU, as average watts per bucket for the last hour / 24 hours / 7 days / 30 days, with the stretches nothing
+  was recorded shaded by reason, and a hover readout). It is drawn directly, so there is no charting library.
+  Checked on this PC's real history: axes, lines, shaded gaps and the hover guide line show correctly; the
+  hover readout box itself was not seen on screen (the scripted pointer test lost the window), only unit-tested
+  for its maths. Still to do: per-day/week/month totals as bars, and a per-program stacked view.
 - **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a
   date range so changing it does not reprice history. A "last bill total / kWh used" helper to get
   the all-in rate.

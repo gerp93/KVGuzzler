@@ -30,6 +30,20 @@
 
           <Separator Margin="0,8" />
 
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <TextBlock Text="Power over time" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <ComboBox x:Name="ChartPeriodBox" SelectedIndex="1" MinWidth="150">
+              <ComboBoxItem Content="Last hour" />
+              <ComboBoxItem Content="Last 24 hours" />
+              <ComboBoxItem Content="Last 7 days" />
+              <ComboBoxItem Content="Last 30 days" />
+            </ComboBox>
+          </StackPanel>
+          <views:PowerChartControl x:Name="PowerChartView" />
+          <TextBlock x:Name="ChartNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+
+          <Separator Margin="0,8" />
+
           <TextBlock Text="Background recording" FontSize="20" FontWeight="SemiBold" />
           <TextBlock x:Name="CollectorStatusText" TextWrapping="Wrap" Text="Checking the collector service..." />
           <TextBlock x:Name="CollectorLastSeenText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" IsVisible="False" />

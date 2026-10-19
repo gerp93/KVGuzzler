@@ -18,7 +18,21 @@ public enum GapReason
 }
 
 /// <summary>Energy one reading used during one minute (UTC, minute-aligned).</summary>
-public sealed record MinuteRow(long MinuteStart, string Name, ReadingScope Scope, double KilowattHours, double Seconds, double PeakWatts);
+public sealed record MinuteRow(
+    long MinuteStart, string Name, ReadingScope Scope, double KilowattHours, double Seconds, double PeakWatts,
+    PowerKind Kind = PowerKind.Other);
+
+/// <summary>Which line of the power chart a set of saved rows belongs to.</summary>
+public enum ChartSeriesKind
+{
+    /// <summary>The whole PC, from the wall meter.</summary>
+    Wall,
+    Cpu,
+    Gpu,
+}
+
+/// <summary>One minute of one chart series: its energy, how many seconds it covers, and its peak.</summary>
+public sealed record SeriesMinute(long MinuteStart, double KilowattHours, double Seconds, double PeakWatts);
 
 public sealed record Gap(DateTimeOffset Start, DateTimeOffset End, GapReason Reason);
 
@@ -57,10 +71,14 @@ public sealed class HistoryStore : IDisposable
         _connectionString = new SqliteConnectionStringBuilder { DataSource = path }.ToString();
         using var c = Open();
         Exec(c, "PRAGMA journal_mode=WAL;");
+        // The chart needs to know which saved rows are the CPU and which the GPU. Files from before this column
+        // existed are upgraded in place (their old rows are read as "unknown" and found by name instead).
+        if (!HasColumn(c, "samples", "kind") && TableExists(c, "samples"))
+            Exec(c, "ALTER TABLE samples ADD COLUMN kind INTEGER NOT NULL DEFAULT 0;");
         Exec(c, """
             CREATE TABLE IF NOT EXISTS samples (
                 minute_start INTEGER NOT NULL, name TEXT NOT NULL, scope INTEGER NOT NULL,
-                kwh REAL NOT NULL, seconds REAL NOT NULL, peak_watts REAL NOT NULL,
+                kwh REAL NOT NULL, seconds REAL NOT NULL, peak_watts REAL NOT NULL, kind INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (minute_start, name));
             CREATE TABLE IF NOT EXISTS gaps (
                 start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL);
@@ -102,12 +120,13 @@ public sealed class HistoryStore : IDisposable
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = """
-                INSERT INTO samples (minute_start, name, scope, kwh, seconds, peak_watts)
-                VALUES ($m, $n, $s, $k, $sec, $p)
+                INSERT INTO samples (minute_start, name, scope, kwh, seconds, peak_watts, kind)
+                VALUES ($m, $n, $s, $k, $sec, $p, $kind)
                 ON CONFLICT (minute_start, name) DO UPDATE SET
                     kwh = kwh + excluded.kwh, seconds = seconds + excluded.seconds,
-                    peak_watts = MAX(peak_watts, excluded.peak_watts)
+                    peak_watts = MAX(peak_watts, excluded.peak_watts), kind = excluded.kind
                 """;
+            cmd.Parameters.AddWithValue("$kind", (int)r.Kind);
             cmd.Parameters.AddWithValue("$m", r.MinuteStart);
             cmd.Parameters.AddWithValue("$n", r.Name);
             cmd.Parameters.AddWithValue("$s", (int)r.Scope);
@@ -251,6 +270,36 @@ public sealed class HistoryStore : IDisposable
         }
 
         return (kwh, TimeSpan.FromSeconds(monitored), gaps);
+    }
+
+    // ----- Chart series -----------------------------------------------------------------
+
+    /// <summary>The minutes of one chart series between two instants, oldest first. A series can be several saved
+    /// readings (two GPUs): their energy and peaks add, and the time covered is the longest any of them was sampled.</summary>
+    public IReadOnlyList<SeriesMinute> QuerySeries(DateTimeOffset from, DateTimeOffset to, ChartSeriesKind kind)
+    {
+        // Fixed fragments chosen by the enum, never text from outside.
+        var filter = kind switch
+        {
+            ChartSeriesKind.Wall => "scope = 2",
+            ChartSeriesKind.Gpu => "scope = 0 AND kind = 2",
+            // Rows saved before the kind column existed have kind 0: the CPU is still found by its name.
+            _ => "scope = 0 AND (kind = 1 OR (kind = 0 AND name LIKE 'CPU package%'))",
+        };
+
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT minute_start, SUM(kwh), MAX(seconds), SUM(peak_watts) FROM samples
+            WHERE {filter} AND minute_start >= $f AND minute_start < $t
+            GROUP BY minute_start ORDER BY minute_start
+            """;
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        var rows = new List<SeriesMinute>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows.Add(new SeriesMinute(r.GetInt64(0), r.GetDouble(1), r.GetDouble(2), r.GetDouble(3)));
+        return rows;
     }
 
     // ----- Per-program estimates --------------------------------------------------------
@@ -404,6 +453,22 @@ public sealed class HistoryStore : IDisposable
         var c = new SqliteConnection(_connectionString);
         c.Open();
         return c;
+    }
+
+    private static bool TableExists(SqliteConnection c, string table)
+    {
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $n";
+        cmd.Parameters.AddWithValue("$n", table);
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    private static bool HasColumn(SqliteConnection c, string table, string column)
+    {
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = $n";
+        cmd.Parameters.AddWithValue("$n", column);
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
     private static void Exec(SqliteConnection c, string sql)
