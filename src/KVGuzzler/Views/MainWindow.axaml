@@ -174,7 +174,7 @@
 
           <StackPanel x:Name="BillsPanel" Spacing="10" IsVisible="False">
             <TextBlock TextWrapping="Wrap"
-                       Text="Enter each bill: the dates it covers, its total, and the kWh it charged for. The price per kWh is worked out for you (total divided by kWh) and used for everything KVGuzzler recorded on those dates, so an old month keeps its own price when the rate changes. Dates after your latest bill use its price as an estimate until you enter the next bill. Flat fees that do not depend on usage (a basic service charge, a monthly credit) can be left out, so the price is that of one more kWh." />
+                       Text="Enter each bill's ELECTRICITY part only: if the bill also has gas or other services, or an overall total covering all of them, use just the electricity charges and the electricity kWh. For each bill enter the dates it covers, the electricity total, and the kWh it charged for. The price per kWh is worked out for you (total divided by kWh) and used for everything KVGuzzler recorded on those dates, so an old month keeps its own price when the rate changes. Dates after your latest bill use its price as an estimate until you enter the next bill. Flat fees that do not depend on usage (a basic service charge, a monthly credit) can be left out, so the price is that of one more kWh." />
             <StackPanel x:Name="BillsList" Spacing="8" />
             <TextBlock x:Name="BillsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
 
@@ -184,10 +184,10 @@
                 <WrapPanel>
                   <StackPanel Margin="0,0,12,8"><TextBlock Text="First day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillStartPicker" /></StackPanel>
                   <StackPanel Margin="0,0,12,8"><TextBlock Text="Last day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillEndPicker" /></StackPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Bill total" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillTotalBox" Width="110" PlaceholderText="206.32" /></StackPanel>
-                  <StackPanel Margin="0,0,12,8"><TextBlock Text="kWh charged" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillKwhBox" Width="110" PlaceholderText="1036" /></StackPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity total" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillTotalBox" Width="110" PlaceholderText="206.32" /></StackPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Electricity kWh" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillKwhBox" Width="110" PlaceholderText="1036" /></StackPanel>
                 </WrapPanel>
-                <TextBlock Text="Flat fees to leave out (optional, as many as you like)" FontSize="12" Opacity="0.7" />
+                <TextBlock Text="Flat electricity fees to leave out (optional, as many as you like)" FontSize="12" Opacity="0.7" />
                 <StackPanel x:Name="FeesPanel" Spacing="6" />
                 <Button x:Name="AddFeeButton" Content="Add a flat fee" HorizontalAlignment="Left" />
                 <TextBlock x:Name="BillPriceText" FontWeight="SemiBold" TextWrapping="Wrap" />

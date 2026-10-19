@@ -79,12 +79,12 @@ public partial class MainWindow
         }
         if (!TryNumber(BillTotalBox.Text, out var total))
         {
-            error = "Enter the bill's total as a plain number, like 206.32.";
+            error = "Enter the electricity total as a plain number, like 206.32 (the electricity part of the bill, not the overall total).";
             return null;
         }
         if (!TryNumber(BillKwhBox.Text, out var kwh))
         {
-            error = "Enter the kWh as a plain number, like 1036 (no thousands separator).";
+            error = "Enter the electricity kWh as a plain number, like 1036 (no thousands separator).";
             return null;
         }
 
