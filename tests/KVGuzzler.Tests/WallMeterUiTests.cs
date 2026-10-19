@@ -85,6 +85,24 @@ public class WallMeterUiTests
     }
 
     [AvaloniaFact]
+    public async Task AnUnexpectedErrorInTestOrSaveIsAMessageNotACrash()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        t.Services.ReadWallMeterAsync = _ => throw new UriFormatException("Invalid URI: The hostname could not be parsed.");
+        var window = new MainWindow(t.Services);
+        window.Show();
+        window.WallHostBox.Text = "192.168.68.106";
+
+        await window.TestWallMeterAsync();
+        Assert.StartsWith("Something unexpected went wrong:", window.WallStatusText.Text);
+
+        await window.SaveWallMeterAsync();
+        Assert.StartsWith("Not saved. Something unexpected went wrong:", window.WallStatusText.Text);
+        Assert.False(File.Exists(ConfigPath(t)));
+    }
+
+    [AvaloniaFact]
     public void TheSavedAddressIsShownAgainAndRemoveForgetsIt()
     {
         UseInvariantCulture();

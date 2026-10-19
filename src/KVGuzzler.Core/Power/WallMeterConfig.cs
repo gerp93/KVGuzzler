@@ -21,7 +21,12 @@ public sealed partial record WallMeterConfig(string Host)
 
     /// <summary>A name or IPv4 address, optionally with a port: <c>192.168.1.50</c>, <c>shelly-pc.lan</c>.
     /// Not a URL: the program builds the address itself, so only the plug's own address can be reached.</summary>
-    public static bool IsValidHost(string? host) => host is not null && host.Length <= 253 && HostPattern().IsMatch(host);
+    public static bool IsValidHost(string? host) =>
+        host is not null && host.Length <= 253 && HostPattern().IsMatch(host)
+        // The pattern allows things like 192.168.68.300 that look right but are not an address: only keep what
+        // the URL parser really accepts as a plain host (and port), so the plug is never asked for with a bad one.
+        && Uri.TryCreate($"http://{host}/", UriKind.Absolute, out var uri)
+        && uri.PathAndQuery == "/" && uri.Host.Length > 0;
 
     /// <summary>The saved meter, or null when none is set up or the file is unreadable.</summary>
     public static WallMeterConfig? Load(string path)

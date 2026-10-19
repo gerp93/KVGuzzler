@@ -101,6 +101,18 @@ public class ShellyPlugTests
         Assert.Contains("did not answer", e.Message);
     }
 
+    [Theory]
+    [InlineData("192.168.68..106")]
+    [InlineData("a..b")]
+    [InlineData("not a host")]
+    public async Task ABadAddressIsAMessageAndNeverAnException(string host)
+    {
+        // Even if something skips the address check, the reader itself must not throw a UriFormatException.
+        var e = await Assert.ThrowsAsync<WallMeterException>(
+            () => ShellyPlug.ReadWattsAsync(Client(new FakePlug()), host, TestContext.Current.CancellationToken));
+        Assert.Contains("not a valid address", e.Message);
+    }
+
     [Fact]
     public async Task ShuttingDownIsNotMistakenForATimeout()
     {
@@ -141,6 +153,10 @@ public class WallMeterConfigTests : IDisposable
     [InlineData("192.168.1.50 ", false)]
     [InlineData("user:pass@192.168.1.50", false)]
     [InlineData("-bad.example", false)]
+    [InlineData("192.168.68..106", false)]                // a doubled dot: the pattern allows it, the URL parser does not. This crashed the app
+    [InlineData("a..b", false)]
+    [InlineData("192.168..", false)]
+    [InlineData("192.168.68.106:99999", false)]           // not a port
     public void OnlyAPlainAddressIsAccepted(string host, bool valid) =>
         Assert.Equal(valid, WallMeterConfig.IsValidHost(host));
 

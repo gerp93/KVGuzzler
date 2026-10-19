@@ -67,5 +67,9 @@ public static class ShellyPlug
         {
             throw new WallMeterException($"Could not reach {host}: {e.Message}", e);
         }
+        catch (UriFormatException)
+        {
+            throw new WallMeterException($"\"{host}\" is not a valid address. Enter the plug's address like 192.168.68.106.");
+        }
     }
 }

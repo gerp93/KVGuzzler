@@ -47,6 +47,11 @@ public partial class MainWindow
         {
             WallStatusText.Text = e.Message;
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // An optional feature must never close the app: say what happened instead.
+            WallStatusText.Text = "Something unexpected went wrong: " + e.Message;
+        }
     }
 
     /// <summary>Saves only an address that answered like a plug, so a typo is caught here and not as a
@@ -62,6 +67,11 @@ public partial class MainWindow
         catch (WallMeterException e)
         {
             WallStatusText.Text = "Not saved. " + e.Message;
+            return;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            WallStatusText.Text = "Not saved. Something unexpected went wrong: " + e.Message;
             return;
         }
 

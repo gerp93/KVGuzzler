@@ -74,11 +74,20 @@ public partial class MainWindow
 
     internal async Task RefreshCollectorAsync(bool includeService, bool includeChart = true)
     {
-        var sleepWatts = SleepWatts;
-        var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
-        var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
-        var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null));
-        ApplyCollector(read, includeChart);
+        try
+        {
+            var sleepWatts = SleepWatts;
+            var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
+            var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
+            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null));
+            ApplyCollector(read, includeChart);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // This runs every second from a timer: a problem reading the history must show as a message, not close the app.
+            CollectorResultText.Text = "Could not refresh the Dashboard: " + e.Message;
+            CollectorResultText.IsVisible = true;
+        }
     }
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack,
