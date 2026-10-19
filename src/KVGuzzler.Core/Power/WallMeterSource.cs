@@ -8,7 +8,7 @@ namespace KVGuzzler.Core.Power;
 /// </summary>
 /// <remarks>The reading has <see cref="ReadingScope.Wall"/>: it already includes everything the CPU, GPU and
 /// memory sensors measure plus the rest of the PC, so it is never added to them.</remarks>
-public sealed class WallMeterSource : IPowerSource
+public sealed class WallMeterSource : IPowerSource, IWallEnergyCounter
 {
     public const string ReadingName = "Whole PC (wall meter)";
 
@@ -30,6 +30,7 @@ public sealed class WallMeterSource : IPowerSource
     private double _watts;
     private long? _readAt;
     private string? _error;
+    private WallCounter? _counter;
 
     public WallMeterSource(string configPath, HttpMessageHandler? handler = null, TimeSpan? pollInterval = null, TimeProvider? time = null)
     {
@@ -52,6 +53,14 @@ public sealed class WallMeterSource : IPowerSource
                 if (IsFresh()) return null;
                 return _error ?? "Waiting for the first reading from the plug.";
             }
+        }
+    }
+
+    public WallCounter? LatestCounter
+    {
+        get
+        {
+            lock (_gate) return _counter;
         }
     }
 
@@ -94,6 +103,7 @@ public sealed class WallMeterSource : IPowerSource
         _polling = null;
         _config = loaded;
         _readAt = null;   // a reading from the old address says nothing about the new one
+        _counter = null;
         _error = null;
 
         if (loaded is null) return;
@@ -111,12 +121,13 @@ public sealed class WallMeterSource : IPowerSource
             {
                 try
                 {
-                    var watts = await ShellyPlug.ReadWattsAsync(_http, host, cancel);
+                    var status = await ShellyPlug.ReadStatusAsync(_http, host, cancel);
                     lock (_gate)
                     {
                         if (cancel.IsCancellationRequested) return;   // the address changed while this was in flight
-                        _watts = watts;
+                        _watts = status.Watts;
                         _readAt = _time.GetTimestamp();
+                        _counter = status.EnergyWh is { } wh ? new WallCounter(host, wh, _time.GetUtcNow()) : null;
                         _error = null;
                     }
                 }

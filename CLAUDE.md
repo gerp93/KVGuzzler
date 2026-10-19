@@ -43,6 +43,14 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   switch the plug, because the PC is plugged into it. The meter's address lives in
   `wall-meter.json` beside the history (not in the per-user settings: the collector service reads it too).
   Only a plain host or IP is accepted, never a URL or path.
+  **Gaps are filled from the plug's own counter.** The status answer's `aenergy.total` (Wh since the plug last restarted) is kept with
+  every sample (`WallMeterSource.LatestCounter`, saved in `history.db` meta by `SetLive`). After a gap (sleep, or a collector restart
+  whose gap is "off"/"lost power") `PowerCollector` waits for the plug's first answer, and when the counter went up (not down: a plug
+  restart; not implying more than `MaxPlugWatts`; same plug address; read within `CounterNearGap` of the gap's start) saves the
+  difference as `plug_kwh` on the **gap row**, never as a sample row. It counts in `ReadingScope.Wall` totals only
+  (`HistoryStore.Query`/`EnergyKwh`, spread evenly over the gap so any period gets its share), never in sensor energy, `Monitored`
+  time or the chart lines. A counter that is missing or went down leaves the gap as it was. Up to a second or two at each end is
+  counted both sampled and in the counter's difference.
 - **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
   the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).
@@ -70,8 +78,7 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
 - **Cost estimator** (Dashboard, under Energy history) has three bases: a typed constant load, the live draw (wall figure if there is a
   wall meter, else the sensors), and "My usage" - real kWh per day over a window, counting off/asleep time, via
   `UsageSummary.AverageDay`. **Sleep power** is only used for the history detail line when there is no wall meter, so Settings hides it once a
-  plug is configured (the plug measures during sleep, but nothing on the PC can read it then; filling those gaps from the plug's own energy
-  counter is in TODO.md).
+  plug is configured (the plug's own counter fills the gaps, see the wall meter rule above).
 - **No menu bar.** Help/About lives in the window (Help tab). No DevTools in release builds.
 - **Logo:** none yet and none is to be fabricated. See TODO.md.
 - Commit `packages.lock.json` files; package versions float within a major, the lock files pin them.

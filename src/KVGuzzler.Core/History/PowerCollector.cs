@@ -25,6 +25,18 @@ public sealed class PowerCollector
     /// <summary>How often the CPU's and GPU's energy is shared out among programs.</summary>
     public static readonly TimeSpan AttributionInterval = TimeSpan.FromSeconds(2);
 
+    /// <summary>The plug's counter read before a gap only counts if it was read this close to where sampling stopped; an older one
+    /// would also cover time that was sampled.</summary>
+    public static readonly TimeSpan CounterNearGap = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long after a gap to keep waiting for the plug to answer again (the network can take a while to come back
+    /// after waking) before leaving the gap without the plug's figure.</summary>
+    public static readonly TimeSpan CounterWait = TimeSpan.FromMinutes(2);
+
+    /// <summary>A plug cannot switch more than this, so a counter difference implying more is not believed (the plug probably
+    /// restarted in the middle of a long gap and counted back up past the old value).</summary>
+    public const double MaxPlugWatts = 4000;
+
     private const double JoulesPerKwh = 3_600_000.0;
 
     private readonly HistoryStore _store;
@@ -42,6 +54,13 @@ public sealed class PowerCollector
     private string? _programNote;
     private readonly Dictionary<string, ProgramEnergy> _programBucket = new(StringComparer.OrdinalIgnoreCase);
 
+    // The plug's own energy counter, which keeps running while the PC does not: read either side of a gap it gives the gap's energy.
+    private readonly IWallEnergyCounter? _counterSource;
+    private WallCounter? _lastCounter;
+    private PendingFill? _pendingFill;
+
+    private sealed record PendingFill(Gap Gap, WallCounter Before, DateTimeOffset GiveUpAt);
+
     private DateTimeOffset? _last;
     private Dictionary<string, double> _lastWatts = new();
     private long _bucketMinute = -1;
@@ -54,6 +73,7 @@ public sealed class PowerCollector
         _store = store;
         _sampler = sampler;
         _programs = programs;
+        _counterSource = sampler.Sources.OfType<IWallEnergyCounter>().FirstOrDefault();
         if (programs is not null)
         {
             var (cpu, gpu) = store.GetIdleBaseline();
@@ -67,7 +87,12 @@ public sealed class PowerCollector
     {
         _store.EndStaleRuns();
         if (_store.LastSeen() is { } lastSeen && now - lastSeen > GapThreshold)
-            _store.AddGap(new Gap(lastSeen, now, _store.StoppedCleanly() ? GapReason.Off : GapReason.LostPower));
+        {
+            var gap = new Gap(lastSeen, now, _store.StoppedCleanly() ? GapReason.Off : GapReason.LostPower);
+            _store.AddGap(gap);
+            // The plug's counter as saved with the last sample: the plug has kept counting since.
+            WaitForPlug(gap, _store.GetWallCounter(), now);
+        }
     }
 
     public PowerSnapshot Tick(DateTimeOffset now)
@@ -81,7 +106,9 @@ public sealed class PowerCollector
             // Energy counters answer with their average over the whole sleep, which is meaningless as a
             // current reading: close the books at the last good sample and start fresh from this one.
             Flush(now);
-            _store.AddGap(new Gap(_last!.Value, now, GapReason.Asleep));
+            var gap = new Gap(_last!.Value, now, GapReason.Asleep);
+            _store.AddGap(gap);
+            WaitForPlug(gap, _lastCounter, now);
             _lastWatts.Clear();
             RestartPrograms();
         }
@@ -94,8 +121,16 @@ public sealed class PowerCollector
 
         _lastWatts = readings.ToDictionary(r => r.Name, r => r.Watts);
         _last = now;
+
+        // Only an answer from just now counts as the counter "as of this tick": after waking, the plug source still holds the
+        // answer from before sleep until it asks again.
+        var counter = _counterSource?.LatestCounter;
+        var fresh = counter is not null && now - counter.ReadAt <= GapThreshold / 2 && counter.ReadAt <= now.AddSeconds(1) ? counter : null;
+        FillGapFromPlug(now, counter);
+        if (fresh is not null) _lastCounter = fresh;
+
         var notes = _programNote is null ? snapshot.Notes : snapshot.Notes.Append(_programNote).ToList();
-        _store.SetLive(now, readings, notes);
+        _store.SetLive(now, readings, notes, fresh);
         return snapshot with { Readings = readings, Notes = notes };
     }
 
@@ -105,6 +140,38 @@ public sealed class PowerCollector
         foreach (var run in _runs.CloseAll()) _store.SaveRun(run);
         Flush(_last ?? DateTimeOffset.UtcNow);
         _store.MarkCleanStop();
+    }
+
+    // ----- Gaps filled from the plug's counter ------------------------------------------
+
+    /// <summary>After a gap, remembers what the plug's counter said before it, so the first answer after it can give the gap's energy.
+    /// Nothing is remembered when there was no counter, or it is not close enough to where sampling stopped.</summary>
+    private void WaitForPlug(Gap gap, WallCounter? before, DateTimeOffset now)
+    {
+        _pendingFill = null;
+        if (_counterSource is null || before is null) return;
+        if ((gap.Start - before.ReadAt).Duration() > CounterNearGap) return;
+        _pendingFill = new PendingFill(gap, before, now + CounterWait);
+    }
+
+    /// <summary>When the plug answers again after a gap, saves the difference of its energy counter as the gap's whole-PC energy.
+    /// A counter that went down (the plug restarted), is missing, or implies more power than a plug can carry leaves the gap
+    /// as it was: no figure is better than a wrong one. The seconds either side of the gap that were also sampled are
+    /// counted in both (a second or two at the PC's draw, a fraction of a watt-hour).</summary>
+    private void FillGapFromPlug(DateTimeOffset now, WallCounter? counter)
+    {
+        if (_pendingFill is not { } pending) return;
+        if (now > pending.GiveUpAt) { _pendingFill = null; return; }
+
+        // An answer from before the PC woke (still held by the plug source) says nothing about the gap's end.
+        if (counter is null || counter.ReadAt < pending.Gap.End.AddSeconds(-2)) return;
+        _pendingFill = null;
+        if (!string.Equals(counter.Host, pending.Before.Host, StringComparison.OrdinalIgnoreCase)) return;   // a different plug
+
+        var wh = counter.TotalWh - pending.Before.TotalWh;
+        var hours = (counter.ReadAt - pending.Before.ReadAt).TotalHours;
+        if (wh < 0 || hours <= 0 || wh / hours > MaxPlugWatts) return;
+        _store.SetGapPlugEnergy(pending.Gap.Start, wh / 1000.0);
     }
 
     private void Integrate(DateTimeOffset from, DateTimeOffset to, IReadOnlyList<PowerReading> readings)
