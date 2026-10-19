@@ -66,6 +66,25 @@ public class WallMeterUiTests
     }
 
     [AvaloniaFact]
+    public async Task TheSleepWattageIsOnlyOfferedWithoutAWallMeter()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        t.Services.ReadWallMeterAsync = _ => Task.FromResult(52.1);
+        var window = new MainWindow(t.Services);
+        window.Show();
+        Assert.True(window.SleepCard.IsVisible);       // the estimate is the only thing there is for time asleep
+
+        window.WallHostBox.Text = "192.168.1.50";
+        await window.SaveWallMeterAsync();
+        Assert.False(window.SleepCard.IsVisible);      // with a plug the headline is its own figure and the estimate is unused
+
+        window.RemoveWallButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.True(window.SleepCard.IsVisible);
+        Assert.True(new MainWindow(t.Services).SleepCard.IsVisible);   // and a fresh window agrees
+    }
+
+    [AvaloniaFact]
     public async Task AUrlOrAPathIsRefusedBeforeAnythingIsAsked()
     {
         UseInvariantCulture();

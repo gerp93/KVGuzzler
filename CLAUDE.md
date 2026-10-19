@@ -67,6 +67,11 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   list rows share the `BarRow` template. One period picker (`StatsPeriodPanel`) drives the Dashboard stats, chart and program lists.
   A component's power is shown as a **share of the whole PC at the wall** when a wall meter exists (else of the sensor total, and
   the header says so); the chart's whole-PC line uses the theme's `Text` colour because `PrimaryAction` is invisible on dark themes.
+- **Cost estimator** (Dashboard, under Energy history) has three bases: a typed constant load, the live draw (wall figure if there is a
+  wall meter, else the sensors), and "My usage" - real kWh per day over a window, counting off/asleep time, via
+  `UsageSummary.AverageDay`. **Sleep power** is only used for the history detail line when there is no wall meter, so Settings hides it once a
+  plug is configured (the plug measures during sleep, but nothing on the PC can read it then; filling those gaps from the plug's own energy
+  counter is in TODO.md).
 - **No menu bar.** Help/About lives in the window (Help tab). No DevTools in release builds.
 - **Logo:** none yet and none is to be fabricated. See TODO.md.
 - Commit `packages.lock.json` files; package versions float within a major, the lock files pin them.
