@@ -84,27 +84,42 @@
               </Grid>
             </Border>
 
-            <!-- The three numbers that matter: what was used, what it cost, and what is being drawn now. -->
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+            <!-- The four numbers that matter: what was used, what it cost, what is being drawn now, and the most it ever drew. -->
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
               <Border Classes="card" Grid.Column="0">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Energy used" Classes="caption" />
-                  <TextBlock x:Name="StatEnergyText" Text="-" Classes="hero" />
+                  <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
+                    <TextBlock x:Name="StatEnergyText" Text="-" Classes="hero" />
+                  </Viewbox>
                   <TextBlock x:Name="StatEnergyCaption" Classes="caption" />
                 </StackPanel>
               </Border>
               <Border Classes="card" Grid.Column="1">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Cost" Classes="caption" />
-                  <TextBlock x:Name="StatCostText" Text="-" Classes="hero" />
+                  <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
+                    <TextBlock x:Name="StatCostText" Text="-" Classes="hero" />
+                  </Viewbox>
                   <TextBlock x:Name="StatCostCaption" Classes="caption" />
                 </StackPanel>
               </Border>
               <Border Classes="card" Grid.Column="2">
                 <StackPanel Spacing="2">
                   <TextBlock x:Name="NowLabelText" Text="Right now" Classes="caption" />
-                  <TextBlock x:Name="NowWattsText" Text="-" Classes="hero" />
+                  <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
+                    <TextBlock x:Name="NowWattsText" Text="-" Classes="hero" />
+                  </Viewbox>
                   <TextBlock x:Name="NowCaptionText" Classes="caption" />
+                </StackPanel>
+              </Border>
+              <Border Classes="card" Grid.Column="3">
+                <StackPanel Spacing="2">
+                  <TextBlock x:Name="StatMaxLabel" Text="Max draw" Classes="caption" />
+                  <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
+                    <TextBlock x:Name="StatMaxText" Text="-" Classes="hero" />
+                  </Viewbox>
+                  <TextBlock x:Name="StatMaxCaption" Classes="caption" />
                 </StackPanel>
               </Border>
             </Grid>

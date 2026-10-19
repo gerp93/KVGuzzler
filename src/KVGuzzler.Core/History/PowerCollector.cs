@@ -64,6 +64,7 @@ public sealed class PowerCollector
     private DateTimeOffset? _last;
     private Dictionary<string, double> _lastWatts = new();
     private long _bucketMinute = -1;
+    private double _pendPeakWatts;   // the highest the sensors' total reached in the minute being collected
     private DateTimeOffset _lastFlush;
     private readonly Dictionary<string, MinuteRow> _bucket = new();
 
@@ -115,6 +116,7 @@ public sealed class PowerCollector
         else if (_last is { } before && now > before)
         {
             Integrate(before, now, readings);
+            _pendPeakWatts = Math.Max(_pendPeakWatts, readings.Where(r => r.Scope == ReadingScope.Component).Sum(r => r.Watts));
             if (_programs is not null && now - _lastAttribution >= AttributionInterval) AttributePrograms(now);
             if (now - _lastFlush >= FlushInterval) Flush(now);
         }
@@ -206,6 +208,8 @@ public sealed class PowerCollector
     {
         if (_bucket.Count > 0) _store.AddMinutes(_bucket.Values.ToList());
         _bucket.Clear();
+        if (_pendPeakWatts > 0 && _bucketMinute >= 0) _store.AddTotalPeak(_bucketMinute, _pendPeakWatts);
+        _pendPeakWatts = 0;
         if (_programBucket.Count > 0) _store.AddProgramMinutes(_bucketMinute, ProgramAttributor.Lump(_programBucket.Values));
         _programBucket.Clear();
         _lastFlush = now;
