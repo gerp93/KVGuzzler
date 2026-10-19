@@ -23,12 +23,18 @@ public static class PowerChart
 
     /// <summary>The whole-PC line (when a wall meter recorded), the CPU and the GPU, as average watts per bucket.
     /// A line with no data in the period is left out.</summary>
-    public static PowerChartData Build(HistoryStore store, DateTimeOffset from, DateTimeOffset to, TimeSpan bucket)
+    /// <param name="peripherals">Extra meters to draw as one more line, "Peripherals" (their sum); none leaves it out.</param>
+    public static PowerChartData Build(HistoryStore store, DateTimeOffset from, DateTimeOffset to, TimeSpan bucket,
+        IReadOnlyCollection<string>? peripherals = null)
     {
         var series = new List<ChartSeries>();
-        foreach (var (name, kind) in new[] { ("Whole PC", ChartSeriesKind.Wall), ("CPU", ChartSeriesKind.Cpu), ("GPU", ChartSeriesKind.Gpu) })
+        foreach (var (name, kind) in new[]
+                 {
+                     ("Whole PC", ChartSeriesKind.Wall), ("CPU", ChartSeriesKind.Cpu), ("GPU", ChartSeriesKind.Gpu),
+                     ("Peripherals", ChartSeriesKind.Peripheral),
+                 })
         {
-            var points = Bucketed(store.QuerySeries(from, to, kind), bucket);
+            var points = Bucketed(store.QuerySeries(from, to, kind, peripherals), bucket);
             if (points.Count > 0) series.Add(new ChartSeries(name, kind, points));
         }
         return new PowerChartData(from, to, bucket, series, store.Query(from, to).Gaps);

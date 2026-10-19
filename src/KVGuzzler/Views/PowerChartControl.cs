@@ -147,6 +147,7 @@ public sealed class PowerChartControl : Control
         // The whole PC is the brightest line of the theme: PrimaryAction is a button fill and vanishes on a dark background.
         ChartSeriesKind.Wall => VaToken.Text,
         ChartSeriesKind.Cpu => VaToken.AccentBlue,
+        ChartSeriesKind.Peripheral => VaToken.TextMuted,
         _ => VaToken.AccentGreen,
     }));
 

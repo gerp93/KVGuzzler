@@ -30,7 +30,14 @@ public enum ChartSeriesKind
     Wall,
     Cpu,
     Gpu,
+
+    /// <summary>The extra meters the user chose to include, added together.</summary>
+    Peripheral,
 }
+
+/// <summary>What one extra meter (a monitor's plug) recorded in a period.</summary>
+/// <param name="PeakWatts">The highest once-a-second reading.</param>
+public sealed record PeripheralUse(string Name, double KilowattHours, double PeakWatts);
 
 /// <summary>One minute of one chart series: its energy, how many seconds it covers, and its peak.</summary>
 public sealed record SeriesMinute(long MinuteStart, double KilowattHours, double Seconds, double PeakWatts);
@@ -394,6 +401,72 @@ public sealed class HistoryStore : IDisposable
         return scope == ReadingScope.Wall ? kwh + GapPlugKwh(c, from, to) : kwh;
     }
 
+    // ----- Extra meters -----------------------------------------------------------------
+
+    /// <summary>What each extra meter recorded between two instants, biggest first. Only what was sampled: unlike the wall meter,
+    /// nothing is filled in for the time the PC was asleep or off.</summary>
+    public IReadOnlyList<PeripheralUse> QueryPeripherals(DateTimeOffset from, DateTimeOffset to)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT name, SUM(kwh), MAX(peak_watts) FROM samples
+            WHERE scope = 3 AND minute_start >= $f AND minute_start < $t
+            GROUP BY name ORDER BY SUM(kwh) DESC
+            """;
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        var rows = new List<PeripheralUse>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows.Add(new PeripheralUse(r.GetString(0), r.GetDouble(1), r.GetDouble(2)));
+        return rows;
+    }
+
+    /// <summary>The energy the named extra meters recorded between two instants. No names is no energy.</summary>
+    public double PeripheralKwh(DateTimeOffset from, DateTimeOffset to, IReadOnlyCollection<string> names)
+    {
+        if (names.Count == 0) return 0;
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT COALESCE(SUM(kwh), 0) FROM samples WHERE scope = 3 AND minute_start >= $f AND minute_start < $t AND {NameIn(cmd, names)}";
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        return Convert.ToDouble(cmd.ExecuteScalar());
+    }
+
+    /// <summary>The most the named extra meters could have drawn together: per minute, the sum of each one's own peak, which
+    /// they never all reach in the same second, so it is only an upper bound. Null when none of them recorded anything.</summary>
+    public PeakWatts? QueryPeripheralPeak(DateTimeOffset from, DateTimeOffset to, IReadOnlyCollection<string> names)
+    {
+        if (names.Count == 0) return null;
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT minute_start, SUM(peak_watts) FROM samples
+            WHERE scope = 3 AND minute_start >= $f AND minute_start < $t AND {NameIn(cmd, names)}
+            GROUP BY minute_start ORDER BY 2 DESC LIMIT 1
+            """;
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        using var r = cmd.ExecuteReader();
+        return r.Read() && !r.IsDBNull(1)
+            ? new PeakWatts(r.GetDouble(1), DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(0)), Exact: names.Count == 1)
+            : null;
+    }
+
+    /// <summary>"name IN ($n0, $n1, ...)" with the names bound as parameters, never pasted into the text.</summary>
+    private static string NameIn(SqliteCommand cmd, IReadOnlyCollection<string> names)
+    {
+        var markers = new List<string>();
+        foreach (var name in names)
+        {
+            var marker = "$n" + markers.Count;
+            markers.Add(marker);
+            cmd.Parameters.AddWithValue(marker, name);
+        }
+        return $"name IN ({string.Join(", ", markers)})";
+    }
+
     /// <summary>The whole-PC energy between two instants that the plug's own counter measured across gaps (time nothing was
     /// sampling: asleep, off, or lost power). Each gap's energy is spread evenly over its length, so a period that cuts a gap
     /// gets its share. This is part of <see cref="ReadingScope.Wall"/> energy, never of the sensors'.</summary>
@@ -440,19 +513,23 @@ public sealed class HistoryStore : IDisposable
 
     /// <summary>The minutes of one chart series between two instants, oldest first. A series can be several saved
     /// readings (two GPUs): their energy and peaks add, and the time covered is the longest any of them was sampled.</summary>
-    public IReadOnlyList<SeriesMinute> QuerySeries(DateTimeOffset from, DateTimeOffset to, ChartSeriesKind kind)
+    /// <param name="peripherals">For <see cref="ChartSeriesKind.Peripheral"/>, which extra meters to add up (none gives an empty series).</param>
+    public IReadOnlyList<SeriesMinute> QuerySeries(DateTimeOffset from, DateTimeOffset to, ChartSeriesKind kind,
+        IReadOnlyCollection<string>? peripherals = null)
     {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+
         // Fixed fragments chosen by the enum, never text from outside.
         var filter = kind switch
         {
             ChartSeriesKind.Wall => "scope = 2",
+            ChartSeriesKind.Peripheral => peripherals is { Count: > 0 } ? $"scope = 3 AND {NameIn(cmd, peripherals)}" : "0",
             ChartSeriesKind.Gpu => "scope = 0 AND kind = 2",
             // Rows saved before the kind column existed have kind 0: the CPU is still found by its name.
             _ => "scope = 0 AND (kind = 1 OR (kind = 0 AND name LIKE 'CPU package%'))",
         };
 
-        using var c = Open();
-        using var cmd = c.CreateCommand();
         cmd.CommandText = $"""
             SELECT minute_start, SUM(kwh), MAX(seconds), SUM(peak_watts) FROM samples
             WHERE {filter} AND minute_start >= $f AND minute_start < $t

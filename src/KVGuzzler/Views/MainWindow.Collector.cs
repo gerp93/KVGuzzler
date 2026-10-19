@@ -81,7 +81,7 @@ public partial class MainWindow
 
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
-        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats, AverageUse? Use);
+        PowerChartData? Chart, RateInfo? Rates, UsageStat? Stats, AverageUse? Use, IReadOnlyList<PeripheralUse>? Peripherals = null);
 
     /// <summary>The chart shows at most the last 30 days, so the two longest choices show that and say so.</summary>
     private static (string Label, TimeSpan Span, TimeSpan Bucket) ChartPeriodFor(int periodIndex) =>
@@ -113,8 +113,9 @@ public partial class MainWindow
             var longPeriod = statsSpan is null || statsSpan > TimeSpan.FromDays(7);
             var readTotals = includeChart
                 && (periodIndex != _programsReadPeriod || !longPeriod || DateTimeOffset.UtcNow - _programsReadAt > LongProgramRefresh);
+            var counted = CountedPeripherals();
             var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, statsSpan, includeChart ? chartPeriod : null, schedule,
-                includeChart ? statsSpan : null, includeChart, readTotals, SelectedEstimateWindow));
+                includeChart ? statsSpan : null, includeChart, readTotals, SelectedEstimateWindow, counted));
             if (read.Programs?.Totals is not null)
             {
                 _programsReadAt = DateTimeOffset.UtcNow;
@@ -139,8 +140,9 @@ public partial class MainWindow
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan? programLookBack,
         (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule, TimeSpan? statsSpan, bool includeStats,
-        bool readProgramTotals, TimeSpan? estimateSpan)
+        bool readProgramTotals, TimeSpan? estimateSpan, IReadOnlyCollection<string> peripherals)
     {
+        IReadOnlyList<PeripheralUse>? peripheralUse = null;
         UsageStat? stats = null;
         AverageUse? use = null;
         RateInfo? rates = null;
@@ -171,9 +173,10 @@ public partial class MainWindow
                         whole = wallKwh;
                 }
                 programs = new ProgramsRead(totals, whole, store.GetLivePrograms(), store.GetIdleBaseline(), store.GetRecentRuns(20));
-                if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
-                if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now);
-                if (includeStats) use = UsageSummary.AverageDay(store, estimateSpan, now);
+                if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket, peripherals);
+                if (includeStats && schedule is not null) stats = UsageSummary.Compute(store, schedule, statsSpan, now, peripherals);
+                if (includeStats) use = UsageSummary.AverageDay(store, estimateSpan, now, peripherals);
+                if (includeStats) peripheralUse = store.QueryPeripherals(statsSpan is { } sp ? now - sp : DateTimeOffset.UnixEpoch, now);
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
             {
@@ -181,7 +184,8 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats, use);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates, stats, use,
+            peripheralUse);
     }
 
     /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
@@ -223,6 +227,7 @@ public partial class MainWindow
         {
             ShowChart(read);
             ShowStats(read.Stats);
+            ShowPeripheralsPeriod(read.Peripherals, read.Rates?.Schedule);
             _averageUse = read.Use;
             RefreshEstimate();
         }

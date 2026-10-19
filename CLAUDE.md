@@ -51,6 +51,16 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   (`HistoryStore.Query`/`EnergyKwh`, spread evenly over the gap so any period gets its share), never in sensor energy, `Monitored`
   time or the chart lines. A counter that is missing or went down leaves the gap as it was. Up to a second or two at each end is
   counted both sampled and in the counter's difference.
+- **Other meters (monitor, speakers).** More smart plugs, each named by the user, in `peripheral-meters.json` beside `wall-meter.json`
+  (`PeripheralMetersConfig`, polled by `PeripheralMetersSource`, followed by the collector like the wall meter). Their readings are
+  `ReadingScope.Peripheral` (scope 3 in `samples`) and the reading **name is the label**, which is also the history key, so renaming
+  starts a new line (there is no rename; remove and add). The label may not be the wall meter's reading name (`samples` is keyed by
+  minute and name). They are **never** in the sensor total, the wall figure, the per-program split or the PC's own total peak: every
+  existing query filters by scope, so keep it that way. They are added to the Dashboard's energy, cost, max draw, "right now",
+  chart line and "My usage" only for the meters ticked in the Dashboard's "Also count" row (`SettingKeys.PeripheralsOff` holds the
+  ones left out, so a new meter counts until switched off). The combined max draw is only an upper bound (shown "≤"). Unlike the wall
+  meter, nothing is filled in for time the PC slept or was off (no `aenergy.total` use for them yet). Removing a meter leaves its
+  history but stops counting it.
 - **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
   the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).

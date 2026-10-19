@@ -35,8 +35,9 @@ public static class Program
         var instanceLock = InstanceLock.TryAcquire(dataDir);
         if (instanceLock is null) return 0;
 
+        var historyDir = HistoryStore.DefaultDirectory(development);
         Services = new AppServices(dataDir, instanceLock, updates, new PowerMonitor(() => PowerSources.Detect(
-                Path.Combine(HistoryStore.DefaultDirectory(development), WallMeterConfig.FileName))));
+                Path.Combine(historyDir, WallMeterConfig.FileName), Path.Combine(historyDir, PeripheralMetersConfig.FileName))));
         try
         {
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
