@@ -1,4 +1,5 @@
 using KVGuzzler.Core.Billing;
+using KVGuzzler.Core.Carbon;
 using KVGuzzler.Core.Power;
 
 namespace KVGuzzler.Core.History;
@@ -16,8 +17,9 @@ namespace KVGuzzler.Core.History;
 /// It includes what their own plugs counted while the PC slept or was off, where that was known.</param>
 /// <param name="PeripheralCount">How many extra meters are included (the peak is then only an upper bound).</param>
 /// <param name="IncludesPc">False when the PC itself was left out (the "peripherals only" view): <paramref name="Kwh"/> is then only the extra meters.</param>
+/// <param name="Carbon">The estimated carbon of the same energy, or null when no grid intensity has been saved (the feed is not set up).</param>
 public sealed record UsageStat(double Kwh, decimal? Cost, bool WholePc, DateTimeOffset? CountedSince, bool PriceEstimated, DateTimeOffset From,
-    PeakWatts? Peak = null, double PeripheralKwh = 0, int PeripheralCount = 0, bool IncludesPc = true);
+    PeakWatts? Peak = null, double PeripheralKwh = 0, int PeripheralCount = 0, bool IncludesPc = true, CarbonResult? Carbon = null);
 
 /// <summary>What the PC actually used per day, from real history, for projecting a bill.</summary>
 /// <param name="Kwh">Energy used over the stretch measured.</param>
@@ -87,6 +89,7 @@ public static class UsageSummary
                 : new PeakWatts(peak.Watts + extra.Watts, peak.At, Exact: false);   // they do not all peak in the same second
 
         return new UsageStat(cost.Kwh, cost.Unpriced ? null : cost.Cost, wholePc, since, cost.Estimated, from, peak,
-            store.PeripheralKwh(from, now, peripherals), peripherals.Count, includePc);
+            store.PeripheralKwh(from, now, peripherals), peripherals.Count, includePc,
+            CarbonCalculator.Compute(store, from, now, includePc, peripherals));
     }
 }

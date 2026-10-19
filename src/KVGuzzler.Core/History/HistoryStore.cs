@@ -36,6 +36,13 @@ public enum ChartSeriesKind
     Peripheral,
 }
 
+/// <summary>What the collector last found out about the carbon feed.</summary>
+/// <param name="Ok">True when it got a reading; false when it could not (and <paramref name="Error"/> says why).</param>
+/// <param name="CheckedAt">When it last asked.</param>
+/// <param name="GramsPerKwh">The figure it got, when <paramref name="Ok"/>.</param>
+/// <param name="ReadingAt">The hour the figure is for.</param>
+public sealed record CarbonStatus(bool Ok, DateTimeOffset CheckedAt, double? GramsPerKwh = null, DateTimeOffset? ReadingAt = null, string? Error = null);
+
 /// <summary>What one extra meter (a monitor's plug) recorded in a period.</summary>
 /// <param name="KilowattHours">Everything it used, including <paramref name="GapKwh"/>.</param>
 /// <param name="PeakWatts">The highest once-a-second reading.</param>
@@ -80,6 +87,7 @@ public sealed class HistoryStore : IDisposable
     private const string IdleGpuKey = "idle_gpu_w";
     private const string WallCounterKey = "wall_counter";
     private const string PeripheralCountersKey = "peripheral_counters";
+    private const string CarbonStatusKey = "carbon_status";
 
     private readonly string _connectionString;
 
@@ -110,6 +118,8 @@ public sealed class HistoryStore : IDisposable
                 start_ms INTEGER PRIMARY KEY, end_ms INTEGER NOT NULL, reason INTEGER NOT NULL, plug_kwh REAL);
             CREATE TABLE IF NOT EXISTS gap_peripherals (
                 start_ms INTEGER NOT NULL, name TEXT NOT NULL, kwh REAL NOT NULL, PRIMARY KEY (start_ms, name));
+            CREATE TABLE IF NOT EXISTS carbon_intensity (
+                hour_start INTEGER PRIMARY KEY, g_per_kwh REAL NOT NULL, estimated INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS live (name TEXT PRIMARY KEY, scope INTEGER NOT NULL, watts REAL NOT NULL, position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS program_samples (
@@ -475,6 +485,91 @@ public sealed class HistoryStore : IDisposable
         cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
         var kwh = Convert.ToDouble(cmd.ExecuteScalar());
         return scope == ReadingScope.Wall ? kwh + GapPlugKwh(c, from, to) : kwh;
+    }
+
+    // ----- Grid carbon intensity --------------------------------------------------------
+
+    /// <summary>Saves the grid's carbon intensity for the hour containing <paramref name="at"/>, replacing what was saved for that hour
+    /// (the figure for the current hour can be refined as it goes).</summary>
+    public void AddCarbon(DateTimeOffset at, double gramsPerKwh, bool estimated)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "INSERT OR REPLACE INTO carbon_intensity (hour_start, g_per_kwh, estimated) VALUES ($h, $g, $e)";
+        cmd.Parameters.AddWithValue("$h", at.ToUnixTimeSeconds() / 3600 * 3600);
+        cmd.Parameters.AddWithValue("$g", gramsPerKwh);
+        cmd.Parameters.AddWithValue("$e", estimated ? 1 : 0);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>The saved intensity of each hour between two instants, by the unix second the hour starts.</summary>
+    public IReadOnlyDictionary<long, double> QueryCarbon(DateTimeOffset from, DateTimeOffset to)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT hour_start, g_per_kwh FROM carbon_intensity WHERE hour_start >= $f AND hour_start < $t";
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 3600 * 3600);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        var rows = new Dictionary<long, double>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows[r.GetInt64(0)] = r.GetDouble(1);
+        return rows;
+    }
+
+    /// <summary>The average of every hour of intensity ever saved, or null when none was. What an hour with no figure of its own is valued at.</summary>
+    public double? AverageCarbonEver()
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT AVG(g_per_kwh) FROM carbon_intensity";
+        return cmd.ExecuteScalar() is double average ? average : null;
+    }
+
+    /// <summary>What the collector last found out about the carbon feed (a reading, or why it could not get one), or null if it never tried.</summary>
+    public CarbonStatus? GetCarbonStatus()
+    {
+        using var c = Open();
+        try { return JsonSerializer.Deserialize<CarbonStatus>(GetMeta(c, CarbonStatusKey) ?? "null"); }
+        catch (JsonException) { return null; }
+    }
+
+    public void SetCarbonStatus(CarbonStatus status)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        SetMeta(c, tx, CarbonStatusKey, JsonSerializer.Serialize(status));
+        tx.Commit();
+    }
+
+    /// <summary>The energy of one kind of reading in each hour between two instants (hours with none are left out), by the unix second
+    /// the hour starts. Only what was sampled: the plug's counter across gaps has no hour of its own.</summary>
+    /// <param name="names">For <see cref="ReadingScope.Peripheral"/>, which extra meters to add up (none gives nothing).</param>
+    public IReadOnlyList<(long Hour, double Kwh)> HourlyKwh(DateTimeOffset from, DateTimeOffset to, ReadingScope scope,
+        IReadOnlyCollection<string>? names = null)
+    {
+        if (names is { Count: 0 }) return Array.Empty<(long, double)>();
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT minute_start / 3600 * 3600 AS hour, SUM(kwh) FROM samples
+            WHERE scope = $scope AND minute_start >= $f AND minute_start < $t {(names is null ? "" : "AND " + NameIn(cmd, names))}
+            GROUP BY hour
+            """;
+        cmd.Parameters.AddWithValue("$scope", (int)scope);
+        cmd.Parameters.AddWithValue("$f", from.ToUnixTimeSeconds() / 60 * 60);
+        cmd.Parameters.AddWithValue("$t", to.ToUnixTimeSeconds());
+        var rows = new List<(long, double)>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows.Add((r.GetInt64(0), r.GetDouble(1)));
+        return rows;
+    }
+
+    /// <summary>What the named extra meters' own counters measured across gaps inside a period.</summary>
+    public double PeripheralGapKwh(DateTimeOffset from, DateTimeOffset to, IReadOnlyCollection<string> names)
+    {
+        if (names.Count == 0) return 0;
+        using var c = Open();
+        return GapPeripheralKwh(c, from, to, names).Values.Sum();
     }
 
     // ----- Extra meters -----------------------------------------------------------------

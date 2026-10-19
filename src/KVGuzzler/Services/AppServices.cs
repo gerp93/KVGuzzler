@@ -49,6 +49,13 @@ public sealed class AppServices : IDisposable
 
     private static readonly HttpClient WallMeterHttp = new();
 
+    /// <summary>One reading from Electricity Maps for the given key and place; throws
+    /// <see cref="KVGuzzler.Core.Carbon.CarbonException"/> with a message fit to show. Replaceable for tests.</summary>
+    public Func<KVGuzzler.Core.Carbon.CarbonConfig, Task<KVGuzzler.Core.Carbon.CarbonReading>> ReadCarbonAsync { get; set; } =
+        config => KVGuzzler.Core.Carbon.ElectricityMapsClient.ReadLatestAsync(CarbonHttp, config, DateTimeOffset.UtcNow);
+
+    private static readonly HttpClient CarbonHttp = new();
+
     /// <summary>Asks Windows whether the collector service is installed and running. Replaceable for tests.</summary>
     public Func<ServiceState> QueryCollectorService { get; set; }
 

@@ -74,6 +74,7 @@ public partial class MainWindow
             StatCostText.Text = "-";
             StatEnergyCaption.Text = "No history yet. It is recorded by the background collector.";
             StatCostCaption.Text = "";
+            StatCarbonCaption.IsVisible = false;
             StatMaxLabel.Text = "Max draw";
             StatMaxText.Text = "-";
             StatMaxCaption.Text = "";
@@ -94,6 +95,8 @@ public partial class MainWindow
                 : "");
 
         ShowMax(stat, period);
+
+        ShowCarbon(stat.Carbon);
 
         StatCostText.Text = stat.Cost is { } cost ? currency + FormatMoney(cost) : "-";
         StatCostCaption.Text = stat.Cost is null ? "Set your electricity rate (or a bill) in Settings."

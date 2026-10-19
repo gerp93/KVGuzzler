@@ -35,6 +35,10 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
         real plug: that `aenergy.total` really keeps counting while the PC sleeps, and whether it survives a plug reboot or
         power cut (the code assumes it does not and leaves such a gap alone). Not built: filling a short stretch where only
         the plug was unreachable while the PC stayed awake, and splitting a long gap whose counter reset in the middle.
+      - **Carbon footprint**: built (Electricity Maps, see CLAUDE.md), **not tried against the real service or with a real key.**
+        To confirm: the v3 `latest` path and `auth-token` header, the field names, the free-tier limits, and that the zone code or
+        "lat, lon" the free key was set up for is accepted. Not built: carbon per program and per run, a grid-intensity line on the
+        chart ("when is it clean"), a "run it later" suggestion, and other sources (UK Carbon Intensity needs no key).
       - **Other meters for peripherals (monitor, speakers)**: built, **not tried on real plugs.** Settings > Other meters
         (add, rename keeping history, remove), `peripheral-meters.json`, Dashboard "Peripherals" card and "Count" tick boxes
         (PC and each meter, so "peripherals only" works too), one chart line per meter, gaps filled from each plug's own counter,
