@@ -149,17 +149,57 @@
       <ScrollViewer>
         <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
           <TextBlock Text="Electricity rate" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock TextWrapping="Wrap"
-                     Text="Use the all-in price per kWh from your bill (supply and delivery per-kWh charges, not the fixed monthly fee)." />
           <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Currency symbol:" VerticalAlignment="Center" />
             <TextBox x:Name="CurrencyBox" Width="60" MaxLength="3" PlaceholderText="$" />
-            <TextBox x:Name="RateBox" Width="120" PlaceholderText="0.15" />
-            <TextBlock Text="per kWh" VerticalAlignment="Center" />
-            <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
+            <TextBlock Text="Price from:" VerticalAlignment="Center" Margin="12,0,0,0" />
+            <ComboBox x:Name="RateModeBox" SelectedIndex="0" MinWidth="170">
+              <ComboBoxItem Content="One rate" />
+              <ComboBoxItem Content="My bills" />
+            </ComboBox>
           </StackPanel>
-          <TextBlock x:Name="RateExampleText" TextWrapping="Wrap" />
-          <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="OrangeRed" IsVisible="False" />
-          <TextBlock x:Name="RateStatusText" TextWrapping="Wrap" />
+
+          <StackPanel x:Name="OneRatePanel" Spacing="12">
+            <TextBlock TextWrapping="Wrap"
+                       Text="Use the all-in price per kWh from your bill (supply and delivery per-kWh charges, not the fixed monthly fee). One price is used for everything, whenever it was recorded." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBox x:Name="RateBox" Width="120" PlaceholderText="0.15" />
+              <TextBlock Text="per kWh" VerticalAlignment="Center" />
+              <Button x:Name="SaveRateButton" Content="Save" Classes="accent" />
+            </StackPanel>
+            <TextBlock x:Name="RateExampleText" TextWrapping="Wrap" />
+            <TextBlock x:Name="RateWarningText" TextWrapping="Wrap" Foreground="OrangeRed" IsVisible="False" />
+            <TextBlock x:Name="RateStatusText" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel x:Name="BillsPanel" Spacing="10" IsVisible="False">
+            <TextBlock TextWrapping="Wrap"
+                       Text="Enter each bill: the dates it covers, its total, and the kWh it charged for. The price per kWh is worked out for you (total divided by kWh) and used for everything KVGuzzler recorded on those dates, so an old month keeps its own price when the rate changes. Dates after your latest bill use its price as an estimate until you enter the next bill. Flat fees that do not depend on usage (a basic service charge, a monthly credit) can be left out, so the price is that of one more kWh." />
+            <StackPanel x:Name="BillsList" Spacing="8" />
+            <TextBlock x:Name="BillsNoteText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+
+            <Border BorderThickness="1" BorderBrush="Gray" CornerRadius="4" Padding="12">
+              <StackPanel Spacing="8">
+                <TextBlock x:Name="BillFormTitle" Text="Add a bill" FontWeight="SemiBold" />
+                <WrapPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="First day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillStartPicker" /></StackPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Last day" FontSize="12" Opacity="0.7" /><CalendarDatePicker x:Name="BillEndPicker" /></StackPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="Bill total" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillTotalBox" Width="110" PlaceholderText="206.32" /></StackPanel>
+                  <StackPanel Margin="0,0,12,8"><TextBlock Text="kWh charged" FontSize="12" Opacity="0.7" /><TextBox x:Name="BillKwhBox" Width="110" PlaceholderText="1036" /></StackPanel>
+                </WrapPanel>
+                <TextBlock Text="Flat fees to leave out (optional, as many as you like)" FontSize="12" Opacity="0.7" />
+                <StackPanel x:Name="FeesPanel" Spacing="6" />
+                <Button x:Name="AddFeeButton" Content="Add a flat fee" HorizontalAlignment="Left" />
+                <TextBlock x:Name="BillPriceText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="BillWarningText" TextWrapping="Wrap" Foreground="OrangeRed" IsVisible="False" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="SaveBillButton" Content="Save bill" Classes="accent" />
+                  <Button x:Name="CancelBillButton" Content="Clear" />
+                </StackPanel>
+                <TextBlock x:Name="BillStatusText" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
 
           <Separator Margin="0,8" />
 

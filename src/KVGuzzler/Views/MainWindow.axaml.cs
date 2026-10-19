@@ -56,6 +56,7 @@ public partial class MainWindow : Window
         StartPowerDisplay();
         StartCollectorDisplay();
         StartWallMeterSettings();
+        StartBillsUi();
     }
 
     // ----- Live power -------------------------------------------------------------------
@@ -99,8 +100,7 @@ public partial class MainWindow : Window
         PowerTotalText.Text = hasComponents ? $"Total active: {s.TotalWatts.ToString("0.0", CultureInfo.CurrentCulture)} W" : "";
 
         var session = $"Active energy since KVGuzzler started: {s.SessionKilowattHours.ToString("0.0000", CultureInfo.CurrentCulture)} kWh";
-        if (decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
-                CultureInfo.InvariantCulture, out var rate))
+        if (CurrentRate() is { } rate)
         {
             var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
             session += $", {currency}{FormatMoney(CostCalculator.Cost(s.SessionKilowattHours, rate))}";
@@ -171,16 +171,18 @@ public partial class MainWindow : Window
         RefreshEstimate();
     }
 
+    /// <summary>What a kWh costs today: the single rate, or the price of the bill covering today (or the latest bill's).</summary>
+    private decimal? CurrentRate() => _services.Database?.LoadRateSchedule().RateAt(DateOnly.FromDateTime(DateTime.Now));
+
     private void RefreshEstimate()
     {
-        var saved = _services.Database?.GetSetting(SettingKeys.RatePerKwh);
         if (!double.TryParse(WattsBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out var watts)
             || watts < 0)
         {
             EstimateText.Text = "Enter a number of watts, for example 400.";
             return;
         }
-        if (!decimal.TryParse(saved, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rate))
+        if (CurrentRate() is not { } rate)
         {
             EstimateText.Text = $"{watts:0.#} W uses {CostCalculator.KilowattHours(watts, TimeSpan.FromHours(1)):0.###} kWh per hour. " +
                                 "Save your electricity rate in Settings to see the cost.";

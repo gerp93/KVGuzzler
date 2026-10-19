@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Threading;
 using KVGuzzler.Collector;
 using KVGuzzler.Core;
+using KVGuzzler.Core.Billing;
 using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
@@ -64,9 +65,13 @@ public partial class MainWindow
         (double? Cpu, double? Gpu) Baseline,
         IReadOnlyList<ProgramRun> Runs);
 
+    /// <summary>The prices for what was read: each rolling period's effective price per kWh (its energy priced day by day, so a
+    /// period that spans two bills is right), one average price for the Programs period, and the schedule for pricing runs.</summary>
+    private sealed record RateInfo(RateSchedule Schedule, IReadOnlyList<(decimal? Rate, bool Estimated)> PeriodRates, decimal? ProgramRate);
+
     private sealed record CollectorRead(
         LiveState? Live, IReadOnlyList<PeriodReport>? Periods, ServiceState? Service, string? Error, ProgramsRead? Programs,
-        PowerChartData? Chart);
+        PowerChartData? Chart, RateInfo? Rates);
 
     /// <summary>How long each choice in the Programs tab looks back.</summary>
     private static readonly TimeSpan[] ProgramPeriods =
@@ -79,7 +84,8 @@ public partial class MainWindow
             var sleepWatts = SleepWatts;
             var lookBack = ProgramPeriods[Math.Clamp(ProgramPeriodBox.SelectedIndex, 0, ProgramPeriods.Length - 1)];
             var chartPeriod = PowerChart.Periods[Math.Clamp(ChartPeriodBox.SelectedIndex, 0, PowerChart.Periods.Count - 1)];
-            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null));
+            var schedule = _services.Database?.LoadRateSchedule();
+            var read = await Task.Run(() => ReadCollector(includeService, sleepWatts, lookBack, includeChart ? chartPeriod : null, schedule));
             ApplyCollector(read, includeChart);
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -91,8 +97,9 @@ public partial class MainWindow
     }
 
     private CollectorRead ReadCollector(bool includeService, double sleepWatts, TimeSpan programLookBack,
-        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod)
+        (string Label, TimeSpan Span, TimeSpan Bucket)? chartPeriod, RateSchedule? schedule)
     {
+        RateInfo? rates = null;
         LiveState? live = null;
         IReadOnlyList<PeriodReport>? periods = null;
         ProgramsRead? programs = null;
@@ -106,6 +113,7 @@ public partial class MainWindow
                 var now = DateTimeOffset.UtcNow;
                 live = store.GetLive();
                 periods = HistoryReport.Standard(store, now, sleepWatts);
+                if (schedule is not null) rates = PriceThePeriods(store, schedule, periods, now, programLookBack);
                 programs = new ProgramsRead(store.QueryPrograms(now - programLookBack, now), store.GetLivePrograms(), store.GetIdleBaseline(),
                     store.GetRecentRuns(20));
                 if (chartPeriod is { } period) chart = PowerChart.Build(store, now - period.Span, now, period.Bucket);
@@ -116,7 +124,26 @@ public partial class MainWindow
             }
         }
 
-        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart);
+        return new CollectorRead(live, periods, includeService ? _services.QueryCollectorService() : null, error, programs, chart, rates);
+    }
+
+    /// <summary>Prices each rolling period's headline energy day by day, and gives the Programs period one average price.</summary>
+    private static RateInfo PriceThePeriods(HistoryStore store, RateSchedule schedule, IReadOnlyList<PeriodReport> periods,
+        DateTimeOffset now, TimeSpan programLookBack)
+    {
+        var spans = new[] { TimeSpan.FromHours(1), TimeSpan.FromDays(1), TimeSpan.FromDays(7), TimeSpan.FromDays(30) };
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var periodRates = new List<(decimal? Rate, bool Estimated)>();
+        for (var i = 0; i < periods.Count; i++)
+        {
+            var wall = periods[i].WallKwh is not null;
+            var cost = schedule.Cost((a, b) => wall ? store.Query(a, b, ReadingScope.Wall).KilowattHours : store.Query(a, b).KilowattHours,
+                now - spans[Math.Min(i, spans.Length - 1)], now);
+            // The effective price is the cost over the energy, so energy x price is exactly the priced total.
+            decimal? rate = cost.Unpriced ? null : cost.Kwh > 0 ? cost.Cost / (decimal)cost.Kwh : schedule.RateAt(today);
+            periodRates.Add((rate, cost.Estimated));
+        }
+        return new RateInfo(schedule, periodRates, schedule.AverageRate(now - programLookBack, now));
     }
 
     private void ApplyCollector(CollectorRead read, bool includeChart)
@@ -134,7 +161,7 @@ public partial class MainWindow
 
         ShowCollectorStatus(read.Live);
         ShowHistory(read);
-        ShowPrograms(read.Programs);
+        ShowPrograms(read.Programs, read.Rates);
         if (includeChart) ShowChart(read);
     }
 
@@ -153,7 +180,7 @@ public partial class MainWindow
 
     // ----- Programs ---------------------------------------------------------------------
 
-    private void ShowPrograms(ProgramsRead? read)
+    private void ShowPrograms(ProgramsRead? read, RateInfo? rates)
     {
         if (read is null)
         {
@@ -169,8 +196,7 @@ public partial class MainWindow
         }
 
         var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
-        var rate = decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
-            CultureInfo.InvariantCulture, out var r) ? r : (decimal?)null;
+        var rate = rates?.ProgramRate;
 
         // Right now: only while the collector is publishing, so a stale list is never shown as current.
         var fresh = read.Live is { } l && DateTimeOffset.UtcNow - l.UpdatedAt < TimeSpan.FromSeconds(10);
@@ -185,7 +211,8 @@ public partial class MainWindow
             : $"CPU and GPU together: {FormatEnergy(all)}"
               + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(all, rt))}" : "");
 
-        RunsList.ItemsSource = RunRows(read.Runs, rate, currency);
+        // A run is priced at the price on the day it ended.
+        RunsList.ItemsSource = RunRows(read.Runs, run => rates?.Schedule.RateAt(DateOnly.FromDateTime(run.End.ToLocalTime().DateTime)), currency);
         RunsNoteText.Text = read.Runs.Count == 0 ? "No runs recorded yet." : "";
         RunsNoteText.IsVisible = read.Runs.Count == 0;
 
@@ -196,9 +223,13 @@ public partial class MainWindow
 
     /// <summary>One line per run: what it cost, when it started and how long it ran.</summary>
     internal static IReadOnlyList<HistoryRow> RunRows(IReadOnlyList<ProgramRun> runs, decimal? rate, string currency) =>
+        RunRows(runs, _ => rate, currency);
+
+    /// <summary>One line per run, each priced at the price on the day it ended.</summary>
+    internal static IReadOnlyList<HistoryRow> RunRows(IReadOnlyList<ProgramRun> runs, Func<ProgramRun, decimal?> rateOf, string currency) =>
         runs.Select(r => new HistoryRow(
             $"{r.Program}: {FormatEnergy(r.TotalKwh)}"
-            + (rate is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(r.TotalKwh, rt))}" : "")
+            + (rateOf(r) is { } rt ? $", {currency}{FormatMoney(CostCalculator.Cost(r.TotalKwh, rt))}" : "")
             + (r.StillRunning ? " (still running)" : ""),
             $"started {r.Start.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · "
             + (r.StillRunning ? "running for " : "ran ") + FormatSpan(r.End - r.Start)
@@ -328,23 +359,23 @@ public partial class MainWindow
             return;
         }
 
-        var rate = decimal.TryParse(_services.Database?.GetSetting(SettingKeys.RatePerKwh), NumberStyles.AllowDecimalPoint,
-            CultureInfo.InvariantCulture, out var r) ? r : (decimal?)null;
         var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
+        var priced = read.Rates?.PeriodRates;
 
-        HistoryList.ItemsSource = read.Periods.Select(p => new HistoryRow(
-            HistoryTitle(p, rate, currency), HistoryDetail(p))).ToList();
-        HistoryNoteText.Text = rate is null ? "Save your electricity rate in Settings to see costs." : "";
-        HistoryNoteText.IsVisible = rate is null;
+        HistoryList.ItemsSource = read.Periods.Select((p, i) => new HistoryRow(
+            HistoryTitle(p, priced?[i].Rate, currency, priced?[i].Estimated ?? false), HistoryDetail(p))).ToList();
+        var anyPrice = priced is not null && priced.Any(x => x.Rate is not null);
+        HistoryNoteText.Text = anyPrice ? "" : "Save your electricity rate (or a bill) in Settings to see costs.";
+        HistoryNoteText.IsVisible = !anyPrice;
     }
 
     /// <summary>With a wall meter the headline is the whole PC (what the bill is made of). Without one it is the
     /// active energy the sensors measured. Sleep is an estimate and never goes in either figure.</summary>
-    internal static string HistoryTitle(PeriodReport p, decimal? rate, string currency)
+    internal static string HistoryTitle(PeriodReport p, decimal? rate, string currency, bool estimated = false)
     {
         var (kwh, what) = p.WallKwh is { } wall ? (wall, "whole PC") : (p.MeasuredKwh, "active");
         var title = $"{p.Label}: {kwh.ToString("0.###", CultureInfo.CurrentCulture)} kWh {what}";
-        if (rate is { } r) title += $", {currency}{FormatMoney(CostCalculator.Cost(kwh, r))}";
+        if (rate is { } r) title += $", {currency}{FormatMoney(CostCalculator.Cost(kwh, r))}" + (estimated ? " (price estimated)" : "");
         return title;
     }
 

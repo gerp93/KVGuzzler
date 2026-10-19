@@ -83,9 +83,15 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   Checked on this PC's real history: axes, lines, shaded gaps and the hover guide line show correctly; the
   hover readout box itself was not seen on screen (the scripted pointer test lost the window), only unit-tested
   for its maths. Still to do: per-day/week/month totals as bars, and a per-program stacked view.
-- **Rates**: time-of-use schedule (start, end, days, rate), then tiered rates. Store each rate with a
-  date range so changing it does not reprice history. A "last bill total / kWh used" helper to get
-  the all-in rate.
+- **Rates from bills** (built): Settings > Electricity rate can switch from "One rate" to "My bills". Each bill is
+  its dates, total and kWh, plus zero or more flat fees to leave out (a basic charge, a credit); the price per kWh is
+  (total - fees) / kWh and applies to everything recorded on those dates, so an old month keeps its own price.
+  Days after the latest bill (or in a gap) use the latest bill's price as an estimate, and are re-priced when the next
+  bill is entered; days before the first bill use the saved single rate. Two bills cannot claim the same day; past
+  bills can be entered in any order. Each bill shows how much of its kWh KVGuzzler measured (wall meter, else the
+  sensors' active power) and what that cost. Dashboard history, the Programs list and runs are priced by date.
+  Not built: time-of-use or tiered rates (this bill has neither), a "work out my rate" helper for plain totals,
+  per-program prices that follow the bill by day (a program's period uses one time-weighted average price).
 - **Wire the VisualAssault theme**: once VisualAssault's `v0.3.0` tag exists, run
   `scripts/update-visual-assault-avalonia.sh v0.3.0`, call `ThemeManager.Apply(id)` in
   `App.OnFrameworkInitializationCompleted`, add a theme picker to Settings, persist the choice.

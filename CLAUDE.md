@@ -43,6 +43,10 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).
   Never present these numbers as measurements, and never add them to the sensor or wall figures: they
   split the CPU and GPU energy that is already counted.
+- **Prices come from `RateSchedule`, never from reading the single rate setting directly.** In "My bills" mode each
+  bill's price (total minus its flat fees, over its kWh) applies to the dates it covers; cost of a period is its
+  energy priced stretch by stretch (`RateSchedule.Cost`), so a period spanning two bills is right. Bill dates are
+  local calendar days. Money is `decimal`, kept as text in the database. Two bills may not share a day.
 - **Velopack:** `VelopackApp.Build().Run()` is the first statement in `Main`; the running version comes
   only from Velopack (`UpdateService.VersionText`); `CheckForUpdatesAsync` throws outside an installed
   build, so `UpdateService` guards on `IsInstalled`. The `Velopack` NuGet package must stay a direct
