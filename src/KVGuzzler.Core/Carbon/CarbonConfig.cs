@@ -5,8 +5,8 @@ using System.Text.RegularExpressions;
 namespace KVGuzzler.Core.Carbon;
 
 /// <summary>
-/// Where the grid's carbon intensity comes from: an Electricity Maps API key and the place (a zone code such as <c>US-NW-PSCO</c>, or
-/// latitude and longitude as <c>39.74, -104.99</c>). Kept in a small file in the machine-wide data folder, because the collector service
+/// Where the grid's carbon intensity comes from: an Electricity Maps API key and the place (a zone code such as <c>US-MIDW-MISO</c>, or
+/// latitude and longitude as <c>44.98, -93.27</c>). Kept in a small file in the machine-wide data folder, because the collector service
 /// does the fetching and cannot read a user's settings.
 /// </summary>
 /// <remarks>The key is stored as plain text in that folder, readable by anyone who can read it. It is a free personal key that can only
@@ -16,9 +16,10 @@ public sealed partial record CarbonConfig(string ApiKey, string Place)
     public const string FileName = "carbon.json";
 
     /// <summary>Fixed here, not in the file, so a key can never be sent anywhere else.</summary>
-    public const string ApiBase = "https://api.electricitymap.org/v3";
+    public const string ApiBase = "https://api.electricitymaps.com/v4";
 
-    [GeneratedRegex(@"^[A-Za-z0-9_\-\.]{8,200}$")]
+    /// <summary>Any visible character, no spaces or control characters: the key goes in a header, so those are the only things to keep out.</summary>
+    [GeneratedRegex(@"^[!-~]{8,200}$")]
     private static partial Regex KeyPattern();
 
     [GeneratedRegex(@"^[A-Za-z0-9]{1,12}(-[A-Za-z0-9]{1,12}){0,4}$")]
@@ -45,8 +46,8 @@ public sealed partial record CarbonConfig(string ApiKey, string Place)
     {
         if (string.IsNullOrWhiteSpace(key)) return "Paste your Electricity Maps API key first.";
         if (!IsValidKey(key.Trim())) return "That does not look like an API key. Copy it whole from the Electricity Maps portal, with no spaces.";
-        if (string.IsNullOrWhiteSpace(place)) return "Enter your zone (like US-NW-PSCO) or your latitude and longitude (like 39.74, -104.99).";
-        if (!IsValidPlace(place.Trim())) return "Enter a zone code like US-NW-PSCO, or a latitude and longitude like 39.74, -104.99.";
+        if (string.IsNullOrWhiteSpace(place)) return "Enter your zone (like US-MIDW-MISO) or your latitude and longitude (like 44.98, -93.27).";
+        if (!IsValidPlace(place.Trim())) return "Enter a zone code like US-MIDW-MISO, or a latitude and longitude like 44.98, -93.27.";
         return null;
     }
 
