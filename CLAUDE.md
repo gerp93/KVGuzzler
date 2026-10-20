@@ -37,6 +37,9 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   with an ACL letting the logged-in user start/stop it (`ServiceInstaller.ServiceSecurity`); `ApplyUpdateAsync` stops it first
   (`EnsureStoppedForUpdateAsync`, UAC only if the ACL is missing, as on a service made by an older build) and the after-update hook
   starts it again.
+- **Impossible readings are dropped, not averaged.** NVML answers with nonsense (50-300 kW) on the first read after the PC wakes.
+  `PowerSampler` drops any reading above `MaxComponentWatts` (sensors) / `MaxMeterWatts` (plugs) like a missing one and says so in the
+  notes; `HistoryStore.RepairImplausibleReadings` (run by the collector at start) fixes rows saved before that. Keep both.
 - **Wall meter.** A smart plug between the wall and the PC is the whole-PC figure (`ReadingScope.Wall`).
   It already contains every sensor reading, so it is shown next to them and **never added to them**
   (`PowerSampler` sums `Component` only). `ShellyPlug` only ever sends `GET`; nothing in the app may

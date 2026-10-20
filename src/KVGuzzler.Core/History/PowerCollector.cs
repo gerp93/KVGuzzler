@@ -35,7 +35,7 @@ public sealed class PowerCollector
 
     /// <summary>A plug cannot switch more than this, so a counter difference implying more is not believed (the plug probably
     /// restarted in the middle of a long gap and counted back up past the old value).</summary>
-    public const double MaxPlugWatts = 4000;
+    public const double MaxPlugWatts = PowerSampler.MaxMeterWatts;
 
     private const double JoulesPerKwh = 3_600_000.0;
 
@@ -93,6 +93,7 @@ public sealed class PowerCollector
     public void Start(DateTimeOffset now)
     {
         _store.EndStaleRuns();
+        _store.RepairImplausibleReadings();
         if (_store.LastSeen() is { } lastSeen && now - lastSeen > GapThreshold)
         {
             var gap = new Gap(lastSeen, now, _store.StoppedCleanly() ? GapReason.Off : GapReason.LostPower);
