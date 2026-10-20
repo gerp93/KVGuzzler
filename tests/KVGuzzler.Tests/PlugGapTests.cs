@@ -80,7 +80,7 @@ public class WallMeterCounterSourceTests : IDisposable
         var counter = source.LatestCounter!;
         Assert.Equal(1234.5, counter.TotalWh);
         Assert.Equal("192.168.1.50", counter.Host);
-        Assert.All(_plug.Requests, r => Assert.Equal(HttpMethod.Get, r.Method));
+        Assert.All(_plug.Snapshot(), r => Assert.Equal(HttpMethod.Get, r.Method));
     }
 
     [Fact]

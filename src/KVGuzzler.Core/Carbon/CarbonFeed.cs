@@ -4,12 +4,13 @@ namespace KVGuzzler.Core.Carbon;
 
 /// <summary>
 /// Keeps the history's grid carbon intensity up to date. Run by the collector service, so it keeps recording with the window closed:
-/// every half hour it asks Electricity Maps for the latest reading and saves it under its hour, and it says in the history what happened
+/// every half hour it asks the chosen source (Electricity Maps or EIA) for the recent grid intensity and saves each hour, and it says in the history what happened
 /// (a reading, or why not) so the window can show it. It follows the config file, so setting up, changing or removing the key in the
 /// window takes effect within about half a minute without restarting the service.
 /// </summary>
-/// <remarks>The free key only returns the latest reading and the last 24 hours, so hours the collector was not running for are never
-/// filled in afterwards; the calculator values those at the average of the hours it does have.</remarks>
+/// <remarks>Electricity Maps' free key only returns the latest reading, so hours the collector was not running for are not filled in
+/// afterwards with it; EIA returns the last couple of days, so it fills what it can. The calculator values any hour with no figure at the
+/// average of the hours it does have.</remarks>
 public sealed class CarbonFeed
 {
     /// <summary>How often a reading is asked for. The figure is hourly, so this catches each hour's update without using much of a free allowance.</summary>
@@ -89,9 +90,11 @@ public sealed class CarbonFeed
 
         try
         {
-            var reading = await ElectricityMapsClient.ReadLatestAsync(_http, config, now, stop);
-            _store.AddCarbon(reading.At, reading.GramsPerKwh, reading.IsEstimated);
-            Save(new CarbonStatus(true, now, reading.GramsPerKwh, reading.At));
+            var readings = await CarbonProviders.ReadAsync(_http, config, now, stop);
+            // Every hour the source gave, so hours missed while the collector was off are filled in where the source has them (EIA does).
+            foreach (var r in readings) _store.AddCarbon(r.At, r.GramsPerKwh, r.IsEstimated);
+            var latest = readings[^1];
+            Save(new CarbonStatus(true, now, latest.GramsPerKwh, latest.At));
             _nextAt = now + Interval;
         }
         catch (CarbonException e)

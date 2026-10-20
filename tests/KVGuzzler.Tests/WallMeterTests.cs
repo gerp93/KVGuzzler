@@ -32,6 +32,9 @@ internal sealed class FakePlug : HttpMessageHandler
     }
 
     public Uri? LastUri { get { lock (_gate) return Requests.LastOrDefault().Uri; } }
+
+    /// <summary>A copy of the requests so far, safe to enumerate while the source is still polling on another thread.</summary>
+    public List<(HttpMethod Method, Uri Uri)> Snapshot() { lock (_gate) return Requests.ToList(); }
 }
 
 public class ShellyPlugTests
@@ -241,7 +244,7 @@ public class WallMeterSourceTests : IDisposable
         Assert.Equal(WallMeterSource.ReadingName, reading.Name);
         Assert.Equal(52.1, reading.Watts);
         Assert.Equal(ReadingScope.Wall, reading.Scope);
-        Assert.All(_plug.Requests, r => Assert.Equal(HttpMethod.Get, r.Method));
+        Assert.All(_plug.Snapshot(), r => Assert.Equal(HttpMethod.Get, r.Method));
     }
 
     [Fact]

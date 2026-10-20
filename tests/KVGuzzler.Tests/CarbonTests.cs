@@ -497,7 +497,7 @@ public class CarbonUiTests
     private static void UseInvariantCulture() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
     private static string ConfigPath(TempData t) => Path.Combine(t.HistoryDir, CarbonConfig.FileName);
 
-    private static CarbonReading Reading(double g = 412) => new(g, DateTimeOffset.UtcNow, false);
+    private static IReadOnlyList<CarbonReading> Reading(double g = 412) => new[] { new CarbonReading(g, DateTimeOffset.UtcNow, false) };
 
     [AvaloniaFact]
     public async Task SaveOnlyKeepsAKeyAndPlaceThatGotAReading_AndNeverShowsTheKeyAgain()

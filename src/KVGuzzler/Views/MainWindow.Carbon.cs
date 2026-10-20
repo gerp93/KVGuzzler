@@ -4,56 +4,89 @@ using KVGuzzler.Core.History;
 
 namespace KVGuzzler.Views;
 
-// Settings > Carbon footprint: the Electricity Maps key and place. Saved in the machine-wide data folder, where the collector service
-// reads it too and picks up a change within about half a minute. The Dashboard shows the carbon of the energy it totals (the Cost card).
+// Settings > Carbon footprint: which source (Electricity Maps or EIA), the key and the place. Saved in the machine-wide data folder, where
+// the collector service reads it too and picks up a change within about half a minute. The Dashboard shows the carbon of the energy it totals
+// (the Cost card).
 public partial class MainWindow
 {
     private const string ElectricityMapsFreeTierUrl = "https://electricitymaps.com/free-tier";
+    private const string EiaRegisterUrl = "https://www.eia.gov/opendata/register.php";
 
     private string CarbonConfigPath => Path.Combine(_services.HistoryDirectory, CarbonConfig.FileName);
 
+    /// <summary>The source chosen in the box.</summary>
+    private string SelectedCarbonSource => CarbonSourceBox.SelectedIndex == 1 ? CarbonSources.Eia : CarbonSources.ElectricityMaps;
+
     private void StartCarbonUi()
     {
+        CarbonSourceBox.SelectedIndex = CarbonConfig.Load(CarbonConfigPath)?.Source == CarbonSources.Eia ? 1 : 0;
         ShowSavedCarbon();
+        CarbonSourceBox.SelectionChanged += (_, _) =>
+        {
+            ShowSavedCarbon();
+            CarbonStatusText.Text = "";
+        };
         TestCarbonButton.Click += async (_, _) => await TestCarbonAsync();
         SaveCarbonButton.Click += async (_, _) => await SaveCarbonAsync();
         RemoveCarbonButton.Click += (_, _) => RemoveCarbon();
-        OpenElectricityMapsButton.Click += async (_, _) => await OpenLinkAsync(ElectricityMapsFreeTierUrl);
+        OpenElectricityMapsButton.Click += async (_, _) =>
+            await OpenLinkAsync(SelectedCarbonSource == CarbonSources.Eia ? EiaRegisterUrl : ElectricityMapsFreeTierUrl);
     }
 
-    /// <summary>The key is never shown again once saved: the box says it is kept, and leaving it empty keeps it.</summary>
+    /// <summary>Only a setup saved for the source in the box is shown: the key is never shown again once saved, the box says it is kept, and
+    /// leaving it empty keeps it.</summary>
     private void ShowSavedCarbon()
     {
-        var saved = CarbonConfig.Load(CarbonConfigPath);
+        var eia = SelectedCarbonSource == CarbonSources.Eia;
+        var saved = CarbonConfig.Load(CarbonConfigPath) is { } c && c.Source == SelectedCarbonSource ? c : null;
         CarbonKeyBox.Text = "";
         CarbonKeyBox.PlaceholderText = saved is null ? "API key" : "Key saved. Paste a new one to change it.";
         CarbonPlaceBox.Text = saved?.Place ?? "";
+        CarbonPlaceBox.PlaceholderText = eia ? "MISO" : "US-MIDW-MISO or 44.98, -93.27";
+        OpenElectricityMapsButton.Content = "Get a free key...";
+        CarbonNoteText.Text = eia
+            ? "Uses the US Energy Information Administration's hourly generation by fuel for your balancing authority (MISO for Minnesota; also PJM, "
+              + "ERCO for Texas, CISO for California, PSCO for Colorado and others) and works the carbon out from the fuel mix. Free: register at the EIA "
+              + "site for a key. It covers the US only, runs an hour or more behind, and leaves out power imported from other grids. Only the key and the "
+              + "authority's code are sent, and only to EIA. The background collector fetches it every half hour, so this needs background recording. "
+              + "The key is saved as plain text in the collector's data folder."
+            : "Shows the estimated CO2 of the electricity used, from how clean your grid is each hour. The background collector asks Electricity Maps for "
+              + "the grid's carbon intensity every half hour and saves it, so this needs background recording. Get a free personal key from the Electricity "
+              + "Maps API portal (it covers one zone: yours), paste it here once, and enter your zone code (like US-MIDW-MISO for Minnesota) or your "
+              + "latitude and longitude (like 44.98, -93.27). Only the key and that place are sent, and only to Electricity Maps. The key is saved as "
+              + "plain text in the collector's data folder.";
     }
 
-    /// <summary>What is typed, with the saved key standing in when the key box is left empty; null (with the reason in the status line)
-    /// when it cannot be used.</summary>
+    /// <summary>What is typed, with the saved key standing in when the key box is left empty (and the saved setup is for this source); null (with
+    /// the reason in the status line) when it cannot be used.</summary>
     private CarbonConfig? TypedCarbon()
     {
+        var source = SelectedCarbonSource;
         var typedKey = CarbonKeyBox.Text?.Trim();
-        var key = string.IsNullOrEmpty(typedKey) ? CarbonConfig.Load(CarbonConfigPath)?.ApiKey : typedKey;
-        var place = CarbonPlaceBox.Text?.Trim();
-        if (CarbonConfig.Problem(key, place) is { } problem)
+        var saved = CarbonConfig.Load(CarbonConfigPath) is { } c && c.Source == source ? c : null;
+        var key = string.IsNullOrEmpty(typedKey) ? saved?.ApiKey : typedKey;
+        var place = CarbonPlaceBox.Text is { } p ? CarbonConfig.Normalised(p, source) : null;
+        if (CarbonConfig.Problem(key, place, source) is { } problem)
         {
             CarbonStatusText.Text = problem;
             return null;
         }
-        return new CarbonConfig(key!, place!);
+        return new CarbonConfig(key!, place!) { Source = source };
     }
 
     internal async Task TestCarbonAsync()
     {
         if (TypedCarbon() is not { } config) return;
-        CarbonStatusText.Text = "Asking Electricity Maps...";
+        CarbonStatusText.Text = $"Asking {CarbonSources.Name(config.Source)}...";
         try
         {
-            var reading = await _services.ReadCarbonAsync(config);
-            CarbonStatusText.Text = $"Reached Electricity Maps. {config.Place} is at {Grams(reading.GramsPerKwh)} right now"
-                                    + (reading.IsEstimated ? " (a modelled figure, not a measurement)." : ".");
+            var readings = await _services.ReadCarbonAsync(config);
+            var latest = readings[^1];
+            CarbonStatusText.Text = config.Source == CarbonSources.Eia
+                ? $"Reached EIA. {config.Place} is at {Grams(latest.GramsPerKwh)} for {latest.At.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} "
+                  + $"(the latest hour EIA has, worked out from the fuel mix; {readings.Count} hours found)."
+                : $"Reached Electricity Maps. {config.Place} is at {Grams(latest.GramsPerKwh)} right now"
+                  + (latest.IsEstimated ? " (a modelled figure, not a measurement)." : ".");
         }
         catch (CarbonException e)
         {
@@ -70,7 +103,7 @@ public partial class MainWindow
     internal async Task SaveCarbonAsync()
     {
         if (TypedCarbon() is not { } config) return;
-        CarbonStatusText.Text = "Checking with Electricity Maps before saving...";
+        CarbonStatusText.Text = $"Checking with {CarbonSources.Name(config.Source)} before saving...";
         try
         {
             await _services.ReadCarbonAsync(config);
@@ -119,7 +152,7 @@ public partial class MainWindow
         var configured = CarbonConfig.Load(CarbonConfigPath) is not null;
         CarbonFeedText.IsVisible = configured || status is not null;
         CarbonFeedText.Text = status is null
-            ? configured ? "The background collector has not asked Electricity Maps yet. It needs background recording turned on." : ""
+            ? configured ? "The background collector has not asked for the grid's carbon intensity yet. It needs background recording turned on." : ""
             : status.Ok
                 ? $"Last reading {Grams(status.GramsPerKwh ?? 0)} for {status.ReadingAt?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}, "
                   + $"checked {status.CheckedAt.ToLocalTime().ToString("t", CultureInfo.CurrentCulture)}."
