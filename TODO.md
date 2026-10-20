@@ -40,7 +40,9 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
         current rates with `detail=full` (and is not too slow), the real field shapes (`energyratestructure`, the schedules, `unit`), and
         that `getpage=<label>` returns one rate. Not built: usage tiers (the first tier is used), holidays (the weekend schedule applies to
         them), demand and fixed charges, the tariff's history (today's is applied to past days), and Xcel-specific bill add-ons.
-      - **Carbon footprint**: built (Electricity Maps, see CLAUDE.md), **not tried against the real service or with a real key.**
+      - **Carbon footprint**: built with two sources, Electricity Maps and EIA (see CLAUDE.md), **not tried with a real key for either.** EIA's
+        answer shape was checked against a real answer for MISO (DEMO_KEY); a real Electricity Maps free key was refused for MISO by Electricity
+        Maps itself, so EIA is the likelier one to work.
         To confirm: the v3 `latest` path and `auth-token` header, the field names, the free-tier limits, and that the zone code or
         "lat, lon" the free key was set up for is accepted. Not built: carbon per program and per run, a grid-intensity line on the
         chart ("when is it clean"), a "run it later" suggestion, and other sources (UK Carbon Intensity needs no key).

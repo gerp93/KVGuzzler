@@ -80,7 +80,13 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   time). Today's tariff is applied to the past as well; bills are the exact figure. A saved tariff over a week old is fetched again by its
   label when the window opens (the old one is kept if that fails). **Not checked against the real service**: written from OpenEI's
   documented field list (the docs give no full sample answer), parsing leaves out what it cannot make sense of.
-- **Carbon footprint (Electricity Maps).** `carbon.json` in the machine-wide data folder holds a free personal Electricity Maps key and a
+- **Carbon footprint (two sources, chosen in Settings: Electricity Maps or EIA).** `CarbonConfig.Source` (`CarbonSources`; files without one are
+  Electricity Maps). **EIA** (`EiaClient`, US only, free registration key as a query parameter to `api.eia.gov` only) reads hourly generation by
+  fuel for a balancing authority (`MISO`, `PJM`, `ERCO`...) and works the intensity out itself: generation-weighted IPCC life-cycle factors
+  (`EiaClient.GramsPerKwh`: coal 820, gas 490, oil 650, nuclear 12, solar 45, wind 11, hydro 24, geothermal 38, biomass/other 230), leaving out
+  storage (BAT, PS), unknown fuels and imports, and skipping partly reported hours. A request returns about 2.5 days, and the feed saves every
+  hour, so hours missed while the collector was off are backfilled (Electricity Maps' free key only gives the latest). A saved setup belongs to
+  its source: the other source's key is never sent to the wrong service. The original Electricity Maps notes follow. `carbon.json` in the machine-wide data folder holds a free personal Electricity Maps key and a
   place (zone code or "lat, lon"), set in Settings > Carbon footprint; the key is plain text there and is shown nowhere after saving.
   The **collector service** fetches (`CarbonFeed`, every 30 minutes, own timer, follows the file) `GET /v3/carbon-intensity/latest` with the
   key in the `auth-token` header and saves it per hour in `carbon_intensity`, plus its last outcome in `meta` (`CarbonStatus`, shown in
@@ -92,7 +98,8 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   Errors carry Electricity Maps' own `message` (never the key) so a refused key can be diagnosed from Settings. The host, `/v4/...` path
   and `auth-token` header were checked to answer (401 without a key) but **a real key has not been tried here**; parsing is tolerant. If
   the API moves again, change `CarbonConfig.ApiBase` and `ElectricityMapsClient.ParseLatest`. The free key is one zone chosen at signup:
-  Minnesota (Xcel/NSP) is `US-MIDW-MISO`.
+  Minnesota (Xcel/NSP) is `US-MIDW-MISO` there and `MISO` at EIA. A free key can be valid yet refused with "You do not have access to this
+  specific endpoint for this specific zone"; `scripts/test-carbon-key.ps1` (hidden key prompt) shows which endpoints a key can read.
 - **Per-program power is an estimate and must read as one.** `ProgramAttributor` shares only the power above
   the learned idle baseline, by each program's share of CPU/GPU busy time; the baseline and anything no
   program claimed are their own rows, and the rows must add up to exactly the energy that went in (tested).

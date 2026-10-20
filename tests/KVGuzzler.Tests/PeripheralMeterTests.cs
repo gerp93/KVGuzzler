@@ -113,8 +113,9 @@ public class PeripheralSourceTests : IDisposable
         var readings = source.Read();
         Assert.Equal(new[] { "Monitor", "Speakers" }, readings.Select(r => r.Name).OrderBy(n => n));
         Assert.All(readings, r => Assert.Equal(ReadingScope.Peripheral, r.Scope));
-        Assert.All(_plug.Requests, r => Assert.Equal(HttpMethod.Get, r.Method));   // read only, always
-        Assert.Contains(_plug.Requests, r => r.Uri.Host == "192.168.1.52");
+        var asked = _plug.Snapshot();   // the plugs are still being polled on other threads
+        Assert.All(asked, r => Assert.Equal(HttpMethod.Get, r.Method));   // read only, always
+        Assert.Contains(asked, r => r.Uri.Host == "192.168.1.52");
     }
 
     [Fact]

@@ -49,10 +49,10 @@ public sealed class AppServices : IDisposable
 
     private static readonly HttpClient WallMeterHttp = new();
 
-    /// <summary>One reading from Electricity Maps for the given key and place; throws
+    /// <summary>The recent grid carbon intensity (oldest first) from the source, key and place in the config; throws
     /// <see cref="KVGuzzler.Core.Carbon.CarbonException"/> with a message fit to show. Replaceable for tests.</summary>
-    public Func<KVGuzzler.Core.Carbon.CarbonConfig, Task<KVGuzzler.Core.Carbon.CarbonReading>> ReadCarbonAsync { get; set; } =
-        config => KVGuzzler.Core.Carbon.ElectricityMapsClient.ReadLatestAsync(CarbonHttp, config, DateTimeOffset.UtcNow);
+    public Func<KVGuzzler.Core.Carbon.CarbonConfig, Task<IReadOnlyList<KVGuzzler.Core.Carbon.CarbonReading>>> ReadCarbonAsync { get; set; } =
+        config => KVGuzzler.Core.Carbon.CarbonProviders.ReadAsync(CarbonHttp, config, DateTimeOffset.UtcNow);
 
     private static readonly HttpClient CarbonHttp = new();
 
