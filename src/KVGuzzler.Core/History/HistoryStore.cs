@@ -191,6 +191,79 @@ public sealed class HistoryStore : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Repairs minutes saved from an impossible sensor answer (before <see cref="PowerSampler.MaxComponentWatts"/> was enforced, a GPU
+    /// driver's nonsense on the first read after waking was averaged in as if real). Such a row keeps its time but gets the average of the
+    /// same sensor's good rows; the per-program split of that minute is scaled to match, and the minute's recorded total peak is dropped
+    /// (the peak then falls back to the sensors' own, repaired, peaks). Returns how many rows were repaired. Does nothing on a clean file.</summary>
+    public int RepairImplausibleReadings()
+    {
+        var limit = PowerSampler.MaxComponentWatts;
+        using var c = Open();
+        if (!TableExists(c, "samples")) return 0;
+
+        var bad = new List<(long Minute, string Name, PowerKind Kind, double Kwh, double Seconds)>();
+        using (var cmd = c.CreateCommand())
+        {
+            cmd.CommandText = "SELECT minute_start, name, kind, kwh, seconds FROM samples WHERE scope IN (0, 1) AND peak_watts > $l";
+            cmd.Parameters.AddWithValue("$l", limit);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) bad.Add((r.GetInt64(0), r.GetString(1), (PowerKind)r.GetInt32(2), r.GetDouble(3), r.GetDouble(4)));
+        }
+        if (bad.Count == 0) return 0;
+
+        using var tx = c.BeginTransaction();
+        foreach (var row in bad)
+        {
+            double average;
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = """
+                    SELECT COALESCE(SUM(kwh) * 3600000.0 / NULLIF(SUM(seconds), 0), 0) FROM samples
+                    WHERE name = $n AND scope IN (0, 1) AND peak_watts <= $l
+                    """;
+                cmd.Parameters.AddWithValue("$n", row.Name);
+                cmd.Parameters.AddWithValue("$l", limit);
+                average = Convert.ToDouble(cmd.ExecuteScalar());
+            }
+            var kwh = average * row.Seconds / 3_600_000.0;
+
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "UPDATE samples SET kwh = $k, peak_watts = $p WHERE minute_start = $m AND name = $n";
+                cmd.Parameters.AddWithValue("$k", kwh);
+                cmd.Parameters.AddWithValue("$p", average);
+                cmd.Parameters.AddWithValue("$m", row.Minute);
+                cmd.Parameters.AddWithValue("$n", row.Name);
+                cmd.ExecuteNonQuery();
+            }
+
+            if (row.Kind is PowerKind.Cpu or PowerKind.Gpu && row.Kwh > 0)
+            {
+                // Scale the programs' share of the same minute by the same amount, so their rows still add up to what went in.
+                var column = row.Kind == PowerKind.Cpu ? "cpu_kwh" : "gpu_kwh";
+                using var cmd = c.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = $"UPDATE program_samples SET {column} = {column} * $f WHERE minute_start = $m";
+                cmd.Parameters.AddWithValue("$f", kwh / row.Kwh);
+                cmd.Parameters.AddWithValue("$m", row.Minute);
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "DELETE FROM total_peaks WHERE minute_start = $m OR watts > $l";
+                cmd.Parameters.AddWithValue("$m", row.Minute);
+                cmd.Parameters.AddWithValue("$l", limit);
+                cmd.ExecuteNonQuery();
+            }
+        }
+        tx.Commit();
+        return bad.Count;
+    }
+
     public void AddGap(Gap gap)
     {
         using var c = Open();
