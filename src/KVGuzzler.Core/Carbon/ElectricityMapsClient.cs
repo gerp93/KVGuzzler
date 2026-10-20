@@ -23,8 +23,9 @@ public sealed record CarbonReading(double GramsPerKwh, DateTimeOffset At, bool I
 /// Reads the latest grid carbon intensity from Electricity Maps (<c>GET /v3/carbon-intensity/latest</c>, key in the <c>auth-token</c>
 /// header). A plain GET: nothing here sends anything but the key and the place, and only to <see cref="CarbonConfig.ApiBase"/>.
 /// </summary>
-/// <remarks>Written from Electricity Maps' documented v3 interface and tested with made-up answers; not yet checked against the real
-/// service. The free key covers one zone, the latest reading and 24 hours of history.</remarks>
+/// <remarks>Uses the v4 interface at <see cref="CarbonConfig.ApiBase"/> (the address and header that Electricity Maps' own portal shows).
+/// Tested with made-up answers; the host, path and header were checked to answer (401 without a key) but a real key has not been tried
+/// here. The free key covers one zone, the latest reading and 24 hours of history.</remarks>
 public static class ElectricityMapsClient
 {
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
@@ -59,6 +60,28 @@ public static class ElectricityMapsClient
         throw new CarbonException("Electricity Maps answered, but not with a carbon intensity. Check the zone, or try again later.");
     }
 
+    /// <summary>The <c>message</c> (or <c>error</c>) of an error answer, cut short, with any trace of the key taken out; null if there is none.</summary>
+    internal static string? ServiceMessage(string body, string apiKey)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            foreach (var name in new[] { "message", "error" })
+                if (doc.RootElement.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()))
+                {
+                    var text = v.GetString()!.Replace(apiKey, "(key)", StringComparison.Ordinal);
+                    text = new string(text.Where(c => !char.IsControl(c)).ToArray()).Trim();
+                    return text.Length > 200 ? text[..200] + "..." : text;
+                }
+        }
+        catch (JsonException)
+        {
+            // Not JSON: nothing worth passing on.
+        }
+        return null;
+    }
+
     public static async Task<CarbonReading> ReadLatestAsync(HttpClient http, CarbonConfig config, DateTimeOffset now,
         CancellationToken cancel = default, TimeSpan? timeoutAfter = null)
     {
@@ -71,14 +94,19 @@ public static class ElectricityMapsClient
             request.Headers.Add("auth-token", config.ApiKey);
             using var response = await http.SendAsync(request, timeout.Token);
 
-            return (int)response.StatusCode switch
+            var status = (int)response.StatusCode;
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            if (status is >= 200 and < 300) return ParseLatest(body, now);
+
+            // Electricity Maps says why in its own words ("Invalid auth-token", a zone the key does not cover): pass that on.
+            var why = ServiceMessage(body, config.ApiKey) is { } m ? $" Electricity Maps says: {m}" : "";
+            throw status switch
             {
-                401 or 403 => throw new CarbonException("Electricity Maps did not accept the key, or the key is not allowed to read this zone. "
-                    + "The free key covers one zone: use the zone it was set up for."),
-                404 => throw new CarbonException("Electricity Maps does not know that zone. Check it on the Electricity Maps map."),
-                429 => throw new CarbonException("Electricity Maps asked us to slow down. It will be tried again later.", rateLimited: true),
-                >= 200 and < 300 => ParseLatest(await response.Content.ReadAsStringAsync(timeout.Token), now),
-                var code => throw new CarbonException($"Electricity Maps answered with an error ({code})."),
+                401 or 403 => new CarbonException($"Electricity Maps did not accept the key (error {status}). "
+                    + "The free key covers one zone: use the zone it was set up for." + why),
+                404 => new CarbonException("Electricity Maps does not know that zone. Check it on the Electricity Maps map." + why),
+                429 => new CarbonException("Electricity Maps asked us to slow down. It will be tried again later." + why, rateLimited: true),
+                _ => new CarbonException($"Electricity Maps answered with an error ({status})." + why),
             };
         }
         catch (OperationCanceledException) when (!cancel.IsCancellationRequested)

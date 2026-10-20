@@ -55,6 +55,7 @@ public class CarbonConfigTests : IDisposable
 
     [Theory]
     [InlineData("US-NW-PSCO", true)]
+    [InlineData("US-MIDW-MISO", true)]
     [InlineData("DE", true)]
     [InlineData("GB", true)]
     [InlineData("39.74, -104.99", true)]
@@ -74,7 +75,10 @@ public class CarbonConfigTests : IDisposable
     [InlineData("a-b_c.d12345", true)]
     [InlineData("short", false)]
     [InlineData("has space 123456", false)]
-    [InlineData("quote\"123456", false)]
+    [InlineData("quote\"123456", true)]            // fine in a header, and saved safely in the JSON file
+    [InlineData("tab\there1234", false)]
+    [InlineData("line\nbreak1234", false)]
+    [InlineData("AbC+dE/fG=hIjKlMn", true)]      // symbols are fine: it is only ever sent in a header
     [InlineData("", false)]
     public void OnlyAKeyShapedLikeOneIsAccepted(string key, bool valid) => Assert.Equal(valid, CarbonConfig.IsValidKey(key));
 
@@ -91,8 +95,8 @@ public class CarbonConfigTests : IDisposable
     [Fact]
     public void TheRequestGoesOnlyToElectricityMapsWhateverIsTyped()
     {
-        Assert.Equal("https://api.electricitymap.org/v3/carbon-intensity/latest?zone=US-NW-PSCO", new CarbonConfig("abcdefgh1234", "US-NW-PSCO").LatestUri().ToString());
-        Assert.Equal("https://api.electricitymap.org/v3/carbon-intensity/latest?lat=39.74&lon=-104.99", new CarbonConfig("abcdefgh1234", "39.74, -104.99").LatestUri().ToString());
+        Assert.Equal("https://api.electricitymaps.com/v4/carbon-intensity/latest?zone=US-NW-PSCO", new CarbonConfig("abcdefgh1234", "US-NW-PSCO").LatestUri().ToString());
+        Assert.Equal("https://api.electricitymaps.com/v4/carbon-intensity/latest?lat=39.74&lon=-104.99", new CarbonConfig("abcdefgh1234", "39.74, -104.99").LatestUri().ToString());
 
         var old = CultureInfo.CurrentCulture;
         CultureInfo.CurrentCulture = new CultureInfo("de-DE");   // a decimal comma must not leak into the address
@@ -172,7 +176,8 @@ public class ElectricityMapsClientTests
         Assert.Equal(412, reading.GramsPerKwh);
         var request = Assert.Single(api.Requests);
         Assert.Equal(HttpMethod.Get, request.Method);
-        Assert.Equal("api.electricitymap.org", request.RequestUri!.Host);
+        Assert.Equal("api.electricitymaps.com", request.RequestUri!.Host);
+        Assert.StartsWith("/v4/carbon-intensity/latest", request.RequestUri.AbsolutePath);
         Assert.DoesNotContain("abcdefgh1234", request.RequestUri.ToString());   // the key is never in the address
         Assert.Equal("abcdefgh1234", Assert.Single(api.Tokens));
     }
@@ -190,6 +195,35 @@ public class ElectricityMapsClientTests
         Assert.Contains(expected, e.Message);
         Assert.Equal(rateLimited, e.RateLimited);
     }
+
+    [Fact]
+    public async Task PassesOnWhyElectricityMapsRefusedInItsOwnWords_NeverEchoingTheKey()
+    {
+        var api = new FakeElectricityMaps
+        {
+            Respond = _ => new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent("{\"error\":\"Invalid auth-token\",\"message\":\"The provided token abcdefgh1234 is invalid.\\nPlease check it.\"}"),
+            },
+        };
+        var e = await Assert.ThrowsAsync<CarbonException>(() => ElectricityMapsClient.ReadLatestAsync(new HttpClient(api), Config, Now, TestContext.Current.CancellationToken));
+        Assert.Contains("(error 401)", e.Message);
+        Assert.Contains("Electricity Maps says: The provided token (key) is invalid.Please check it.", e.Message);
+        Assert.DoesNotContain("abcdefgh1234", e.Message);
+    }
+
+    [Theory]
+    [InlineData("""{"error":"Forbidden zone"}""", "Forbidden zone")]
+    [InlineData("""{"message":"x","error":"y"}""", "x")]
+    [InlineData("<html>gateway</html>", null)]
+    [InlineData("""[1]""", null)]
+    [InlineData("""{"message":""}""", null)]
+    public void OnlyAShortPlainMessageIsPassedOn(string body, string? expected) =>
+        Assert.Equal(expected, ElectricityMapsClient.ServiceMessage(body, "abcdefgh1234"));
+
+    [Fact]
+    public void ALongMessageIsCutShort() =>
+        Assert.Equal(203, ElectricityMapsClient.ServiceMessage("""{"message":"%s"}""".Replace("%s", new string('x', 500)), "k")!.Length);
 
     [Fact]
     public async Task AnUnreachableServiceSaysSo()
