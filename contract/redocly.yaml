@@ -1,0 +1,6 @@
+extends:
+  - recommended
+
+rules:
+  # Plain reads of server state have no way to fail the caller's way.
+  operation-4xx-response: off

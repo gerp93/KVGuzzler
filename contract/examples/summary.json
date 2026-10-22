@@ -1,0 +1,14 @@
+{
+  "from": "2026-10-01T05:00:00Z",
+  "to": "2026-11-01T05:00:00Z",
+  "channels": [
+    { "channel_id": "refoss-em16p-1/mains-a", "scope": "mains", "kwh": 412.8, "cost": "61.92", "carbon_g": 181600, "peak_watts": 7410.0, "monitored_hours": 744 },
+    { "channel_id": "refoss-em16p-1/mains-b", "scope": "mains", "kwh": 288.1, "cost": "43.22", "carbon_g": 126800, "peak_watts": 5120.0, "monitored_hours": 744 },
+    { "channel_id": "refoss-em16p-1/ch-07", "scope": "circuit", "kwh": 96.4, "cost": "14.46", "carbon_g": 42400, "peak_watts": 5400.0, "monitored_hours": 744 },
+    { "channel_id": "pc-wall", "scope": "pc", "kwh": 134.0, "cost": "20.10", "carbon_g": null, "peak_watts": 640.0, "monitored_hours": 700 }
+  ],
+  "house_kwh": 700.9,
+  "house_cost": "105.14",
+  "unmetered_kwh": 604.5,
+  "carbon_estimated_share": 0.12
+}

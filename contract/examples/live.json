@@ -1,0 +1,12 @@
+{
+  "time": "2026-10-22T18:04:11Z",
+  "readings": [
+    { "channel_id": "refoss-em16p-1/mains-a", "watts": 1620.4, "volts": 121.3, "amps": 13.4 },
+    { "channel_id": "refoss-em16p-1/mains-b", "watts": 1105.9, "volts": 120.8, "amps": 9.2 },
+    { "channel_id": "refoss-em16p-1/ch-07", "watts": 4210.0, "volts": 241.0, "amps": 17.5 },
+    { "channel_id": "refoss-em16p-1/ch-11", "watts": 7.2, "volts": null, "amps": null },
+    { "channel_id": "pc-wall", "watts": 312.5, "volts": null, "amps": null }
+  ],
+  "house_watts": 2726.3,
+  "notes": ["Garage plug did not answer for 90 s."]
+}

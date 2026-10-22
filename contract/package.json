@@ -1,0 +1,17 @@
+{
+  "name": "kvguzzler-contract",
+  "private": true,
+  "description": "Lints contract/openapi.yaml and checks contract/examples against its schemas.",
+  "type": "module",
+  "scripts": {
+    "lint": "redocly lint openapi.yaml",
+    "check-examples": "node check-examples.mjs",
+    "test": "npm run lint && npm run check-examples"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.5.0"
+  }
+}
