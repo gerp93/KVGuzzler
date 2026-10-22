@@ -10,5 +10,6 @@
   "house_kwh": 700.9,
   "house_cost": "105.14",
   "unmetered_kwh": 604.5,
+  "cost_estimated": false,
   "carbon_estimated_share": 0.12
 }

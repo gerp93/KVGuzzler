@@ -300,3 +300,56 @@ select:focus-visible {
     grid-column: 1 / -1;
   }
 }
+
+/* Rates editor */
+.card h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.field > span {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.bill-form {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 8px 12px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.fee {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chips.save {
+  align-items: center;
+  margin-top: 16px;
+}
+
+.chips button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.note.error {
+  color: var(--color-accent-red);
+}
+
+@media (min-width: 720px) {
+  main > .card:has(.bill-form) {
+    grid-column: 1 / -1;
+  }
+}

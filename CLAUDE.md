@@ -32,6 +32,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - Scopes (`mains | circuit | plug | pc`) are never summed across each other: the house is the `mains` channels alone, circuits
   and plugs are parts of it, and the PC's wall plug is a slice of a circuit and is added to nothing.
 - A reading above its channel's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
+- Pricing in the server (`server/internal/rates`) is a **port** of `KVGuzzler.Core.Billing` (bills, flat fees, `RateSchedule`); its tests are
+  `BillingTests.cs` ported case for case. A change to a pricing rule goes in both places, with the test in both. Money is exact (`big.Rat`),
+  never a float; bill dates are local calendar days. Only "one rate" and "my bills" exist there: the OpenEI lookup and carbon are not ported.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the

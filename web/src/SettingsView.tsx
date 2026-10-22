@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
+import { RatesCard } from './RatesCard';
 import { THEMES, type Channel, type Theme } from './lib';
 
 function ChannelRow({ channel, onChanged }: { channel: Channel; onChanged: () => void }) {
@@ -52,6 +53,7 @@ export function SettingsView({
 }) {
   return (
     <>
+      <RatesCard />
       <section class="card">
         <h2>Channels</h2>
         <p class="caption">

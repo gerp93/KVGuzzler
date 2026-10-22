@@ -32,11 +32,12 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/store` | SQLite (WAL, pure Go): devices, channels, per-minute history, totals and bucketed series. |
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
 | `internal/api` | Status, devices, channels (rename, switch off), live, series, summary. |
+| `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
 ## Not built yet (answers 501)
 
-Adding devices, rates and bills, carbon, and the PC ingest. **Real Refoss readings are not wired in**: the shape of
+Adding devices, carbon, and the PC ingest. Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
 `Refoss.Status.Get` (per-channel watts, volts, amps, kWh) has not been seen on a real device, so `StatusRaw` returns the body
 untouched and nothing guesses its fields. The first real device call decides the mapping.
 

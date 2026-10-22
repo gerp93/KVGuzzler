@@ -28,7 +28,9 @@ export function AppliancesView({ channels }: { channels: Channel[] }) {
         <i style={{ width: `${top > 0 ? (c.kwh / top) * 100 : 0}%` }} />
       </span>
       <span class="num">{formatKwh(c.kwh)}</span>
-      {c.cost !== null && c.cost !== undefined && <span class="num cost">{formatMoney(c.cost)}</span>}
+      {c.cost !== null && c.cost !== undefined && (
+        <span class="num cost">{formatMoney(c.cost, data?.cost_estimated)}</span>
+      )}
     </li>
   );
 
@@ -40,7 +42,12 @@ export function AppliancesView({ channels }: { channels: Channel[] }) {
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
         <p class="big">{formatKwh(split?.houseKwh)}</p>
-        {data?.house_cost && <p class="caption">{formatMoney(data.house_cost)}</p>}
+        {data?.house_cost && (
+          <p class="caption">
+            {formatMoney(data.house_cost, data.cost_estimated)}
+            {data.cost_estimated && ' (some days are priced at the latest bill, until the next one is entered)'}
+          </p>
+        )}
       </section>
 
       {error && (

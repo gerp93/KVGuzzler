@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -184,7 +185,7 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 
 func TestUnbuiltRoutesSayNotImplemented(t *testing.T) {
 	srv, _ := newServer(t, 1)
-	for _, path := range []string{"/api/v1/rates", "/api/v1/carbon"} {
+	for _, path := range []string{"/api/v1/carbon"} {
 		if r := get(t, srv.URL+path, nil); r.StatusCode != http.StatusNotImplemented {
 			t.Errorf("%s: %d, want 501", path, r.StatusCode)
 		}
@@ -202,5 +203,130 @@ func TestDefaultBucket(t *testing.T) {
 		if got := defaultBucket(span); got != want {
 			t.Errorf("defaultBucket(%v) = %s, want %s", span, got, want)
 		}
+	}
+}
+
+func put(t *testing.T, url, body string) (*http.Response, string) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPut, url, bytes.NewBufferString(body))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(resp.Body)
+	return resp, buf.String()
+}
+
+func TestRatesDefaultSaveAndRefuse(t *testing.T) {
+	srv, _ := newServer(t, 1)
+
+	var cfg struct {
+		Mode  string            `json:"mode"`
+		Bills []json.RawMessage `json:"bills"`
+	}
+	get(t, srv.URL+"/api/v1/rates", &cfg)
+	if cfg.Mode != "one" || cfg.Bills == nil || len(cfg.Bills) != 0 {
+		t.Fatalf("default = %+v, want mode one and an empty (not null) bills list", cfg)
+	}
+
+	if r, body := put(t, srv.URL+"/api/v1/rates", `{"mode":"one","fixed_rate":"0.15"}`); r.StatusCode != 200 {
+		t.Fatalf("save: %d %s", r.StatusCode, body)
+	}
+	var saved struct {
+		FixedRate string `json:"fixed_rate"`
+		Currency  string `json:"currency"`
+	}
+	get(t, srv.URL+"/api/v1/rates", &saved)
+	if saved.FixedRate != "0.15" || saved.Currency != "USD" {
+		t.Errorf("saved = %+v", saved)
+	}
+
+	for name, body := range map[string]string{
+		"lookup is not built":    `{"mode":"lookup"}`,
+		"unknown mode":           `{"mode":"free"}`,
+		"negative rate":          `{"mode":"one","fixed_rate":"-1"}`,
+		"rate not a decimal":     `{"mode":"one","fixed_rate":"abc"}`,
+		"rate sent as a number":  `{"mode":"one","fixed_rate":0.15}`,
+		"overlapping bills":      `{"mode":"bills","bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500},{"start":"2026-08-31","end":"2026-09-30","total":"100","kwh":500}]}`,
+		"fees swallow the total": `{"mode":"bills","bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500,"fixed_fees":[{"label":"x","amount":"100"}]}]}`,
+		"unknown field":          `{"mode":"one","nonsense":1}`,
+		"bad currency":           `{"mode":"one","currency":"dollars"}`,
+	} {
+		if r, _ := put(t, srv.URL+"/api/v1/rates", body); r.StatusCode != 400 {
+			t.Errorf("%s: status %d, want 400", name, r.StatusCode)
+		}
+	}
+}
+
+func parseMoney(t *testing.T, s *string) float64 {
+	t.Helper()
+	if s == nil {
+		t.Fatal("expected a cost, got null")
+	}
+	var f float64
+	if _, err := fmt.Sscanf(*s, "%f", &f); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func TestSummaryCostFollowsTheRate(t *testing.T) {
+	srv, end := newServer(t, 30)
+	q := "?from=" + day.Format(time.RFC3339) + "&to=" + end.Add(time.Minute).Format(time.RFC3339)
+
+	// No rate yet: energy is counted, nothing is priced.
+	var before model.Summary
+	get(t, srv.URL+"/api/v1/summary"+q, &before)
+	if before.HouseCost != nil {
+		t.Errorf("house cost %s with no rate set, want null", *before.HouseCost)
+	}
+	for _, c := range before.Channels {
+		if c.KWh > 0 && c.Cost != nil {
+			t.Errorf("%s priced with no rate", c.ChannelID)
+		}
+	}
+
+	put(t, srv.URL+"/api/v1/rates", `{"mode":"one","fixed_rate":"0.20"}`)
+	var after model.Summary
+	get(t, srv.URL+"/api/v1/summary"+q, &after)
+	if after.HouseKWh == nil || after.HouseCost == nil {
+		t.Fatalf("house kwh=%v cost=%v", after.HouseKWh, after.HouseCost)
+	}
+	if got, want := parseMoney(t, after.HouseCost), *after.HouseKWh*0.20; math.Abs(got-want) > 0.0001 {
+		t.Errorf("house cost %v, want kWh x 0.20 = %v", got, want)
+	}
+	for _, c := range after.Channels {
+		if got, want := parseMoney(t, c.Cost), c.KWh*0.20; math.Abs(got-want) > 0.0001 {
+			t.Errorf("%s cost %v, want %v", c.ChannelID, got, want)
+		}
+	}
+}
+
+func TestBillPricesAreUsedAndEstimatesAreFlagged(t *testing.T) {
+	srv, end := newServer(t, 30)
+	q := "?from=" + day.Format(time.RFC3339) + "&to=" + end.Add(time.Minute).Format(time.RFC3339)
+
+	// A bill that ended the day before the data: every day in the period is "after the latest bill", so an estimate.
+	bills := `{"mode":"bills","bills":[{"start":"2026-09-01","end":"2026-10-20","total":"150","kwh":1000}]}`
+	if r, body := put(t, srv.URL+"/api/v1/rates", bills); r.StatusCode != 200 {
+		t.Fatalf("save: %d %s", r.StatusCode, body)
+	}
+	var sum model.Summary
+	get(t, srv.URL+"/api/v1/summary"+q, &sum)
+	if !sum.CostEstimated {
+		t.Error("cost_estimated should be true for days after the latest bill")
+	}
+	if got, want := parseMoney(t, sum.HouseCost), *sum.HouseKWh*0.15; math.Abs(got-want) > 0.0001 {
+		t.Errorf("house cost %v, want the bill's $0.15 x kWh = %v", got, want)
+	}
+
+	// A bill that covers the data: not an estimate.
+	covering := `{"mode":"bills","bills":[{"start":"2026-10-01","end":"2026-10-31","total":"150","kwh":1000}]}`
+	put(t, srv.URL+"/api/v1/rates", covering)
+	get(t, srv.URL+"/api/v1/summary"+q, &sum)
+	if sum.CostEstimated {
+		t.Error("cost_estimated should be false when a bill covers the period")
 	}
 }
