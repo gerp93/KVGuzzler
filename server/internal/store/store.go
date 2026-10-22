@@ -297,3 +297,21 @@ func maxF(a, b float64) float64 {
 	}
 	return b
 }
+
+// Meta returns a small saved value by key (settings kept as text), and whether it exists.
+func (s *Store) Meta(ctx context.Context, key string) (string, bool, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return v, err == nil, err
+}
+
+// SetMeta saves a small value by key, replacing any earlier one.
+func (s *Store) SetMeta(ctx context.Context, key, value string) error {
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO meta(key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
+	return err
+}

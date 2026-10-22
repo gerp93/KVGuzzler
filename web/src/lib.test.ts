@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  circuitsByWatts, formatKwh, formatWatts, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  circuitsByWatts, formatKwh, formatMoney, formatWatts, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Channel, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -71,6 +71,16 @@ describe('formatting and periods', () => {
     expect(formatWatts(null)).toBe('—');
     expect(formatKwh(3.456)).toBe('3.46 kWh');
     expect(formatKwh(120.04)).toBe('120.0 kWh');
+  });
+
+  it('formats money as dollars and cents, marking an estimate', () => {
+    expect(formatMoney('13.68')).toBe('$13.68');
+    expect(formatMoney('0.199155')).toBe('$0.20');
+    expect(formatMoney('61.9')).toBe('$61.90');
+    expect(formatMoney('-4')).toBe('-$4.00');
+    expect(formatMoney('13.68', true)).toBe('≈ $13.68');
+    expect(formatMoney(null)).toBe('—');
+    expect(formatMoney('abc')).toBe('—');
   });
 
   it('periodRange ends at the next whole minute', () => {

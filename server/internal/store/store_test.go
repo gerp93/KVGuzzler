@@ -112,3 +112,20 @@ func TestSeriesBuckets(t *testing.T) {
 		t.Fatalf("minutes = %d points, %v", len(minutes), err)
 	}
 }
+
+func TestMetaRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	if _, ok, err := s.Meta(ctx, "k"); ok || err != nil {
+		t.Fatalf("missing key: ok=%v err=%v", ok, err)
+	}
+	if err := s.SetMeta(ctx, "k", "one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetMeta(ctx, "k", "two"); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok, err := s.Meta(ctx, "k"); v != "two" || !ok || err != nil {
+		t.Errorf("Meta = %q, %v, %v", v, ok, err)
+	}
+}

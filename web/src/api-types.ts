@@ -325,11 +325,20 @@ export interface components {
              *     clamp accounts for. Derived, so shown as its own row and never added to anything.
              */
             unmetered_kwh?: number | null;
+            /**
+             * @description True when any part of a cost in this summary was priced by estimate: a day after the latest bill or in a gap
+             *     between bills uses the most recent bill's price until the next bill is entered. Show such costs as approximate.
+             */
+            cost_estimated?: boolean;
             /** @description The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity. */
             carbon_estimated_share?: number | null;
         };
         /** @enum {string} */
         RateMode: "one" | "bills" | "lookup";
+        FixedFee: {
+            label: string;
+            amount: components["schemas"]["Money"];
+        };
         Bill: {
             /**
              * Format: date
@@ -342,7 +351,11 @@ export interface components {
              */
             end: string;
             total: components["schemas"]["Money"];
-            flat_fees?: components["schemas"]["Money"];
+            /**
+             * @description Charges on the bill that do not depend on use (a basic service charge, a credit as a negative amount). They are
+             *     left out when the price per kWh is worked out: (total minus these) / kwh.
+             */
+            fixed_fees?: components["schemas"]["FixedFee"][];
             kwh: number;
         };
         RateConfig: {

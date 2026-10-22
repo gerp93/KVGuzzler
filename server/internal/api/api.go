@@ -1,7 +1,8 @@
 // Package api serves the house API described in contract/openapi.yaml.
 //
-// Implemented so far: status, devices (read), channels (read, rename, switch off), live, series and summary.
-// The rest of the contract (adding devices, rates, carbon, the PC ingest) answers 501 until it is built.
+// Implemented so far: status, devices (read), channels (read, rename, switch off), live, series, summary (with cost
+// from the saved rates) and the rates settings. The rest of the contract (adding devices, carbon, the PC ingest)
+// answers 501 until it is built.
 package api
 
 import (
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/rates"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
 )
 
@@ -51,9 +53,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
+	mux.HandleFunc("GET /api/v1/rates", s.getRates)
+	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
 	for _, route := range []string{
 		"POST /api/v1/devices", "DELETE /api/v1/devices/{deviceId}",
-		"GET /api/v1/rates", "PUT /api/v1/rates", "GET /api/v1/carbon", "PUT /api/v1/carbon",
+		"GET /api/v1/carbon", "PUT /api/v1/carbon",
 		"POST /api/v1/ingest/pc",
 	} {
 		mux.HandleFunc(route, notImplemented)
@@ -262,9 +266,17 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	schedule := cfg.Schedule(s.Loc)
+
 	sum := model.Summary{From: from.UTC(), To: to.UTC(), Channels: []model.ChannelSummary{}}
 	var house, circuits float64
-	haveMains := false
+	var houseCost rates.Money
+	haveMains, housePriced := false, true
 	for _, ch := range on {
 		t, err := s.Store.Totals(r.Context(), ch.ID, from, to)
 		if err != nil {
@@ -276,12 +288,37 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 			peak := t.PeakWatts
 			cs.PeakWatts = &peak
 		}
+
+		// Each stretch of the period is priced at its own day's rate (a period can span two bills).
+		var readErr error
+		priced := schedule.Cost(func(f, to time.Time) float64 {
+			tot, err := s.Store.Totals(r.Context(), ch.ID, f, to)
+			if err != nil && readErr == nil {
+				readErr = err
+			}
+			return tot.KWh
+		}, from, to)
+		if readErr != nil {
+			serverError(w, readErr)
+			return
+		}
+		if !priced.Unpriced {
+			c := priced.Cost.String()
+			cs.Cost = &c
+			sum.CostEstimated = sum.CostEstimated || priced.Estimated
+		}
 		sum.Channels = append(sum.Channels, cs)
+
 		// Scopes are never summed across each other: the house is the mains alone, circuits are summed on their own.
 		switch ch.Scope {
 		case model.ScopeMains:
 			house += t.KWh
 			haveMains = true
+			if priced.Unpriced {
+				housePriced = false
+			} else {
+				houseCost = houseCost.Add(priced.Cost)
+			}
 		case model.ScopeCircuit:
 			circuits += t.KWh
 		}
@@ -293,6 +330,59 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 			unmetered = 0
 		}
 		sum.UnmeteredKWh = &unmetered
+		if housePriced {
+			c := houseCost.String()
+			sum.HouseCost = &c
+		}
 	}
 	writeJSON(w, http.StatusOK, sum)
+}
+
+const ratesKey = "rates"
+
+// rateConfig is the saved price settings, or the default (one rate, none set) before any are saved.
+func (s *Server) rateConfig(ctx context.Context) (rates.Config, error) {
+	text, ok, err := s.Store.Meta(ctx, ratesKey)
+	if err != nil || !ok {
+		return rates.DefaultConfig(), err
+	}
+	var cfg rates.Config
+	if err := json.Unmarshal([]byte(text), &cfg); err != nil {
+		return rates.Config{}, err
+	}
+	return cfg.Normalized(), nil
+}
+
+func (s *Server) getRates(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+func (s *Server) putRates(w http.ResponseWriter, r *http.Request) {
+	var cfg rates.Config
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_rates", err.Error())
+		return
+	}
+	cfg = cfg.Normalized()
+	if err := cfg.Validate(); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_rates", err.Error())
+		return
+	}
+	body, err := json.Marshal(cfg)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if err := s.Store.SetMeta(r.Context(), ratesKey, string(body)); err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
 }

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { Channel, Live, Series, Status, Summary } from './lib';
+import type { Channel, Live, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -43,6 +43,13 @@ export const api = {
   series: (channelId: string, from: string, to: string, bucket?: string) =>
     request<Series>(`api/v1/series?${q({ channel_id: channelId, from, to, bucket })}`),
   summary: (from: string, to: string) => request<Summary>(`api/v1/summary?${q({ from, to })}`),
+  rates: () => request<RateConfig>('api/v1/rates'),
+  setRates: (cfg: RateConfig) =>
+    request<RateConfig>('api/v1/rates', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    }),
   updateChannel: (id: string, body: { label?: string; enabled?: boolean }) =>
     request<Channel>(`api/v1/channels/${encodeURIComponent(id)}`, {
       method: 'PATCH',

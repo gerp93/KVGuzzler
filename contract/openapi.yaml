@@ -560,12 +560,26 @@ components:
           description: |
             `house_kwh` minus the energy of the enabled `circuit` channels, never below zero: what no circuit
             clamp accounts for. Derived, so shown as its own row and never added to anything.
+        cost_estimated:
+          type: boolean
+          description: |
+            True when any part of a cost in this summary was priced by estimate: a day after the latest bill or in a gap
+            between bills uses the most recent bill's price until the next bill is entered. Show such costs as approximate.
         carbon_estimated_share:
           type: [number, 'null']
           description: The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity.
     RateMode:
       type: string
       enum: [one, bills, lookup]
+    FixedFee:
+      type: object
+      required: [label, amount]
+      properties:
+        label:
+          type: string
+          maxLength: 60
+        amount:
+          $ref: '#/components/schemas/Money'
     Bill:
       type: object
       required: [start, end, total, kwh]
@@ -580,8 +594,13 @@ components:
           description: Last local day the bill covers. Two bills may not share a day.
         total:
           $ref: '#/components/schemas/Money'
-        flat_fees:
-          $ref: '#/components/schemas/Money'
+        fixed_fees:
+          type: array
+          description: |
+            Charges on the bill that do not depend on use (a basic service charge, a credit as a negative amount). They are
+            left out when the price per kWh is worked out: (total minus these) / kwh.
+          items:
+            $ref: '#/components/schemas/FixedFee'
         kwh:
           type: number
           exclusiveMinimum: 0

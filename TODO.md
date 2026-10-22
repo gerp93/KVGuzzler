@@ -122,8 +122,9 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   the API for status, devices, channels, live, series and summary, and the `web/` dashboard (Live, History, Appliances, Settings; themed,
   phone-width checked, embedded in the server binary). **Verified only against the simulator and fake HTTP servers**;
   nothing has been tried on a real Refoss monitor. Still to do, in order: real Refoss readings (call `Refoss.Status.Get` on a real
-  device first and write the mapping from its answer; confirm auth is off), rates/bills/OpenEI/carbon in Go (port with the C# test
-  cases; the dashboard shows cost once the server prices it), the PC relay (C# collector pushes per-minute summaries to `POST /api/v1/ingest/pc`
+  device first and write the mapping from its answer; confirm auth is off), OpenEI/carbon in Go (port with the C# test
+  cases; **rates and bills are done** (`server/internal/rates`, the Settings price editor, cost in the Appliances view), still to port: the
+  OpenEI lookup and the carbon footprint), the PC relay (C# collector pushes per-minute summaries to `POST /api/v1/ingest/pc`
   with an outbox), the Electron viewer that loads the dashboard from the server, then retiring the Avalonia window (only once the
   dashboard does everything it does; the collector service stays). The server box itself (Debian) is set up separately.
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then

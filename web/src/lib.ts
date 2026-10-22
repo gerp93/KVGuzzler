@@ -13,6 +13,9 @@ export type Point = S['SeriesPoint'];
 export type Summary = S['Summary'];
 export type ChannelSummary = S['ChannelSummary'];
 export type Status = S['Status'];
+export type RateConfig = S['RateConfig'];
+export type Bill = S['Bill'];
+export type FixedFee = S['FixedFee'];
 
 export type PeriodKey = '1h' | '24h' | '7d' | '30d';
 
@@ -40,9 +43,16 @@ export function formatKwh(k: number | null | undefined): string {
   return `${k < 10 ? k.toFixed(2) : k.toFixed(1)} kWh`;
 }
 
-export function formatMoney(m: string | null | undefined): string {
-  return m === null || m === undefined ? '—' : `$${m}`;
+/** A money string as dollars and cents. `estimated` marks a price that rests on a stand-in rate with a leading ≈. */
+export function formatMoney(m: string | null | undefined, estimated = false): string {
+  if (m === null || m === undefined) return '—';
+  const n = Number(m);
+  if (!Number.isFinite(n)) return '—';
+  return `${estimated ? '≈ ' : ''}${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
 }
+
+/** Above this per kWh a rate is almost certainly cents typed as dollars. */
+export const SUSPICIOUSLY_HIGH_RATE = 1;
 
 export interface Row {
   channel: Channel;

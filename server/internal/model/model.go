@@ -81,10 +81,11 @@ type ChannelSummary struct {
 }
 
 type Summary struct {
-	From         time.Time        `json:"from"`
-	To           time.Time        `json:"to"`
-	Channels     []ChannelSummary `json:"channels"`
-	HouseKWh     *float64         `json:"house_kwh"`
-	HouseCost    *string          `json:"house_cost"`
-	UnmeteredKWh *float64         `json:"unmetered_kwh"`
+	From          time.Time        `json:"from"`
+	To            time.Time        `json:"to"`
+	Channels      []ChannelSummary `json:"channels"`
+	HouseKWh      *float64         `json:"house_kwh"`
+	HouseCost     *string          `json:"house_cost"`
+	CostEstimated bool             `json:"cost_estimated"`
+	UnmeteredKWh  *float64         `json:"unmetered_kwh"`
 }

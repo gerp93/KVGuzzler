@@ -10,6 +10,7 @@ const examples = {
   'live.json': 'Live',
   'summary.json': 'Summary',
   'ingest-pc.json': 'PcIngest',
+  'rates.json': 'RateConfig',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });
