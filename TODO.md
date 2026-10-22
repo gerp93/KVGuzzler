@@ -116,6 +116,15 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   sensors' active power) and what that cost. Dashboard history, the Programs list and runs are priced by date.
   Not built: time-of-use or tiered rates (this bill has neither), a "work out my rate" helper for plain totals,
   per-program prices that follow the bill by day (a program's period uses one time-weighted average price).
+- **Whole-house energy monitor** (Refoss clamp monitors, always-on server; plan agreed, first parts built): `contract/` is the
+  OpenAPI between the parts and `server/` (Go, see its README) is the house server. Built: the contract with checked examples, a
+  read-only Refoss client (`DeviceInfo` parsed), a simulated house, SQLite history, a collector that drops impossible readings, and
+  the API for status, devices, channels, live, series and summary. **Verified only against the simulator and fake HTTP servers**;
+  nothing has been tried on a real Refoss monitor. Still to do, in order: real Refoss readings (call `Refoss.Status.Get` on a real
+  device first and write the mapping from its answer; confirm auth is off), rates/bills/OpenEI/carbon in Go (port with the C# test
+  cases), the TypeScript dashboard in `web/`, the PC relay (C# collector pushes per-minute summaries to `POST /api/v1/ingest/pc`
+  with an outbox), the Electron viewer that loads the dashboard from the server, then retiring the Avalonia window (only once the
+  dashboard does everything it does; the collector service stays). The server box itself (Debian) is set up separately.
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /
   `icon_png` in both release workflows; add the logo to the README header and the app header.

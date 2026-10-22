@@ -428,6 +428,8 @@ components:
       properties:
         id:
           type: string
+          description: Stable, and never contains a slash (it is used as a URL path segment), for example `refoss-em16p-1:ch-07`.
+          pattern: '^[^/\s]+$'
         device_id:
           type: string
         index:

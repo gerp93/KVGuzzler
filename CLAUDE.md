@@ -17,11 +17,25 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
 
 ## Repo layout and releases
 
-The repo is growing a whole-house energy monitor beside the PC app (planned: `server/` Go, `web/` TypeScript dashboard,
-`shell/` Electron viewer, `contract/` the OpenAPI/JSON Schema between them and the PC collector). Until those exist, only
-`src/` and `tests/` matter. **Desktop releases and the .NET CI are path-filtered** (`auto-release.yml`, `ci.yml`): only
+The repo also holds a whole-house energy monitor beside the PC app: `contract/` (OpenAPI between the parts, `npm test`),
+`server/` (Go house server, see its README; `go vet ./... && go test ./...`), and planned `web/` (TypeScript dashboard) and
+`shell/` (Electron viewer that loads the dashboard from the server). The PC app stays C#: sensors and per-program shares only
+exist on the PC. The Avalonia window is **frozen** (no new features; new UI goes in the dashboard) and is retired only once the
+dashboard does everything it does; the collector service stays. **Desktop releases and the .NET CI are path-filtered** (`auto-release.yml`, `ci.yml`): only
 changes under `src/`, `tests/`, `KVGuzzler.sln`, `Directory.Build.props` (and `VERSION_BUMP.md` for releases) cut a desktop
 release, so server/web/viewer/docs-only pushes do not. To force a desktop release with no code change, edit `VERSION_BUMP.md`.
+
+## Rules for the house server (`server/`, `contract/`)
+
+- Devices are only **read**. The Refoss client has a method allowlist (no `*.Set`); a device host is a plain host/IP, never a URL,
+  path or port (`internal/hostcheck`). Refoss local auth is turned off on the devices (a 401 is reported, not worked around).
+- Scopes (`mains | circuit | plug | pc`) are never summed across each other: the house is the `mains` channels alone, circuits
+  and plugs are parts of it, and the PC's wall plug is a slice of a circuit and is added to nothing.
+- A reading above its channel's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
+- Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
+  changes only for a breaking change, and the server and its clients move together.
+- **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the
+  mapping from a real answer and keep it as a test fixture.
 
 ## Rules that are easy to break
 
