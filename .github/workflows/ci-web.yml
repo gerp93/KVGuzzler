@@ -43,3 +43,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+      - name: The build output stays out of git
+        run: test -z "$(git status --porcelain)"
