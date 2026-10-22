@@ -1,0 +1,26 @@
+{
+  "name": "kvguzzler-house-web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The house dashboard. Built into server/internal/webui/dist and embedded in the Go server.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "gen:types": "openapi-typescript ../contract/openapi.yaml -o src/api-types.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "node scripts/clean-dist.mjs && vite build",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "preact": "^11.0.1",
+    "uplot": "^1.6.32"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

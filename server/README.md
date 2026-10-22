@@ -7,9 +7,10 @@ cross-compiles for the Linux box.
 ## Run it with no hardware
 
 ```bash
+(cd web && npm install && npm run build)    # the dashboard, embedded into the server
 cd server
 go run ./cmd/housed -sim -data ./data        # a made-up house; nothing it reports is a measurement
-curl localhost:8080/api/v1/live
+# open http://localhost:8080/ , or: curl localhost:8080/api/v1/live
 ```
 
 Flags: `-listen` (default `:8080`), `-data` (folder for `house.db`), `-sim`, `-tz` (IANA zone for day buckets, e.g. `America/Chicago`).
@@ -31,6 +32,7 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/store` | SQLite (WAL, pure Go): devices, channels, per-minute history, totals and bucketed series. |
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
 | `internal/api` | Status, devices, channels (rename, switch off), live, series, summary. |
+| `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
 ## Not built yet (answers 501)
 

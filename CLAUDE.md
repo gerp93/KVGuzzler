@@ -18,8 +18,8 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
 ## Repo layout and releases
 
 The repo also holds a whole-house energy monitor beside the PC app: `contract/` (OpenAPI between the parts, `npm test`),
-`server/` (Go house server, see its README; `go vet ./... && go test ./...`), and planned `web/` (TypeScript dashboard) and
-`shell/` (Electron viewer that loads the dashboard from the server). The PC app stays C#: sensors and per-program shares only
+`server/` (Go house server, see its README; `go vet ./... && go test ./...`), `web/` (TypeScript dashboard, embedded in the server
+binary; build it first: `cd web && npm run check`) and a planned `shell/` (Electron viewer that loads the dashboard from the server). The PC app stays C#: sensors and per-program shares only
 exist on the PC. The Avalonia window is **frozen** (no new features; new UI goes in the dashboard) and is retired only once the
 dashboard does everything it does; the collector service stays. **Desktop releases and the .NET CI are path-filtered** (`auto-release.yml`, `ci.yml`): only
 changes under `src/`, `tests/`, `KVGuzzler.sln`, `Directory.Build.props` (and `VERSION_BUMP.md` for releases) cut a desktop
