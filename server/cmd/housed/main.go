@@ -18,6 +18,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/sim"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
+	"github.com/gerp93/KVGuzzler/server/internal/webui"
 )
 
 // version is set at build time (-ldflags "-X main.version=...").
@@ -65,11 +66,10 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 		log.Print("no devices configured yet (real Refoss support is not built); use -sim to try the server")
 	}
 
-	srv := &http.Server{
-		Addr:              listen,
-		Handler:           (&api.Server{Store: st, Collector: col, Loc: loc, Version: version}).Handler(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	root := http.NewServeMux()
+	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Loc: loc, Version: version}).Handler())
+	root.Handle("/", webui.Handler())
+	srv := &http.Server{Addr: listen, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	done := make(chan struct{})
 	go func() { col.Run(ctx); close(done) }()
 	go func() {

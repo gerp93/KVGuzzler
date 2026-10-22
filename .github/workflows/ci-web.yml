@@ -1,0 +1,48 @@
+# Typecheck, test and build the house dashboard. Only for changes to web/ and the contract its types come from.
+
+name: CI (web)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'contract/**'
+      - 'scripts/update-visual-assault-web.sh'
+      - '.github/workflows/ci-web.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'contract/**'
+      - 'scripts/update-visual-assault-web.sh'
+      - '.github/workflows/ci-web.yml'
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: API types match the contract
+        run: |
+          npm run gen:types
+          git diff --exit-code src/api-types.ts
+
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: The build output stays out of git
+        run: test -z "$(git status --porcelain)"

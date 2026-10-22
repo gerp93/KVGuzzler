@@ -1,0 +1,302 @@
+/* Mobile first. Colors come only from the VisualAssault custom properties (themes/themes.css). */
+
+:root {
+  --gap: 12px;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Header and sections */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--gap);
+  padding: 8px 16px;
+  background: var(--color-top-bar-bg);
+}
+
+.top h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.top nav {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.top nav button {
+  flex: 1 0 auto;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+}
+
+.top nav button:hover {
+  background: var(--color-top-bar-hover);
+}
+
+.top nav button[aria-current='page'] {
+  background: var(--color-primary-action);
+  color: var(--color-primary-action-text, var(--color-text));
+}
+
+main {
+  display: grid;
+  gap: var(--gap);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.card {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.card.warn {
+  border-color: var(--color-accent-red);
+}
+
+.card.warn p {
+  margin: 4px 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.row h2 {
+  margin: 0;
+}
+
+.big {
+  margin: 0;
+  font-size: clamp(2.2rem, 9vw, 3.6rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.caption,
+.note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.note {
+  font-size: 0.95rem;
+}
+
+/* Bars */
+.bars {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.bars.wide li {
+  grid-template-columns: minmax(0, 8rem) 1fr auto auto;
+}
+
+.bars .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars .bar {
+  height: 10px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 5px;
+}
+
+.bars .bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-blue);
+}
+
+.num {
+  min-width: 4.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost {
+  color: var(--color-text-muted);
+}
+
+.derived {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* Controls */
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.seg button {
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.seg button[aria-pressed='true'],
+.chips button[aria-pressed='true'] {
+  background: var(--color-primary-action);
+  color: var(--color-primary-action-text, var(--color-text));
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+input:not([type='checkbox']),
+select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.settings {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings .grow {
+  flex: 1 1 10rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+}
+
+.chart {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.chart .u-legend {
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+@media (min-width: 720px) {
+  .top nav {
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
+
+  main {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  main > .hero,
+  main > .warn,
+  main > .note {
+    grid-column: 1 / -1;
+  }
+}
