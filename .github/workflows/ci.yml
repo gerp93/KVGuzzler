@@ -1,12 +1,25 @@
 # Build (warnings are errors) and test on every PR and push to main, via KVG_Standards' ci-dotnet.yml.
+# Only for changes to the C# side; server/, web/, shell/ and contract/ get their own CI.
 
 name: CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'KVGuzzler.sln'
+      - 'Directory.Build.props'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'KVGuzzler.sln'
+      - 'Directory.Build.props'
+      - '.github/workflows/ci.yml'
 
 jobs:
   ci:
