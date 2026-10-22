@@ -7,6 +7,14 @@ name: Auto Release
 on:
   push:
     branches: [main]
+    # Only the desktop app and its collector are released from here. The house server, web dashboard and
+    # viewer (server/, web/, shell/, contract/) live in the same repo and must not cut a desktop release.
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'KVGuzzler.sln'
+      - 'Directory.Build.props'
+      - 'VERSION_BUMP.md'
 
 permissions:
   contents: write

@@ -15,6 +15,14 @@ dotnet test KVGuzzler.sln                    # unit tests + headless Avalonia UI
 dotnet run --project src/KVGuzzler           # a development run (separate -dev data folder)
 ```
 
+## Repo layout and releases
+
+The repo is growing a whole-house energy monitor beside the PC app (planned: `server/` Go, `web/` TypeScript dashboard,
+`shell/` Electron viewer, `contract/` the OpenAPI/JSON Schema between them and the PC collector). Until those exist, only
+`src/` and `tests/` matter. **Desktop releases and the .NET CI are path-filtered** (`auto-release.yml`, `ci.yml`): only
+changes under `src/`, `tests/`, `KVGuzzler.sln`, `Directory.Build.props` (and `VERSION_BUMP.md` for releases) cut a desktop
+release, so server/web/viewer/docs-only pushes do not. To force a desktop release with no code change, edit `VERSION_BUMP.md`.
+
 ## Rules that are easy to break
 
 - **Never hand-edit vendored files.** `src/KVGuzzler/KvgDbLocation/` and (when wired)
