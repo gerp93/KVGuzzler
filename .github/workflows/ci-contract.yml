@@ -1,0 +1,35 @@
+# Lint contract/openapi.yaml and check its examples against the schemas. Only for changes to contract/.
+
+name: CI (contract)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contract/**'
+      - '.github/workflows/ci-contract.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contract/**'
+      - '.github/workflows/ci-contract.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: contract/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint and check examples
+        run: npm test

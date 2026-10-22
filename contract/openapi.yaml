@@ -1,0 +1,733 @@
+openapi: 3.1.0
+info:
+  title: KVGuzzler house API
+  version: 1.0.0
+  license:
+    name: AGPL-3.0-only
+    identifier: AGPL-3.0-only
+  description: |
+    The API of the always-on house server (`server/`, Go): whole-house and per-circuit power from the Refoss
+    clamp monitors, smart plugs, and the PC pushed in by the KVGuzzler collector. The web dashboard (`web/`) and the
+    Electron viewer (`shell/`) are its clients; the C# PC collector uses `POST /api/v1/ingest/pc`.
+
+    **Versioning.** The contract has an integer major version, `api_version` (currently 1), sent by the server in the
+    `X-KVG-Api-Version` header and in `GET /api/v1/status`, and by the PC collector in its ingest body. A client that
+    sees a different major must stop and say which side needs updating. Adding optional fields or endpoints does not
+    change the major; removing or re-typing anything does.
+
+    **Rules every reading follows** (they mirror KVGuzzler's CLAUDE.md):
+    - Everything about a device is read-only. This API never switches or configures a physical device.
+    - Scopes are never summed across each other. `mains` is the whole house, `circuit` and `plug` are parts of it, and
+      `pc` is the PC's own wall plug, which is a slice of some circuit already counted. Only readings of one scope
+      are ever added together, and `house_watts` is the sum of the `mains` channels alone.
+    - Money is a decimal string (`"12.34"`), never a number. Dates and times are RFC 3339 in UTC; "day" buckets and
+      bill dates use the server's configured local time zone.
+    - A reading above the sanity cap for its channel is dropped, not averaged; the drop is reported in `notes`.
+servers:
+  - url: http://house-box:8080
+    description: The house server (host name and port are chosen at install time).
+tags:
+  - name: Read
+    description: Current and historical readings, for the dashboard and the viewer.
+  - name: Settings
+    description: The server's own configuration (labels, devices, rates, carbon). Never changes a physical device.
+  - name: Ingest
+    description: Data pushed in by the PC collector.
+security: []
+paths:
+  /api/v1/status:
+    get:
+      tags: [Read]
+      operationId: getStatus
+      summary: Server identity, versions and anything that needs attention.
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-KVG-Api-Version:
+              $ref: '#/components/headers/ApiVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /api/v1/devices:
+    get:
+      tags: [Read]
+      operationId: listDevices
+      summary: Every configured device and whether it answered recently.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [devices]
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
+    post:
+      tags: [Settings]
+      operationId: addDevice
+      summary: Start polling a device. Only a plain host or IP is accepted, never a URL or path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewDevice'
+      responses:
+        '201':
+          description: Created. The server has already read the device once to learn its channels.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          description: The device did not answer or did not look like the kind named.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/devices/{deviceId}:
+    delete:
+      tags: [Settings]
+      operationId: removeDevice
+      summary: Stop polling a device. Its history is kept, it is just no longer counted live.
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/channels:
+    get:
+      tags: [Read]
+      operationId: listChannels
+      summary: Every channel (a circuit, a mains leg, a plug, the PC) with its label.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channels]
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Channel'
+  /api/v1/channels/{channelId}:
+    patch:
+      tags: [Settings]
+      operationId: updateChannel
+      summary: Rename a channel or switch it off. Changes only the server's own label, never the device.
+      parameters:
+        - $ref: '#/components/parameters/ChannelId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelUpdate'
+      responses:
+        '200':
+          description: The updated channel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/live:
+    get:
+      tags: [Read]
+      operationId: getLive
+      summary: The latest reading of every enabled channel.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Live'
+  /api/v1/series:
+    get:
+      tags: [Read]
+      operationId: getSeries
+      summary: A channel's power over a period, bucketed.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: channel_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: bucket
+          in: query
+          required: false
+          description: Defaults to the coarsest bucket that keeps the period under about 400 points.
+          schema:
+            $ref: '#/components/schemas/Bucket'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Series'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/summary:
+    get:
+      tags: [Read]
+      operationId: getSummary
+      summary: Energy, cost and carbon per channel for a period, plus the house total.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Summary'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/rates:
+    get:
+      tags: [Settings]
+      operationId: getRates
+      summary: How the price of a kWh is worked out.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateConfig'
+    put:
+      tags: [Settings]
+      operationId: setRates
+      summary: Replace the rate settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateConfig'
+      responses:
+        '200':
+          description: The saved settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateConfig'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/carbon:
+    get:
+      tags: [Settings]
+      operationId: getCarbon
+      summary: Carbon-footprint settings and the last outcome of the grid-intensity fetch. Never returns the key.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarbonConfig'
+    put:
+      tags: [Settings]
+      operationId: setCarbon
+      summary: Save the place and, optionally, a new key. The key is write-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CarbonUpdate'
+      responses:
+        '200':
+          description: The saved settings (without the key).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarbonConfig'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/ingest/pc:
+    post:
+      tags: [Ingest]
+      operationId: ingestPc
+      summary: The PC collector pushes per-minute summaries. Safe to repeat.
+      description: |
+        Each reading is keyed by (`source_id`, `minute`, `name`); sending the same one again replaces it, so the
+        collector can resend its whole outbox after a failure. Batches may arrive in any order.
+        A body whose `api_version` differs from the server's is refused with 426.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PcIngest'
+      responses:
+        '200':
+          description: Stored.
+          headers:
+            X-KVG-Api-Version:
+              $ref: '#/components/headers/ApiVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '426':
+          description: The collector and the server speak different major versions of this contract.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  headers:
+    ApiVersion:
+      description: The contract's major version the server speaks.
+      schema:
+        type: integer
+        const: 1
+  parameters:
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    ChannelId:
+      name: channelId
+      in: path
+      required: true
+      schema:
+        type: string
+    From:
+      name: from
+      in: query
+      required: true
+      description: Start of the period (inclusive), RFC 3339.
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      required: true
+      description: End of the period (exclusive), RFC 3339.
+      schema:
+        type: string
+        format: date-time
+  responses:
+    Problem:
+      description: The request was refused; the body says why.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: A short stable name, for example `host_not_plain`, `api_version_mismatch`.
+        message:
+          type: string
+        server_api_version:
+          type: integer
+          description: Present on a version mismatch.
+    Money:
+      type: string
+      pattern: '^-?\d+(\.\d{1,6})?$'
+      description: An exact decimal amount in the configured currency.
+    Scope:
+      type: string
+      description: |
+        What a channel measures. Scopes are never summed across each other.
+        `mains` is the whole house (one per measured leg; the house is their sum), `circuit` is one breaker, `plug` is one
+        appliance on a smart plug, `pc` is the PC's own wall plug and is a slice of a circuit, never added to anything.
+      enum: [mains, circuit, plug, pc]
+    Bucket:
+      type: string
+      enum: [minute, hour, day]
+    Status:
+      type: object
+      required: [api_version, server_version, time, notes]
+      properties:
+        api_version:
+          type: integer
+          const: 1
+        server_version:
+          type: string
+        time:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+          description: The IANA zone used for "day" buckets and bill dates.
+        notes:
+          type: array
+          description: Plain-language things that need attention (a device stopped answering, a reading dropped).
+          items:
+            type: string
+    NewDevice:
+      type: object
+      required: [kind, host]
+      properties:
+        kind:
+          type: string
+          enum: [refoss, shelly_plug]
+        host:
+          type: string
+          description: A plain host name or IP address only; a URL, path or port is refused.
+        name:
+          type: string
+          description: A label for the device (a plug's reading is named after this).
+    Device:
+      type: object
+      required: [id, kind, host, online]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [refoss, shelly_plug, pc]
+        host:
+          type: string
+          description: Empty for `pc`, which pushes instead of being polled.
+        name:
+          type: string
+        model:
+          type: string
+          description: As the device reports it, for example `em06p`.
+        online:
+          type: boolean
+        last_seen:
+          type: [string, 'null']
+          format: date-time
+    Channel:
+      type: object
+      required: [id, device_id, scope, label, enabled]
+      properties:
+        id:
+          type: string
+        device_id:
+          type: string
+        index:
+          type: [integer, 'null']
+          description: The channel number on the device, when it has one.
+        scope:
+          $ref: '#/components/schemas/Scope'
+        label:
+          type: string
+          description: What the user calls it, for example "Dryer" or "EV charger".
+        enabled:
+          type: boolean
+          description: A switched-off channel is not shown or counted but its history is kept.
+        max_watts:
+          type: [number, 'null']
+          description: The sanity cap; a reading above it is dropped.
+    ChannelUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 60
+        enabled:
+          type: boolean
+    Reading:
+      type: object
+      required: [channel_id, watts]
+      properties:
+        channel_id:
+          type: string
+        watts:
+          type: number
+        volts:
+          type: [number, 'null']
+        amps:
+          type: [number, 'null']
+    Live:
+      type: object
+      required: [time, readings, house_watts, notes]
+      properties:
+        time:
+          type: string
+          format: date-time
+        readings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reading'
+        house_watts:
+          type: [number, 'null']
+          description: The sum of the `mains` readings only; null when no mains channel answered.
+        notes:
+          type: array
+          items:
+            type: string
+    SeriesPoint:
+      type: object
+      required: [t, avg_watts, max_watts, kwh]
+      properties:
+        t:
+          type: string
+          format: date-time
+          description: Start of the bucket.
+        avg_watts:
+          type: number
+        max_watts:
+          type: number
+        kwh:
+          type: number
+    Series:
+      type: object
+      required: [channel_id, bucket, points]
+      properties:
+        channel_id:
+          type: string
+        bucket:
+          $ref: '#/components/schemas/Bucket'
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesPoint'
+    ChannelSummary:
+      type: object
+      required: [channel_id, scope, kwh]
+      properties:
+        channel_id:
+          type: string
+        scope:
+          $ref: '#/components/schemas/Scope'
+        kwh:
+          type: number
+        cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        carbon_g:
+          type: [number, 'null']
+          description: Grams of CO2e, an average-grid estimate (always shown as approximate).
+        peak_watts:
+          type: [number, 'null']
+        monitored_hours:
+          type: number
+          description: Hours inside the period in which this channel actually reported.
+    Summary:
+      type: object
+      required: [from, to, channels, house_kwh]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelSummary'
+        house_kwh:
+          type: [number, 'null']
+          description: Energy of the `mains` channels only; null when there is none.
+        house_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        unmetered_kwh:
+          type: [number, 'null']
+          description: |
+            `house_kwh` minus the energy of the enabled `circuit` channels, never below zero: what no circuit
+            clamp accounts for. Derived, so shown as its own row and never added to anything.
+        carbon_estimated_share:
+          type: [number, 'null']
+          description: The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity.
+    RateMode:
+      type: string
+      enum: [one, bills, lookup]
+    Bill:
+      type: object
+      required: [start, end, total, kwh]
+      properties:
+        start:
+          type: string
+          format: date
+          description: First local day the bill covers.
+        end:
+          type: string
+          format: date
+          description: Last local day the bill covers. Two bills may not share a day.
+        total:
+          $ref: '#/components/schemas/Money'
+        flat_fees:
+          $ref: '#/components/schemas/Money'
+        kwh:
+          type: number
+          exclusiveMinimum: 0
+    RateConfig:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          $ref: '#/components/schemas/RateMode'
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: USD
+        fixed_rate:
+          $ref: '#/components/schemas/Money'
+        bills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bill'
+        tariff_label:
+          type: [string, 'null']
+          description: The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side.
+    CarbonConfig:
+      type: object
+      required: [configured]
+      properties:
+        configured:
+          type: boolean
+          description: Whether a key is saved. The key itself is never returned.
+        place:
+          type: string
+          description: A zone code, or "lat, lon".
+        last_outcome:
+          type: [string, 'null']
+          description: What the last fetch said, in plain language.
+        last_fetch:
+          type: [string, 'null']
+          format: date-time
+    CarbonUpdate:
+      type: object
+      properties:
+        place:
+          type: string
+        key:
+          type: string
+          writeOnly: true
+          description: Omit to keep the saved key.
+    IngestScope:
+      type: string
+      description: The PC collector's own reading scopes, kept as they are in its code.
+      enum: [component, breakdown, wall, peripheral]
+    PcReading:
+      type: object
+      required: [name, scope, avg_watts, max_watts, samples]
+      properties:
+        name:
+          type: string
+        scope:
+          $ref: '#/components/schemas/IngestScope'
+        kind:
+          type: string
+          enum: [other, cpu, gpu]
+        avg_watts:
+          type: number
+        max_watts:
+          type: number
+        samples:
+          type: integer
+          minimum: 1
+          description: How many once-a-second readings the minute is made of.
+    PcProgram:
+      type: object
+      required: [name, kwh]
+      properties:
+        name:
+          type: string
+          description: A short label such as `chrome.exe` or `python.exe (ComfyUI)`; never a command line.
+        kwh:
+          type: number
+          description: An estimate. Never added to the sensor or wall figures.
+    PcGap:
+      type: object
+      required: [from, to, reason]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          enum: [asleep, off, lost_power]
+        plug_kwh:
+          type: [number, 'null']
+          description: Energy the wall plug's own counter recorded across the gap, when it could be read.
+    PcMinute:
+      type: object
+      required: [minute, readings]
+      properties:
+        minute:
+          type: string
+          format: date-time
+          description: The start of the minute, on a whole minute, in UTC.
+        readings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcReading'
+        programs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcProgram'
+        total_peak_watts:
+          type: [number, 'null']
+          description: The highest once-a-second reading of the sensors' total in the minute.
+    PcIngest:
+      type: object
+      required: [api_version, source_id, minutes]
+      properties:
+        api_version:
+          type: integer
+          const: 1
+        source_id:
+          type: string
+          description: A stable id for this PC, kept in its settings.
+        source_name:
+          type: string
+        minutes:
+          type: array
+          maxItems: 1440
+          items:
+            $ref: '#/components/schemas/PcMinute'
+        gaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcGap'
+    IngestResult:
+      type: object
+      required: [api_version, accepted]
+      properties:
+        api_version:
+          type: integer
+          const: 1
+        accepted:
+          type: integer
+          description: How many minutes were stored (new or replaced).
+        notes:
+          type: array
+          items:
+            type: string

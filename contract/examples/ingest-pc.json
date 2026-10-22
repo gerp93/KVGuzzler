@@ -1,0 +1,25 @@
+{
+  "api_version": 1,
+  "source_id": "pc-7f3a9c1e",
+  "source_name": "Desktop",
+  "minutes": [
+    {
+      "minute": "2026-10-22T18:03:00Z",
+      "readings": [
+        { "name": "CPU package", "scope": "component", "kind": "cpu", "avg_watts": 61.4, "max_watts": 118.0, "samples": 60 },
+        { "name": "CPU cores", "scope": "breakdown", "kind": "cpu", "avg_watts": 49.0, "max_watts": 96.2, "samples": 60 },
+        { "name": "RTX 5070 Ti", "scope": "component", "kind": "gpu", "avg_watts": 214.7, "max_watts": 301.5, "samples": 60 },
+        { "name": "Wall meter", "scope": "wall", "kind": "other", "avg_watts": 312.5, "max_watts": 355.0, "samples": 60 },
+        { "name": "Monitor", "scope": "peripheral", "kind": "other", "avg_watts": 28.1, "max_watts": 31.0, "samples": 59 }
+      ],
+      "programs": [
+        { "name": "python.exe (ComfyUI)", "kwh": 0.0031 },
+        { "name": "chrome.exe", "kwh": 0.0004 }
+      ],
+      "total_peak_watts": 402.3
+    }
+  ],
+  "gaps": [
+    { "from": "2026-10-22T02:10:00Z", "to": "2026-10-22T06:41:00Z", "reason": "asleep", "plug_kwh": 0.071 }
+  ]
+}
