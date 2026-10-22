@@ -45,6 +45,7 @@ public partial class MainWindow
         };
         ExportCsvButton.Click += async (_, _) => await ChooseExportAsync();
         TestPeripheralButton.Click += async (_, _) => await TestPeripheralAsync();
+        OpenPeripheralButton.Click += async (_, _) => await OpenTypedPeripheralPageAsync();
         AddPeripheralButton.Click += async (_, _) => await AddPeripheralAsync();
         RebuildPeripherals();
     }
@@ -90,16 +91,20 @@ public partial class MainWindow
             var name = new TextBox { Text = meter.Label, Width = 180, MaxLength = PeripheralMeter.MaxLabelLength, VerticalAlignment = VerticalAlignment.Center };
             var rename = new Button { Content = "Rename", VerticalAlignment = VerticalAlignment.Center };
             rename.Click += (_, _) => RenamePeripheral(meter, name.Text);
+            var open = new Button { Content = "Open in browser", VerticalAlignment = VerticalAlignment.Center };
+            open.Click += async (_, _) => await OpenPlugPageAsync(meter.Host, PeripheralStatusText);
             var remove = new Button { Content = "Remove", VerticalAlignment = VerticalAlignment.Center };
             remove.Click += (_, _) => RemovePeripheral(meter);
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), ColumnSpacing = 12 };
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), ColumnSpacing = 12 };
             row.Children.Add(name);
             Grid.SetColumn(rename, 1);
             row.Children.Add(rename);
             var host = new TextBlock { Text = meter.Host, Classes = { "caption" }, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(host, 2);
             row.Children.Add(host);
-            Grid.SetColumn(remove, 3);
+            Grid.SetColumn(open, 3);
+            row.Children.Add(open);
+            Grid.SetColumn(remove, 4);
             row.Children.Add(remove);
             PeripheralSettingsList.Children.Add(row);
         }
@@ -122,6 +127,18 @@ public partial class MainWindow
             return null;
         }
         return meter;
+    }
+
+    /// <summary>Opens the plug at the address typed in the box (before it is added), so it can be looked at on the network.</summary>
+    internal async Task OpenTypedPeripheralPageAsync()
+    {
+        var host = PeripheralHostBox.Text?.Trim();
+        if (string.IsNullOrEmpty(host) || !WallMeterConfig.IsValidHost(host))
+        {
+            PeripheralStatusText.Text = "Enter just the plug's address first (like 192.168.1.51), without http:// or a path.";
+            return;
+        }
+        await OpenPlugPageAsync(host, PeripheralStatusText);
     }
 
     internal async Task TestPeripheralAsync()

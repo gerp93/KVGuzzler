@@ -231,7 +231,7 @@ public partial class MainWindow
         if (includeChart)
         {
             ShowChart(read);
-            ShowStats(read.Stats);
+            ShowStats(read.Stats, read.Rates?.Schedule);
             ShowPeripheralsPeriod(read.Peripherals, read.Rates?.Schedule);
             _averageUse = read.Use;
             RefreshEstimate();

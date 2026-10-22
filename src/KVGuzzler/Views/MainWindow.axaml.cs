@@ -481,10 +481,19 @@ public partial class MainWindow : Window
 
     // ----- Help and updates -------------------------------------------------------------
 
+    /// <summary>How a link is opened; the system browser unless a test says otherwise.</summary>
+    internal Func<Uri, Task>? UriLauncher { get; set; }
+
     private async Task OpenLinkAsync(string url)
     {
+        var uri = new Uri(url);
+        if (UriLauncher is { } custom)
+        {
+            await custom(uri);
+            return;
+        }
         var launcher = TopLevel.GetTopLevel(this)?.Launcher;
-        if (launcher is not null) await launcher.LaunchUriAsync(new Uri(url));
+        if (launcher is not null) await launcher.LaunchUriAsync(uri);
     }
 
     public async Task CheckForUpdatesAsync()

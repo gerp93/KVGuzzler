@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Controls;
+using KVGuzzler.Core.Billing;
 using KVGuzzler.Core.History;
 using KVGuzzler.Data;
 
@@ -66,8 +67,9 @@ public partial class MainWindow
             spinner.Classes.Set("busy", busy);
     }
 
-    private void ShowStats(UsageStat? stat)
+    private void ShowStats(UsageStat? stat, RateSchedule? schedule = null)
     {
+        ShowRateNote(stat, schedule);
         if (stat is null)
         {
             StatEnergyText.Text = "-";
@@ -102,6 +104,28 @@ public partial class MainWindow
         StatCostCaption.Text = stat.Cost is null ? "Set your electricity rate (or a bill) in Settings."
             : stat.PriceEstimated ? "Part of this uses an estimated price, until you enter your next bill."
             : "Priced at the rate for each day.";
+    }
+
+    /// <summary>The footnote on the Cost card saying which rate the price comes from, when it is a looked-up tariff: the utility, the rate's
+    /// name, what it averages to over the period, and that it is only the energy charge. Hidden for the other two sources, which are
+    /// the user's own figures.</summary>
+    private void ShowRateNote(UsageStat? stat, RateSchedule? schedule)
+    {
+        StatRateNote.IsVisible = schedule is { Mode: RateMode.Lookup };
+        if (schedule is not { Mode: RateMode.Lookup }) return;
+
+        var currency = _services.Database?.GetSetting(SettingKeys.Currency) ?? "$";
+        if (schedule.Tariff is not { } tariff)
+        {
+            StatRateNote.Text = "Rate lookup is on, but no rate has been chosen yet, so your single rate is used. Choose one in Settings.";
+            return;
+        }
+
+        // What the period really averaged to (its cost over its energy), else what the tariff works out to today at the usual hours.
+        decimal? average = stat is { Cost: { } cost, Kwh: > 0 } ? cost / (decimal)stat.Kwh : schedule.RateAt(DateOnly.FromDateTime(DateTime.Now));
+        StatRateNote.Text = $"Rate: {tariff.Utility}, {tariff.Name} (from OpenEI)"
+            + (average is { } price ? $" · averaging {currency}{price.ToString("0.0000", CultureInfo.CurrentCulture)} per kWh at the hours you use power" : "")
+            + " · energy charge only: fixed fees, riders and taxes are not in it";
     }
 
     /// <summary>The fourth card: the highest power drawn in the period and when. The whole PC at the wall when there is a meter,

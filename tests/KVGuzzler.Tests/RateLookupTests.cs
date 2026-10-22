@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
 using KVGuzzler.Collector;
 using KVGuzzler.Core.Billing;
 using KVGuzzler.Core.History;
@@ -503,6 +504,81 @@ public class RateLookupUiTests
             await Task.Delay(100, TestContext.Current.CancellationToken);
             Assert.Equal(expected, lookup.Refreshes);
         }
+    }
+
+    private static async Task<TempData> LookupDashboardAsync(Action<TempData>? beforeShow = null)
+    {
+        var t = new TempData();
+        t.Services.QueryCollectorService = () => ServiceState.Running;
+        t.Services.Database!.SetSetting(SettingKeys.RatePerKwh, "0.50");
+        t.Services.Database.SetSetting(SettingKeys.Currency, "$");
+        beforeShow?.Invoke(t);
+        var minute = DateTimeOffset.UtcNow.AddMinutes(-30).ToUnixTimeSeconds() / 60 * 60;
+        using var store = new HistoryStore(Path.Combine(t.HistoryDir, HistoryStore.FileName));
+        store.AddMinutes(new[] { new MinuteRow(minute, WallMeterSource.ReadingName, ReadingScope.Wall, 1.0, 60, 300) });
+        store.SetLive(DateTimeOffset.UtcNow, new List<PowerReading> { new(WallMeterSource.ReadingName, 200, ReadingScope.Wall) }, Array.Empty<string>());
+        await Task.CompletedTask;
+        return t;
+    }
+
+    [AvaloniaFact]
+    public async Task TheCostCardSaysWhichLookedUpRateItIsUsing()
+    {
+        UseInvariantCulture();
+        // A flat tariff, so the price does not depend on what hour the test happens to run in.
+        using var t = await LookupDashboardAsync(x =>
+        {
+            x.Services.Database!.SetSetting(SettingKeys.RateMode, "lookup");
+            x.Services.Database.SetSetting(SettingKeys.RateLookupTariff, Candidate(OpenEiJson.Flat(rate: 0.12)).Tariff.ToJson());
+        });
+        var window = new MainWindow(t.Services);
+        window.Show();
+        await window.RefreshCollectorAsync(includeService: true);
+
+        Assert.True(window.StatRateNote.IsVisible);
+        Assert.Equal("Rate: Example Electric, Residential Standard (from OpenEI) · averaging $0.1200 per kWh at the hours you use power"
+                     + " · energy charge only: fixed fees, riders and taxes are not in it", window.StatRateNote.Text);
+        Assert.Equal("$0.12", window.StatCostText.Text);   // 1 kWh at that rate, so the note and the number agree
+    }
+
+    [AvaloniaFact]
+    public async Task TheFootnoteIsOnlyForALookedUpRate_AndSaysSoWhenNoneIsChosenYet()
+    {
+        UseInvariantCulture();
+        using var t = await LookupDashboardAsync(x => x.Services.Database!.SetSetting(SettingKeys.RateMode, "lookup"));   // on, but no tariff saved
+        var window = new MainWindow(t.Services);
+        window.Show();
+        await window.RefreshCollectorAsync(includeService: true);
+        Assert.True(window.StatRateNote.IsVisible);
+        Assert.Contains("no rate has been chosen yet", window.StatRateNote.Text);
+        Assert.Contains("single rate is used", window.StatRateNote.Text);
+
+        window.RateModeBox.SelectedIndex = 0;   // the fixed rate: the user's own figure, nothing to footnote
+        await window.RefreshCollectorAsync(includeService: false);
+        Assert.False(window.StatRateNote.IsVisible);
+        window.RateModeBox.SelectedIndex = 1;   // and bills
+        await window.RefreshCollectorAsync(includeService: false);
+        Assert.False(window.StatRateNote.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void TheSettingsPageKeepsTheTwoMeterCardsTogetherWithCarbonAfterThem()
+    {
+        UseInvariantCulture();
+        using var t = new TempData();
+        var window = new MainWindow(t.Services);
+        window.Show();
+
+        Border Card(Control c) => c.GetLogicalAncestors().OfType<Border>().First(b => b.Classes.Contains("card"));
+        var wall = Card(window.WallHostBox);
+        var other = Card(window.PeripheralSettingsList);
+        var carbon = Card(window.CarbonSourceBox);
+        var cards = ((Panel)wall.Parent!).Children;
+
+        Assert.Same(wall.Parent, other.Parent);
+        Assert.Same(wall.Parent, carbon.Parent);
+        Assert.Equal(cards.IndexOf(wall) + 1, cards.IndexOf(other));     // the wall meter and the other meters sit side by side
+        Assert.True(cards.IndexOf(carbon) > cards.IndexOf(other));       // carbon is not between them
     }
 
     [AvaloniaFact]
