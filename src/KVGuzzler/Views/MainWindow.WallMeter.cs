@@ -1,4 +1,5 @@
 using System.Globalization;
+using Avalonia.Controls;
 using KVGuzzler.Core.Power;
 
 namespace KVGuzzler.Views;
@@ -13,6 +14,7 @@ public partial class MainWindow
     {
         WallHostBox.Text = WallMeterConfig.Load(WallConfigPath)?.Host ?? "";
         TestWallButton.Click += async (_, _) => await TestWallMeterAsync();
+        OpenWallButton.Click += async (_, _) => await OpenWallMeterPageAsync();
         SaveWallButton.Click += async (_, _) => await SaveWallMeterAsync();
         RemoveWallButton.Click += (_, _) => RemoveWallMeter();
         RefreshSleepCard();
@@ -37,6 +39,31 @@ public partial class MainWindow
             return null;
         }
         return host;
+    }
+
+    /// <summary>The page of a plug: the plain address in a browser, so the plug can be looked at (and set up) on the network. Only ever
+    /// <c>http://</c> and the host that passed <see cref="WallMeterConfig.IsValidHost"/>, never a path.</summary>
+    internal static string PlugPageUrl(string host) => $"http://{host}/";
+
+    internal async Task OpenWallMeterPageAsync()
+    {
+        if (TypedHost() is not { } host) return;
+        await OpenPlugPageAsync(host, WallStatusText);
+    }
+
+    /// <summary>Opens a plug's own page in the system browser, and says so (or why not) in <paramref name="status"/>.</summary>
+    private async Task OpenPlugPageAsync(string host, TextBlock status)
+    {
+        try
+        {
+            await OpenLinkAsync(PlugPageUrl(host));
+            status.Text = $"Opened http://{host}/ in your browser. It only loads from a computer on the same network as the plug.";
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // An optional convenience must never close the app: say what happened instead.
+            status.Text = "Could not open the browser: " + e.Message;
+        }
     }
 
     internal async Task TestWallMeterAsync()

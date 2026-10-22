@@ -67,7 +67,8 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   plug's own `aenergy.total` like the wall meter (`gap_peripherals` table, `IPeripheralEnergyCounters`, counters saved in `meta` so a
   restart can fill too); that energy is in `PeripheralKwh`/`QueryPeripherals` (as `GapKwh`), never sampled and never in the chart. A
   meter that stops answering is named in the live notes (`IPowerSourceNotes`). Export (Dashboard > Energy history) is
-  `HistoryExport.DailyCsv`, one row per local day; labels that could run as a spreadsheet formula are written as text. Removing a meter
+  `HistoryExport.DailyCsv`, one row per local day; each plug row has an "Open in browser" button (`PlugPageUrl`: only `http://` + a host that
+  passed `IsValidHost`, never a path; `MainWindow.UriLauncher` is the test seam); labels that could run as a spreadsheet formula are written as text. Removing a meter
   leaves its history but stops counting it.
 - **Rate source is a choice of three** (Settings > Electricity rate > "Price from"; `SettingKeys.RateMode`: `one`, `bills`, `lookup`;
   `RateMode`): one fixed rate, per-bill prices, or a **looked-up tariff** from the OpenEI Utility Rate Database (`OpenEiClient`, window only,
@@ -78,7 +79,8 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
   day** (`RateSchedule.RateAt`), so in lookup mode a day's price is the grid weighted by `UsageProfile` (the share of usage in each hour,
   weekday/weekend, learned from the last 60 days of history on the background read, at most hourly, only for a tariff that varies by
   time). Today's tariff is applied to the past as well; bills are the exact figure. A saved tariff over a week old is fetched again by its
-  label when the window opens (the old one is kept if that fails). **Not checked against the real service**: written from OpenEI's
+  label when the window opens (the old one is kept if that fails). With a looked-up tariff the Cost card carries a footnote
+  (`StatRateNote`) naming the utility, the rate, what the period averaged to per kWh, and that it is the energy charge only. **Not checked against the real service**: written from OpenEI's
   documented field list (the docs give no full sample answer), parsing leaves out what it cannot make sense of.
 - **Carbon footprint (two sources, chosen in Settings: Electricity Maps or EIA).** `CarbonConfig.Source` (`CarbonSources`; files without one are
   Electricity Maps). **EIA** (`EiaClient`, US only, free registration key as a query parameter to `api.eia.gov` only) reads hourly generation by
