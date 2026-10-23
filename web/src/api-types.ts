@@ -128,6 +128,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The house's energy over the rolling periods (hour, day, week, month, year, all time).
+         * @description One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains channel is shown.
+         */
+        get: operations["getHouseHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the cost estimator needs for the house.
+         * @description Today's price per kWh, and what the house (the mains) really used per day over a window, counting every hour, averaged over the time
+         *     actually recorded. `usage` is null when less than an hour has been recorded.
+         */
+        get: operations["getHouseEstimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The house's daily energy and cost over a period, as a CSV download.
+         * @description One row per local day: the house (the mains), each circuit on its own, the day's cost of the house at that day's price (blank when no
+         *     price is known), and its estimated CO2 once any grid intensity has been saved. A label a spreadsheet could run as a formula is written as text.
+         */
+        get: operations["exportHouseCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/summary": {
         parameters: {
             query?: never;
@@ -660,6 +722,33 @@ export interface components {
             cost_estimated?: boolean;
             /** @description The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity. */
             carbon_estimated_share?: number | null;
+            /** @description The mains channels' highest draws added. An upper bound: the legs need not peak in the same second. */
+            house_peak_watts?: number | null;
+            /** @description The mains channels' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved. */
+            house_carbon_g?: number | null;
+            /** @description The part of the house's energy whose carbon was worked out at an average because its own hour had no saved intensity. */
+            house_carbon_estimated_kwh?: number | null;
+        };
+        HouseHistoryPeriod: {
+            /** @enum {string} */
+            key: "1h" | "24h" | "7d" | "30d" | "1y" | "all";
+            label: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description The `mains` channels' energy only. */
+            kwh: number;
+            cost?: components["schemas"]["Money"] | null;
+            cost_estimated: boolean;
+            /** @description An upper bound (the mains legs' peaks added). */
+            peak_watts?: number | null;
+            carbon_g?: number | null;
+            carbon_estimated_kwh?: number | null;
+        };
+        HouseHistory: {
+            /** @description Empty when no mains channel is shown. */
+            periods: components["schemas"]["HouseHistoryPeriod"][];
         };
         /** @enum {string} */
         RateMode: "one" | "bills" | "lookup";
@@ -1294,6 +1383,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Series"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    getHouseHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseHistory"];
+                };
+            };
+        };
+    };
+    getHouseEstimate: {
+        parameters: {
+            query?: {
+                /** @description How far back to average. Default 7d. */
+                window?: "24h" | "7d" | "30d" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerEstimate"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    exportHouseCsv: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, sent as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
             400: components["responses"]["Problem"];

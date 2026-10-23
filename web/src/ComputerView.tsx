@@ -8,7 +8,7 @@ import { PcLiveCard } from './PcLiveCard';
 import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
-  COUNT_PC, carbonNote, countedTotals, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
+  COUNT_PC, carbonNote, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
   type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
@@ -189,9 +189,12 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
           )}
 
           <Estimator
-            id={id}
-            plugIds={detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid))}
-            includePc={!off.has(COUNT_PC)}
+            load={(window) =>
+              api.computerEstimate(id, window, detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid)), !off.has(COUNT_PC))
+            }
+            deps={[id, detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid)).join(','), off.has(COUNT_PC)]}
+            basisOf={usageBasis}
+            who="the PC"
             nowWatts={nowWatts}
             nowWhat={nowWhat}
           />

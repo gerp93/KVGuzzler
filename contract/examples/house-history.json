@@ -1,0 +1,28 @@
+{
+  "periods": [
+    {
+      "key": "24h",
+      "label": "Last 24 hours",
+      "from": "2026-10-21T18:05:00Z",
+      "to": "2026-10-22T18:05:00Z",
+      "kwh": 41.7,
+      "cost": "5.84",
+      "cost_estimated": false,
+      "peak_watts": 14200.0,
+      "carbon_g": 15400.0,
+      "carbon_estimated_kwh": 3.2
+    },
+    {
+      "key": "all",
+      "label": "All time",
+      "from": "2000-01-01T00:00:00Z",
+      "to": "2026-10-22T18:05:00Z",
+      "kwh": 310.4,
+      "cost": null,
+      "cost_estimated": false,
+      "peak_watts": null,
+      "carbon_g": null,
+      "carbon_estimated_kwh": null
+    }
+  ]
+}

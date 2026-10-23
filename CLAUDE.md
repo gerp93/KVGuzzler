@@ -82,6 +82,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   and again when read); the window only navigates to the server's origin or its own two pages, anything else opens in the browser (http/https
   only); sandboxed, context-isolated, and only its own `file:` pages may use the IPC (the remote dashboard gets no bridge). It bundles no copy of the
   dashboard, so a server update updates every UI. **Releases:** `release-viewer.yml` (manual) publishes the unsigned installer as a **pre-release** tagged `viewer-vX.Y.Z`, never a plain `vX.Y.Z`: those tags are the desktop app's, and its Velopack updater reads this repo's releases (non-pre-releases only). The viewer's Help > Check for updates only offers the download page; there is no silent updater.
+- **The main dashboard (Live) has the same kinds of figure as a computer's page**, for the house (the mains alone): period picker, energy, cost, right now, max draw
+  (`house_peak_watts`, an upper bound: the legs' peaks added), the carbon line, the rate note, each circuit's energy/cost/share of the house, `GET /estimate`,
+  `GET /history` and `GET /export.csv` (the house and each circuit per day) and a house chart. None of it adds a circuit or plug to the house.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the
