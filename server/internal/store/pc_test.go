@@ -117,3 +117,38 @@ func TestPcGapsAreClippedAndTheirPlugEnergyIsSharedEvenly(t *testing.T) {
 		t.Errorf("gaps = %+v, want both, the second without a plug figure", all.Gaps)
 	}
 }
+
+func TestASensorWhoseKindWasLearnedLaterIsOneLineWithTheSpecificKind(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	start := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	reading := func(kind string) pcrelay.Reading {
+		return pcrelay.Reading{Name: "CPU package", Scope: "component", Kind: kind, AvgWatts: 100, MaxWatts: 110, Samples: 60}
+	}
+	in := pcrelay.Ingest{APIVersion: 1, SourceID: "pc-1", Minutes: []pcrelay.Minute{
+		{Minute: start, Readings: []pcrelay.Reading{reading("other")}},                    // saved before the kind was known
+		{Minute: start.Add(time.Minute), Readings: []pcrelay.Reading{reading("")}},        // none sent
+		{Minute: start.Add(2 * time.Minute), Readings: []pcrelay.Reading{reading("cpu")}}, // saved after
+	}}
+	if _, err := s.IngestPC(ctx, in, start.Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	src, _ := s.PcSourceSummary(ctx, "pc-1", start, start.Add(time.Hour))
+	if len(src.Components) != 1 || src.Components[0].Kind != "cpu" {
+		t.Fatalf("components = %+v, want one line of kind cpu", src.Components)
+	}
+	if want := 100.0 * 180 / 3.6e6; math.Abs(src.Components[0].KWh-want) > 1e-12 {
+		t.Errorf("kWh = %v, want all three minutes in the one line (%v)", src.Components[0].KWh, want)
+	}
+
+	// A sensor that never had a kind stays "other".
+	other := pcrelay.Ingest{APIVersion: 1, SourceID: "pc-2", Minutes: []pcrelay.Minute{{Minute: start, Readings: []pcrelay.Reading{{Name: "Fan", Scope: "component", AvgWatts: 5, MaxWatts: 6, Samples: 60}}}}}
+	if _, err := s.IngestPC(ctx, other, start.Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	src2, _ := s.PcSourceSummary(ctx, "pc-2", start, start.Add(time.Hour))
+	if len(src2.Components) != 1 || src2.Components[0].Kind != "other" {
+		t.Errorf("components = %+v, want kind other", src2.Components)
+	}
+}
