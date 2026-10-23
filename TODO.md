@@ -147,7 +147,8 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - **Parity with the window, in progress** (the window stays until the dashboard does everything it does). Done: per-minute sensors, the wall
     breakdown and programs (relay), gaps with reasons, and now the **live look** (Right now with each part's share of the PC and "everything else",
     live per-program watts with the idle level, notes, Max draw, Recent runs; the per-component chart with shaded gaps). Programs now carry a cost (estimated; at the period's average price, runs at the price on the day they ended), the split bar and legend, and "how this is worked out". The energy history list (hour to all time, gaps by reason), the daily CSV export (formula-safe labels) and the year and all-time periods are done. The cost estimator (constant load, right now, my usage over a window; today's price and the real average per day come from the server) and the Count ticks (PC and each plug, in the figures, max draw and the estimator) are done. Still to do, in order:
-    the OpenEI tariff lookup and the carbon footprint (both ports, with the currency symbol and the carbon columns of the CSV). The Help tab (version,
+    the carbon footprint (Electricity Maps and EIA, with the carbon columns of the CSV). The OpenEI tariff lookup (key saved write-only, search by address, the
+    rate in use, the weekly refresh, the usage-weighted day price, the footnote) and the currency symbol are done, **not checked against the real OpenEI**. The Help tab (version,
     links, how to read the numbers) and the read-only database card are done.
   - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the
     reason, and the setup form refuses a bad address and saves a good one). Still to do: a release (the tag namespace is shared with the

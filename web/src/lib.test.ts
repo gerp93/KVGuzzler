@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, BASELINE, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -374,5 +374,26 @@ describe('the cost estimator', () => {
 describe('file sizes', () => {
   it('reads in bytes, KB, MB and GB', () => {
     expect([formatBytes(812), formatBytes(217_088), formatBytes(3_565_158), formatBytes(5_000_000_000)]).toEqual(['812 B', '212 KB', '3.4 MB', '4.7 GB']);
+  });
+});
+
+describe('currency and the looked-up price note', () => {
+  it('shows the sign of the saved currency on every amount, and the code when there is no sign', () => {
+    expect([currencySymbol('USD'), currencySymbol('EUR'), currencySymbol('GBP'), currencySymbol('SEK'), currencySymbol(undefined)]).toEqual(['$', '€', '£', 'SEK ', '$']);
+    setCurrencyCode('EUR');
+    expect(formatMoney('12.3')).toBe('€12.30');
+    expect(formatMoney('-1', true)).toBe('≈ -€1.00');
+    setCurrencyCode('SEK');
+    expect(formatMoney('2')).toBe('SEK 2.00');
+    setCurrencyCode('USD');
+    expect(formatMoney('12.3')).toBe('$12.30');
+  });
+
+  it('names the utility and rate, what the period averaged to, and what is left out', () => {
+    const tariff = { utility: 'Example Electric', name: 'Residential Time of Use', tiers: 2, fixed_charge: '6.75 $/month', varies_by_time: true };
+    expect(tariffNote(tariff, 10, '1.50')).toBe(
+      'Priced at Example Electric: Residential Time of Use; this period averaged $0.1500 per kWh, weighted by when the power is used. The energy charge only; the fixed charge (6.75 $/month) is not in it; only the first usage tier is used.',
+    );
+    expect(tariffNote({ ...tariff, tiers: 1, fixed_charge: null, varies_by_time: false }, 0, null)).toBe('Priced at Example Electric: Residential Time of Use. The energy charge only.');
   });
 });

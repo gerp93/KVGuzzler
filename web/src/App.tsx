@@ -5,7 +5,7 @@ import { HelpView } from './HelpView';
 import { HistoryView } from './HistoryView';
 import { usePoll, useStored } from './hooks';
 import { LiveView } from './LiveView';
-import { DEFAULT_THEME, isTheme, type Channel } from './lib';
+import { DEFAULT_THEME, isTheme, setCurrencyCode, type Channel } from './lib';
 import { routePath, useRoute } from './route';
 import { SettingsView } from './SettingsView';
 
@@ -30,6 +30,9 @@ export function App() {
   const [rev, setRev] = useState(0);
   const status = usePoll(api.status, 30_000, []);
   const chan = usePoll<Channel[]>(() => api.channels(), 0, [rev]);
+  // Every amount is shown in the currency of the saved price settings.
+  const rateSettings = usePoll(api.rates, 60_000, [rev]);
+  setCurrencyCode(rateSettings.data?.currency);
 
   const mismatch = [status.error, chan.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
   const active: TabId = TABS.find((t) => t.id === route.tab)?.id ?? 'live';

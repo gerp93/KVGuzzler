@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import { SUSPICIOUSLY_HIGH_RATE, formatMoney, type Bill, type FixedFee, type RateConfig } from './lib';
+import { TariffPicker } from './TariffPicker';
+import { SUSPICIOUSLY_HIGH_RATE, currencySymbol, formatMoney, setCurrencyCode, type Bill, type FixedFee, type RateConfig, type TariffInfo } from './lib';
 
 const blankBill = { start: '', end: '', total: '', kwh: '', fees: [] as { label: string; amount: string }[] };
 
@@ -14,9 +15,11 @@ export function RatesCard() {
   const [message, setMessage] = useState('');
   const [saved, setSaved] = useState(false);
   const [draft, setDraft] = useState(blankBill);
+  const [tariff, setTariff] = useState<TariffInfo>();
 
   useEffect(() => {
     api.rates().then(setCfg, (e: Error) => setMessage(e.message));
+    api.tariff().then(setTariff, () => undefined);
   }, []);
   if (!cfg) return <section class="card"><h2>Electricity price</h2><p class="note">{message || 'Loading…'}</p></section>;
 
@@ -42,8 +45,10 @@ export function RatesCard() {
     api.setRates(cfg).then(
       (r) => {
         setCfg(r);
+        setCurrencyCode(r.currency);
         setSaved(true);
         setMessage('');
+        api.tariff().then(setTariff, () => undefined);
       },
       (e: Error) => setMessage(e.message),
     );
@@ -67,11 +72,22 @@ export function RatesCard() {
         <select value={cfg.mode} onChange={(e) => change({ ...cfg, mode: (e.target as HTMLSelectElement).value as RateConfig['mode'] })}>
           <option value="one">One rate</option>
           <option value="bills">My bills</option>
+          <option value="lookup">A utility's published rate</option>
         </select>
       </label>
 
       <label class="field">
-        <span>{cfg.mode === 'bills' ? 'Rate for days before the first bill ($ per kWh)' : 'Rate ($ per kWh)'}</span>
+        <span>Currency (three-letter code)</span>
+        <input
+          maxLength={3}
+          placeholder="USD"
+          value={cfg.currency ?? 'USD'}
+          onInput={(e) => change({ ...cfg, currency: (e.target as HTMLInputElement).value.toUpperCase() })}
+        />
+      </label>
+
+      <label class="field">
+        <span>{cfg.mode === 'bills' ? `Rate for days before the first bill (${currencySymbol(cfg.currency).trim()} per kWh)` : cfg.mode === 'lookup' ? `Rate to use until a published rate is chosen (${currencySymbol(cfg.currency).trim()} per kWh)` : `Rate (${currencySymbol(cfg.currency).trim()} per kWh)`}</span>
         <input
           inputMode="decimal"
           placeholder="0.15"
@@ -84,6 +100,10 @@ export function RatesCard() {
         />
       </label>
       {looksLikeCents && <p class="note">That is more than $1 per kWh. Did you type cents? 15¢ is 0.15.</p>}
+
+      {cfg.mode === 'lookup' && (
+        <TariffPicker current={tariff} label={cfg.tariff_label} onChoose={(l) => change({ ...cfg, tariff_label: l })} />
+      )}
 
       {cfg.mode === 'bills' && (
         <>
@@ -107,7 +127,7 @@ export function RatesCard() {
             <legend>Add a bill</legend>
             {field('start', 'First day', 'date')}
             {field('end', 'Last day', 'date')}
-            {field('total', 'Total ($)')}
+            {field('total', `Total (${currencySymbol(cfg.currency)})`)}
             {field('kwh', 'kWh billed', 'number')}
             {draft.fees.map((f, i) => (
               <div class="fee" key={i}>

@@ -17,6 +17,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/api"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
+	"github.com/gerp93/KVGuzzler/server/internal/openei"
 	"github.com/gerp93/KVGuzzler/server/internal/sim"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
 	"github.com/gerp93/KVGuzzler/server/internal/webui"
@@ -83,7 +84,9 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 	}
 
 	root := http.NewServeMux()
-	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version, DatabasePath: dbPath}).Handler())
+	apiServer := &api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version, DatabasePath: dbPath, Lookup: &openei.Client{HTTP: &http.Client{}}}
+	go apiServer.RunRatesRefresh(ctx, time.Hour, log.Printf)
+	root.Handle("/api/", apiServer.Handler())
 	root.Handle("/", webui.Handler())
 	srv := &http.Server{Addr: listen, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	done := make(chan struct{})

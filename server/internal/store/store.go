@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -392,6 +393,35 @@ func (s *Store) DeviceChannels(ctx context.Context, deviceID string) ([]model.Ch
 			return nil, err
 		}
 		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// HourlyKWh is the energy the given channels together used in each hour of [from, to), by the unix second the hour starts. Only the
+// channels of one scope should be given (never the house and its circuits together: that would count the same power twice).
+func (s *Store) HourlyKWh(ctx context.Context, channelIDs []string, from, to time.Time) (map[int64]float64, error) {
+	out := map[int64]float64{}
+	if len(channelIDs) == 0 {
+		return out, nil
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(channelIDs)), ",")
+	args := make([]any, 0, len(channelIDs)+2)
+	for _, id := range channelIDs {
+		args = append(args, id)
+	}
+	args = append(args, from.Unix(), to.Unix())
+	rows, err := s.db.QueryContext(ctx, `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds) FROM minutes WHERE channel_id IN (`+marks+`) AND minute >= ? AND minute < ? GROUP BY 1`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hour int64
+		var ws float64
+		if err := rows.Scan(&hour, &ws); err != nil {
+			return nil, err
+		}
+		out[hour] = ws / joulesPerKWh
 	}
 	return out, rows.Err()
 }

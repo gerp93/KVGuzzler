@@ -1,0 +1,36 @@
+{
+  "candidates": [
+    {
+      "label": "flat-1",
+      "utility": "Example Electric",
+      "name": "Residential Standard",
+      "uri": "https://openei.org/apps/USURDB/rate/view/flat-1",
+      "fetched_at": "2026-10-22T18:00:00Z",
+      "summary": "Example Electric: Residential Standard \u00b7 $0.1200 per kWh",
+      "cheapest": 0.12,
+      "dearest": 0.12,
+      "varies_by_time": false,
+      "periods": 1,
+      "tiers": 1,
+      "fixed_charge": null,
+      "is_default": true,
+      "approved": false
+    },
+    {
+      "label": "tou-1",
+      "utility": "Example Electric",
+      "name": "Residential Time of Use",
+      "uri": null,
+      "fetched_at": "2026-10-22T18:00:00Z",
+      "summary": "Example Electric: Residential Time of Use \u00b7 $0.0800 to $0.2000 per kWh, 2 time-of-use periods",
+      "cheapest": 0.08,
+      "dearest": 0.2,
+      "varies_by_time": true,
+      "periods": 2,
+      "tiers": 2,
+      "fixed_charge": "6.75 $/month",
+      "is_default": false,
+      "approved": true
+    }
+  ]
+}

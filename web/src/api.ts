@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, Device, GroupDetail, Live, NewDevice, PcLive, PcSeries, RateConfig, Series, Status, Summary } from './lib';
+import type { ApplianceGroup, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -99,6 +99,15 @@ export const api = {
     }),
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
+  openEi: () => request<OpenEiStatus>('api/v1/openei'),
+  setOpenEiKey: (apiKey: string) =>
+    request<OpenEiStatus>('api/v1/openei', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey }),
+    }),
+  lookupRates: (address: string) => request<{ candidates: TariffCandidate[] }>(`api/v1/rates/lookup?${q({ address })}`).then((r) => r.candidates),
+  tariff: () => request<TariffInfo | undefined>('api/v1/rates/tariff'),
   setRates: (cfg: RateConfig) =>
     request<RateConfig>('api/v1/rates', {
       method: 'PUT',

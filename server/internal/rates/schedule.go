@@ -12,8 +12,8 @@ const (
 	ModeOne Mode = "one"
 	// ModeBills is each bill's price for the dates it covers.
 	ModeBills Mode = "bills"
-	// ModeLookup is a utility's published tariff. It is not built in the server yet, so a schedule in this mode
-	// prices with the single rate, as the desktop app does when it has no tariff.
+	// ModeLookup is a utility's published tariff from OpenEI: it gives the price of each hour, and a day's price is that weighted by the
+	// hours the power is really used. Without a tariff this mode prices with the single rate.
 	ModeLookup Mode = "lookup"
 )
 
@@ -37,10 +37,12 @@ type RatedCost struct {
 // an estimate (corrected the moment the next bill is entered); a day before the first bill uses the single rate, or the
 // first bill's price if there is none.
 type Schedule struct {
-	mode  Mode
-	flat  *Money
-	bills []Bill
-	loc   *time.Location
+	mode    Mode
+	flat    *Money
+	bills   []Bill
+	loc     *time.Location
+	tariff  *Tariff
+	profile UsageProfile
 }
 
 func NewSchedule(mode Mode, flat *Money, bills []Bill, loc *time.Location) *Schedule {
@@ -49,7 +51,7 @@ func NewSchedule(mode Mode, flat *Money, bills []Bill, loc *time.Location) *Sche
 	if loc == nil {
 		loc = time.Local
 	}
-	return &Schedule{mode: mode, flat: flat, bills: sorted, loc: loc}
+	return &Schedule{mode: mode, flat: flat, bills: sorted, loc: loc, profile: UniformProfile()}
 }
 
 func (s *Schedule) usesBills() bool { return s.mode == ModeBills && len(s.bills) > 0 }
@@ -65,6 +67,10 @@ func (s *Schedule) covering(day Date) *Bill {
 
 // RateAt is the price of a kWh on a local day, or nil when nothing is known.
 func (s *Schedule) RateAt(day Date) *Money {
+	if s.usesTariff() {
+		m := s.tariffRate(day)
+		return &m
+	}
 	if !s.usesBills() {
 		return s.flat
 	}

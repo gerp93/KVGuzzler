@@ -16,6 +16,7 @@ const examples = {
   'computer-series.json': 'PcSeries',
   'computer-history.json': 'ComputerHistory',
   'computer-estimate.json': 'ComputerEstimate',
+  'tariff-candidates.json': 'TariffCandidates',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });

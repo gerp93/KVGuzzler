@@ -17,6 +17,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/openei"
 	"github.com/gerp93/KVGuzzler/server/internal/pcrelay"
 	"github.com/gerp93/KVGuzzler/server/internal/rates"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
@@ -38,6 +39,8 @@ type Server struct {
 	Loc       *time.Location
 	Version   string
 	Now       func() time.Time
+	// Lookup finds a utility's published tariff (OpenEI); nil means the lookup mode is not available.
+	Lookup openei.Lookup
 	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
 	// how big it is. Empty reports nothing.
 	DatabasePath string
@@ -69,6 +72,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/devices", s.addDevice)
 	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
+	mux.HandleFunc("GET /api/v1/rates/lookup", s.lookupRates)
+	mux.HandleFunc("GET /api/v1/rates/tariff", s.getTariff)
+	mux.HandleFunc("GET /api/v1/openei", s.getOpenEi)
+	mux.HandleFunc("PUT /api/v1/openei", s.putOpenEi)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
 	mux.HandleFunc("GET /api/v1/groups", s.listGroups)
 	mux.HandleFunc("POST /api/v1/groups", s.addGroup)
@@ -1111,7 +1118,16 @@ func (s *Server) rateConfig(ctx context.Context) (rates.Config, error) {
 	if err := json.Unmarshal([]byte(text), &cfg); err != nil {
 		return rates.Config{}, err
 	}
-	return cfg.Normalized(), nil
+	cfg = cfg.Normalized()
+	if cfg.Mode == rates.ModeLookup {
+		if cfg.Tariff, err = s.savedTariff(ctx); err != nil {
+			return rates.Config{}, err
+		}
+		if cfg.Profile, err = s.savedProfile(ctx); err != nil {
+			return rates.Config{}, err
+		}
+	}
+	return cfg, nil
 }
 
 func (s *Server) getRates(w http.ResponseWriter, r *http.Request) {
@@ -1135,6 +1151,16 @@ func (s *Server) putRates(w http.ResponseWriter, r *http.Request) {
 	if err := cfg.Validate(); err != nil {
 		writeProblem(w, http.StatusBadRequest, "bad_rates", err.Error())
 		return
+	}
+	if cfg.Mode == rates.ModeLookup {
+		// The chosen rate is read again from OpenEI by its label and kept; a failure says why and leaves the saved prices as they were.
+		if code, msg, err := s.chooseTariff(r.Context(), derefString(cfg.TariffLabel)); err != nil {
+			serverError(w, err)
+			return
+		} else if code != 0 {
+			writeProblem(w, code, "bad_rates", msg)
+			return
+		}
 	}
 	body, err := json.Marshal(cfg)
 	if err != nil {

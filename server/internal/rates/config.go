@@ -13,6 +13,11 @@ type Config struct {
 	FixedRate   *Money  `json:"fixed_rate,omitempty"`
 	Bills       []Bill  `json:"bills"`
 	TariffLabel *string `json:"tariff_label,omitempty"`
+
+	// Tariff and Profile are the looked-up tariff and when the power is used. They are kept apart from the saved configuration (the
+	// grid is big and the profile is learned), so they are filled in by whoever loads the configuration for pricing.
+	Tariff  *Tariff       `json:"-"`
+	Profile *UsageProfile `json:"-"`
 }
 
 // DefaultConfig is one rate, none set yet: energy is counted but nothing is priced.
@@ -23,9 +28,7 @@ var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 // Validate says why a configuration cannot be saved, in words fit to show, or returns nil.
 func (c Config) Validate() error {
 	switch c.Mode {
-	case ModeOne, ModeBills:
-	case ModeLookup:
-		return errors.New("Looking a rate up from a utility's published tariff is not built in the house server yet.")
+	case ModeOne, ModeBills, ModeLookup:
 	default:
 		return errors.New("The price source is one rate or my bills.")
 	}
@@ -51,5 +54,5 @@ func (c Config) Normalized() Config {
 
 // Schedule is the schedule this configuration describes, with days cut at local midnight in loc.
 func (c Config) Schedule(loc *time.Location) *Schedule {
-	return NewSchedule(c.Mode, c.FixedRate, c.Bills, loc)
+	return NewSchedule(c.Mode, c.FixedRate, c.Bills, loc).WithTariff(c.Tariff, c.Profile)
 }
