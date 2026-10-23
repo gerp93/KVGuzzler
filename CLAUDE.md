@@ -19,7 +19,7 @@ dotnet run --project src/KVGuzzler           # a development run (separate -dev 
 
 The repo also holds a whole-house energy monitor beside the PC app: `contract/` (OpenAPI between the parts, `npm test`),
 `server/` (Go house server, see its README; `go vet ./... && go test ./...`), `web/` (TypeScript dashboard, embedded in the server
-binary; build it first: `cd web && npm run check`) and a planned `shell/` (Electron viewer that loads the dashboard from the server). The PC app stays C#: sensors and per-program shares only
+binary; build it first: `cd web && npm run check`) and `shell/` (the Electron viewer: a window that loads the dashboard from the server and keeps only the server's address; `cd shell && npm run check`). The PC app stays C#: sensors and per-program shares only
 exist on the PC. The Avalonia window is **frozen** (no new features; new UI goes in the dashboard) and is retired only once the
 dashboard does everything it does; the collector service stays. **Desktop releases and the .NET CI are path-filtered** (`auto-release.yml`, `ci.yml`): only
 changes under `src/`, `tests/`, `KVGuzzler.sln`, `Directory.Build.props` (and `VERSION_BUMP.md` for releases) cut a desktop
@@ -58,6 +58,10 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   that is away is retried every minute, a different `api_version` every 10, and a batch the server refuses three times in a row is skipped so it cannot
   hold up the rest (it stays in this PC's own history). The push's field names are checked against `contract/examples/ingest-pc.json` in the tests.
   The source id (`relay_source_id`) is made once and kept. The first push from a new source adopts the only computer when it has no collector.
+- **The viewer (`shell/`) shows only the server.** The address is a plain host and port, never a URL with a path/user/query (checked on the way in
+  and again when read); the window only navigates to the server's origin or its own two pages, anything else opens in the browser (http/https
+  only); sandboxed, context-isolated, and only its own `file:` pages may use the IPC (the remote dashboard gets no bridge). It bundles no copy of the
+  dashboard, so a server update updates every UI. No release pipeline or updater yet (see its README).
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the

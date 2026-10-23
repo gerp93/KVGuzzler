@@ -1,0 +1,41 @@
+# Typecheck, test and build the Electron viewer. Only for changes to shell/. Electron's own binary is not needed for any of this,
+# so its download is skipped.
+
+name: CI (shell)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shell/**'
+      - '.github/workflows/ci-shell.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'shell/**'
+      - '.github/workflows/ci-shell.yml'
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    defaults:
+      run:
+        working-directory: shell
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: shell/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: The build output stays out of git
+        run: test -z "$(git status --porcelain)"

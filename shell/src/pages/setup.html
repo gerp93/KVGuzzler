@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>House power</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 16px/1.5 system-ui, 'Segoe UI', sans-serif; color: #fff; background: #0d47a1; }
+      main { width: min(28rem, calc(100vw - 32px)); padding: 24px; background: #2a5dac; border: 1px solid #567ebd; border-radius: 8px; }
+      h1 { margin: 0 0 8px; font-size: 1.3rem; }
+      p { margin: 8px 0; color: #d6e0f2; }
+      label { display: block; margin-top: 16px; font-size: 0.9rem; color: #d6e0f2; }
+      input { box-sizing: border-box; width: 100%; margin-top: 4px; padding: 10px; font: inherit; color: inherit; background: #0d47a1; border: 1px solid #567ebd; border-radius: 8px; }
+      button { margin-top: 16px; padding: 10px 18px; font: inherit; color: inherit; background: #46505a; border: 1px solid #567ebd; border-radius: 8px; cursor: pointer; }
+      button:hover { background: #5a646e; }
+      #error { min-height: 1.5em; color: #ff9696; }
+      :focus-visible { outline: 2px solid #96c8ff; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Where is the house server?</h1>
+      <p>Enter the address of the machine that runs it, as you would type it in a browser, without the <code>http://</code>.</p>
+      <form id="form">
+        <label for="address">Server address</label>
+        <input id="address" autocomplete="off" spellcheck="false" placeholder="192.168.68.110" autofocus />
+        <p id="error" role="alert"></p>
+        <button type="submit">Connect</button>
+      </form>
+      <p id="version"></p>
+    </main>
+    <script>
+      const input = document.getElementById('address');
+      const error = document.getElementById('error');
+      const typed = new URLSearchParams(location.search).get('address');
+      window.viewer.state().then((s) => {
+        if (!s) return;
+        input.value = (typed ?? s.address).replace(/^http:\/\//, '').replace(/:8080$/, '');
+        document.getElementById('version').textContent = 'Version ' + s.version;
+      });
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        const result = await window.viewer.setServer(input.value);
+        if (!result.ok) error.textContent = result.error ?? 'Could not use that address.';
+      });
+    </script>
+  </body>
+</html>
