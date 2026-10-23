@@ -739,10 +739,10 @@ paths:
     put:
       tags: [Settings]
       operationId: setCarbon
-      summary: Save the source, place and, optionally, a new key. The key is write-only.
+      summary: Save the place and, optionally, a new EIA key. The key is write-only.
       description: |
         A reading is taken first, and the setup is only kept if it got one, so a wrong key or place is said so at once. A key left out keeps the
-        saved one, but only for the same source: it is never sent to another.
+        saved one. The key is kept in a private file on the server, not in the database, and goes to EIA only.
       requestBody:
         required: true
         content:
@@ -1300,13 +1300,9 @@ components:
         configured:
           type: boolean
           description: Whether a key is saved. The key itself is never returned.
-        source:
-          type: string
-          enum: [electricitymaps, eia]
-          description: Where the grid's carbon intensity comes from. Electricity Maps (a zone, or latitude and longitude) or the US EIA (a balancing authority like MISO).
         place:
           type: string
-          description: A zone code or "lat, lon" (Electricity Maps), or a balancing authority code (EIA).
+          description: The balancing authority's code (like MISO). The grid's carbon intensity comes from the US EIA's hourly generation by fuel.
         last_outcome:
           type: [string, 'null']
           description: What the last fetch said, in plain language.
@@ -1323,12 +1319,9 @@ components:
     CarbonUpdate:
       type: object
       properties:
-        source:
-          type: string
-          enum: [electricitymaps, eia]
-          description: Default electricitymaps.
         place:
           type: string
+          description: The balancing authority's code, like MISO.
         key:
           type: string
           writeOnly: true

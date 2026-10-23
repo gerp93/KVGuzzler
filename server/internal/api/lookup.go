@@ -14,8 +14,8 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/rates"
 )
 
-// The saved pieces of the "price from a utility's published tariff" mode. They live in the meta table next to the rate configuration; the key
-// is write-only (it is never sent back) and goes only to api.openei.org.
+// The saved pieces of the "price from a utility's published tariff" mode. The tariff and profile live in the meta table next to the rate
+// configuration; the key is write-only (it is never sent back), goes only to api.openei.org, and is kept in the private secrets file, not the database.
 const (
 	openEiKeyKey   = "openei_key"
 	tariffKey      = "tariff"
@@ -46,7 +46,7 @@ func (s *Server) savedProfile(ctx context.Context) (*rates.UsageProfile, error) 
 }
 
 func (s *Server) openEiKey(ctx context.Context) (string, error) {
-	key, _, err := s.Store.Meta(ctx, openEiKeyKey)
+	key, _, err := s.Store.Secret(ctx, openEiKeyKey)
 	return key, err
 }
 
@@ -83,7 +83,7 @@ func (s *Server) putOpenEi(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_key", "An OpenEI API key is letters, digits, dashes and underscores, 8 or more of them. Check it was copied whole.")
 		return
 	}
-	if err := s.Store.SetMeta(r.Context(), openEiKeyKey, key); err != nil {
+	if err := s.Store.SetSecret(r.Context(), openEiKeyKey, key); err != nil {
 		serverError(w, err)
 		return
 	}

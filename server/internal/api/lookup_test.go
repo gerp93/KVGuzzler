@@ -105,7 +105,7 @@ func TestTheKeyIsSavedWithoutEverBeingSentBack(t *testing.T) {
 	if _, body := send(t, http.MethodGet, srv.URL+"/api/v1/openei", ""); strings.Contains(body, goodKey) {
 		t.Errorf("the key came back: %s", body)
 	}
-	if k, _, _ := st.Meta(t.Context(), openEiKeyKey); k != goodKey {
+	if k, _, _ := st.Secret(t.Context(), openEiKeyKey); k != goodKey {
 		t.Errorf("stored key = %q", k)
 	}
 	if r, body := send(t, http.MethodPut, srv.URL+"/api/v1/openei", `{"api_key":""}`); r.StatusCode != 200 || !strings.Contains(body, `"has_key":false`) {

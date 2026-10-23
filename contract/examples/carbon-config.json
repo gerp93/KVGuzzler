@@ -1,6 +1,5 @@
 {
   "configured": true,
-  "source": "eia",
   "place": "MISO",
   "last_outcome": "Reading saved.",
   "last_fetch": "2026-10-22T18:05:00Z",

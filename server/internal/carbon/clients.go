@@ -19,8 +19,7 @@ import (
 const EiaBase = "https://api.eia.gov/v2/electricity/rto/fuel-type-data/data/"
 
 const (
-	mapsTimeout = 10 * time.Second
-	eiaTimeout  = 30 * time.Second
+	eiaTimeout = 30 * time.Second
 	// EiaRows is how many rows to ask for: about nine fuels an hour, so roughly the last two and a half days.
 	EiaRows = 600
 	// minimumFuels: an hour reported with fewer fuels than this is a partial report, and its mix would mislead.
@@ -35,13 +34,11 @@ var GramsPerKwh = map[string]float64{
 	"COL": 820, "NG": 490, "OIL": 650, "NUC": 12, "SUN": 45, "SNB": 45, "WND": 11, "WAT": 24, "GEO": 38, "BIO": 230, "OTH": 230,
 }
 
-// Client asks the sources for the grid's carbon intensity. The bases are only changed by tests.
+// Client asks EIA for the grid's carbon intensity. The base and limit are only changed by tests.
 type Client struct {
-	HTTP      *http.Client
-	MapsBase  string
-	EiaBase   string
-	MapsLimit time.Duration
-	EiaLimit  time.Duration
+	HTTP     *http.Client
+	EiaBase  string
+	EiaLimit time.Duration
 }
 
 func (c *Client) client() *http.Client {
@@ -51,13 +48,6 @@ func (c *Client) client() *http.Client {
 	return &http.Client{}
 }
 
-func (c *Client) mapsBase() string {
-	if c.MapsBase != "" {
-		return c.MapsBase
-	}
-	return MapsBase
-}
-
 func (c *Client) eiaBase() string {
 	if c.EiaBase != "" {
 		return c.EiaBase
@@ -65,88 +55,13 @@ func (c *Client) eiaBase() string {
 	return EiaBase
 }
 
-// Read asks whichever source the config names for the recent hours, oldest first: Electricity Maps gives the latest hour, EIA the last couple
-// of days (so hours missed while the server was off can be filled in). The error, when it is a *Error, is worded to be shown.
+// Read asks EIA for the recent hours, oldest first (the last couple of days, so hours missed while the server was off can be filled in). The
+// error, when it is a *Error, is worded to be shown.
 func (c *Client) Read(ctx context.Context, cfg Config, now time.Time) ([]Reading, error) {
-	if cfg.Source == EIA {
-		return c.readEia(ctx, cfg)
-	}
-	r, err := c.readLatest(ctx, cfg, now)
-	if err != nil {
-		return nil, err
-	}
-	return []Reading{r}, nil
+	return c.readEia(ctx, cfg)
 }
 
-// ---- Electricity Maps
-
-// ParseLatest is the figure and its hour from a "latest" answer. Tolerant of a missing time (it says now) and of the figure being wrapped in a
-// data object; anything that is not a believable number of grams is refused.
-func ParseLatest(body string, now time.Time) (Reading, error) {
-	var root any
-	if err := json.Unmarshal([]byte(body), &root); err == nil {
-		if obj, ok := root.(map[string]any); ok {
-			if data, ok := obj["data"].(map[string]any); ok {
-				if _, has := obj["carbonIntensity"]; !has {
-					obj = data
-				}
-			}
-			if grams, ok := obj["carbonIntensity"].(float64); ok && !math.IsNaN(grams) && !math.IsInf(grams, 0) && grams >= 0 && grams <= 3000 {
-				at := now
-				if s, ok := obj["datetime"].(string); ok {
-					if t, err := time.Parse(time.RFC3339, s); err == nil {
-						at = t
-					}
-				}
-				estimated, _ := obj["isEstimated"].(bool)
-				return Reading{GramsPerKwh: grams, At: at.UTC(), Estimated: estimated}, nil
-			}
-		}
-	}
-	return Reading{}, fail("Electricity Maps answered, but not with a carbon intensity. Check the zone, or try again later.")
-}
-
-func (c *Client) readLatest(ctx context.Context, cfg Config, now time.Time) (Reading, error) {
-	limit := c.MapsLimit
-	if limit == 0 {
-		limit = mapsTimeout
-	}
-	status, body, err := c.get(ctx, cfg.LatestURL(c.mapsBase()), limit, map[string]string{"auth-token": cfg.APIKey}, "Electricity Maps")
-	if err != nil {
-		return Reading{}, err
-	}
-	if status >= 200 && status < 300 {
-		return ParseLatest(body, now)
-	}
-	why := ""
-	if m := mapsMessage(body, cfg.APIKey); m != "" {
-		why = " Electricity Maps says: " + m
-	}
-	switch status {
-	case 401, 403:
-		return Reading{}, fail("Electricity Maps did not accept the key (error %d). The free key covers one zone: use the zone it was set up for.%s", status, why)
-	case 404:
-		return Reading{}, fail("Electricity Maps does not know that zone. Check it on the Electricity Maps map.%s", why)
-	case 429:
-		return Reading{}, &Error{Message: "Electricity Maps asked us to slow down. It will be tried again later." + why, RateLimited: true}
-	}
-	return Reading{}, fail("Electricity Maps answered with an error (%d).%s", status, why)
-}
-
-// mapsMessage is the message (or error) of an error answer, cut short, with any trace of the key taken out; "" if there is none.
-func mapsMessage(body, apiKey string) string {
-	var root map[string]any
-	if json.Unmarshal([]byte(body), &root) != nil {
-		return ""
-	}
-	for _, name := range []string{"message", "error"} {
-		if s, ok := root[name].(string); ok && strings.TrimSpace(s) != "" {
-			return clean(s, apiKey)
-		}
-	}
-	return ""
-}
-
+// clean is a service's own words for an error, cut short, with any trace of the key and any control character taken out.
 func clean(text, apiKey string) string {
 	if apiKey != "" {
 		text = strings.ReplaceAll(text, apiKey, "(key)")

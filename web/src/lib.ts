@@ -640,11 +640,6 @@ export function carbonNote(carbonG: number | null | undefined, kwh: number | nul
   return parts.join('; ') + '.';
 }
 
-/** The sources the grid's carbon intensity can come from, with what to type for the place. */
-export const CARBON_SOURCES = [
-  { key: 'electricitymaps', label: 'Electricity Maps', placeLabel: 'Zone (like US-MIDW-MISO) or latitude, longitude', placeholder: 'US-MIDW-MISO' },
-  { key: 'eia', label: 'EIA (US only)', placeLabel: "Balancing authority's code (like MISO)", placeholder: 'MISO' },
-] as const;
 
 /** Where a house "my usage" estimate comes from, in words: the window and that every hour is in it. */
 export function houseUsageBasis(use: AverageUse, windowKey: string): string {

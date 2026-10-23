@@ -205,7 +205,6 @@ type TariffCandidates struct {
 // CarbonConfig is the carbon-footprint setup as a client sees it. The key is never part of it.
 type CarbonConfig struct {
 	Configured  bool       `json:"configured"`
-	Source      string     `json:"source,omitempty"`
 	Place       string     `json:"place,omitempty"`
 	LastOutcome *string    `json:"last_outcome"`
 	LastFetch   *time.Time `json:"last_fetch"`
