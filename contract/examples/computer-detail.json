@@ -4,14 +4,34 @@
     "name": "Desktop",
     "source_id": "pc-7f3a9c1e",
     "wall_channel_id": "shelly-192.168.1.106:plug",
-    "peripheral_channel_ids": ["shelly-192.168.1.67:plug"],
+    "peripheral_channel_ids": [
+      "shelly-192.168.1.67:plug"
+    ],
     "last_seen": "2026-10-22T18:04:11Z"
   },
   "from": "2026-10-22T05:00:00Z",
   "to": "2026-10-23T05:00:00Z",
-  "wall": { "channel_id": "shelly-192.168.1.106:plug", "computer_id": "comp-1a2b3c4d", "scope": "pc", "kwh": 3.1, "cost": "0.47", "carbon_g": null, "peak_watts": 355.0, "monitored_hours": 9.9 },
+  "wall": {
+    "channel_id": "shelly-192.168.1.106:plug",
+    "computer_id": "comp-1a2b3c4d",
+    "scope": "pc",
+    "kwh": 3.1,
+    "cost": "0.47",
+    "carbon_g": null,
+    "peak_watts": 355.0,
+    "monitored_hours": 9.9
+  },
   "peripherals": [
-    { "channel_id": "shelly-192.168.1.67:plug", "computer_id": "comp-1a2b3c4d", "scope": "plug", "kwh": 0.6, "cost": "0.09", "carbon_g": null, "peak_watts": 52.0, "monitored_hours": 9.9 }
+    {
+      "channel_id": "shelly-192.168.1.67:plug",
+      "computer_id": "comp-1a2b3c4d",
+      "scope": "plug",
+      "kwh": 0.6,
+      "cost": "0.09",
+      "carbon_g": null,
+      "peak_watts": 52.0,
+      "monitored_hours": 9.9
+    }
   ],
   "setup_kwh": 3.7,
   "setup_cost": "0.56",
@@ -22,16 +42,103 @@
     "last_seen": "2026-10-22T18:04:11Z",
     "total_peak_watts": 402.3,
     "components": [
-      { "name": "CPU package", "scope": "component", "kind": "cpu", "kwh": 0.61, "avg_watts": 61.4, "peak_watts": 118.0, "monitored_hours": 9.9 },
-      { "name": "RTX 5070 Ti", "scope": "component", "kind": "gpu", "kwh": 2.12, "avg_watts": 214.7, "peak_watts": 301.5, "monitored_hours": 9.9 },
-      { "name": "Wall meter", "scope": "wall", "kind": "other", "kwh": 3.1, "avg_watts": 312.5, "peak_watts": 355.0, "monitored_hours": 9.9 }
+      {
+        "name": "CPU package",
+        "scope": "component",
+        "kind": "cpu",
+        "kwh": 0.61,
+        "avg_watts": 61.4,
+        "peak_watts": 118.0,
+        "monitored_hours": 9.9
+      },
+      {
+        "name": "RTX 5070 Ti",
+        "scope": "component",
+        "kind": "gpu",
+        "kwh": 2.12,
+        "avg_watts": 214.7,
+        "peak_watts": 301.5,
+        "monitored_hours": 9.9
+      },
+      {
+        "name": "Wall meter",
+        "scope": "wall",
+        "kind": "other",
+        "kwh": 3.1,
+        "avg_watts": 312.5,
+        "peak_watts": 355.0,
+        "monitored_hours": 9.9
+      }
     ],
     "programs": [
-      { "name": "python.exe (ComfyUI)", "cpu_kwh": 0.31, "gpu_kwh": 1.9, "kwh": 2.21, "active_seconds": 31200 },
-      { "name": "chrome.exe", "cpu_kwh": 0.12, "gpu_kwh": 0, "kwh": 0.12, "active_seconds": 4100 }
+      {
+        "name": "python.exe (ComfyUI)",
+        "cpu_kwh": 0.31,
+        "gpu_kwh": 1.9,
+        "kwh": 2.21,
+        "active_seconds": 31200
+      },
+      {
+        "name": "chrome.exe",
+        "cpu_kwh": 0.12,
+        "gpu_kwh": 0,
+        "kwh": 0.12,
+        "active_seconds": 4100
+      }
     ],
     "gaps": [
-      { "from": "2026-10-22T07:10:00Z", "to": "2026-10-22T11:41:00Z", "reason": "asleep", "plug_kwh": 0.071 }
+      {
+        "from": "2026-10-22T07:10:00Z",
+        "to": "2026-10-22T11:41:00Z",
+        "reason": "asleep",
+        "plug_kwh": 0.071
+      }
+    ],
+    "live": {
+      "at": "2026-10-22T18:04:11Z",
+      "readings": [
+        {
+          "name": "CPU package",
+          "scope": "component",
+          "kind": "cpu",
+          "watts": 63.2
+        },
+        {
+          "name": "RTX 5070 Ti",
+          "scope": "component",
+          "kind": "gpu",
+          "watts": 218.4
+        },
+        {
+          "name": "Wall meter",
+          "scope": "wall",
+          "kind": "other",
+          "watts": 318.0
+        }
+      ],
+      "programs": [
+        {
+          "name": "python.exe (ComfyUI)",
+          "cpu_watts": 21.5,
+          "gpu_watts": 160.2
+        }
+      ],
+      "notes": [
+        "The GPU gave an impossible reading just after waking; it was ignored."
+      ],
+      "idle_cpu_watts": 18.5,
+      "idle_gpu_watts": 9.0
+    },
+    "runs": [
+      {
+        "name": "python.exe (ComfyUI)",
+        "start": "2026-10-22T17:10:00Z",
+        "end": "2026-10-22T18:04:00Z",
+        "cpu_kwh": 0.021,
+        "gpu_kwh": 0.141,
+        "active_seconds": 3100,
+        "still_running": true
+      }
     ]
   }
 }

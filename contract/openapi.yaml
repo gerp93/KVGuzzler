@@ -328,6 +328,27 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/live:
+    get:
+      tags: [Read]
+      operationId: getComputerLive
+      summary: The latest look a computer's collector sent.
+      description: |
+        Just the PC's latest readings and per-program power, small enough to ask for every few seconds (the detail answer re-reads a whole
+        period). 204 when no collector reports for this computer or none has sent a look yet.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcLive'
+        '204':
+          description: No collector reports for this computer, or none has sent a look yet.
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/groups:
     get:
       tags: [Read]
@@ -957,6 +978,93 @@ components:
           type: number
           minimum: 0
           description: How long the program was busy in the minute.
+    PcLiveReading:
+      type: object
+      required: [name, scope, watts]
+      properties:
+        name:
+          type: string
+        scope:
+          $ref: '#/components/schemas/IngestScope'
+        kind:
+          type: string
+          enum: [other, cpu, gpu]
+        watts:
+          type: number
+          minimum: 0
+    PcLiveProgram:
+      type: object
+      required: [name, cpu_watts, gpu_watts]
+      description: What one program is estimated to be causing right now. An estimate, never a measurement.
+      properties:
+        name:
+          type: string
+        cpu_watts:
+          type: number
+          minimum: 0
+        gpu_watts:
+          type: number
+          minimum: 0
+    PcLive:
+      type: object
+      required: [at]
+      description: |
+        The PC's readings as of its last look, sent every few seconds while the collector is running (the newest one replaces the
+        last). It is not history: the minutes are. A client shows how old it is and treats a stale one as "not answering".
+      properties:
+        at:
+          type: string
+          format: date-time
+          description: When the PC took these readings.
+        readings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcLiveReading'
+        programs:
+          type: array
+          description: Biggest first.
+          items:
+            $ref: '#/components/schemas/PcLiveProgram'
+        notes:
+          type: array
+          description: Plain-language things the PC wants to say (a sensor that dropped out, an impossible reading it ignored).
+          items:
+            type: string
+        idle_cpu_watts:
+          type: [number, 'null']
+          description: The idle baseline the per-program estimate shares power above. The lowest quiet 30-second average seen so far.
+        idle_gpu_watts:
+          type: [number, 'null']
+        age_seconds:
+          type: number
+          minimum: 0
+          description: "Set by the server when the dashboard reads it. How long ago the server received this, by its own clock (the PC's clock is not trusted for it). Not part of a push."
+    PcRun:
+      type: object
+      required: [name, start, end, cpu_kwh, gpu_kwh, active_seconds, still_running]
+      description: |
+        What a program is estimated to have caused from when it started until it closed (a program with several processes counts as
+        one run). An estimate.
+      properties:
+        name:
+          type: string
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        cpu_kwh:
+          type: number
+          minimum: 0
+        gpu_kwh:
+          type: number
+          minimum: 0
+        active_seconds:
+          type: number
+          minimum: 0
+        still_running:
+          type: boolean
     PcGap:
       type: object
       required: [from, to, reason]
@@ -1013,6 +1121,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PcGap'
+        live:
+          $ref: '#/components/schemas/PcLive'
+        runs:
+          type: array
+          maxItems: 200
+          description: The PC's recent program runs. Sending one again replaces it (a run still going grows).
+          items:
+            $ref: '#/components/schemas/PcRun'
     ApplianceGroup:
       type: object
       required: [id, name, channel_ids]
@@ -1201,6 +1317,16 @@ components:
           description: Stretches the PC was not sampling (asleep, off, lost power), clipped to the period.
           items:
             $ref: '#/components/schemas/PcGap'
+        live:
+          oneOf:
+            - $ref: '#/components/schemas/PcLive'
+            - type: 'null'
+          description: The PC's latest readings, or null when it has not sent any.
+        runs:
+          type: array
+          description: Program runs that overlapped the period, still-running first, then newest.
+          items:
+            $ref: '#/components/schemas/PcRun'
     IngestResult:
       type: object
       required: [api_version, accepted]

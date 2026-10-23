@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applianceList, circuitsByWatts, formatDuration, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Channel, type Computer, type PcComponent, type Reading, type Series, type Summary,
+  applianceList, circuitsByWatts, formatAge, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcLiveReading, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -161,5 +161,54 @@ describe('the Appliances list', () => {
   it('lists a computer with its wall plug figure, biggest first, and one with no wall plug last', () => {
     const list = applianceList(summary, channels, [computer('empty'), computer('comp-1', 'wall')]);
     expect(list.computers.map((r) => [r.computer.id, r.wall?.kwh])).toEqual([['comp-1', 5], ['empty', undefined]]);
+  });
+});
+
+const lr = (name: string, scope: PcLiveReading['scope'], watts: number): PcLiveReading => ({ name, scope, kind: 'other', watts });
+
+describe('the PC right now', () => {
+  const readings = [lr('GPU', 'component', 120), lr('CPU package', 'component', 60), lr('CPU cores', 'breakdown', 50), lr('Wall meter', 'wall', 300), lr('Monitor', 'peripheral', 30)];
+
+  it('keeps wall, sensors, inside and meters in their own groups and shares the wall by the sensors and the rest', () => {
+    const s = liveSplit({ readings });
+    expect(s.sensors.map((r) => r.name)).toEqual(['GPU', 'CPU package']);
+    expect(s.inside.map((r) => r.name)).toEqual(['CPU cores']);
+    expect(s.meters.map((r) => r.name)).toEqual(['Monitor']);
+    expect(s.wall?.watts).toBe(300);
+    expect(s.sensorWatts).toBe(180); // the CPU cores inside the package and the monitor are not added
+    expect(s.baseWatts).toBe(300);
+    expect(s.baseIsWall).toBe(true);
+    expect(s.otherWatts).toBe(120);
+  });
+
+  it('shares the sensors total when there is no wall meter, and never reports a negative remainder', () => {
+    const none = liveSplit({ readings: readings.filter((r) => r.scope !== 'wall') });
+    expect([none.baseWatts, none.baseIsWall, none.otherWatts]).toEqual([180, false, null]);
+    expect(liveSplit({ readings: [lr('GPU', 'component', 200), lr('Wall meter', 'wall', 150)] }).otherWatts).toBe(0);
+  });
+
+  it('percent shares need something to share of', () => {
+    expect(sharePercent(120, 300)).toBe(40);
+    expect(sharePercent(5, 0)).toBeNull();
+  });
+
+  it('lists programs biggest first and drops the ones causing next to nothing', () => {
+    const rows = programsNow({ programs: [{ name: 'a', cpu_watts: 1, gpu_watts: 0 }, { name: 'b', cpu_watts: 20, gpu_watts: 110 }, { name: 'idle', cpu_watts: 0.1, gpu_watts: 0.2 }] });
+    expect(rows.map((r) => [r.name, r.watts])).toEqual([['b', 130], ['a', 1]]);
+  });
+
+  it('says what the estimate is measured from, and that a missing level is not learned yet', () => {
+    expect(idleText({ idle_cpu_watts: 18.5, idle_gpu_watts: null })).toBe('CPU 19 W, GPU not learned yet');
+  });
+
+  it('is stale after half a minute and says how old in words', () => {
+    expect([isLiveStale({ age_seconds: 12 }), isLiveStale({ age_seconds: 31 })]).toEqual([false, true]);
+    expect([formatAge(2), formatAge(95), formatAge(7200)]).toEqual(['just now', '2 min ago', '2 h ago']);
+  });
+
+  it('adds a run CPU and GPU energy and measures its length', () => {
+    const run = { name: 'x', start: '2026-10-22T12:00:00Z', end: '2026-10-22T12:20:00Z', cpu_kwh: 0.01, gpu_kwh: 0.04, active_seconds: 1, still_running: false };
+    expect(runKwh(run)).toBeCloseTo(0.05);
+    expect(runDuration(run)).toBe(1200);
   });
 });

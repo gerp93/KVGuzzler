@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/model"
@@ -40,6 +42,22 @@ CREATE TABLE IF NOT EXISTS pc_peaks (
   minute    INTEGER NOT NULL,
   watts     REAL NOT NULL,
   PRIMARY KEY (source_id, minute)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS pc_live (
+  source_id TEXT PRIMARY KEY,
+  received  INTEGER NOT NULL,
+  body      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pc_runs (
+  source_id TEXT NOT NULL,
+  name      TEXT NOT NULL COLLATE NOCASE,
+  start_ts  INTEGER NOT NULL,
+  end_ts    INTEGER NOT NULL,
+  cpu_kwh   REAL NOT NULL,
+  gpu_kwh   REAL NOT NULL,
+  active_s  REAL NOT NULL,
+  still     INTEGER NOT NULL,
+  PRIMARY KEY (source_id, name, start_ts)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS pc_gaps (
   source_id TEXT NOT NULL,
@@ -103,6 +121,29 @@ ON CONFLICT(source_id) DO UPDATE SET name = CASE WHEN excluded.name <> '' THEN e
 			return 0, err
 		}
 	}
+	if in.Live != nil {
+		body, err := json.Marshal(in.Live)
+		if err != nil {
+			return 0, err
+		}
+		// Only the newest look is kept: a late or repeated one does not replace a newer one.
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO pc_live(source_id, received, body) VALUES (?, ?, ?)
+ON CONFLICT(source_id) DO UPDATE SET received = excluded.received, body = excluded.body
+WHERE json_extract(excluded.body, '$.at') >= json_extract(pc_live.body, '$.at')`, in.SourceID, now.Unix(), string(body)); err != nil {
+			return 0, err
+		}
+	}
+	for _, r := range in.Runs {
+		still := 0
+		if r.StillRunning {
+			still = 1
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO pc_runs(source_id, name, start_ts, end_ts, cpu_kwh, gpu_kwh, active_s, still) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			in.SourceID, r.Name, r.Start.Unix(), r.End.Unix(), r.CPUKwh, r.GPUKwh, r.ActiveSeconds, still); err != nil {
+			return 0, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
@@ -136,6 +177,12 @@ func (s *Store) PcSourceSummary(ctx context.Context, sourceID string, from, to t
 			return nil, err
 		}
 		if src.Gaps, err = s.pcGaps(ctx, src.SourceID, f, t); err != nil {
+			return nil, err
+		}
+		if src.Live, err = s.PcLive(ctx, src.SourceID); err != nil {
+			return nil, err
+		}
+		if src.Runs, err = s.pcRuns(ctx, src.SourceID, f, t); err != nil {
 			return nil, err
 		}
 		return src, nil
@@ -248,6 +295,57 @@ WHERE source_id = ? AND to_ts > ? AND from_ts < ? ORDER BY from_ts`, id, f, t)
 			g.PlugKwh = &share
 		}
 		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// PcLive is the newest look the PC sent, or nil. ReceivedAt is the server's own clock, which the API turns into an age.
+func (s *Store) PcLive(ctx context.Context, id string) (*model.PcLive, error) {
+	var received int64
+	var body string
+	err := s.db.QueryRowContext(ctx, `SELECT received, body FROM pc_live WHERE source_id = ?`, id).Scan(&received, &body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var l model.PcLive
+	if err := json.Unmarshal([]byte(body), &l); err != nil {
+		return nil, err
+	}
+	l.ReceivedAt = time.Unix(received, 0).UTC()
+	if l.Readings == nil {
+		l.Readings = []model.PcLiveReading{}
+	}
+	if l.Programs == nil {
+		l.Programs = []model.PcLiveProgram{}
+	}
+	if l.Notes == nil {
+		l.Notes = []string{}
+	}
+	return &l, nil
+}
+
+// pcRuns are the program runs that overlapped [f, t): the ones still going first, then the newest.
+func (s *Store) pcRuns(ctx context.Context, id string, f, t int64) ([]model.PcRun, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT name, start_ts, end_ts, cpu_kwh, gpu_kwh, active_s, still FROM pc_runs
+WHERE source_id = ? AND end_ts >= ? AND start_ts < ? ORDER BY still DESC, end_ts DESC LIMIT 50`, id, f, t)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.PcRun{}
+	for rows.Next() {
+		var r model.PcRun
+		var start, end int64
+		var still int
+		if err := rows.Scan(&r.Name, &start, &end, &r.CPUKwh, &r.GPUKwh, &r.ActiveSeconds, &still); err != nil {
+			return nil, err
+		}
+		r.Start, r.End, r.StillRunning = time.Unix(start, 0).UTC(), time.Unix(end, 0).UTC(), still == 1
+		out = append(out, r)
 	}
 	return out, rows.Err()
 }

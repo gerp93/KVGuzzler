@@ -30,6 +30,9 @@ public sealed class RelayFeed
 
     public const int MaxBatchesPerStep = 24;
 
+    /// <summary>How often the PC's latest look is sent, when it has changed.</summary>
+    public static readonly TimeSpan LiveEvery = TimeSpan.FromSeconds(5);
+
     /// <summary>A batch the server refuses this many times in a row is skipped, so one bad minute cannot hold up everything after it.
     /// What was skipped stays in this PC's own history.</summary>
     public const int RefusalsBeforeSkipping = 3;
@@ -44,9 +47,14 @@ public sealed class RelayFeed
     private readonly HttpClient _http;
     private readonly TimeProvider _time;
 
+    private readonly object _idLock = new();
+
     private DateTimeOffset _nextAt = DateTimeOffset.MinValue;
     private long _refusedAfter = -1;
     private int _refusals;
+
+    private DateTimeOffset _liveNextAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _liveSentAt = DateTimeOffset.MinValue;
 
     public RelayFeed(HistoryStore store, string configPath, string machineName, HttpMessageHandler? handler = null, TimeProvider? time = null)
     {
@@ -61,25 +69,19 @@ public sealed class RelayFeed
     /// <summary>What happened on the last look, in words ("sent 12 minutes", or why not). Also kept in the history for the window to show.</summary>
     public string? Status { get; private set; }
 
+    /// <summary>What happened on the last live push, only when it failed (null when the last one went through). Kept apart from
+    /// <see cref="Status"/> so a missed look never hides what happened to the history.</summary>
+    public string? LiveStatus { get; private set; }
+
     /// <summary>Raised when <see cref="Status"/> changes, so the host can log it.</summary>
     public event Action<string>? StatusChanged;
 
-    /// <summary>Looks at the config now and then until stopped.</summary>
+    /// <summary>Looks at the config now and then until stopped, and sends the PC's latest look every few seconds beside it.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
         try
         {
-            using var timer = new PeriodicTimer(CheckEvery, _time);
-            do
-            {
-                try { await StepAsync(stop); }
-                catch (Exception e) when (e is not OperationCanceledException)
-                {
-                    // An optional feature must never stop the collector: say what happened and carry on.
-                    SetStatus("Something unexpected went wrong sending to the house server: " + e.Message);
-                }
-            }
-            while (await timer.WaitForNextTickAsync(stop));
+            await Task.WhenAll(MinutesLoopAsync(stop), LiveLoopAsync(stop));
         }
         catch (OperationCanceledException)
         {
@@ -89,6 +91,62 @@ public sealed class RelayFeed
         {
             _http.Dispose();
         }
+    }
+
+    private async Task MinutesLoopAsync(CancellationToken stop)
+    {
+        using var timer = new PeriodicTimer(CheckEvery, _time);
+        do
+        {
+            try { await StepAsync(stop); }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // An optional feature must never stop the collector: say what happened and carry on.
+                SetStatus("Something unexpected went wrong sending to the house server: " + e.Message);
+            }
+        }
+        while (await timer.WaitForNextTickAsync(stop));
+    }
+
+    private async Task LiveLoopAsync(CancellationToken stop)
+    {
+        using var timer = new PeriodicTimer(LiveEvery, _time);
+        do
+        {
+            try { await LiveStepAsync(stop); }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                LiveStatus = "Something unexpected went wrong sending the live look: " + e.Message;
+            }
+        }
+        while (await timer.WaitForNextTickAsync(stop));
+    }
+
+    /// <summary>One live look: sends the PC's latest readings and recent program runs if the collector has saved a newer look than the
+    /// last one sent, and the server is not being waited out after a failure. Returns whether one was sent. It never touches the
+    /// watermark: a live look is not history, the next one replaces it.</summary>
+    public async Task<bool> LiveStepAsync(CancellationToken stop = default)
+    {
+        var config = RelayConfig.Load(_configPath);
+        if (config is null) return false;
+
+        var now = _time.GetUtcNow();
+        if (now < _liveNextAt) return false;
+
+        var batch = RelayBatchBuilder.BuildLive(_store, SourceId(), _machineName, now);
+        if (batch?.Live is null || batch.Live.At <= _liveSentAt) return false;
+
+        var outcome = await PostAsync(config, batch, stop);
+        if (outcome.Kind == Kind.Accepted)
+        {
+            _liveSentAt = batch.Live.At;
+            LiveStatus = null;
+            return true;
+        }
+
+        _liveNextAt = now + (outcome.Kind == Kind.WrongVersion ? RetryAfterVersion : RetryAfterError);
+        LiveStatus = outcome.Message;
+        return false;
     }
 
     /// <summary>One look: sends what is new, if the house server is set up and not waiting out a failure. Returns how many minutes were sent.</summary>
@@ -203,11 +261,14 @@ public sealed class RelayFeed
     /// <summary>A name for this PC that stays the same: made once and kept in the history.</summary>
     private string SourceId()
     {
-        var id = _store.GetMeta(SourceIdKey);
-        if (!string.IsNullOrEmpty(id)) return id;
-        id = "pc-" + Guid.NewGuid().ToString("N")[..8];
-        _store.SetMeta(SourceIdKey, id);
-        return id;
+        lock (_idLock)
+        {
+            var id = _store.GetMeta(SourceIdKey);
+            if (!string.IsNullOrEmpty(id)) return id;
+            id = "pc-" + Guid.NewGuid().ToString("N")[..8];
+            _store.SetMeta(SourceIdKey, id);
+            return id;
+        }
     }
 
     private static long Floor(long unixSeconds) => unixSeconds / 60 * 60;

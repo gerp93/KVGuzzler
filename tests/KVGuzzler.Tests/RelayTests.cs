@@ -148,6 +148,98 @@ public class RelayBatchTests
         Assert.Equal(Minute(5), next.Minutes[0].Minute.ToUnixTimeSeconds());
     }
 
+    private static DateTimeOffset LiveAt => T0.AddMinutes(30);
+
+    /// <summary>A history with a latest look, a fresh per-program split, an idle baseline and two runs, as a collector leaves it.</summary>
+    private static TempHistory HistoryWithALook()
+    {
+        var h = new TempHistory();
+        h.Store.AddMinutes(new[]
+        {
+            new MinuteRow(Minute(29), "CPU package", ReadingScope.Component, 0.001, 60, 120, PowerKind.Cpu),
+            new MinuteRow(Minute(29), "RTX", ReadingScope.Component, 0.002, 60, 200, PowerKind.Gpu),
+        });
+        h.Store.SetLive(LiveAt, new[]
+        {
+            new PowerReading("CPU package", 61.5, ReadingScope.Component),
+            new PowerReading("RTX", 120, ReadingScope.Component),
+            new PowerReading("Fans", 7, ReadingScope.Breakdown),
+            new PowerReading("Wall meter", 300, ReadingScope.Wall),
+            new PowerReading("Negative", -4, ReadingScope.Component),
+        }, new[] { "GPU read a nonsense value and was ignored.", new string('n', 400) });
+        h.Store.SetLivePrograms(LiveAt, new[] { new ProgramLive("ComfyUI", 20, 110), new ProgramLive("chrome.exe", 5, 0) });
+        h.Store.SetIdleBaseline(18.5, null);
+        h.Store.SaveRun(new ProgramRun("ComfyUI", LiveAt.AddMinutes(-20), LiveAt, 0.01, 0.04, 1200, true));
+        h.Store.SaveRun(new ProgramRun("old.exe", LiveAt.AddHours(-3), LiveAt.AddHours(-2), 0.002, 0, 3600, false));
+        return h;
+    }
+
+    [Fact]
+    public void TheLiveLookCarriesReadingsKindsProgramsIdleBaselineNotesAndRuns()
+    {
+        using var h = HistoryWithALook();
+
+        var batch = RelayBatchBuilder.BuildLive(h.Store, "pc-1", "Desktop", LiveAt)!;
+
+        Assert.Empty(batch.Minutes);
+        Assert.Empty(batch.Gaps);
+        var live = batch.Live!;
+        Assert.Equal(LiveAt, live.At);
+        // The negative reading is left out; the kind comes from what the minutes were saved with.
+        Assert.Equal(new[] { "CPU package", "RTX", "Fans", "Wall meter" }, live.Readings.Select(r => r.Name).ToArray());
+        Assert.Equal(("component", "cpu", 61.5), (live.Readings[0].Scope, live.Readings[0].Kind, live.Readings[0].Watts));
+        Assert.Equal("gpu", live.Readings[1].Kind);
+        Assert.Equal(("breakdown", "other"), (live.Readings[2].Scope, live.Readings[2].Kind));
+        Assert.Equal("wall", live.Readings[3].Scope);
+        Assert.Equal(new[] { "ComfyUI", "chrome.exe" }, live.Programs.Select(p => p.Name).ToArray());
+        Assert.Equal((20.0, 110.0), (live.Programs[0].CpuWatts, live.Programs[0].GpuWatts));
+        Assert.Equal(18.5, live.IdleCpuWatts);
+        Assert.Null(live.IdleGpuWatts);
+        Assert.Equal(2, live.Notes.Count);
+        Assert.Equal(RelayBatchBuilder.MaxNoteLength, live.Notes[1].Length);
+
+        var runs = batch.Runs!;
+        Assert.Equal(new[] { "ComfyUI", "old.exe" }, runs.Select(r => r.Name).ToArray());
+        Assert.True(runs[0].StillRunning);
+        Assert.Equal((0.01, 0.04, 1200.0), (runs[0].CpuKwh, runs[0].GpuKwh, runs[0].ActiveSeconds));
+    }
+
+    [Fact]
+    public void ProgramPowerFromACollectorThatStoppedSharingItIsLeftOutAndRunsNeverEndInTheFuture()
+    {
+        using var h = HistoryWithALook();
+        h.Store.SetLivePrograms(LiveAt - RelayBatchBuilder.LiveProgramsFresh - TimeSpan.FromSeconds(1), new[] { new ProgramLive("ComfyUI", 20, 110) });
+
+        var batch = RelayBatchBuilder.BuildLive(h.Store, "pc-1", "D", LiveAt.AddMinutes(-5))!;   // the PC's clock stepped back
+        Assert.Empty(batch.Live!.Programs);
+        Assert.All(batch.Runs!, r => Assert.True(r.End <= LiveAt.AddMinutes(-5) && r.Start <= r.End));
+    }
+
+    [Fact]
+    public void WithNoLookSavedThereIsNothingLiveToSend()
+    {
+        using var h = new TempHistory();
+        Assert.Null(RelayBatchBuilder.BuildLive(h.Store, "pc-1", "D", LiveAt));
+    }
+
+    [Fact]
+    public void ALiveLookUsesOnlyFieldNamesTheContractDefinesAndAMinutesPushLeavesLiveOut()
+    {
+        using var h = HistoryWithALook();
+        var live = RelayBatchBuilder.BuildLive(h.Store, "pc-1", "Desktop", LiveAt)!;
+
+        using var ours = JsonDocument.Parse(JsonSerializer.Serialize(live, RelayBatch.Json));
+        using var theirs = JsonDocument.Parse(File.ReadAllText(ContractExample("ingest-pc.json")));
+        var missing = new List<string>();
+        Compare(ours.RootElement, theirs.RootElement, "$", missing);
+        Assert.True(missing.Count == 0, "Not in the contract's example: " + string.Join(", ", missing));
+
+        var minutes = RelayBatchBuilder.Build(h.Store, "pc-1", "Desktop", Minute(28), Minute(29))!;
+        using var plain = JsonDocument.Parse(JsonSerializer.Serialize(minutes, RelayBatch.Json));
+        Assert.False(plain.RootElement.TryGetProperty("live", out _));   // the contract has no null for it: it is left out
+        Assert.False(plain.RootElement.TryGetProperty("runs", out _));
+    }
+
     /// <summary>The push's field names must be the contract's: every property this collector writes has to exist in the contract's own example.</summary>
     [Fact]
     public void EveryFieldNameIsOneTheContractDefines()
@@ -380,6 +472,62 @@ public class RelayFeedTests : IDisposable
         Assert.Matches("^pc-[0-9a-f]{8}$", id);
         Assert.Equal(id, b.RootElement.GetProperty("source_id").GetString());
         Assert.Equal(id, _h.Store.GetMeta(RelayFeed.SourceIdKey));
+    }
+
+    private void SaveLook(DateTimeOffset at, double cpuWatts) =>
+        _h.Store.SetLive(at, new[] { new PowerReading("CPU package", cpuWatts, ReadingScope.Component, PowerKind.Cpu) }, Array.Empty<string>());
+
+    [Fact]
+    public async Task ALiveLookIsSentOnlyWhenTheCollectorSavedANewOneAndLeavesTheHistoryAlone()
+    {
+        new RelayConfig("house-box").Save(ConfigPath);
+        var feed = Feed();
+        Assert.False(await feed.LiveStepAsync(TestContext.Current.CancellationToken));   // nothing saved yet
+        Assert.Empty(_house.Requests);
+
+        SaveLook(_clock.GetUtcNow(), 50);
+        Assert.True(await feed.LiveStepAsync(TestContext.Current.CancellationToken));
+        using (var first = _house.Sent(0))
+        {
+            Assert.Equal(0, first.RootElement.GetProperty("minutes").GetArrayLength());
+            Assert.Equal(50, first.RootElement.GetProperty("live").GetProperty("readings")[0].GetProperty("watts").GetDouble());
+        }
+
+        Assert.False(await feed.LiveStepAsync(TestContext.Current.CancellationToken));  // the same look is not sent twice
+        SaveLook(_clock.GetUtcNow().AddSeconds(1), 70);
+        Assert.True(await feed.LiveStepAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, _house.Requests.Count);
+
+        Assert.Null(_h.Store.GetMeta(RelayFeed.WatermarkKey));   // a look is not history: nothing was marked as sent
+    }
+
+    [Fact]
+    public async Task AFailedLiveLookIsWaitedOutAndNeverReplacesTheHistoryStatus()
+    {
+        new RelayConfig("house-box").Save(ConfigPath);
+        SaveLook(_clock.GetUtcNow(), 50);
+        _house.Answers.Enqueue(HttpStatusCode.InternalServerError);
+
+        var feed = Feed();
+        Assert.False(await feed.LiveStepAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("error", feed.LiveStatus);
+        Assert.Null(feed.Status);
+
+        Assert.False(await feed.LiveStepAsync(TestContext.Current.CancellationToken));   // still waiting out the minute
+        Assert.Single(_house.Requests);
+
+        _clock.Advance(RelayFeed.RetryAfterError + TimeSpan.FromSeconds(1));
+        SaveLook(_clock.GetUtcNow(), 60);
+        Assert.True(await feed.LiveStepAsync(TestContext.Current.CancellationToken));
+        Assert.Null(feed.LiveStatus);
+    }
+
+    [Fact]
+    public async Task WithNoConfigNoLiveLookIsSent()
+    {
+        SaveLook(_clock.GetUtcNow(), 50);
+        Assert.False(await Feed().LiveStepAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(_house.Requests);
     }
 }
 

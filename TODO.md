@@ -144,6 +144,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
     `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the
     PC under Appliances. No window setting for it yet (the window is frozen).
+  - **Parity with the window, in progress** (the window stays until the dashboard does everything it does). Done: per-minute sensors, the wall
+    breakdown and programs (relay), gaps with reasons, and now the **live look** (Right now with each part's share of the PC and "everything else",
+    live per-program watts with the idle level, notes, Max draw, Recent runs). Still to do, in order: per-component chart with shaded gaps; program
+    cost and the CPU/GPU split; the energy history list and CSV export; the cost estimator; year and all-time periods; the Count ticks for peripherals;
+    the OpenEI tariff lookup and the carbon footprint (both ports); Help/About; read-only database info.
   - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the
     reason, and the setup form refuses a bad address and saves a good one). Still to do: a release (the tag namespace is shared with the
     desktop app's Velopack releases, which read this repo's releases to find updates, so check that a second app's release cannot confuse them,
