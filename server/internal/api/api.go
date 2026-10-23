@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ type Server struct {
 	Loc       *time.Location
 	Version   string
 	Now       func() time.Time
+	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
+	// how big it is. Empty reports nothing.
+	DatabasePath string
 }
 
 type problem struct {
@@ -127,6 +131,12 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 	// "Local" is not an IANA zone name, so it is only reported when the server was given a real one (-tz).
 	if name := s.Loc.String(); name != "Local" {
 		st["time_zone"] = name
+	}
+	if s.DatabasePath != "" {
+		st["database_path"] = s.DatabasePath
+		if info, err := os.Stat(s.DatabasePath); err == nil {
+			st["database_bytes"] = info.Size()
+		}
 	}
 	writeJSON(w, http.StatusOK, st)
 }

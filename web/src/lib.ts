@@ -544,3 +544,19 @@ export function usageBasis(use: AverageUse, windowKey: string): string {
     : `${use.whole_pc ? 'That is the whole PC at the wall' : 'That is the CPU, GPU and memory sensors only (a wall plug would show the whole PC)'}${use.peripheral_count > 0 ? `, plus ${plugs}.` : '.'}`;
   return `The PC used ${formatKwh(use.kwh)} over ${covered}: ${formatKwh(use.kwh_per_day)} a day, an average of ${formatWatts(use.average_watts)} counting the time it was off or asleep. ${what}`;
 }
+
+/** A file size in words: "812 B", "212 KB", "3.4 MB". */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = bytes / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
+}
+
+export const PROJECT_URL = 'https://github.com/gerp93/KVGuzzler';
+export const ISSUES_URL = 'https://github.com/gerp93/KVGuzzler/issues';

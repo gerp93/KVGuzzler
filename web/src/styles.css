@@ -553,3 +553,12 @@ a.button {
   align-items: center;
   gap: 6px;
 }
+
+/* Five tabs have to fit a phone without scrolling the bar sideways */
+@media (max-width: 480px) {
+  .top nav a {
+    flex: 1 1 auto;
+    padding: 8px 6px;
+    font-size: 0.9rem;
+  }
+}

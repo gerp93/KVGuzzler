@@ -252,3 +252,28 @@ func TestTheEnergyHistoryHasARowPerPeriodWithGapsByReason(t *testing.T) {
 		t.Errorf("priced all = %+v", all)
 	}
 }
+
+func TestTheStatusSaysWhereTheDatabaseIsAndHowBigOnlyWhenTold(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "house.db")
+	s, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	with := httptest.NewServer((&Server{Store: s, Collector: collector.New(s, time.Second), Loc: time.UTC, Version: "test", DatabasePath: path}).Handler())
+	t.Cleanup(with.Close)
+	without := httptest.NewServer((&Server{Store: s, Collector: collector.New(s, time.Second), Loc: time.UTC, Version: "test"}).Handler())
+	t.Cleanup(without.Close)
+
+	var st map[string]any
+	get(t, with.URL+"/api/v1/status", &st)
+	if st["database_path"] != path || st["database_bytes"] == nil || st["database_bytes"].(float64) <= 0 {
+		t.Errorf("status = %v", st)
+	}
+	var plain map[string]any
+	get(t, without.URL+"/api/v1/status", &plain)
+	if _, ok := plain["database_path"]; ok {
+		t.Errorf("a server not told where its database is should not say: %v", plain)
+	}
+}

@@ -58,7 +58,8 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return err
 	}
-	st, err := store.Open(filepath.Join(dataDir, "house.db"))
+	dbPath := filepath.Join(dataDir, "house.db")
+	st, err := store.Open(dbPath)
 	if err != nil {
 		return err
 	}
@@ -82,7 +83,7 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 	}
 
 	root := http.NewServeMux()
-	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version}).Handler())
+	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version, DatabasePath: dbPath}).Handler())
 	root.Handle("/", webui.Handler())
 	srv := &http.Server{Addr: listen, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	done := make(chan struct{})
