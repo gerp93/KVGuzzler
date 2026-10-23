@@ -6,6 +6,7 @@ import { buildContextMenuTemplate } from './contextMenu';
 import { buildMenuTemplate, REPO_URL, type MenuOptions } from './menu';
 import { isLocalPage, isSafeExternalUrl, isServerUrl, normalizeServerAddress } from './serverAddress';
 import { loadSettings, saveSettings } from './settings';
+import { probeServer } from './probe';
 import { checkForUpdate, isNewer, newestViewerRelease, parseVersion } from './updateCheck';
 
 describe('the server address', () => {
@@ -203,5 +204,37 @@ describe('the update check', () => {
     const down = vi.fn(async () => { throw new Error('getaddrinfo ENOTFOUND api.github.com'); }) as unknown as typeof fetch;
     expect(await checkForUpdate('0.1.0', down)).toMatchObject({ kind: 'failed', reason: expect.stringContaining('Could not reach GitHub') });
     expect(await checkForUpdate('dev', answer(releases))).toMatchObject({ kind: 'failed' });
+  });
+});
+
+describe('checking the address before saving it', () => {
+  const answer = (body: unknown, status = 200) => vi.fn(async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })) as unknown as typeof fetch;
+  const server = 'http://192.168.68.110:8080';
+
+  it('accepts a house server and asks it only for its status', async () => {
+    const fetchFn = answer({ api_version: 1, server_version: 'db4aff0', notes: [] });
+    expect(await probeServer(server, fetchFn)).toEqual({ ok: true, version: 'db4aff0' });
+    expect((fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe('http://192.168.68.110:8080/api/v1/status');
+  });
+
+  it('says it is not the house server when something else answers', async () => {
+    for (const fetchFn of [answer('<html>router login</html>'), answer({ hello: 1 }), answer([1, 2]), answer({ api_version: 'one' })]) {
+      const r = await probeServer(server, fetchFn);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toContain('not the house server');
+    }
+    const r = await probeServer(server, answer({}, 404));
+    expect(r).toEqual({ ok: false, reason: '192.168.68.110:8080 answered, but not like the house server (error 404). Is that the right address and port?' });
+  });
+
+  it('says a mistyped or switched-off address does not answer, in words, within the time given', async () => {
+    const down = vi.fn(async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch;
+    const r = await probeServer('http://162.168.68.110:8080', down);
+    expect(r).toEqual({ ok: false, reason: 'Could not reach 162.168.68.110:8080. Check the address for a typo, and that the server is on.' });
+
+    const hang = ((_url: string, init: RequestInit) => new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason)))) as unknown as typeof fetch;
+    const slow = await probeServer('http://162.168.68.110:8080', hang, 50);
+    expect(slow.ok).toBe(false);
+    if (!slow.ok) expect(slow.reason).toContain('did not answer');
   });
 });

@@ -16,6 +16,7 @@
       button { margin-top: 16px; padding: 10px 18px; font: inherit; color: inherit; background: #46505a; border: 1px solid #567ebd; border-radius: 8px; cursor: pointer; }
       button:hover { background: #5a646e; }
       #error { min-height: 1.5em; color: #ff9696; }
+      button:disabled { opacity: 0.6; cursor: progress; }
       :focus-visible { outline: 2px solid #96c8ff; outline-offset: 2px; }
     </style>
   </head>
@@ -27,7 +28,7 @@
         <label for="address">Server address</label>
         <input id="address" autocomplete="off" spellcheck="false" placeholder="192.168.68.110" autofocus />
         <p id="error" role="alert"></p>
-        <button type="submit">Connect</button>
+        <button id="connect" type="submit">Connect</button>
       </form>
       <p id="version"></p>
     </main>
@@ -40,11 +41,30 @@
         input.value = (typed ?? s.address).replace(/^http:\/\//, '').replace(/:8080$/, '');
         document.getElementById('version').textContent = 'Version ' + s.version;
       });
+      const button = document.getElementById('connect');
+      // After a failed check the same address can be saved anyway (the server may just be off); typing anything else starts over.
+      let failedWith = null;
+      input.addEventListener('input', () => {
+        failedWith = null;
+        error.textContent = '';
+        button.textContent = 'Connect';
+      });
       document.getElementById('form').addEventListener('submit', async (e) => {
         e.preventDefault();
         error.textContent = '';
-        const result = await window.viewer.setServer(input.value);
-        if (!result.ok) error.textContent = result.error ?? 'Could not use that address.';
+        const force = failedWith !== null && failedWith === input.value;
+        button.disabled = true;
+        button.textContent = force ? 'Saving…' : 'Connecting…';
+        const result = await window.viewer.setServer(input.value, force);
+        button.disabled = false;
+        if (result.ok) return;
+        error.textContent = result.error ?? 'Could not use that address.';
+        if (result.canForce) {
+          failedWith = input.value;
+          button.textContent = 'Save anyway';
+        } else {
+          button.textContent = 'Connect';
+        }
       });
     </script>
   </body>

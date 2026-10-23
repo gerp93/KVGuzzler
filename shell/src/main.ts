@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type IpcMainInvokeEve
 import { join } from 'node:path';
 import { buildContextMenuTemplate } from './contextMenu';
 import { buildMenuTemplate } from './menu';
+import { probeServer } from './probe';
 import { isLocalPage, isSafeExternalUrl, isServerUrl, normalizeServerAddress } from './serverAddress';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { checkForUpdate } from './updateCheck';
@@ -93,10 +94,15 @@ function fromOwnPage(event: IpcMainInvokeEvent): boolean {
 
 function registerIpc(): void {
   ipcMain.handle('viewer:state', (event) => (fromOwnPage(event) ? { address: settings.serverAddress ?? '', version: app.getVersion() } : null));
-  ipcMain.handle('viewer:set-server', (event, input: unknown) => {
+  ipcMain.handle('viewer:set-server', async (event, input: unknown, force: unknown) => {
     if (!fromOwnPage(event) || typeof input !== 'string') return { ok: false, error: 'Refused.' };
     const address = normalizeServerAddress(input);
     if (!address) return { ok: false, error: "That isn't an address I can use. Enter the server's host, like 192.168.68.110 or house-box:8080." };
+    // Look before saving: a mistyped address says so in a few seconds. Saving it anyway is one more press (the server may simply be off).
+    if (force !== true) {
+      const probe = await probeServer(address);
+      if (!probe.ok) return { ok: false, error: probe.reason, canForce: true };
+    }
     settings = { serverAddress: address };
     saveSettings(app.getPath('userData'), settings);
     showServer();
