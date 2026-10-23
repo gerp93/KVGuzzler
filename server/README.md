@@ -55,7 +55,9 @@ old binary back if it does not. The database is never touched. Rollback restores
 
 - On your PC, `~/.config/kvguzzler/deploy.env` (outside the repo; `scripts/deploy.env.example` shows the fields): the box's `user@host`, the port, and the server settings.
 - On the box, `/etc/housed/housed.env`: `HOUSED_TZ` (which calendar day a bill or "day" bucket belongs to), and optionally `HOUSED_LISTEN` and `HOUSED_DATA`. The unit file in `server/deploy/` carries only plain defaults and reads that file. A command-line flag still wins over the environment.
-- Secrets are not kept in files at all: an API key (Electricity Maps, EIA, OpenEI) is typed into the dashboard once and stored in the database on the box.
+- An API key (EIA, OpenEI) is typed into the dashboard once and kept on the box in `secrets.json` beside the database (mode 0600, readable by the `housed` user only), **not in the
+  database**, so the snapshots and backups of `house.db` do not carry it. It is write-only (never sent back) and goes only to its own service. It is plain text there: the server needs it
+  to use it, so this is about who can read the file and what gets copied, not encryption. Rotate a key at the service if a copy of the old database could have leaked it.
 
 ## First call to a Refoss monitor
 

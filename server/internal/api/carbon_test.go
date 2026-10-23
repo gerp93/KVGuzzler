@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,9 +18,19 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/store"
 )
 
-const mapsOK = `{"zone":"US-NW-PSCO","carbonIntensity":412,"datetime":"2026-10-22T14:00:00.000Z","isEstimated":false}`
+// eiaOK is EIA's answer for one complete hour (22:00 UTC on 22 Oct 2026), about 373 g/kWh.
+func eiaRows(period string) string {
+	row := func(fuel, mwh string) string {
+		return `{"period":"` + period + `","respondent":"MISO","fueltype":"` + fuel + `","value":"` + mwh + `","value-units":"megawatthours"}`
+	}
+	return row("COL", "16146") + "," + row("NG", "20970") + "," + row("NUC", "8329") + "," + row("WND", "18383")
+}
 
-// carbonServer is a server whose grid-intensity source is a fake one the test controls.
+func eiaOK(w http.ResponseWriter, _ *http.Request) {
+	fmt.Fprint(w, `{"response":{"data":[`+eiaRows("2026-10-22T22")+`]}}`)
+}
+
+// carbonServer is a server whose grid-intensity source is a fake EIA the test controls.
 func carbonServer(t *testing.T, respond func(w http.ResponseWriter, r *http.Request)) (*httptest.Server, *store.Store, *[]*http.Request) {
 	t.Helper()
 	var seen []*http.Request
@@ -33,50 +44,52 @@ func carbonServer(t *testing.T, respond func(w http.ResponseWriter, r *http.Requ
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	clock := time.Date(2026, 10, 22, 19, 0, 0, 0, time.UTC)
+	clock := time.Date(2026, 10, 22, 23, 0, 0, 0, time.UTC)
 	api := &Server{Store: st, Collector: collector.New(st, time.Second), Loc: time.UTC, Version: "test", Now: func() time.Time { return clock },
-		Carbon: &carbon.Client{MapsBase: fake.URL + "/v4", EiaBase: fake.URL + "/eia/"}}
+		Carbon: &carbon.Client{EiaBase: fake.URL + "/eia/"}}
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
 	return srv, st, &seen
 }
 
-func okMapsAnswer(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, mapsOK) }
+func okMapsAnswer(w http.ResponseWriter, r *http.Request) { eiaOK(w, r) }
 
 func TestTheCarbonSetupOnlyKeepsAKeyAndPlaceThatGotAReadingAndNeverShowsTheKeyAgain(t *testing.T) {
-	status := 401
+	status := 403
 	srv, st, seen := carbonServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if status != 200 {
 			w.WriteHeader(status)
 			return
 		}
-		okMapsAnswer(w, r)
+		eiaOK(w, r)
 	})
 	url := srv.URL + "/api/v1/carbon"
 	day := func() (time.Time, time.Time) {
 		return time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
 	}
+	const key = "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
 
 	var v model.CarbonConfig
 	if get(t, url, &v); v.Configured {
 		t.Fatal("a fresh server is not set up")
 	}
 	for name, body := range map[string]string{
-		"no key":      `{"place":"US-NW-PSCO"}`,
-		"bad key":     `{"key":"no","place":"US-NW-PSCO"}`,
-		"no place":    `{"key":"abcdefgh1234"}`,
-		"bad place":   `{"key":"abcdefgh1234","place":"x&y=1"}`,
-		"bad source":  `{"source":"elsewhere","key":"abcdefgh1234","place":"DE"}`,
-		"unknown key": `{"key":"abcdefgh1234","place":"DE","extra":1}`,
+		"no key":                              `{"place":"MISO"}`,
+		"bad key":                             `{"key":"no","place":"MISO"}`,
+		"no place":                            `{"key":"` + key + `"}`,
+		"bad place":                           `{"key":"` + key + `","place":"x&y=1"}`,
+		"a zone":                              `{"key":"` + key + `","place":"US-MIDW-MISO"}`,
+		"unknown key":                         `{"key":"` + key + `","place":"MISO","extra":1}`,
+		"an old source field is not accepted": `{"source":"electricitymaps","key":"` + key + `","place":"MISO"}`,
 	} {
 		if r, _ := send(t, http.MethodPut, url, body); r.StatusCode != 400 {
 			t.Errorf("%s: %d, want 400", name, r.StatusCode)
 		}
 	}
 
-	// The key is refused by the source: not saved, and the reason is the source's.
-	r, body := send(t, http.MethodPut, url, `{"key":"abcdefgh1234","place":"US-NW-PSCO"}`)
-	if r.StatusCode != 400 || !strings.Contains(body, "Not saved. Electricity Maps did not accept the key") {
+	// The key is refused by EIA: not saved, and the reason is EIA's.
+	r, body := send(t, http.MethodPut, url, `{"key":"`+key+`","place":"MISO"}`)
+	if r.StatusCode != 400 || !strings.Contains(body, "Not saved. EIA did not accept the key") {
 		t.Errorf("refused key: %d %s", r.StatusCode, body)
 	}
 	if get(t, url, &v); v.Configured {
@@ -84,12 +97,12 @@ func TestTheCarbonSetupOnlyKeepsAKeyAndPlaceThatGotAReadingAndNeverShowsTheKeyAg
 	}
 
 	status = 200
-	r, body = send(t, http.MethodPut, url, `{"key":"abcdefgh1234","place":"US-NW-PSCO"}`)
-	if r.StatusCode != 200 || strings.Contains(body, "abcdefgh1234") {
+	r, body = send(t, http.MethodPut, url, `{"key":"`+key+`","place":"miso"}`)
+	if r.StatusCode != 200 || strings.Contains(body, key) {
 		t.Fatalf("save: %d %s", r.StatusCode, body)
 	}
 	v = decode[model.CarbonConfig](t, body)
-	if !v.Configured || v.Source != carbon.ElectricityMaps || v.Place != "US-NW-PSCO" || v.LastGrams == nil || *v.LastGrams != 412 || v.LastFetch == nil {
+	if !v.Configured || v.Place != "MISO" || v.LastGrams == nil || math.Abs(*v.LastGrams-373.1) > 0.5 || v.LastFetch == nil {
 		t.Errorf("config = %+v", v)
 	}
 	from, to := day()
@@ -97,16 +110,12 @@ func TestTheCarbonSetupOnlyKeepsAKeyAndPlaceThatGotAReadingAndNeverShowsTheKeyAg
 		t.Errorf("the reading was not saved: %v", hours)
 	}
 
-	// Leaving the key out keeps the saved one (for the same source) and uses it.
-	if r, _ := send(t, http.MethodPut, url, `{"place":"DE"}`); r.StatusCode != 200 {
+	// Leaving the key out keeps the saved one and uses it.
+	if r, _ := send(t, http.MethodPut, url, `{"place":"PJM"}`); r.StatusCode != 200 {
 		t.Fatalf("change place: %d", r.StatusCode)
 	}
-	if last := (*seen)[len(*seen)-1]; last.Header.Get("auth-token") != "abcdefgh1234" || !strings.Contains(last.URL.RawQuery, "zone=DE") {
-		t.Errorf("the saved key was not used: %q %s", last.Header.Get("auth-token"), last.URL.RawQuery)
-	}
-	// ...but never for another source.
-	if r, body := send(t, http.MethodPut, url, `{"source":"eia","place":"MISO"}`); r.StatusCode != 400 || !strings.Contains(body, "Paste your EIA API key") {
-		t.Errorf("another source with the old key: %d %s", r.StatusCode, body)
+	if last := (*seen)[len(*seen)-1]; !strings.Contains(last.URL.RawQuery, "api_key="+key) || !strings.Contains(last.URL.RawQuery, "PJM") {
+		t.Errorf("the saved key was not used: %s", last.URL.RawQuery)
 	}
 
 	// Removing it keeps the hours already saved.
@@ -118,6 +127,32 @@ func TestTheCarbonSetupOnlyKeepsAKeyAndPlaceThatGotAReadingAndNeverShowsTheKeyAg
 	}
 	if hours, _ := st.QueryCarbon(t.Context(), from, to); len(hours) != 1 {
 		t.Errorf("removing the key lost the saved hours: %v", hours)
+	}
+}
+
+func TestAKeyIsNeverWrittenIntoTheDatabaseFile(t *testing.T) {
+	srv, st, _ := carbonServer(t, eiaOK)
+	const key = "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
+	if r, b := send(t, http.MethodPut, srv.URL+"/api/v1/carbon", `{"key":"`+key+`","place":"MISO"}`); r.StatusCode != 200 {
+		t.Fatalf("%d %s", r.StatusCode, b)
+	}
+	if r, b := send(t, http.MethodPut, srv.URL+"/api/v1/openei", `{"api_key":"openeikey123456"}`); r.StatusCode != 200 {
+		t.Fatalf("%d %s", r.StatusCode, b)
+	}
+	// Whatever the database holds (the rows, and the write-ahead log beside it), neither key is in it.
+	dir := st.DataDir()
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if e.Name() == "secrets.json" {
+			continue
+		}
+		b, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		if strings.Contains(string(b), key) || strings.Contains(string(b), "openeikey123456") {
+			t.Errorf("a key is in %s", e.Name())
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "secrets.json")); err != nil || !strings.Contains(string(b), key) {
+		t.Errorf("the secrets file: %v", err)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -23,7 +24,8 @@ var ErrNotFound = errors.New("not found")
 const joulesPerKWh = 3.6e6
 
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	secrets secretFile
 }
 
 // Open opens (creating it if needed) the database file at path.
@@ -48,7 +50,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, secrets: secretFile{path: filepath.Join(filepath.Dir(path), "secrets.json")}}, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }

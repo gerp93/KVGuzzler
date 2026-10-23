@@ -522,9 +522,9 @@ export interface paths {
         /** Carbon-footprint settings and the last outcome of the grid-intensity fetch. Never returns the key. */
         get: operations["getCarbon"];
         /**
-         * Save the source, place and, optionally, a new key. The key is write-only.
+         * Save the place and, optionally, a new EIA key. The key is write-only.
          * @description A reading is taken first, and the setup is only kept if it got one, so a wrong key or place is said so at once. A key left out keeps the
-         *     saved one, but only for the same source: it is never sent to another.
+         *     saved one. The key is kept in a private file on the server, not in the database, and goes to EIA only.
          */
         put: operations["setCarbon"];
         post?: never;
@@ -824,12 +824,7 @@ export interface components {
         CarbonConfig: {
             /** @description Whether a key is saved. The key itself is never returned. */
             configured: boolean;
-            /**
-             * @description Where the grid's carbon intensity comes from. Electricity Maps (a zone, or latitude and longitude) or the US EIA (a balancing authority like MISO).
-             * @enum {string}
-             */
-            source?: "electricitymaps" | "eia";
-            /** @description A zone code or "lat, lon" (Electricity Maps), or a balancing authority code (EIA). */
+            /** @description The balancing authority's code (like MISO). The grid's carbon intensity comes from the US EIA's hourly generation by fuel. */
             place?: string;
             /** @description What the last fetch said, in plain language. */
             last_outcome?: string | null;
@@ -844,11 +839,7 @@ export interface components {
             last_hour?: string | null;
         };
         CarbonUpdate: {
-            /**
-             * @description Default electricitymaps.
-             * @enum {string}
-             */
-            source?: "electricitymaps" | "eia";
+            /** @description The balancing authority's code, like MISO. */
             place?: string;
             /** @description Omit to keep the saved key. */
             key?: string;

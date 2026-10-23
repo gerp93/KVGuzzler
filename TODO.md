@@ -150,7 +150,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     the dashboard now has everything in the window's feature list except four things that do not carry over (the background-recording controls: the Windows service
     stays and the server has nothing to turn on; the sleep-wattage estimate: the server reads the wall plug through sleep; choosing a database location: it is the box's; the
     in-app update check: the box is deployed to), plus what needs hardware (Refoss). **The window is not retired**: that is the user's call. The carbon footprint (Electricity Maps and EIA, `PUT /carbon` that checks before keeping, the
-    carbon line under a computer's figures and the CSV columns) is done, **not checked against the real services**. The OpenEI tariff lookup (key saved write-only, search by address, the
+    carbon line under a computer's figures and the CSV columns) is done, EIA and the OpenEI lookup were tried by the user with real keys on 2026-10-23 and returned data; the dashboard shows the carbon for EIA only (Electricity Maps was dropped from the server, the window still has it). The OpenEI tariff lookup (key saved write-only, search by address, the
     rate in use, the weekly refresh, the usage-weighted day price, the footnote) and the currency symbol are done, **not checked against the real OpenEI**. The Help tab (version,
     links, how to read the numbers) and the read-only database card are done.
   - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the

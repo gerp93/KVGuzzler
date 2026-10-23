@@ -101,7 +101,7 @@ export const api = {
   rates: () => request<RateConfig>('api/v1/rates'),
   carbon: () => request<CarbonConfig>('api/v1/carbon'),
   /** Saves the source, place and (when given) a new key; the server takes a reading first and only keeps a setup that got one. */
-  setCarbon: (body: { source: string; place: string; key?: string }) =>
+  setCarbon: (body: { place: string; key?: string }) =>
     request<CarbonConfig>('api/v1/carbon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
   houseHistory: () => request<HouseHistory>('api/v1/history'),

@@ -12,9 +12,8 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 )
 
-// The saved pieces of the carbon footprint: the source, key and place (the key is write-only and goes only to its own source), and what the
-// last fetch said. The key is kept as plain text in the server's database, like the OpenEI key: it is a free personal key that can only read
-// public grid data.
+// The saved pieces of the carbon footprint: the key and place (the key is write-only and goes only to EIA) in the private secrets file, not the
+// database, and what the last fetch said in the meta table.
 const (
 	carbonConfigKey = "carbon_config"
 	carbonStatusKey = "carbon_status"
@@ -29,7 +28,7 @@ func (s *Server) carbonClient() *carbon.Client {
 
 // LoadCarbonConfig is the saved setup as it will be used, or nil when none is set up or what is saved cannot be used.
 func (s *Server) LoadCarbonConfig(ctx context.Context) (*carbon.Config, error) {
-	text, ok, err := s.Store.Meta(ctx, carbonConfigKey)
+	text, ok, err := s.Store.Secret(ctx, carbonConfigKey)
 	if err != nil || !ok || text == "" {
 		return nil, err
 	}
@@ -83,7 +82,7 @@ func (s *Server) carbonView(ctx context.Context) (model.CarbonConfig, error) {
 		return out, err
 	}
 	if cfg != nil {
-		out.Configured, out.Source, out.Place = true, cfg.Source, cfg.Place
+		out.Configured, out.Place = true, cfg.Place
 	}
 	st, err := s.carbonStatus(ctx)
 	if err != nil || st == nil {
@@ -111,26 +110,17 @@ func (s *Server) getCarbon(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
-// putCarbon saves the source, place and, optionally, a new key. It only keeps a setup that got a reading, so a wrong key or place is said so
-// at once instead of failing quietly later. The key is write-only: omit it to keep the saved one (for the same source).
+// putCarbon saves the place and, optionally, a new key. It only keeps a setup that got a reading, so a wrong key or place is said so at once
+// instead of failing quietly later. The key is write-only: omit it to keep the saved one.
 func (s *Server) putCarbon(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Source string  `json:"source"`
-		Place  string  `json:"place"`
-		Key    *string `json:"key"`
+		Place string  `json:"place"`
+		Key   *string `json:"key"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		writeProblem(w, http.StatusBadRequest, "bad_carbon", "send source, place and (the first time) key")
-		return
-	}
-	source := body.Source
-	if source == "" {
-		source = carbon.ElectricityMaps
-	}
-	if source != carbon.ElectricityMaps && source != carbon.EIA {
-		writeProblem(w, http.StatusBadRequest, "bad_carbon", "The source is Electricity Maps or EIA.")
+		writeProblem(w, http.StatusBadRequest, "bad_carbon", "send place and (the first time) key")
 		return
 	}
 	key := ""
@@ -138,19 +128,19 @@ func (s *Server) putCarbon(w http.ResponseWriter, r *http.Request) {
 		key = strings.TrimSpace(*body.Key)
 	}
 	if key == "" {
-		// A key left out keeps the saved one, but only for the source it was saved for: it is never sent to another.
+		// A key left out keeps the saved one.
 		if have, err := s.LoadCarbonConfig(r.Context()); err != nil {
 			serverError(w, err)
 			return
-		} else if have != nil && have.Source == source {
+		} else if have != nil {
 			key = have.APIKey
 		}
 	}
-	if msg := carbon.Problem(key, body.Place, source); msg != "" {
+	if msg := carbon.Problem(key, body.Place); msg != "" {
 		writeProblem(w, http.StatusBadRequest, "bad_carbon", msg)
 		return
 	}
-	cfg, _ := carbon.Config{Source: source, APIKey: key, Place: body.Place}.Valid()
+	cfg, _ := carbon.Config{APIKey: key, Place: body.Place}.Valid()
 
 	readings, err := s.carbonClient().Read(r.Context(), cfg, s.now())
 	if err != nil {
@@ -167,7 +157,7 @@ func (s *Server) putCarbon(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	if err := s.Store.SetMeta(r.Context(), carbonConfigKey, string(text)); err != nil {
+	if err := s.Store.SetSecret(r.Context(), carbonConfigKey, string(text)); err != nil {
 		serverError(w, err)
 		return
 	}
@@ -194,7 +184,7 @@ func (s *Server) putCarbon(w http.ResponseWriter, r *http.Request) {
 
 // deleteCarbon removes the key and the place. The hours already saved stay, so the footprint of past energy is still shown.
 func (s *Server) deleteCarbon(w http.ResponseWriter, r *http.Request) {
-	if err := s.Store.SetMeta(r.Context(), carbonConfigKey, ""); err != nil {
+	if err := s.Store.SetSecret(r.Context(), carbonConfigKey, ""); err != nil {
 		serverError(w, err)
 		return
 	}

@@ -1,12 +1,11 @@
-// The carbon footprint's setup: which source gives the grid's carbon intensity, the key (write-only) and the place. Saving takes a reading first and
-// only keeps a setup that got one. The key is kept on the server and sent to its own source only.
+// The carbon footprint's setup: the US EIA's free API key (write-only) and your balancing authority's code. Saving takes a reading first and only
+// keeps a setup that got one. The key is kept in a private file on the server and sent to EIA only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import { CARBON_SOURCES, type CarbonConfig } from './lib';
+import type { CarbonConfig } from './lib';
 
 export function CarbonCard() {
   const [cfg, setCfg] = useState<CarbonConfig>();
-  const [source, setSource] = useState<string>('electricitymaps');
   const [place, setPlace] = useState('');
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,21 +13,16 @@ export function CarbonCard() {
 
   const load = (c: CarbonConfig) => {
     setCfg(c);
-    if (c.configured) {
-      setSource(c.source ?? 'electricitymaps');
-      setPlace(c.place ?? '');
-    }
+    if (c.configured) setPlace(c.place ?? '');
   };
   useEffect(() => {
     api.carbon().then(load, (e: Error) => setMessage(e.message));
   }, []);
 
-  const meta = CARBON_SOURCES.find((s) => s.key === source) ?? CARBON_SOURCES[0];
-
   const save = () => {
     setBusy(true);
     setMessage('');
-    api.setCarbon({ source, place: place.trim(), key: key.trim() || undefined }).then(
+    api.setCarbon({ place: place.trim(), key: key.trim() || undefined }).then(
       (c) => {
         load(c);
         setKey('');
@@ -56,25 +50,16 @@ export function CarbonCard() {
     <section class="card">
       <h2>Carbon footprint</h2>
       <p class="caption">
-        An estimate of the CO₂ the grid emitted to make the electricity used: each hour's energy times that hour's grid intensity. It is the grid's average, not
-        what one more kWh would cause. It needs a free key from one source; the server keeps it and sends it to that source only.
+        An estimate of the CO₂ the grid emitted to make the electricity used: each hour's energy times that hour's grid intensity, worked out from the US
+        Energy Information Administration's hourly generation by fuel for your balancing authority (US only). It is the grid's average, not what one more kWh
+        would cause. It needs a free EIA API key (eia.gov/opendata); the server keeps it in a private file and sends it to EIA only.
       </p>
       <label class="field">
-        <span>Source</span>
-        <select value={source} onChange={(e) => setSource((e.target as HTMLSelectElement).value)}>
-          {CARBON_SOURCES.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>
+        <input value={place} placeholder="MISO" onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />
       </label>
       <label class="field">
-        <span>{meta.placeLabel}</span>
-        <input value={place} placeholder={meta.placeholder} onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />
-      </label>
-      <label class="field">
-        <span>API key {cfg?.configured ? '(leave empty to keep the saved one)' : ''}</span>
+        <span>EIA API key {cfg?.configured ? '(leave empty to keep the saved one)' : ''}</span>
         <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
       </label>
       <div class="chips save">

@@ -12,24 +12,14 @@ import (
 	"time"
 )
 
-// These are the cases of CarbonTests and CarbonEiaTests in the C# test project (the parts that do not need the window), one for one.
+// These are the cases of CarbonEiaTests and the EIA-independent parts of CarbonTests in the C# test project, one for one (Electricity Maps was
+// not carried over).
 
 var now = time.Date(2026, 10, 19, 15, 30, 0, 0, time.UTC)
 
-const mapsAnswer = `{"zone":"US-NW-PSCO","carbonIntensity":412,"datetime":"2026-10-19T14:00:00.000Z","updatedAt":"2026-10-19T13:55:00.000Z","emissionFactorType":"lifecycle","isEstimated":false,"estimationMethod":null}`
-
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
-func TestOnlyAZoneOrCoordinatesIsAccepted(t *testing.T) {
-	for place, valid := range map[string]bool{
-		"US-NW-PSCO": true, "US-MIDW-MISO": true, "DE": true, "GB": true, "39.74, -104.99": true, "39.74,-104.99": true, "-33.87, 151.21": true,
-		"": false, "US NW": false, "US-NW-PSCO&x=1": false, "../../x": false, "95, 10": false, "10, 190": false, "1,2,3": false,
-	} {
-		if got := IsValidPlace(place, ElectricityMaps); got != valid {
-			t.Errorf("place %q: %v, want %v", place, got, valid)
-		}
-	}
-}
+const goodKey = "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
 
 func TestOnlyAKeyShapedLikeOneIsAccepted(t *testing.T) {
 	for key, valid := range map[string]bool{
@@ -42,94 +32,53 @@ func TestOnlyAKeyShapedLikeOneIsAccepted(t *testing.T) {
 	}
 }
 
-func TestExplainsWhatIsMissing(t *testing.T) {
-	cases := []struct{ key, place, source, want string }{
-		{"", "US-NW-PSCO", ElectricityMaps, "Paste your Electricity Maps API key"},
-		{"no", "US-NW-PSCO", ElectricityMaps, "does not look like an API key"},
-		{"abcdefgh1234", "", ElectricityMaps, "Enter your zone"},
-		{"abcdefgh1234", "not a place!", ElectricityMaps, "zone code like"},
-		{"", "MISO", EIA, "Paste your EIA API key"},
-		{"abcdefghijklmnopqrstuvwxyz0123456789ABCD", "", EIA, "balancing authority's code, like MISO"},
-		{"abcdefghijklmnopqrstuvwxyz0123456789ABCD", "MI SO", EIA, "letters and digits only"},
-	}
-	for _, c := range cases {
-		if got := Problem(c.key, c.place, c.source); !strings.Contains(got, c.want) {
-			t.Errorf("Problem(%q, %q, %s) = %q, want it to say %q", c.key, c.place, c.source, got, c.want)
-		}
-	}
-	if Problem("abcdefgh1234", "US-NW-PSCO", ElectricityMaps) != "" || Problem("abcdefghijklmnopqrstuvwxyz0123456789ABCD", "MISO", EIA) != "" {
-		t.Error("a good setup should have no problem")
-	}
-}
-
 func TestAnEiaPlaceIsABalancingAuthorityCode(t *testing.T) {
 	for place, valid := range map[string]bool{
 		"MISO": true, "PJM": true, "ERCO": true, "US-MIDW-MISO": false, "39.7, -104.9": false, "MISO&x=1": false, "miso": false, "A": false, "": false,
 	} {
-		if got := IsValidPlace(place, EIA); got != valid {
+		if got := IsValidPlace(place); got != valid {
 			t.Errorf("EIA place %q: %v, want %v", place, got, valid)
 		}
 	}
-	if Normalised(" miso ", EIA) != "MISO" || Normalised(" us-midw-miso ", ElectricityMaps) != "us-midw-miso" {
-		t.Error("an authority is upper case, a zone is left as typed")
+	if Normalised(" miso ") != "MISO" {
+		t.Error("an authority is upper case")
 	}
 }
 
-func TestASetupIsOnlyUsableWhenItsKeyAndPlaceFitItsSource(t *testing.T) {
-	good, ok := Config{APIKey: " abcdefgh1234 ", Place: "US-MIDW-MISO"}.Valid()
-	if !ok || good.Source != ElectricityMaps || good.APIKey != "abcdefgh1234" { // a setup saved before there was a choice is Electricity Maps
-		t.Errorf("old setup = %+v, %v", good, ok)
+func TestExplainsWhatIsMissing(t *testing.T) {
+	cases := []struct{ key, place, want string }{
+		{"", "MISO", "Paste your EIA API key"},
+		{"no", "MISO", "does not look like an API key"},
+		{goodKey, "", "balancing authority's code, like MISO"},
+		{goodKey, "MI SO", "letters and digits only"},
 	}
-	eia, ok := Config{Source: EIA, APIKey: "abcdefghijklmnopqrstuvwxyz0123456789ABCD", Place: "miso"}.Valid()
-	if !ok || eia.Place != "MISO" {
-		t.Errorf("eia = %+v, %v", eia, ok)
+	for _, c := range cases {
+		if got := Problem(c.key, c.place); !strings.Contains(got, c.want) {
+			t.Errorf("Problem(%q, %q) = %q, want it to say %q", c.key, c.place, got, c.want)
+		}
+	}
+	if Problem(goodKey, "MISO") != "" {
+		t.Error("a good setup should have no problem")
+	}
+}
+
+func TestASetupIsOnlyUsableWhenItsKeyAndPlaceFitAndItIsEiaOrFromBeforeThereWasAChoice(t *testing.T) {
+	good, ok := Config{APIKey: " " + goodKey + " ", Place: "miso"}.Valid()
+	if !ok || good.Source != EIA || good.APIKey != goodKey || good.Place != "MISO" {
+		t.Errorf("good = %+v, %v", good, ok)
+	}
+	if _, ok := (Config{Source: EIA, APIKey: goodKey, Place: "PJM"}).Valid(); !ok {
+		t.Error("a setup saved as eia should be usable")
 	}
 	for name, bad := range map[string]Config{
-		"unknown source":    {Source: "somewhere-else", APIKey: "abcdefgh1234", Place: "MISO"},
-		"zone given to EIA": {Source: EIA, APIKey: "abcdefgh1234", Place: "US-MIDW-MISO"},
-		"hand-edited place": {APIKey: "abcdefgh1234", Place: "x&y=1"},
-		"no key":            {Place: "DE"},
+		"saved for Electricity Maps": {Source: "electricitymaps", APIKey: "abcdefgh1234", Place: "US-MIDW-MISO"},
+		"unknown source":             {Source: "somewhere-else", APIKey: goodKey, Place: "MISO"},
+		"a zone is not an authority": {APIKey: goodKey, Place: "US-MIDW-MISO"},
+		"hand-edited place":          {APIKey: goodKey, Place: "x&y=1"},
+		"no key":                     {Place: "MISO"},
 	} {
 		if _, ok := bad.Valid(); ok {
 			t.Errorf("%s should not be usable", name)
-		}
-	}
-}
-
-func TestTheRequestGoesOnlyToElectricityMapsWhateverIsTyped(t *testing.T) {
-	if got := (Config{APIKey: "abcdefgh1234", Place: "US-NW-PSCO"}).LatestURL(MapsBase); got != "https://api.electricitymaps.com/v4/carbon-intensity/latest?zone=US-NW-PSCO" {
-		t.Errorf("zone = %s", got)
-	}
-	if got := (Config{APIKey: "abcdefgh1234", Place: "39.74, -104.99"}).LatestURL(MapsBase); got != "https://api.electricitymaps.com/v4/carbon-intensity/latest?lat=39.74&lon=-104.99" {
-		t.Errorf("coordinates = %s", got)
-	}
-}
-
-func TestReadsTheFigureItsHourAndWhetherItWasModelled(t *testing.T) {
-	r, err := ParseLatest(mapsAnswer, now)
-	if err != nil || r.GramsPerKwh != 412 || !r.At.Equal(time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)) || r.Estimated {
-		t.Errorf("reading = %+v, %v", r, err)
-	}
-	if r, _ := ParseLatest(`{"carbonIntensity":300.5,"isEstimated":true}`, now); !r.Estimated {
-		t.Error("a modelled figure should say so")
-	}
-}
-
-func TestAMissingTimeMeansNowAndAWrappedAnswerIsStillRead(t *testing.T) {
-	bare, _ := ParseLatest(`{"carbonIntensity":300}`, now)
-	if !bare.At.Equal(now) {
-		t.Errorf("at = %v", bare.At)
-	}
-	wrapped, err := ParseLatest(`{"data":{"carbonIntensity":250,"datetime":"2026-10-19T10:00:00Z"}}`, now)
-	if err != nil || wrapped.GramsPerKwh != 250 {
-		t.Errorf("wrapped = %+v, %v", wrapped, err)
-	}
-}
-
-func TestAnythingElseIsReportedAsNotACarbonIntensity(t *testing.T) {
-	for _, answer := range []string{`{"zone":"DE"}`, `{"carbonIntensity":"412"}`, `{"carbonIntensity":null}`, `{"carbonIntensity":-5}`, `{"carbonIntensity":999999}`, `[1,2]`, "<html>login</html>", ""} {
-		if _, err := ParseLatest(answer, now); err == nil || !strings.Contains(err.Error(), "not with a carbon intensity") {
-			t.Errorf("%q: err = %v", answer, err)
 		}
 	}
 }
@@ -144,82 +93,6 @@ func fakeSource(t *testing.T, respond func(w http.ResponseWriter, r *http.Reques
 	t.Cleanup(srv.Close)
 	return srv, &seen
 }
-
-func okMaps(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, mapsAnswer) }
-
-var mapsConfig = Config{Source: ElectricityMaps, APIKey: "abcdefgh1234", Place: "US-NW-PSCO"}
-
-func TestAsksWithAGetAndTheKeyInTheHeaderOnly(t *testing.T) {
-	srv, seen := fakeSource(t, okMaps)
-	c := &Client{MapsBase: srv.URL + "/v4"}
-	got, err := c.Read(context.Background(), mapsConfig, now)
-	if err != nil || len(got) != 1 || got[0].GramsPerKwh != 412 {
-		t.Fatalf("got %v, %v", got, err)
-	}
-	r := (*seen)[0]
-	if len(*seen) != 1 || r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, "/v4/carbon-intensity/latest") {
-		t.Errorf("request = %s %s", r.Method, r.URL)
-	}
-	if strings.Contains(r.URL.String(), "abcdefgh1234") || r.Header.Get("auth-token") != "abcdefgh1234" {
-		t.Errorf("the key should be in the header and never in the address: %s / %q", r.URL, r.Header.Get("auth-token"))
-	}
-}
-
-func TestExplainsWhatTheErrorMeans(t *testing.T) {
-	for status, c := range map[int]struct {
-		want    string
-		limited bool
-	}{
-		401: {"did not accept the key", false}, 403: {"did not accept the key", false}, 404: {"does not know that zone", false},
-		429: {"slow down", true}, 500: {"error (500)", false},
-	} {
-		srv, _ := fakeSource(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) })
-		_, err := (&Client{MapsBase: srv.URL}).Read(context.Background(), mapsConfig, now)
-		ce, ok := err.(*Error)
-		if !ok || !strings.Contains(ce.Message, c.want) || ce.RateLimited != c.limited {
-			t.Errorf("%d: err = %v, want %q (limited %v)", status, err, c.want, c.limited)
-		}
-	}
-}
-
-func TestPassesOnWhyElectricityMapsRefusedInItsOwnWordsNeverEchoingTheKey(t *testing.T) {
-	srv, _ := fakeSource(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(401)
-		fmt.Fprint(w, "{\"error\":\"Invalid auth-token\",\"message\":\"The provided token abcdefgh1234 is invalid.\\nPlease check it.\"}")
-	})
-	_, err := (&Client{MapsBase: srv.URL}).Read(context.Background(), mapsConfig, now)
-	if err == nil || !strings.Contains(err.Error(), "(error 401)") || !strings.Contains(err.Error(), "Electricity Maps says: The provided token (key) is invalid.Please check it.") ||
-		strings.Contains(err.Error(), "abcdefgh1234") {
-		t.Errorf("err = %v", err)
-	}
-}
-
-func TestOnlyAShortPlainMessageIsPassedOn(t *testing.T) {
-	for body, want := range map[string]string{
-		`{"error":"Forbidden zone"}`: "Forbidden zone", `{"message":"x","error":"y"}`: "x", "<html>gateway</html>": "", `[1]`: "", `{"message":""}`: "",
-	} {
-		if got := mapsMessage(body, "abcdefgh1234"); got != want {
-			t.Errorf("%q: %q, want %q", body, got, want)
-		}
-	}
-	if got := mapsMessage(`{"message":"`+strings.Repeat("x", 500)+`"}`, "k"); len(got) != 203 {
-		t.Errorf("a long message is %d long, want it cut to 203", len(got))
-	}
-}
-
-func TestAnUnreachableServiceSaysSoAndAHangingOneTimesOut(t *testing.T) {
-	_, err := (&Client{MapsBase: "http://127.0.0.1:1/v4"}).Read(context.Background(), mapsConfig, now)
-	if err == nil || !strings.HasPrefix(err.Error(), "Could not reach Electricity Maps") || strings.Contains(err.Error(), "abcdefgh1234") {
-		t.Errorf("unreachable: %v", err)
-	}
-	srv, _ := fakeSource(t, func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
-	_, err = (&Client{MapsBase: srv.URL, MapsLimit: 100 * time.Millisecond}).Read(context.Background(), mapsConfig, now)
-	if err == nil || !strings.Contains(err.Error(), "did not answer") {
-		t.Errorf("hanging: %v", err)
-	}
-}
-
-// ---- EIA
 
 func eiaRow(period, fuel, value string) string {
 	return fmt.Sprintf(`{"period":%q,"respondent":"MISO","respondent-name":"Midcontinent Independent System Operator, Inc.","fueltype":%q,"type-name":"x","value":%q,"value-units":"megawatthours"}`, period, fuel, value)
@@ -293,9 +166,9 @@ func TestAnythingThatIsNotGenerationDataIsAMessage(t *testing.T) {
 	}
 }
 
-var eiaConfig = Config{Source: EIA, APIKey: "abcdefghijklmnopqrstuvwxyz0123456789ABCD", Place: "MISO"}
+var eiaConfig = Config{Source: EIA, APIKey: goodKey, Place: "MISO"}
 
-func TestTheEiaRequestGoesOnlyToEiaWithTheAuthorityAndKeyEncoded(t *testing.T) {
+func TestTheRequestGoesOnlyToEiaWithTheAuthorityAndKeyEncoded(t *testing.T) {
 	raw := EiaURL(EiaBase, Config{Source: EIA, APIKey: "k&x=1 #y12345678", Place: "MISO"})
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -331,7 +204,7 @@ func TestAPlaceEiaKnowsNothingAboutIsSaidPlainly(t *testing.T) {
 	}
 }
 
-func TestExplainsWhatTheEiaErrorMeansInItsOwnWordsNeverEchoingTheKey(t *testing.T) {
+func TestExplainsWhatTheErrorMeansInEiasOwnWordsNeverEchoingTheKey(t *testing.T) {
 	for status, c := range map[int]struct {
 		want    string
 		limited bool
@@ -353,17 +226,20 @@ func TestExplainsWhatTheEiaErrorMeansInItsOwnWordsNeverEchoingTheKey(t *testing.
 			t.Errorf("%q: %q, want %q", body, got, want)
 		}
 	}
+	if got := eiaMessage(`{"error":"`+strings.Repeat("x", 500)+`"}`, "k"); len(got) != 203 {
+		t.Errorf("a long message is %d long, want it cut to 203", len(got))
+	}
 }
 
-func TestTheSourceInTheConfigDecidesWhoIsAsked(t *testing.T) {
-	eia, eiaSeen := fakeSource(t, func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, eiaAnswer(realHour("2026-10-19T04")...)) })
-	maps, mapsSeen := fakeSource(t, okMaps)
-	c := &Client{EiaBase: eia.URL, MapsBase: maps.URL}
-	if got, err := c.Read(context.Background(), eiaConfig, now); err != nil || len(got) != 1 || len(*eiaSeen) != 1 || len(*mapsSeen) != 0 {
-		t.Errorf("EIA: %v, %v", got, err)
+func TestAnUnreachableServiceSaysSoAndAHangingOneTimesOut(t *testing.T) {
+	_, err := (&Client{EiaBase: "http://127.0.0.1:1/data"}).Read(context.Background(), eiaConfig, now)
+	if err == nil || !strings.HasPrefix(err.Error(), "Could not reach EIA") || strings.Contains(err.Error(), goodKey) {
+		t.Errorf("unreachable: %v", err)
 	}
-	if got, err := c.Read(context.Background(), Config{APIKey: "abcdefgh1234", Place: "US-MIDW-MISO"}, now); err != nil || len(got) != 1 || got[0].GramsPerKwh != 412 || len(*mapsSeen) != 1 {
-		t.Errorf("maps: %v, %v", got, err)
+	srv, _ := fakeSource(t, func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
+	_, err = (&Client{EiaBase: srv.URL, EiaLimit: 100 * time.Millisecond}).Read(context.Background(), eiaConfig, now)
+	if err == nil || !strings.Contains(err.Error(), "did not answer") {
+		t.Errorf("hanging: %v", err)
 	}
 }
 
@@ -419,13 +295,17 @@ func (f *fakeSink) SaveStatus(_ context.Context, s Status) error {
 
 func (f *fakeSink) last() Status { return f.statuses[len(f.statuses)-1] }
 
+func okEia(w http.ResponseWriter, _ *http.Request) {
+	fmt.Fprint(w, eiaAnswer(append(realHour("2026-10-19T13"), realHour("2026-10-19T14")...)...))
+}
+
 func feedFor(t *testing.T, cfg **Config, respond func(w http.ResponseWriter, r *http.Request)) (*Feed, *fakeSink, *time.Time, *[]*http.Request) {
 	t.Helper()
 	srv, seen := fakeSource(t, respond)
 	clock := time.Date(2026, 10, 19, 14, 5, 0, 0, time.UTC)
 	sink := &fakeSink{}
 	return &Feed{
-		Client: &Client{MapsBase: srv.URL},
+		Client: &Client{EiaBase: srv.URL},
 		Load:   func(context.Context) (*Config, error) { return *cfg, nil },
 		Sink:   sink,
 		Now:    func() time.Time { return clock },
@@ -434,31 +314,30 @@ func feedFor(t *testing.T, cfg **Config, respond func(w http.ResponseWriter, r *
 
 func TestWithNothingSetUpItAsksNothingAndSaysNothing(t *testing.T) {
 	var cfg *Config
-	f, sink, _, seen := feedFor(t, &cfg, okMaps)
+	f, sink, _, seen := feedFor(t, &cfg, okEia)
 	if asked, err := f.Step(context.Background()); asked || err != nil || len(*seen) != 0 || len(sink.statuses) != 0 {
 		t.Errorf("asked %v, %v, %d requests, %d statuses", asked, err, len(*seen), len(sink.statuses))
 	}
 }
 
-func TestSavesTheReadingUnderItsHourAndSaysSo(t *testing.T) {
-	cfg := &mapsConfig
-	f, sink, clock, _ := feedFor(t, &cfg, okMaps)
+func TestSavesEveryHourItGotAndSaysSo(t *testing.T) {
+	cfg := &eiaConfig
+	f, sink, clock, _ := feedFor(t, &cfg, okEia)
 	if asked, _ := f.Step(context.Background()); !asked {
 		t.Fatal("it should have asked")
 	}
-	hour := time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)
-	if sink.hours[hour.Unix()] != 412 {
+	if len(sink.hours) != 2 {
 		t.Errorf("hours = %v", sink.hours)
 	}
 	s := sink.last()
-	if !s.OK || s.GramsPerKwh == nil || *s.GramsPerKwh != 412 || !s.CheckedAt.Equal(*clock) {
+	if !s.OK || s.GramsPerKwh == nil || math.Abs(*s.GramsPerKwh-368.99) > 0.005 || s.At == nil || s.At.Hour() != 14 || !s.CheckedAt.Equal(*clock) {
 		t.Errorf("status = %+v", s)
 	}
 }
 
 func TestAsksAgainOnlyOnceTheIntervalHasPassed(t *testing.T) {
-	cfg := &mapsConfig
-	f, _, clock, seen := feedFor(t, &cfg, okMaps)
+	cfg := &eiaConfig
+	f, _, clock, seen := feedFor(t, &cfg, okEia)
 	f.Step(context.Background())
 	*clock = clock.Add(10 * time.Minute)
 	if asked, _ := f.Step(context.Background()); asked || len(*seen) != 1 {
@@ -471,26 +350,26 @@ func TestAsksAgainOnlyOnceTheIntervalHasPassed(t *testing.T) {
 }
 
 func TestANewKeyOrPlaceIsUsedAtOnceNotAtTheNextInterval(t *testing.T) {
-	cfg := &mapsConfig
-	f, _, clock, seen := feedFor(t, &cfg, okMaps)
+	cfg := &eiaConfig
+	f, _, clock, seen := feedFor(t, &cfg, okEia)
 	f.Step(context.Background())
-	changed := Config{Source: ElectricityMaps, APIKey: "abcdefgh1234", Place: "DE"}
+	changed := Config{Source: EIA, APIKey: goodKey, Place: "PJM"}
 	cfg = &changed
 	*clock = clock.Add(30 * time.Second)
-	if asked, _ := f.Step(context.Background()); !asked || !strings.Contains((*seen)[1].URL.RawQuery, "zone=DE") {
+	if asked, _ := f.Step(context.Background()); !asked || !strings.Contains((*seen)[1].URL.RawQuery, "PJM") {
 		t.Errorf("asked %v; %d requests", asked, len(*seen))
 	}
 }
 
 func TestAFailureIsSavedWithItsReasonAndRetriedSoonerThanASuccess(t *testing.T) {
-	cfg := &mapsConfig
-	status := 401
+	cfg := &eiaConfig
+	status := 403
 	f, sink, clock, _ := feedFor(t, &cfg, func(w http.ResponseWriter, r *http.Request) {
 		if status != 200 {
 			w.WriteHeader(status)
 			return
 		}
-		okMaps(w, r)
+		okEia(w, r)
 	})
 	f.Step(context.Background())
 	if s := sink.last(); s.OK || !strings.Contains(s.Error, "did not accept the key") || len(sink.hours) != 0 { // nothing made up
@@ -504,7 +383,7 @@ func TestAFailureIsSavedWithItsReasonAndRetriedSoonerThanASuccess(t *testing.T) 
 }
 
 func TestBeingToldToSlowDownMeansWaitingAGoodWhile(t *testing.T) {
-	cfg := &mapsConfig
+	cfg := &eiaConfig
 	f, _, clock, _ := feedFor(t, &cfg, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(429) })
 	f.Step(context.Background())
 	*clock = clock.Add(RetryAfterError + time.Minute)
@@ -518,31 +397,17 @@ func TestBeingToldToSlowDownMeansWaitingAGoodWhile(t *testing.T) {
 }
 
 func TestRemovingTheKeyIsSaidOnceAndStopsTheAsking(t *testing.T) {
-	cfg := &mapsConfig
-	f, sink, clock, seen := feedFor(t, &cfg, okMaps)
+	cfg := &eiaConfig
+	f, sink, clock, seen := feedFor(t, &cfg, okEia)
 	f.Step(context.Background())
 	cfg = nil
 	*clock = clock.Add(2 * time.Hour)
-	if asked, _ := f.Step(context.Background()); asked || sink.last().Error != "Not set up." || len(*seen) != 1 || len(sink.hours) != 1 { // the hours already saved are kept
+	if asked, _ := f.Step(context.Background()); asked || sink.last().Error != "Not set up." || len(*seen) != 1 || len(sink.hours) != 2 { // the hours already saved are kept
 		t.Errorf("asked %v, status %+v, %d requests, hours %v", asked, sink.last(), len(*seen), sink.hours)
 	}
 	n := len(sink.statuses)
 	f.Step(context.Background())
 	if len(sink.statuses) != n {
 		t.Error("it said 'Not set up.' again")
-	}
-}
-
-func TestEiaFillsInTheHoursItHasAndSavesTheNewest(t *testing.T) {
-	cfg := &eiaConfig
-	srv, _ := fakeSource(t, func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprint(w, eiaAnswer(append(realHour("2026-10-19T03"), realHour("2026-10-19T04")...)...))
-	})
-	sink := &fakeSink{}
-	f := &Feed{Client: &Client{EiaBase: srv.URL}, Load: func(context.Context) (*Config, error) { return cfg, nil }, Sink: sink,
-		Now: func() time.Time { return time.Date(2026, 10, 19, 6, 5, 0, 0, time.UTC) }}
-	f.Step(context.Background())
-	if len(sink.hours) != 2 || sink.last().At == nil || sink.last().At.Hour() != 4 {
-		t.Errorf("hours %v, status %+v", sink.hours, sink.last())
 	}
 }
