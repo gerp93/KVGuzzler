@@ -27,6 +27,8 @@ export type PcRun = S['PcRun'];
 export type PcProgramTotal = S['PcProgramTotal'];
 export type PcSeries = S['PcSeries'];
 export type ComputerHistory = S['ComputerHistory'];
+export type ComputerEstimate = S['ComputerEstimate'];
+export type AverageUse = S['AverageUse'];
 export type PcHistoryPeriod = S['PcHistoryPeriod'];
 export type PcSeriesLine = S['PcSeriesLine'];
 export type Device = S['Device'];
@@ -449,4 +451,96 @@ export function historyDetail(p: PcHistoryPeriod): string {
   if (p.off_seconds > 0) parts.push(`off ${formatDuration(p.off_seconds)}`);
   if (p.lost_power_seconds > 0) parts.push(`lost power or crashed ${formatDuration(p.lost_power_seconds)}`);
   return parts.join(' · ');
+}
+
+/** The key of the PC itself among the things a computer's figures can count (the plugs next to it are keyed by channel id). */
+export const COUNT_PC = 'pc';
+
+/** The things left out of a computer's figures, as saved: a comma list. A new plug counts until it is switched off. */
+export function parseCountOff(text: string): Set<string> {
+  return new Set(text.split(',').filter(Boolean));
+}
+
+export function toggleCount(off: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(off);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
+export interface CountedTotals {
+  /** Null when nothing counted has a figure. */
+  kwh: number | null;
+  /** Null when any counted part has no price: a partly priced total would mislead. */
+  cost: string | null;
+  /** The parts' highest draws added: an upper bound when more than one part counts, as they need not peak together. */
+  peak: number | null;
+  peakIsBound: boolean;
+  /** What is counted, in words: "the whole PC at the wall", "Monitor". */
+  parts: string[];
+}
+
+/** What a computer's figures add up to for the things ticked: the PC at its wall plug and the plugs next to it, each a separate device
+ * measured on its own (the PC's figure never contains them). */
+export function countedTotals(
+  detail: Pick<ComputerDetail, 'wall' | 'peripherals'>, off: ReadonlySet<string>, label: (channelId: string) => string,
+): CountedTotals {
+  const counted: { summary: ChannelSummary; name: string }[] = [];
+  if (detail.wall && !off.has(COUNT_PC)) counted.push({ summary: detail.wall, name: 'the whole PC at the wall' });
+  for (const p of detail.peripherals) if (!off.has(p.channel_id)) counted.push({ summary: p, name: label(p.channel_id) });
+  if (counted.length === 0) return { kwh: null, cost: null, peak: null, peakIsBound: false, parts: [] };
+
+  const peaks = counted.map((c) => c.summary.peak_watts).filter((w): w is number => w != null);
+  return {
+    kwh: counted.reduce((t, c) => t + c.summary.kwh, 0),
+    cost: sumMoney(counted.map((c) => c.summary.cost)),
+    peak: peaks.length > 0 ? peaks.reduce((t, w) => t + w, 0) : null,
+    peakIsBound: peaks.length > 1,
+    parts: counted.map((c) => c.name),
+  };
+}
+
+/** The draw right now of what is counted: the PC (when ticked and known) plus each ticked plug that has a reading. Null with none. */
+export function countedWatts(pcWatts: number | null, plugs: { key: string; watts: number | null }[], off: ReadonlySet<string>): number | null {
+  const parts: number[] = [];
+  if (pcWatts != null && !off.has(COUNT_PC)) parts.push(pcWatts);
+  for (const p of plugs) if (p.watts != null && !off.has(p.key)) parts.push(p.watts);
+  return parts.length > 0 ? parts.reduce((t, w) => t + w, 0) : null;
+}
+
+export type EstimateMode = 'constant' | 'now' | 'usage';
+
+export const ESTIMATE_WINDOWS: { key: '24h' | '7d' | '30d' | 'all'; label: string; days: number | null }[] = [
+  { key: '24h', label: 'the last 24 hours', days: 1 },
+  { key: '7d', label: 'the last 7 days', days: 7 },
+  { key: '30d', label: 'the last 30 days', days: 30 },
+  { key: 'all', label: 'all recorded time', days: null },
+];
+
+export interface EstimateLine {
+  label: string;
+  kwh: number;
+  /** A money string, or null without a price. */
+  cost: string | null;
+}
+
+/** The figures under the estimator: what the same energy per day would be per hour (not for real usage), day, 30 days and year. */
+export function estimateLines(kwhPerDay: number, rate: string | null, perHour: boolean): EstimateLine[] {
+  const line = (label: string, days: number): EstimateLine => {
+    const kwh = kwhPerDay * days;
+    const price = rate != null ? Number(rate) : NaN;
+    return { label, kwh, cost: Number.isFinite(price) ? (kwh * price).toFixed(4) : null };
+  };
+  return [...(perHour ? [line('Per hour', 1 / 24)] : []), line('Per day', 1), line('Per 30 days', 30), line('Per year', 365)];
+}
+
+/** Where a "my usage" estimate comes from, in words: the window, what was counted, and that off and asleep time is in it. */
+export function usageBasis(use: AverageUse, windowKey: string): string {
+  const w = ESTIMATE_WINDOWS.find((x) => x.key === windowKey) ?? ESTIMATE_WINDOWS[1]!;
+  const short = w.days == null || use.days < w.days * 0.95;
+  const covered = short ? `the ${formatDuration(use.days * 86400)} recorded so far` : w.label;
+  const plugs = `${use.peripheral_count} peripheral meter${use.peripheral_count === 1 ? '' : 's'}`;
+  const what = !use.includes_pc
+    ? `That is the ${plugs} only, not the PC.`
+    : `${use.whole_pc ? 'That is the whole PC at the wall' : 'That is the CPU, GPU and memory sensors only (a wall plug would show the whole PC)'}${use.peripheral_count > 0 ? `, plus ${plugs}.` : '.'}`;
+  return `The PC used ${formatKwh(use.kwh)} over ${covered}: ${formatKwh(use.kwh_per_day)} a day, an average of ${formatWatts(use.average_watts)} counting the time it was off or asleep. ${what}`;
 }

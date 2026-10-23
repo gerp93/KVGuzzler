@@ -539,3 +539,17 @@ a.button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
 }
+
+.count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.count label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

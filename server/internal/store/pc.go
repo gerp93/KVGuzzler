@@ -453,3 +453,15 @@ func (s *Store) PcSensorsKwh(ctx context.Context, sourceID string, from, to time
 func (s *Store) PcGaps(ctx context.Context, sourceID string, from, to time.Time) ([]model.PcGap, error) {
 	return s.pcGaps(ctx, sourceID, from.Unix(), to.Unix())
 }
+
+// PcFirstSensorMinute is the first minute the PC's sensors have anything recorded, or false when they have none.
+func (s *Store) PcFirstSensorMinute(ctx context.Context, sourceID string) (time.Time, bool, error) {
+	var first sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM pc_minutes WHERE source_id = ? AND scope = 'component'`, sourceID).Scan(&first); err != nil {
+		return time.Time{}, false, err
+	}
+	if !first.Valid {
+		return time.Time{}, false, nil
+	}
+	return time.Unix(first.Int64, 0).UTC(), true, nil
+}

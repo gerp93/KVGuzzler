@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
+  applianceList, BASELINE, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -310,5 +310,63 @@ describe('the energy history row detail', () => {
 
   it('without a wall plug says the figure is the sensors, and leaves out the plug counter it does not have', () => {
     expect(historyDetail(row({ basis: 'sensors', plug_gap_kwh: 0.06, asleep_seconds: 600 }))).toBe('CPU, GPU and memory sensors only · asleep 10 min');
+  });
+});
+
+describe('what a computer counts', () => {
+  const sum = (id: string, kwh: number, cost: string | null, peak: number | null) =>
+    ({ channel_id: id, scope: 'plug', kwh, cost, peak_watts: peak, monitored_hours: 1 }) as ChannelSummary;
+  const detail = {
+    wall: { ...sum('wall', 1, '0.20', 300), scope: 'pc' } as ChannelSummary,
+    peripherals: [sum('monitor', 0.2, '0.04', 40), sum('speakers', 0.1, null, 10)],
+  };
+  const label = (id: string) => id.toUpperCase();
+
+  it('counts everything until something is switched off, adding the parts and bounding the peak', () => {
+    const t = countedTotals(detail, new Set(), label);
+    expect(t.kwh).toBeCloseTo(1.3);
+    expect(t.cost).toBeNull(); // the speakers have no price: a partly priced total would mislead
+    expect([t.peak, t.peakIsBound]).toEqual([350, true]);
+    expect(t.parts).toEqual(['the whole PC at the wall', 'MONITOR', 'SPEAKERS']);
+  });
+
+  it('leaves out what is unticked, the PC included, and says nothing when nothing is counted', () => {
+    const noPc = countedTotals(detail, new Set([COUNT_PC, 'speakers']), label);
+    expect([noPc.kwh, noPc.cost, noPc.peak, noPc.peakIsBound, noPc.parts]).toEqual([0.2, '0.04', 40, false, ['MONITOR']]);
+    expect(countedTotals(detail, new Set([COUNT_PC, 'monitor', 'speakers']), label).kwh).toBeNull();
+  });
+
+  it('adds the draw right now of the ticked parts that have a reading', () => {
+    const plugs = [{ key: 'monitor', watts: 30 }, { key: 'speakers', watts: null }];
+    expect(countedWatts(300, plugs, new Set())).toBe(330);
+    expect(countedWatts(300, plugs, new Set(['monitor']))).toBe(300);
+    expect(countedWatts(null, plugs, new Set([COUNT_PC]))).toBe(30);
+    expect(countedWatts(null, [], new Set())).toBeNull();
+  });
+
+  it('round-trips the switched-off list', () => {
+    expect([...toggleCount(new Set(['a']), 'b')].sort()).toEqual(['a', 'b']);
+    expect([...toggleCount(new Set(['a', 'b']), 'a')]).toEqual(['b']);
+    expect([...parseCountOff('a,,b')].sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('the cost estimator', () => {
+  it('scales a day to an hour (when asked), 30 days and a year, and prices each at the rate', () => {
+    const lines = estimateLines(2.4, '0.20', true);
+    expect(lines.map((l) => l.label)).toEqual(['Per hour', 'Per day', 'Per 30 days', 'Per year']);
+    expect(lines[1]).toMatchObject({ kwh: 2.4, cost: '0.4800' });
+    expect(lines[3]!.kwh).toBeCloseTo(876);
+    expect(estimateLines(2.4, null, false).map((l) => [l.label, l.cost])).toEqual([['Per day', null], ['Per 30 days', null], ['Per year', null]]);
+  });
+
+  it('says where a usage estimate comes from, and how much was really recorded', () => {
+    const use: AverageUse = { kwh: 36.4, days: 7, kwh_per_day: 5.2, average_watts: 216.7, whole_pc: true, includes_pc: true, from: '', peripheral_count: 1 };
+    expect(usageBasis(use, '7d')).toBe(
+      'The PC used 36.4 kWh over the last 7 days: 5.20 kWh a day, an average of 217 W counting the time it was off or asleep. That is the whole PC at the wall, plus 1 peripheral meter.',
+    );
+    expect(usageBasis({ ...use, days: 0.125 }, '30d')).toContain('over the 3 h recorded so far');
+    expect(usageBasis({ ...use, includes_pc: false, peripheral_count: 2 }, '7d')).toContain('That is the 2 peripheral meters only, not the PC.');
+    expect(usageBasis({ ...use, whole_pc: false, peripheral_count: 0 }, '7d')).toContain('sensors only (a wall plug would show the whole PC).');
   });
 });

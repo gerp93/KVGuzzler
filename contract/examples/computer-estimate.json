@@ -1,0 +1,15 @@
+{
+  "rate": "0.14",
+  "rate_estimated": false,
+  "currency": "USD",
+  "usage": {
+    "kwh": 36.4,
+    "days": 7.0,
+    "kwh_per_day": 5.2,
+    "average_watts": 216.7,
+    "whole_pc": true,
+    "from": "2026-10-15T18:05:00Z",
+    "peripheral_count": 1,
+    "includes_pc": true
+  }
+}
