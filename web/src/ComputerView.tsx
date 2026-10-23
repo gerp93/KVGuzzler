@@ -155,7 +155,7 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <p class="caption">
                 Inside the PC, reported by its collector (last heard from {ago(detail.pc.last_seen)}).
               </p>
-              <PcInsides pc={detail.pc} />
+              <PcInsides pc={detail.pc} wholeKwh={detail.wall?.kwh ?? null} />
             </>
           ) : (
             <section class="card">

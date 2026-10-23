@@ -749,12 +749,33 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		if detail.PC != nil {
+			priceProgramsAndRuns(detail.PC, schedule, from, to, s.Loc)
+		}
 		if detail.PC != nil && detail.PC.Live != nil {
 			// How old the PC's look is, by this server's clock: the PC's own clock is not trusted for it.
 			detail.PC.Live.AgeSeconds = max(0, s.now().Sub(detail.PC.Live.ReceivedAt).Seconds())
 		}
 	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// priceProgramsAndRuns puts a cost on each program (its energy at the period's average price, one number for many small amounts) and
+// on each run (at the price on the day it ended). Both are estimates because the energy is. Nothing is priced without a known price.
+func priceProgramsAndRuns(pc *model.PcSource, schedule *rates.Schedule, from, to time.Time, loc *time.Location) {
+	avg := schedule.AverageRate(from, to)
+	for i := range pc.Programs {
+		if avg != nil {
+			c := rates.MoneyFromFloat(pc.Programs[i].KWh).Mul(*avg).String()
+			pc.Programs[i].Cost = &c
+		}
+	}
+	for i := range pc.Runs {
+		if rate := schedule.RateAt(rates.DateOf(pc.Runs[i].End, loc)); rate != nil {
+			c := rates.MoneyFromFloat(pc.Runs[i].CPUKwh + pc.Runs[i].GPUKwh).Mul(*rate).String()
+			pc.Runs[i].Cost = &c
+		}
+	}
 }
 
 // computerSeries is the PC collector's sensors, wall plug and meters over time, one line each, with the gaps to shade. It is the

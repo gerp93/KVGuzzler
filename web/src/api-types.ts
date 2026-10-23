@@ -650,6 +650,8 @@ export interface components {
             gpu_kwh: number;
             active_seconds: number;
             still_running: boolean;
+            /** @description A money string, the run's energy at the price on the day it ended; null when no price is known. In a push this is not sent (the server prices it). */
+            cost?: string | null;
         };
         PcSeriesLine: {
             name: string;
@@ -776,6 +778,8 @@ export interface components {
             /** @description cpu_kwh plus gpu_kwh. An estimate. */
             kwh: number;
             active_seconds?: number;
+            /** @description A money string, the program's energy at the period's average price per kWh; null when no price is known. An estimate. */
+            cost?: string | null;
         };
         PcSource: {
             source_id: string;

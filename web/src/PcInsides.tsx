@@ -1,7 +1,7 @@
 // What the PC's own collector reported about its insides: its sensors, the programs it blames, and the times it was not
 // recording. Shown inside a computer's detail; none of it is added to the house or circuit figures.
 import {
-  formatDuration, formatKwh, formatWatts, gapLabel, groupComponents, runDuration, runKwh,
+  formatDuration, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, programRows, programSplit, runDuration, runKwh,
   type PcComponent, type PcSource,
 } from './lib';
 
@@ -23,9 +23,12 @@ function ComponentBars({ rows }: { rows: PcComponent[] }) {
   );
 }
 
-export function PcInsides({ pc }: { pc: PcSource }) {
+export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: number | null }) {
   const g = groupComponents(pc.components);
-  const topProgram = Math.max(0, ...pc.programs.map((p) => p.kwh));
+  const rows = programRows(pc.programs, wholeKwh);
+  const split = programSplit(pc.programs, wholeKwh);
+  const splitTotal = split.reduce((t, p) => t + p.kwh, 0);
+  const programsKwh = pc.programs.reduce((t, p) => t + p.kwh, 0);
 
   return (
     <>
@@ -62,23 +65,51 @@ export function PcInsides({ pc }: { pc: PcSource }) {
 
       {pc.programs.length > 0 && (
         <section class="card">
-          <h2>Programs (an estimate)</h2>
+          <h2>Who used the power (an estimate)</h2>
+          <p class="note">
+            CPU and GPU together: {formatKwh(programsKwh)}
+            {pc.programs.every((p) => p.cost != null) ? `, ${formatMoney(pc.programs.reduce((t, p) => t + Number(p.cost), 0).toFixed(2), true)}` : ''}
+          </p>
+          {splitTotal > 0 && (
+            <>
+              <div class="split" role="img" aria-label="Where the power went">
+                {split.map((p) => (
+                  <i key={p.kind} class={`part ${p.kind}`} style={{ width: `${(p.kwh / splitTotal) * 100}%` }} title={`${p.label}: ${formatKwh(p.kwh)}`} />
+                ))}
+              </div>
+              <ul class="legend">
+                {split.map((p) => (
+                  <li key={p.kind}>
+                    <i class={`swatch ${p.kind}`} aria-hidden="true" /> {p.label} {Math.round((p.kwh / splitTotal) * 100)}%
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p class="caption">{wholeKwh != null && wholeKwh > 0 ? 'Percentages in the list are of the whole PC at the wall.' : 'Percentages in the list are of the energy the CPU and GPU used.'}</p>
           <ul class="bars wide">
-            {pc.programs.slice(0, 15).map((p) => (
-              <li key={p.name}>
-                <span class="name">{p.name}</span>
-                <span class="bar" aria-hidden="true">
-                  <i style={{ width: `${topProgram > 0 ? (p.kwh / topProgram) * 100 : 0}%` }} />
+            {rows.map((r) => (
+              <li key={r.name}>
+                <span class="name">
+                  {r.name}
+                  <span class="caption block">{r.note}</span>
                 </span>
-                <span class="num">{formatKwh(p.kwh)}</span>
-                <span class="num cost">{formatDuration(p.active_seconds ?? 0)}</span>
+                <span class={`bar ${r.kind}`} aria-hidden="true">
+                  <i style={{ width: `${r.share * 100}%` }} />
+                </span>
+                <span class="num">{formatKwh(r.kwh)}</span>
+                <span class="num cost">{r.cost != null ? formatMoney(r.cost, true) : ''}</span>
               </li>
             ))}
           </ul>
-          <p class="caption">
-            Only the power above the PC's idle level is shared out, by how busy each program kept the CPU and GPU. It is an
-            estimate, not a measurement, and it splits energy already counted above.
-          </p>
+          <details>
+            <summary>How this is worked out</summary>
+            <p class="note">
+              The CPU and GPU only report their total power; Windows reports how much of the CPU and GPU each program used. The power above
+              idle is shared out in proportion to that. The idle power itself belongs to no program. Every program is tracked automatically,
+              grouped by executable name. It is an estimate, not a measurement, and it splits energy already counted above.
+            </p>
+          </details>
         </section>
       )}
 
@@ -97,6 +128,7 @@ export function PcInsides({ pc }: { pc: PcSource }) {
                   </span>
                 </span>
                 <span class="num">{formatKwh(runKwh(r))}</span>
+                {r.cost != null && <span class="num cost">{formatMoney(r.cost, true)}</span>}
               </li>
             ))}
           </ul>

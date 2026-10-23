@@ -76,14 +76,16 @@
         "cpu_kwh": 0.31,
         "gpu_kwh": 1.9,
         "kwh": 2.21,
-        "active_seconds": 31200
+        "active_seconds": 31200,
+        "cost": "0.3094"
       },
       {
         "name": "chrome.exe",
         "cpu_kwh": 0.12,
         "gpu_kwh": 0,
         "kwh": 0.12,
-        "active_seconds": 4100
+        "active_seconds": 4100,
+        "cost": "0.0168"
       }
     ],
     "gaps": [
@@ -137,7 +139,8 @@
         "cpu_kwh": 0.021,
         "gpu_kwh": 0.141,
         "active_seconds": 3100,
-        "still_running": true
+        "still_running": true,
+        "cost": "0.0227"
       }
     ]
   }
