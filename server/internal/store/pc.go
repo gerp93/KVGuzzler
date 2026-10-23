@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/model"
@@ -348,4 +349,91 @@ WHERE source_id = ? AND end_ts >= ? AND start_ts < ? ORDER BY still DESC, end_ts
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// PcSeries is a PC collector's sensors, wall plug and meters over [from, to), bucketed like Series, with the gaps inside the period.
+// The readings that are parts of a sensor (scope breakdown) are left out: they are not separate lines. Nil when it never reported.
+func (s *Store) PcSeries(ctx context.Context, sourceID string, from, to time.Time, bucket model.Bucket, loc *time.Location) (*model.PcSeries, error) {
+	var known int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pc_sources WHERE source_id = ?`, sourceID).Scan(&known); err != nil {
+		return nil, err
+	}
+	if known == 0 {
+		return nil, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT scope, name, kind, minute, avg_w * seconds, max_w, seconds FROM pc_minutes
+WHERE source_id = ? AND minute >= ? AND minute < ? AND scope IN ('component', 'wall', 'peripheral') ORDER BY minute`,
+		sourceID, from.Unix(), to.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type key struct{ scope, name string }
+	type line struct {
+		kind    string
+		buckets map[int64]*agg
+	}
+	lines := map[key]*line{}
+	for rows.Next() {
+		var k key
+		var kind string
+		var minute int64
+		var a agg
+		if err := rows.Scan(&k.scope, &k.name, &kind, &minute, &a.ws, &a.max, &a.secs); err != nil {
+			return nil, err
+		}
+		l := lines[k]
+		if l == nil {
+			l = &line{kind: "other", buckets: map[int64]*agg{}}
+			lines[k] = l
+		}
+		if kind != "other" {
+			l.kind = kind
+		}
+		at := bucketStart(time.Unix(minute, 0), bucket, loc).Unix()
+		if b := l.buckets[at]; b != nil {
+			b.ws += a.ws
+			b.secs += a.secs
+			b.max = maxF(b.max, a.max)
+		} else {
+			l.buckets[at] = &a
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := &model.PcSeries{Bucket: bucket, Lines: []model.PcSeriesLine{}}
+	for k, l := range lines {
+		times := make([]int64, 0, len(l.buckets))
+		for t := range l.buckets {
+			times = append(times, t)
+		}
+		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+		pl := model.PcSeriesLine{Name: k.name, Scope: k.scope, Kind: l.kind, Points: make([]model.Point, 0, len(times))}
+		for _, t := range times {
+			b := l.buckets[t]
+			if b.secs <= 0 {
+				continue
+			}
+			pl.Points = append(pl.Points, model.Point{T: time.Unix(t, 0).UTC(), AvgWatts: b.ws / b.secs, MaxWatts: b.max, KWh: b.ws / joulesPerKWh})
+		}
+		out.Lines = append(out.Lines, pl)
+	}
+	// The wall line first, then the sensors, then the meters; within each, by name, so the order never shuffles between reads.
+	rank := map[string]int{"wall": 0, "component": 1, "peripheral": 2}
+	sort.Slice(out.Lines, func(i, j int) bool {
+		a, b := out.Lines[i], out.Lines[j]
+		if rank[a.Scope] != rank[b.Scope] {
+			return rank[a.Scope] < rank[b.Scope]
+		}
+		return a.Name < b.Name
+	})
+
+	if out.Gaps, err = s.pcGaps(ctx, sourceID, from.Unix(), to.Unix()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

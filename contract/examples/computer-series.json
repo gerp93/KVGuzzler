@@ -1,0 +1,64 @@
+{
+  "bucket": "hour",
+  "lines": [
+    {
+      "name": "Wall meter",
+      "scope": "wall",
+      "kind": "other",
+      "points": [
+        {
+          "t": "2026-10-22T17:00:00Z",
+          "avg_watts": 312.4,
+          "max_watts": 401.0,
+          "kwh": 0.312
+        },
+        {
+          "t": "2026-10-22T18:00:00Z",
+          "avg_watts": 298.1,
+          "max_watts": 380.0,
+          "kwh": 0.298
+        }
+      ]
+    },
+    {
+      "name": "RTX 5070 Ti",
+      "scope": "component",
+      "kind": "gpu",
+      "points": [
+        {
+          "t": "2026-10-22T17:00:00Z",
+          "avg_watts": 214.8,
+          "max_watts": 290.0,
+          "kwh": 0.215
+        },
+        {
+          "t": "2026-10-22T18:00:00Z",
+          "avg_watts": 203.0,
+          "max_watts": 280.0,
+          "kwh": 0.203
+        }
+      ]
+    },
+    {
+      "name": "Monitor",
+      "scope": "peripheral",
+      "kind": "other",
+      "points": [
+        {
+          "t": "2026-10-22T17:00:00Z",
+          "avg_watts": 28.0,
+          "max_watts": 31.0,
+          "kwh": 0.028
+        }
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "from": "2026-10-22T17:40:00Z",
+      "to": "2026-10-22T17:55:00Z",
+      "reason": "asleep",
+      "plug_kwh": 0.01
+    }
+  ]
+}

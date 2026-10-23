@@ -65,6 +65,8 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   no null for it). The server keeps only the newest look per source (`pc_live`, by its `at`; a late older one does not replace it), drops a look whose
   time makes no sense without refusing the minutes with it, and gives the dashboard its **age by the server's own clock** (`age_seconds`, never the PC's):
   past 30 s the page calls it "not answering". `GET /api/v1/computers/{id}/live` is the one-row version the page asks for every 5 s.
+  `GET /api/v1/computers/{id}/series` gives one line per sensor, the PC's own wall reading and each meter it reads (never the "inside" parts of a
+  sensor, never added together) plus the gaps, which the chart shades instead of drawing a line across them.
 - **The viewer (`shell/`) shows only the server.** The address is a plain host and port, never a URL with a path/user/query (checked on the way in
   and again when read); the window only navigates to the server's origin or its own two pages, anything else opens in the browser (http/https
   only); sandboxed, context-isolated, and only its own `file:` pages may use the IPC (the remote dashboard gets no bridge). It bundles no copy of the

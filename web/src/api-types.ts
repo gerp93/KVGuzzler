@@ -228,6 +228,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/computers/{computerId}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What each part of a computer drew over a period.
+         * @description One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a channel's series,
+         *     plus the stretches the collector was not recording so a chart can shade them. The lines are never added together. 204 when no
+         *     collector reports for this computer or it has never reported.
+         */
+        get: operations["getComputerSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -628,6 +650,20 @@ export interface components {
             gpu_kwh: number;
             active_seconds: number;
             still_running: boolean;
+        };
+        PcSeriesLine: {
+            name: string;
+            /** @enum {string} */
+            scope: "component" | "wall" | "peripheral";
+            /** @enum {string} */
+            kind: "cpu" | "gpu" | "other";
+            points: components["schemas"]["SeriesPoint"][];
+        };
+        PcSeries: {
+            bucket: components["schemas"]["Bucket"];
+            /** @description The wall line first, then the sensors, then the meters. Never added together. */
+            lines: components["schemas"]["PcSeriesLine"][];
+            gaps: components["schemas"]["PcGap"][];
         };
         PcGap: {
             /** Format: date-time */
@@ -1209,6 +1245,44 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getComputerSeries: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+                /** @description Defaults to the coarsest bucket that keeps the period under about 400 points. */
+                bucket?: components["schemas"]["Bucket"];
+            };
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcSeries"];
+                };
+            };
+            /** @description No collector reports for this computer, or it has never reported. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
         };
     };

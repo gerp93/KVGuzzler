@@ -9,6 +9,14 @@ export interface Line {
   /** Seconds since the epoch, one per value. */
   x: number[];
   y: number[];
+  /** Drawn dashed: a separate device next to the main lines. */
+  dashed?: boolean;
+}
+
+/** A stretch of the period to shade (seconds since the epoch): a time nothing was being recorded, so no line is drawn across it. */
+export interface Shade {
+  from: number;
+  to: number;
 }
 
 const css = (name: string) => getComputedStyle(document.body).getPropertyValue(name).trim() || '#888';
@@ -29,7 +37,7 @@ export function lineFrom(name: string, colorVar: string, points: { t: string; av
 }
 
 /** `domain` is the period shown, in seconds since the epoch, so a chart with few points still spans the period. */
-export function Chart({ lines, domain, height = 260 }: { lines: Line[]; domain: [number, number]; height?: number }) {
+export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +45,7 @@ export function Chart({ lines, domain, height = 260 }: { lines: Line[]; domain: 
     if (!el || lines.length === 0) return;
     const text = css('--color-text');
     const grid = css('--color-border');
+    const shade = css('--color-accent-muted');
     const plot = new uPlot(
       {
         width: el.clientWidth || 600,
@@ -57,7 +66,24 @@ export function Chart({ lines, domain, height = 260 }: { lines: Line[]; domain: 
             size: 64,
           },
         ],
-        series: [{}, ...lines.map((l) => ({ label: l.name, stroke: css(l.colorVar), width: 2, spanGaps: false }))],
+        series: [{}, ...lines.map((l) => ({ label: l.name, stroke: css(l.colorVar), width: 2, spanGaps: false, dash: l.dashed ? [6, 4] : undefined }))],
+        hooks: {
+          // Shade the times nothing was recorded, behind the lines.
+          drawClear: [
+            (u: uPlot) => {
+              const { ctx, bbox } = u;
+              ctx.save();
+              ctx.globalAlpha = 0.25;
+              ctx.fillStyle = shade;
+              for (const g of shades) {
+                const x0 = Math.max(bbox.left, u.valToPos(g.from, 'x', true));
+                const x1 = Math.min(bbox.left + bbox.width, u.valToPos(g.to, 'x', true));
+                if (x1 > x0) ctx.fillRect(x0, bbox.top, x1 - x0, bbox.height);
+              }
+              ctx.restore();
+            },
+          ],
+        },
       },
       align(lines),
       el,
@@ -68,7 +94,7 @@ export function Chart({ lines, domain, height = 260 }: { lines: Line[]; domain: 
       resize.disconnect();
       plot.destroy();
     };
-  }, [lines, domain, height]);
+  }, [lines, domain, shades, height]);
 
   return <div ref={box} class="chart" role="img" aria-label="Power over time" />;
 }
