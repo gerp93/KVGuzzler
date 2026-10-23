@@ -109,6 +109,27 @@ type ComputerHistory struct {
 	Periods []PcHistoryPeriod `json:"periods"`
 }
 
+// AverageUse is what a computer really used per day over a window, counting the time it was off or asleep, so it projects what a bill
+// would really be. It averages over the time actually recorded when recording started partway through the window.
+type AverageUse struct {
+	KWh             float64   `json:"kwh"`
+	Days            float64   `json:"days"`
+	KWhPerDay       float64   `json:"kwh_per_day"`
+	AverageWatts    float64   `json:"average_watts"`
+	WholePC         bool      `json:"whole_pc"`
+	IncludesPC      bool      `json:"includes_pc"`
+	From            time.Time `json:"from"`
+	PeripheralCount int       `json:"peripheral_count"`
+}
+
+// ComputerEstimate is what the cost estimator needs: today's price per kWh, and (when at least an hour is recorded) the real usage.
+type ComputerEstimate struct {
+	Rate          *string     `json:"rate"`
+	RateEstimated bool        `json:"rate_estimated"`
+	Currency      string      `json:"currency"`
+	Usage         *AverageUse `json:"usage"`
+}
+
 type PcSource struct {
 	SourceID       string           `json:"source_id"`
 	Name           string           `json:"name"`

@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/detail", s.computerDetail)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/live", s.computerLive)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/history", s.computerHistory)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/estimate", s.computerEstimate)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/export.csv", s.computerExport)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/series", s.computerSeries)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
@@ -866,6 +867,154 @@ func (s *Server) computerHistory(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out.Periods = append(out.Periods, row)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// minimumForAverage: less recorded time than this gives an average too noisy to project from.
+const minimumForAverage = time.Hour
+
+// computerEstimate gives the cost estimator today's price and what the computer really used per day over a window ("24h", "7d", "30d",
+// "all"; default 7d). The whole PC at its wall plug is used if it recorded anything in the window, otherwise the sensors; with
+// include_peripherals the plugs next to it are added. It averages over the time actually recorded, and says nothing (usage null) when
+// less than an hour has been.
+func (s *Server) computerEstimate(w http.ResponseWriter, r *http.Request) {
+	comp, err := s.Store.Computer(r.Context(), r.PathValue("computerId"))
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	schedule := cfg.Schedule(s.Loc)
+	now := s.now()
+	today := rates.DateOf(now, s.Loc)
+	out := model.ComputerEstimate{Currency: cfg.Currency, RateEstimated: schedule.IsEstimate(today)}
+	if rate := schedule.RateAt(today); rate != nil {
+		c := rate.String()
+		out.Rate = &c
+	}
+
+	spans := map[string]time.Duration{"24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour, "30d": 30 * 24 * time.Hour, "all": 0}
+	key := r.URL.Query().Get("window")
+	if key == "" {
+		key = "7d"
+	}
+	span, ok := spans[key]
+	if !ok {
+		writeProblem(w, http.StatusBadRequest, "bad_window", "window is 24h, 7d, 30d or all")
+		return
+	}
+	from := allTimeFrom
+	if span > 0 {
+		from = now.Add(-span)
+	}
+	includePC := r.URL.Query().Get("include_pc") != "false"
+	wanted := map[string]bool{}
+	for _, id := range strings.Split(r.URL.Query().Get("peripherals"), ",") {
+		if id != "" {
+			wanted[id] = true
+		}
+	}
+
+	_, byID, err := s.enabledChannels(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	// Only the plugs that belong to this computer, are shown, and were asked for are counted.
+	var plugs []model.Channel
+	for _, id := range comp.PeripheralChannelIDs {
+		if ch, ok := byID[id]; ok && ch.Enabled && wanted[id] {
+			plugs = append(plugs, ch)
+		}
+	}
+
+	var kwh float64
+	var whole bool
+	var first time.Time
+	var have bool
+	earliest := func(t time.Time, ok bool) {
+		if ok && (!have || t.Before(first)) {
+			first, have = t, true
+		}
+	}
+	if includePC {
+		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+			t, err := s.Store.Totals(r.Context(), ch.ID, from, now)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			if t.KWh > 0 {
+				ft, ok, err := s.Store.FirstMinute(r.Context(), ch.ID)
+				if err != nil {
+					serverError(w, err)
+					return
+				}
+				earliest(ft, ok)
+				whole = true
+			}
+		}
+		if !whole && comp.SourceID != nil {
+			ft, ok, err := s.Store.PcFirstSensorMinute(r.Context(), *comp.SourceID)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			earliest(ft, ok)
+		}
+	}
+	for _, ch := range plugs {
+		ft, ok, err := s.Store.FirstMinute(r.Context(), ch.ID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if !includePC {
+			earliest(ft, ok)
+		}
+	}
+	if !have {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	if first.After(from) {
+		from = first
+	}
+	if now.Sub(from) < minimumForAverage {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+
+	if includePC {
+		if whole {
+			t, err := s.Store.Totals(r.Context(), derefString(comp.WallChannelID), from, now)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			kwh = t.KWh
+		} else if kwh, err = s.Store.PcSensorsKwh(r.Context(), *comp.SourceID, from, now); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	for _, ch := range plugs {
+		t, err := s.Store.Totals(r.Context(), ch.ID, from, now)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		kwh += t.KWh
+	}
+	days := now.Sub(from).Hours() / 24
+	out.Usage = &model.AverageUse{
+		KWh: kwh, Days: days, KWhPerDay: kwh / days, AverageWatts: kwh / days * 1000 / 24,
+		WholePC: whole, IncludesPC: includePC, From: from.UTC(), PeripheralCount: len(plugs),
 	}
 	writeJSON(w, http.StatusOK, out)
 }

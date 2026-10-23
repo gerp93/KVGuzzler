@@ -294,6 +294,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/computers/{computerId}/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the cost estimator needs for a computer.
+         * @description Today's price per kWh, and what the computer really used per day over a window, counting the time it was off or asleep. The whole
+         *     PC at its wall plug is used if it recorded anything in the window, otherwise its sensors; it averages over the time actually
+         *     recorded. `usage` is null when less than an hour has been recorded.
+         */
+        get: operations["getComputerEstimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -737,6 +759,29 @@ export interface components {
         };
         ComputerHistory: {
             periods: components["schemas"]["PcHistoryPeriod"][];
+        };
+        AverageUse: {
+            kwh: number;
+            /** @description The time actually recorded in the window, in days. */
+            days: number;
+            kwh_per_day: number;
+            /** @description kwh_per_day as a steady draw, counting the time it was off or asleep. */
+            average_watts: number;
+            /** @description True when the figure is the whole PC at the wall, false when it is only what the sensors measured. */
+            whole_pc: boolean;
+            /** @description False when only the plugs next to the computer were counted. */
+            includes_pc: boolean;
+            /** Format: date-time */
+            from: string;
+            /** @description How many plugs next to the computer were added. */
+            peripheral_count: number;
+        };
+        ComputerEstimate: {
+            /** @description Today's price per kWh as a money string; null when none is known. */
+            rate: string | null;
+            rate_estimated: boolean;
+            currency: string;
+            usage: components["schemas"]["AverageUse"] | null;
         };
         PcGap: {
             /** Format: date-time */
@@ -1407,6 +1452,40 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getComputerEstimate: {
+        parameters: {
+            query?: {
+                /** @description How far back to average. Default 7d. */
+                window?: "24h" | "7d" | "30d" | "all";
+                /**
+                 * @description Comma-separated channel ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
+                 *     the computer are ignored.
+                 */
+                peripherals?: string;
+                /** @description False to leave the PC out and average only the plugs named in `peripherals`. Default true. */
+                include_pc?: boolean;
+            };
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerEstimate"];
                 };
             };
             400: components["responses"]["Problem"];

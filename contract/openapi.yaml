@@ -425,6 +425,49 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/estimate:
+    get:
+      tags: [Read]
+      operationId: getComputerEstimate
+      summary: What the cost estimator needs for a computer.
+      description: |
+        Today's price per kWh, and what the computer really used per day over a window, counting the time it was off or asleep. The whole
+        PC at its wall plug is used if it recorded anything in the window, otherwise its sensors; it averages over the time actually
+        recorded. `usage` is null when less than an hour has been recorded.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+        - name: window
+          in: query
+          required: false
+          description: How far back to average. Default 7d.
+          schema:
+            type: string
+            enum: ['24h', '7d', '30d', all]
+        - name: peripherals
+          in: query
+          required: false
+          description: |
+            Comma-separated channel ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
+            the computer are ignored.
+          schema:
+            type: string
+        - name: include_pc
+          in: query
+          required: false
+          description: False to leave the PC out and average only the plugs named in `peripherals`. Default true.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerEstimate'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/groups:
     get:
       tags: [Read]
@@ -1222,6 +1265,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PcHistoryPeriod'
+    AverageUse:
+      type: object
+      required: [kwh, days, kwh_per_day, average_watts, whole_pc, includes_pc, from, peripheral_count]
+      properties:
+        kwh:
+          type: number
+        days:
+          type: number
+          description: The time actually recorded in the window, in days.
+        kwh_per_day:
+          type: number
+        average_watts:
+          type: number
+          description: kwh_per_day as a steady draw, counting the time it was off or asleep.
+        whole_pc:
+          type: boolean
+          description: True when the figure is the whole PC at the wall, false when it is only what the sensors measured.
+        includes_pc:
+          type: boolean
+          description: False when only the plugs next to the computer were counted.
+        from:
+          type: string
+          format: date-time
+        peripheral_count:
+          type: integer
+          description: How many plugs next to the computer were added.
+    ComputerEstimate:
+      type: object
+      required: [rate, rate_estimated, currency, usage]
+      properties:
+        rate:
+          type: [string, 'null']
+          description: Today's price per kWh as a money string; null when none is known.
+        rate_estimated:
+          type: boolean
+        currency:
+          type: string
+        usage:
+          oneOf:
+            - $ref: '#/components/schemas/AverageUse'
+            - type: 'null'
     PcGap:
       type: object
       required: [from, to, reason]

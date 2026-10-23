@@ -2,10 +2,14 @@ import { api } from './api';
 import { Chart, lineFrom, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { EnergyHistory } from './EnergyHistory';
+import { Estimator } from './Estimator';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
 import { PeriodPicker } from './Periods';
-import { formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, pcLineStyle, periodRange, type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey } from './lib';
+import {
+  COUNT_PC, countedTotals, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
+  type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey,
+} from './lib';
 import { routePath } from './route';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
@@ -57,10 +61,30 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
   // The look is small and changes every few seconds, so it has its own quick poll; the period data above is slow.
   const { data: look } = usePoll(() => api.computerLive(id), 5_000, [id]);
 
+  // What each plug draws right now, as the server reads it.
+  const { data: plugsNow } = usePoll(() => api.live(), 5_000, []);
+  const plugWatts = (channelId: string) => plugsNow?.readings.find((r) => r.channel_id === channelId)?.watts ?? null;
+
+  // What the figures count: the PC and each plug next to it, until one is switched off (and a new plug counts until it is).
+  const [offText, setOffText] = useStored(`count-off-${id}`, '');
+  const off = parseCountOff(offText);
+  const toggle = (key: string) => setOffText([...toggleCount(off, key)].join(','));
+
   const detail = data?.detail;
   const liveNow = look ?? detail?.pc?.live ?? undefined;
-  const nowWatts = liveNow ? (isLiveStale(liveNow) ? null : liveSplit(liveNow).baseWatts) : null;
-  const peak = detail?.wall?.peak_watts ?? detail?.pc?.total_peak_watts ?? null;
+  const counted = detail ? countedTotals(detail, off, label) : undefined;
+  const hasPlugs = (detail?.peripherals.length ?? 0) > 0;
+  // The PC itself right now: its wall plug as the server reads it, else the PC's own look (wall as it reads it, else the sensors).
+  const pcWatts = detail?.computer.wall_channel_id != null ? plugWatts(detail.computer.wall_channel_id) : null;
+  const pcLook = liveNow && !isLiveStale(liveNow) ? liveSplit(liveNow).baseWatts : null;
+  const plugsList = (detail?.peripherals ?? []).map((p) => ({ key: p.channel_id, watts: plugWatts(p.channel_id) }));
+  const nowWatts = countedWatts(pcWatts ?? pcLook, plugsList, off);
+  const pcWhat = pcWatts != null ? 'the whole PC at the wall' : liveNow && liveSplit(liveNow).baseIsWall ? 'the whole PC at the wall, as it reads it' : 'the sensors added together';
+  const nowWhat = [...(off.has(COUNT_PC) ? [] : [pcWhat]), ...(detail?.peripherals ?? []).filter((p) => !off.has(p.channel_id)).map((p) => label(p.channel_id))].join(', ') || 'nothing counted';
+  const pcPeak = detail?.wall?.peak_watts ?? detail?.pc?.total_peak_watts ?? null;
+  // The sensors' peak stands in for the wall's only when there is no wall plug and nothing else counts.
+  const peak = hasPlugs && counted && counted.parts.length > 0 ? counted.peak : pcPeak;
+  const peakIsBound = hasPlugs ? (counted?.peakIsBound ?? false) : false;
   return (
     <>
       <a class="back" href={routePath('appliances')}>
@@ -84,11 +108,11 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
             <div class="stats">
               <div class="stat">
                 <span class="caption">Energy</span>
-                <p class="big small">{detail.wall ? formatKwh(detail.wall.kwh) : '—'}</p>
+                <p class="big small">{(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'}</p>
               </div>
               <div class="stat">
                 <span class="caption">Cost</span>
-                <p class="big small">{detail.wall?.cost != null ? formatMoney(detail.wall.cost, detail.cost_estimated) : '—'}</p>
+                <p class="big small">{(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'}</p>
               </div>
               <div class="stat">
                 <span class="caption">Right now</span>
@@ -96,14 +120,33 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               </div>
               <div class="stat">
                 <span class="caption">Max draw</span>
-                <p class="big small">{peak != null ? formatWatts(peak) : '—'}</p>
+                <p class="big small">{peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'}</p>
               </div>
             </div>
+            {hasPlugs && (
+              <div class="count" role="group" aria-label="What to count">
+                <span class="caption">Count:</span>
+                {detail.wall && (
+                  <label>
+                    <input type="checkbox" checked={!off.has(COUNT_PC)} onChange={() => toggle(COUNT_PC)} /> PC
+                  </label>
+                )}
+                {detail.peripherals.map((p) => (
+                  <label key={p.channel_id}>
+                    <input type="checkbox" checked={!off.has(p.channel_id)} onChange={() => toggle(p.channel_id)} /> {label(p.channel_id)}
+                  </label>
+                ))}
+              </div>
+            )}
             <p class="caption">
-              {detail.wall
-                ? 'The whole PC at the wall.'
-                : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
-              {peak != null && !detail.wall?.peak_watts ? " Max draw is the highest the sensors reached together; the wall is not measured." : ''}
+              {hasPlugs
+                ? counted && counted.parts.length > 0
+                  ? `Counting ${counted.parts.join(', ')}. Each is measured on its own plug; the PC's figure does not include the others.${peakIsBound ? ' The highest draw is an upper bound: the parts need not peak together.' : ''}`
+                  : 'Nothing is counted: tick the PC or a plug above.'
+                : detail.wall
+                  ? 'The whole PC at the wall.'
+                  : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
+              {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
             </p>
           </section>
 
@@ -114,8 +157,8 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <h2>The whole desk</h2>
               <p class="big small">{formatKwh(detail.setup_kwh)}</p>
               <p class="caption">
-                The PC plus its peripherals{detail.setup_cost != null ? `, ${formatMoney(detail.setup_cost, detail.cost_estimated)}` : ''}. A separate
-                figure: the PC's own number above does not include them.
+                The PC plus all of its peripherals{detail.setup_cost != null ? `, ${formatMoney(detail.setup_cost, detail.cost_estimated)}` : ''}, whatever is
+                ticked above.
               </p>
               <ul class="bars wide">
                 {detail.peripherals.map((p) => (
@@ -139,6 +182,14 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <p class="caption">Each plug on its own line. They are not added together.</p>
             </section>
           )}
+
+          <Estimator
+            id={id}
+            plugIds={detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid))}
+            includePc={!off.has(COUNT_PC)}
+            nowWatts={nowWatts}
+            nowWhat={nowWhat}
+          />
 
           <EnergyHistory id={id} period={period as PeriodKey} />
 
