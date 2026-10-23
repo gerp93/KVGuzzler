@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -99,6 +99,11 @@ export const api = {
     }),
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
+  carbon: () => request<CarbonConfig>('api/v1/carbon'),
+  /** Saves the source, place and (when given) a new key; the server takes a reading first and only keeps a setup that got one. */
+  setCarbon: (body: { source: string; place: string; key?: string }) =>
+    request<CarbonConfig>('api/v1/carbon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
   openEi: () => request<OpenEiStatus>('api/v1/openei'),
   setOpenEiKey: (apiKey: string) =>
     request<OpenEiStatus>('api/v1/openei', {

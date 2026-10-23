@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gerp93/KVGuzzler/server/internal/carbon"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
@@ -41,6 +42,8 @@ type Server struct {
 	Now       func() time.Time
 	// Lookup finds a utility's published tariff (OpenEI); nil means the lookup mode is not available.
 	Lookup openei.Lookup
+	// Carbon reads the grid's carbon intensity; nil means the real sources.
+	Carbon *carbon.Client
 	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
 	// how big it is. Empty reports nothing.
 	DatabasePath string
@@ -93,11 +96,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/export.csv", s.computerExport)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/series", s.computerSeries)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
-	for _, route := range []string{
-		"GET /api/v1/carbon", "PUT /api/v1/carbon",
-	} {
-		mux.HandleFunc(route, notImplemented)
-	}
+	mux.HandleFunc("GET /api/v1/carbon", s.getCarbon)
+	mux.HandleFunc("PUT /api/v1/carbon", s.putCarbon)
+	mux.HandleFunc("DELETE /api/v1/carbon", s.deleteCarbon)
 	return withVersion(mux)
 }
 
@@ -459,6 +460,14 @@ func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to 
 		c := priced.Cost.String()
 		cs.Cost = &c
 	}
+	car, err := s.carbonOf(ctx, []string{ch.ID}, from, to)
+	if err != nil {
+		return model.ChannelSummary{}, rates.RatedCost{}, err
+	}
+	if car != nil {
+		g, est := car.Kg*1000, car.EstimatedKWh
+		cs.CarbonG, cs.CarbonEstimatedKWh = &g, &est
+	}
 	return cs, priced, nil
 }
 
@@ -771,6 +780,10 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		if detail.PC != nil {
 			priceProgramsAndRuns(detail.PC, schedule, from, to, s.Loc)
+			if err := s.pcCarbon(r.Context(), detail.PC, from, to); err != nil {
+				serverError(w, err)
+				return
+			}
 		}
 		if detail.PC != nil && detail.PC.Live != nil {
 			// How old the PC's look is, by this server's clock: the PC's own clock is not trusted for it.
@@ -778,6 +791,26 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// pcCarbon puts the carbon of what the PC's sensors measured on the PC's summary: each hour's energy at that hour's grid intensity.
+func (s *Server) pcCarbon(ctx context.Context, pc *model.PcSource, from, to time.Time) error {
+	ever, ok, err := s.Store.AverageCarbonEver(ctx)
+	if err != nil || !ok {
+		return err
+	}
+	known, err := s.Store.QueryCarbon(ctx, from, to)
+	if err != nil {
+		return err
+	}
+	byHour, err := s.Store.PcHourlyKWh(ctx, pc.SourceID, from, to)
+	if err != nil {
+		return err
+	}
+	r := carbonResult(known, ever, byHour)
+	g, est := r.Kg*1000, r.EstimatedKWh
+	pc.CarbonG, pc.CarbonEstimatedKWh = &g, &est
+	return nil
 }
 
 // priceProgramsAndRuns puts a cost on each program (its energy at the period's average price, one number for many small amounts) and

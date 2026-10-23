@@ -18,6 +18,8 @@ type exportDay struct {
 	Wall    *float64 // the whole PC at its wall plug; nil when it has none
 	Sensors float64
 	Meters  []float64 // one per meter, in the order of the labels
+	// PcKg and MetersKg are the day's estimated CO2 for the PC and for the meters, in kilograms; nil when the carbon footprint has nothing.
+	PcKg, MetersKg *float64
 }
 
 // dailyCSV writes one row per day: the whole PC at the wall (blank without a wall plug), what the sensors measured, a column for each
@@ -30,6 +32,10 @@ func dailyCSV(days []exportDay, meterLabels []string, rateAt func(rates.Date) *r
 		header = append(header, m+" (kwh)")
 	}
 	header = append(header, "pc_cost", "peripherals_cost")
+	withCarbon := len(days) > 0 && days[0].PcKg != nil
+	if withCarbon {
+		header = append(header, "pc_co2_kg", "peripherals_co2_kg")
+	}
 	b.WriteString(csvLine(header))
 
 	for _, d := range days {
@@ -53,6 +59,16 @@ func dailyCSV(days []exportDay, meterLabels []string, rateAt func(rates.Date) *r
 			pc = *d.Wall
 		}
 		row = append(row, cost(pc), cost(meters))
+		if withCarbon {
+			pcKg, metersKg := "", "0"
+			if d.PcKg != nil {
+				pcKg = number(*d.PcKg)
+			}
+			if len(d.Meters) > 0 && d.MetersKg != nil {
+				metersKg = number(*d.MetersKg)
+			}
+			row = append(row, pcKg, metersKg)
+		}
 		b.WriteString(csvLine(row))
 	}
 	return b.String()
@@ -91,6 +107,22 @@ func csvCell(text string) string {
 }
 
 var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// dayBounds is the part of a local day inside [from, to).
+func (s *Server) dayBounds(day rates.Date, from, to time.Time) (time.Time, time.Time) {
+	f, t := s.scheduleDayStart(day), s.scheduleDayStart(day.AddDays(1))
+	if f.Before(from) {
+		f = from
+	}
+	if t.After(to) {
+		t = to
+	}
+	return f, t
+}
+
+func (s *Server) scheduleDayStart(day rates.Date) time.Time {
+	return time.Date(day.Year, day.Month, day.Day, 0, 0, 0, 0, s.Loc)
+}
 
 // computerExport is a computer's daily energy and cost over a period as a CSV download: one row per local day, the whole PC at its wall
 // plug, what its sensors measured, and each plug next to it.
@@ -166,10 +198,64 @@ func (s *Server) computerExport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The carbon footprint, a day at a time, once any grid intensity has been saved.
+	ever, haveCarbon, err := s.Store.AverageCarbonEver(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	var known map[int64]float64
+	var wallID string
+	var meterIDs []string
+	if haveCarbon {
+		if known, err = s.Store.QueryCarbon(r.Context(), from, to); err != nil {
+			serverError(w, err)
+			return
+		}
+		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+			wallID = ch.ID
+		}
+		for _, id := range comp.PeripheralChannelIDs {
+			if ch, ok := byID[id]; ok && ch.Enabled {
+				meterIDs = append(meterIDs, id)
+			}
+		}
+	}
+	dayKg := func(day rates.Date, byHour func(f, t time.Time) (map[int64]float64, error)) (*float64, error) {
+		f, t := s.dayBounds(day, from, to)
+		hours, err := byHour(f, t)
+		if err != nil {
+			return nil, err
+		}
+		kg := carbonResult(known, ever, hours).Kg
+		return &kg, nil
+	}
+
 	var days []exportDay
 	last := rates.DateOf(to.Add(-time.Nanosecond), s.Loc)
 	for day := rates.DateOf(from, s.Loc); !day.After(last); day = day.AddDays(1) {
 		d := exportDay{Day: day, Sensors: sensors[day]}
+		if haveCarbon {
+			var err error
+			if d.PcKg, err = dayKg(day, func(f, t time.Time) (map[int64]float64, error) {
+				switch {
+				case wallID != "":
+					return s.Store.HourlyKWh(r.Context(), []string{wallID}, f, t)
+				case comp.SourceID != nil:
+					return s.Store.PcHourlyKWh(r.Context(), *comp.SourceID, f, t)
+				}
+				return map[int64]float64{}, nil
+			}); err != nil {
+				serverError(w, err)
+				return
+			}
+			if d.MetersKg, err = dayKg(day, func(f, t time.Time) (map[int64]float64, error) {
+				return s.Store.HourlyKWh(r.Context(), meterIDs, f, t)
+			}); err != nil {
+				serverError(w, err)
+				return
+			}
+		}
 		if wall != nil {
 			v := wall[day]
 			d.Wall = &v

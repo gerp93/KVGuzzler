@@ -139,7 +139,10 @@ type PcSource struct {
 	Programs       []PcProgramTotal `json:"programs"`
 	Gaps           []PcGap          `json:"gaps"`
 	Live           *PcLive          `json:"live"`
-	Runs           []PcRun          `json:"runs"`
+	// CarbonG and CarbonEstimatedKWh are the carbon of what the PC's sensors measured over the period (the same figures a channel carries).
+	CarbonG            *float64 `json:"carbon_g"`
+	CarbonEstimatedKWh *float64 `json:"carbon_estimated_kwh"`
+	Runs               []PcRun  `json:"runs"`
 }
 
 // Computer is a computer as the user sees it: a name, the collector that reports its insides (if any), the plug it is on
@@ -197,4 +200,15 @@ type TariffCandidate struct {
 
 type TariffCandidates struct {
 	Candidates []TariffCandidate `json:"candidates"`
+}
+
+// CarbonConfig is the carbon-footprint setup as a client sees it. The key is never part of it.
+type CarbonConfig struct {
+	Configured  bool       `json:"configured"`
+	Source      string     `json:"source,omitempty"`
+	Place       string     `json:"place,omitempty"`
+	LastOutcome *string    `json:"last_outcome"`
+	LastFetch   *time.Time `json:"last_fetch"`
+	LastGrams   *float64   `json:"last_grams"`
+	LastHour    *time.Time `json:"last_hour"`
 }

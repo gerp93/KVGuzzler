@@ -17,6 +17,7 @@ const examples = {
   'computer-history.json': 'ComputerHistory',
   'computer-estimate.json': 'ComputerEstimate',
   'tariff-candidates.json': 'TariffCandidates',
+  'carbon-config.json': 'CarbonConfig',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });

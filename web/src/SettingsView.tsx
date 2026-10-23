@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { ComputersCard } from './ComputersCard';
+import { CarbonCard } from './CarbonCard';
 import { DatabaseCard } from './DatabaseCard';
 import { DevicesCard } from './DevicesCard';
 import { GroupsCard } from './GroupsCard';
@@ -72,6 +73,7 @@ export function SettingsView({
           ))}
         </ul>
       </section>
+      <CarbonCard />
       <DatabaseCard />
       <section class="card">
         <h2>Theme</h2>

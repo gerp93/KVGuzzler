@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, BASELINE, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -304,12 +304,12 @@ describe('the energy history row detail', () => {
   it('says how much the sensors account for and every stretch nothing was recorded, by reason', () => {
     expect(historyDetail(row({}))).toBe('of which CPU, GPU and memory 3.00 kWh (75% of the whole PC)');
     expect(historyDetail(row({ asleep_seconds: 13800, plug_gap_kwh: 0.06, off_seconds: 7200, lost_power_seconds: 600 }))).toBe(
-      "of which CPU, GPU and memory 3.00 kWh (75% of the whole PC) · asleep 3 h 50 min · 0.06 kWh of the whole PC is from the plug's own energy counter, for time the PC was asleep or off · off 2 h · lost power or crashed 10 min",
+      'of which CPU, GPU and memory 3.00 kWh (75% of the whole PC) · asleep 3 h 50 min · off 2 h · lost power or crashed 10 min',
     );
   });
 
   it('without a wall plug says the figure is the sensors, and leaves out the plug counter it does not have', () => {
-    expect(historyDetail(row({ basis: 'sensors', plug_gap_kwh: 0.06, asleep_seconds: 600 }))).toBe('CPU, GPU and memory sensors only · asleep 10 min');
+    expect(historyDetail(row({ basis: 'sensors', asleep_seconds: 600 }))).toBe('CPU, GPU and memory sensors only · asleep 10 min');
   });
 });
 
@@ -317,8 +317,8 @@ describe('what a computer counts', () => {
   const sum = (id: string, kwh: number, cost: string | null, peak: number | null) =>
     ({ channel_id: id, scope: 'plug', kwh, cost, peak_watts: peak, monitored_hours: 1 }) as ChannelSummary;
   const detail = {
-    wall: { ...sum('wall', 1, '0.20', 300), scope: 'pc' } as ChannelSummary,
-    peripherals: [sum('monitor', 0.2, '0.04', 40), sum('speakers', 0.1, null, 10)],
+    wall: { ...sum('wall', 1, '0.20', 300), scope: 'pc', carbon_g: 400, carbon_estimated_kwh: 0.25 } as ChannelSummary,
+    peripherals: [{ ...sum('monitor', 0.2, '0.04', 40), carbon_g: 80, carbon_estimated_kwh: 0.1 }, sum('speakers', 0.1, null, 10)],
   };
   const label = (id: string) => id.toUpperCase();
 
@@ -395,5 +395,30 @@ describe('currency and the looked-up price note', () => {
       'Priced at Example Electric: Residential Time of Use; this period averaged $0.1500 per kWh, weighted by when the power is used. The energy charge only; the fixed charge (6.75 $/month) is not in it; only the first usage tier is used.',
     );
     expect(tariffNote({ ...tariff, tiers: 1, fixed_charge: null, varies_by_time: false }, 0, null)).toBe('Priced at Example Electric: Residential Time of Use. The energy charge only.');
+  });
+});
+
+describe('the carbon footprint', () => {
+  it('adds the carbon of what is counted and says how much was valued at an average', () => {
+    const sum = (id: string, kwh: number, carbon_g: number | null, est: number | null) =>
+      ({ channel_id: id, scope: 'plug', kwh, cost: null, peak_watts: null, monitored_hours: 1, carbon_g, carbon_estimated_kwh: est }) as ChannelSummary;
+    const detail = { wall: { ...sum('wall', 1, 400, 0.25), scope: 'pc' } as ChannelSummary, peripherals: [sum('monitor', 0.2, 80, 0.1), sum('speakers', 0.1, null, null)] };
+    const all = countedTotals(detail, new Set(), (id) => id);
+    expect([all.carbonG, all.carbonEstimatedKwh]).toEqual([480, 0.35]);
+    expect(countedTotals(detail, new Set([COUNT_PC, 'monitor']), (id) => id).carbonG).toBeNull(); // the speakers have no carbon: nothing to show
+    expect(countedTotals({ ...detail, wall: undefined }, new Set(['monitor', 'speakers']), (id) => id).carbonG).toBeNull();
+  });
+
+  it('writes an amount as grams, kilograms or tonnes, always approximate', () => {
+    expect([formatCarbon(412), formatCarbon(1240), formatCarbon(15_000), formatCarbon(2_100_000)]).toEqual(['≈ 412 g CO₂e', '≈ 1.24 kg CO₂e', '≈ 15.0 kg CO₂e', '≈ 2.1 t CO₂e']);
+  });
+
+  it('says the average it came to and the share valued at an average, and nothing without carbon', () => {
+    expect(carbonNote(480, 1.2, 0.3)).toBe(
+      "≈ 480 g CO₂e (the grid's average, not what one more kWh would cause); averaging 400 g per kWh; 25% of the energy valued at an average for want of its own hour's figure.",
+    );
+    expect(carbonNote(480, 1.2, 0)).not.toContain('valued at an average');
+    expect(carbonNote(null, 1, 0)).toBe('');
+    expect(carbonNote(5, null, 0)).toBe('');
   });
 });
