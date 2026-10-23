@@ -391,6 +391,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rates/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search OpenEI for the residential rates around an address or ZIP code.
+         * @description Needs the OpenEI API key to be saved. Only rates in force now that can be priced per kWh by hour are returned, the likeliest first.
+         *     Written from OpenEI's documented fields and not yet checked against the live service.
+         */
+        get: operations["lookupRates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rates/tariff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The looked-up tariff in use. */
+        get: operations["getTariff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/openei": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether an OpenEI API key is saved. Never returns the key. */
+        get: operations["getOpenEi"];
+        /**
+         * Save, or with an empty key remove, the OpenEI API key.
+         * @description The key is kept on the server and sent to api.openei.org only.
+         */
+        put: operations["setOpenEi"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/carbon": {
         parameters: {
             query?: never;
@@ -628,6 +687,43 @@ export interface components {
             bills?: components["schemas"]["Bill"][];
             /** @description The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side. */
             tariff_label?: string | null;
+        };
+        OpenEiStatus: {
+            has_key: boolean;
+        };
+        OpenEiKeyUpdate: {
+            /** @description Letters, digits, dashes and underscores, 8 to 128 of them; empty removes the saved key. */
+            api_key: string;
+        };
+        /**
+         * @description A utility's published tariff reduced to an energy price per kWh for each month, kind of day and hour (the grid stays on the server). The
+         *     energy charge only: the first tier's rate plus its adjustment and the month's fuel adjustment. Fixed and demand charges are left out.
+         */
+        TariffInfo: {
+            /** @description The rate's label in the OpenEI Utility Rate Database. */
+            label: string;
+            utility: string;
+            name: string;
+            uri?: string | null;
+            /** Format: date-time */
+            fetched_at: string;
+            summary: string;
+            cheapest: number;
+            dearest: number;
+            varies_by_time: boolean;
+            periods: number;
+            /** @description The most usage tiers any period has; only the first tier is used. */
+            tiers: number;
+            fixed_charge?: string | null;
+        };
+        TariffCandidate: components["schemas"]["TariffInfo"] & {
+            /** @description OpenEI marks it as the most common rate for its sector and service type. */
+            is_default: boolean;
+            /** @description An OpenEI expert has checked it. */
+            approved: boolean;
+        };
+        TariffCandidates: {
+            candidates: components["schemas"]["TariffCandidate"][];
         };
         CarbonConfig: {
             /** @description Whether a key is saved. The key itself is never returned. */
@@ -1661,6 +1757,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateConfig"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    lookupRates: {
+        parameters: {
+            query: {
+                address: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TariffCandidates"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    getTariff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TariffInfo"];
+                };
+            };
+            /** @description No tariff has been chosen. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getOpenEi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenEiStatus"];
+                };
+            };
+        };
+    };
+    setOpenEi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenEiKeyUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenEiStatus"];
                 };
             };
             400: components["responses"]["Problem"];

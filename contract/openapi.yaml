@@ -594,6 +594,78 @@ paths:
                 $ref: '#/components/schemas/RateConfig'
         '400':
           $ref: '#/components/responses/Problem'
+  /api/v1/rates/lookup:
+    get:
+      tags: [Settings]
+      operationId: lookupRates
+      summary: Search OpenEI for the residential rates around an address or ZIP code.
+      description: |
+        Needs the OpenEI API key to be saved. Only rates in force now that can be priced per kWh by hour are returned, the likeliest first.
+        Written from OpenEI's documented fields and not yet checked against the live service.
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TariffCandidates'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/rates/tariff:
+    get:
+      tags: [Settings]
+      operationId: getTariff
+      summary: The looked-up tariff in use.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TariffInfo'
+        '204':
+          description: No tariff has been chosen.
+  /api/v1/openei:
+    get:
+      tags: [Settings]
+      operationId: getOpenEi
+      summary: Whether an OpenEI API key is saved. Never returns the key.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenEiStatus'
+    put:
+      tags: [Settings]
+      operationId: setOpenEi
+      summary: Save, or with an empty key remove, the OpenEI API key.
+      description: The key is kept on the server and sent to api.openei.org only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenEiKeyUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenEiStatus'
+        '400':
+          $ref: '#/components/responses/Problem'
   /api/v1/carbon:
     get:
       tags: [Settings]
@@ -1034,6 +1106,73 @@ components:
         tariff_label:
           type: [string, 'null']
           description: The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side.
+    OpenEiStatus:
+      type: object
+      required: [has_key]
+      properties:
+        has_key:
+          type: boolean
+    OpenEiKeyUpdate:
+      type: object
+      required: [api_key]
+      properties:
+        api_key:
+          type: string
+          description: Letters, digits, dashes and underscores, 8 to 128 of them; empty removes the saved key.
+    TariffInfo:
+      type: object
+      required: [label, utility, name, fetched_at, summary, cheapest, dearest, varies_by_time, periods, tiers]
+      description: |
+        A utility's published tariff reduced to an energy price per kWh for each month, kind of day and hour (the grid stays on the server). The
+        energy charge only: the first tier's rate plus its adjustment and the month's fuel adjustment. Fixed and demand charges are left out.
+      properties:
+        label:
+          type: string
+          description: The rate's label in the OpenEI Utility Rate Database.
+        utility:
+          type: string
+        name:
+          type: string
+        uri:
+          type: [string, 'null']
+        fetched_at:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        cheapest:
+          type: number
+        dearest:
+          type: number
+        varies_by_time:
+          type: boolean
+        periods:
+          type: integer
+        tiers:
+          type: integer
+          description: The most usage tiers any period has; only the first tier is used.
+        fixed_charge:
+          type: [string, 'null']
+    TariffCandidate:
+      allOf:
+        - $ref: '#/components/schemas/TariffInfo'
+        - type: object
+          required: [is_default, approved]
+          properties:
+            is_default:
+              type: boolean
+              description: OpenEI marks it as the most common rate for its sector and service type.
+            approved:
+              type: boolean
+              description: An OpenEI expert has checked it.
+    TariffCandidates:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TariffCandidate'
     CarbonConfig:
       type: object
       required: [configured]

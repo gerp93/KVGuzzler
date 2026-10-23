@@ -28,6 +28,9 @@ export type PcProgramTotal = S['PcProgramTotal'];
 export type PcSeries = S['PcSeries'];
 export type ComputerHistory = S['ComputerHistory'];
 export type ComputerEstimate = S['ComputerEstimate'];
+export type TariffInfo = S['TariffInfo'];
+export type TariffCandidate = S['TariffCandidate'];
+export type OpenEiStatus = S['OpenEiStatus'];
 export type AverageUse = S['AverageUse'];
 export type PcHistoryPeriod = S['PcHistoryPeriod'];
 export type PcSeriesLine = S['PcSeriesLine'];
@@ -67,12 +70,45 @@ export function formatKwh(k: number | null | undefined): string {
   return `${k < 10 ? k.toFixed(2) : k.toFixed(1)} kWh`;
 }
 
-/** A money string as dollars and cents. `estimated` marks a price that rests on a stand-in rate with a leading ≈. */
+/** The sign shown before an amount: the common currencies, else the three-letter code and a space. */
+export function currencySymbol(code: string | null | undefined): string {
+  switch (code) {
+    case undefined:
+    case null:
+    case '':
+    case 'USD':
+    case 'CAD':
+    case 'AUD':
+    case 'NZD':
+    case 'MXN':
+      return '$';
+    case 'EUR':
+      return '€';
+    case 'GBP':
+      return '£';
+    case 'JPY':
+    case 'CNY':
+      return '¥';
+    case 'INR':
+      return '₹';
+    default:
+      return `${code} `;
+  }
+}
+
+let symbol = '$';
+
+/** Sets the currency every amount is shown in (the server's rate settings say which). Called when the settings are read. */
+export function setCurrencyCode(code: string | null | undefined): void {
+  symbol = currencySymbol(code);
+}
+
+/** A money string with the currency's sign and two decimals. `estimated` marks a price that rests on a stand-in rate with a leading ≈. */
 export function formatMoney(m: string | null | undefined, estimated = false): string {
   if (m === null || m === undefined) return '—';
   const n = Number(m);
   if (!Number.isFinite(n)) return '—';
-  return `${estimated ? '≈ ' : ''}${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
+  return `${estimated ? '≈ ' : ''}${n < 0 ? '-' : ''}${symbol}${Math.abs(n).toFixed(2)}`;
 }
 
 /** Above this per kWh a rate is almost certainly cents typed as dollars. */
@@ -560,3 +596,15 @@ export function formatBytes(bytes: number): string {
 
 export const PROJECT_URL = 'https://github.com/gerp93/KVGuzzler';
 export const ISSUES_URL = 'https://github.com/gerp93/KVGuzzler/issues';
+
+/** What a looked-up price comes to over a period, in words: the rate, what the period averaged to per kWh and what is left out. With no
+ * energy to average over the line says only which rate it is and what is left out. */
+export function tariffNote(t: Pick<TariffInfo, 'utility' | 'name' | 'tiers' | 'fixed_charge' | 'varies_by_time'>, kwh: number, cost: string | null): string {
+  const avg = cost != null && kwh > 0 ? Number(cost) / kwh : null;
+  const parts = [`Priced at ${t.utility}: ${t.name}`];
+  if (avg != null && Number.isFinite(avg)) parts.push(`this period averaged ${symbol}${avg.toFixed(4)} per kWh${t.varies_by_time ? ', weighted by when the power is used' : ''}`);
+  const left = ['The energy charge only'];
+  if (t.fixed_charge) left.push(`the fixed charge (${t.fixed_charge}) is not in it`);
+  if (t.tiers > 1) left.push('only the first usage tier is used');
+  return `${parts.join('; ')}. ${left.join('; ')}.`;
+}

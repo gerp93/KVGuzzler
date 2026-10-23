@@ -5,6 +5,7 @@ import { EnergyHistory } from './EnergyHistory';
 import { Estimator } from './Estimator';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
+import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
   COUNT_PC, countedTotals, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
@@ -148,6 +149,7 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
                   : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
               {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
             </p>
+            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
           </section>
 
           {liveNow && <PcLiveCard live={liveNow} />}

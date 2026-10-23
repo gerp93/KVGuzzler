@@ -166,3 +166,35 @@ type ComputerDetail struct {
 	CostEstimated bool             `json:"cost_estimated"`
 	PC            *PcSource        `json:"pc"`
 }
+
+// OpenEiStatus says whether an OpenEI API key is saved. The key itself is never sent back.
+type OpenEiStatus struct {
+	HasKey bool `json:"has_key"`
+}
+
+// TariffInfo is what a utility's published tariff looks like to a client: who, what, what it costs. The rate grid itself stays on the server.
+type TariffInfo struct {
+	Label        string    `json:"label"`
+	Utility      string    `json:"utility"`
+	Name         string    `json:"name"`
+	URI          *string   `json:"uri"`
+	FetchedAt    time.Time `json:"fetched_at"`
+	Summary      string    `json:"summary"`
+	Cheapest     float64   `json:"cheapest"`
+	Dearest      float64   `json:"dearest"`
+	VariesByTime bool      `json:"varies_by_time"`
+	Periods      int       `json:"periods"`
+	Tiers        int       `json:"tiers"`
+	FixedCharge  *string   `json:"fixed_charge"`
+}
+
+// TariffCandidate is one rate found for an address, ready to be chosen.
+type TariffCandidate struct {
+	TariffInfo
+	IsDefault bool `json:"is_default"`
+	Approved  bool `json:"approved"`
+}
+
+type TariffCandidates struct {
+	Candidates []TariffCandidate `json:"candidates"`
+}

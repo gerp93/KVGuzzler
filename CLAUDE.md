@@ -34,7 +34,11 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - A reading above its channel's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
 - Pricing in the server (`server/internal/rates`) is a **port** of `KVGuzzler.Core.Billing` (bills, flat fees, `RateSchedule`); its tests are
   `BillingTests.cs` ported case for case. A change to a pricing rule goes in both places, with the test in both. Money is exact (`big.Rat`),
-  never a float; bill dates are local calendar days. Only "one rate" and "my bills" exist there: the OpenEI lookup and carbon are not ported.
+  never a float; bill dates are local calendar days. "One rate", "my bills" and the **OpenEI lookup** exist there (carbon is not ported yet). The lookup is a port of `OpenEiClient`/`Tariff`/`UsageProfile`
+  (`server/internal/openei`, `rates/tariff.go`; the parsing cases are ported one for one): the free API key is saved **write-only** on the server (`PUT /openei`, never
+  returned, sent to `api.openei.org` only, never in an error text), the chosen rate is read again by its label (a browser never sends a grid), a tariff over a week old is
+  read again (the old one stays if that fails), and a day's price is the grid weighted by the hours the house really uses power (the mains clamps' last 60 days, else the
+  computers' wall plugs; learned at most hourly) when the tariff varies by time. `RefreshRates` runs hourly from `housed`. **Not checked against the real service.**
 - Plugs: `server/internal/shelly` is a port of `ShellyPlug` (one read-only GET; a plug often has the PC or a fridge on it, so nothing may
   switch it). A device is read once before it is saved, so a wrong address is refused with 502; a saved device is restored after a restart
   even if it is offline. The PC's own wall plug is added with scope `pc`: a slice, added to nothing.
