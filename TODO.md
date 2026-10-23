@@ -132,6 +132,15 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - **Appliance groups** are built (an entertainment center on two plugs shown as one; Settings > Appliance groups). Only Shelly plugs can be
     added so far, so a group of other brands waits for their sources (below).
   - **The C# relay client** is built (`RelayFeed`, `relay.json`; see CLAUDE.md) and tested against a fake server and the contract's field
+    names. It was also run for real once: the development collector (its `KVGuzzler-dev` history, a week of backfill) pushed 26 minutes to a
+    **throwaway local server**, which accepted everything (sensors, the CPU breakdown, the wall meter, programs including the system baseline, and
+    gaps with their reasons). It has **not** pushed to the real box: the installed collector service is still the version before the relay, so it
+    needs the update first. Then put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` and look for "House server: Sent N
+    minute(s)" in its log and the PC's sensors and programs on its page under Appliances (the box's one computer adopts the first collector).
+    No window setting for it yet (the window is frozen).
+  - **Appliance groups** are built (an entertainment center on two plugs shown as one; Settings > Appliance groups). Only Shelly plugs can be
+    added so far, so a group of other brands waits for their sources (below).
+  - **The C# relay client** is built (`RelayFeed`, `relay.json`; see CLAUDE.md) and tested against a fake server and the contract's field
     names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
     `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the
     PC under Appliances. No window setting for it yet (the window is frozen).

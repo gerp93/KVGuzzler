@@ -109,6 +109,9 @@ ON CONFLICT(source_id) DO UPDATE SET name = CASE WHEN excluded.name <> '' THEN e
 	return len(in.Minutes), nil
 }
 
+// A reading is one line however its kind was recorded over time: history saved before the PC knew a sensor's kind says "other", later
+// minutes say cpu or gpu, and the summary takes the specific kind when any minute has one.
+//
 // PcSourceSummary is what one PC collector reported over [from, to): its sensors, its wall figure and peripherals, the
 // per-program estimates, and the stretches it was not sampling (clipped to the period, with a plug counter's energy shared
 // evenly over the gap so any period gets its share). It is nil when that collector has never reported.
@@ -162,9 +165,11 @@ func (s *Store) pcSources(ctx context.Context) ([]model.PcSource, error) {
 
 func (s *Store) pcComponents(ctx context.Context, id string, f, t int64) ([]model.PcComponent, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT name, scope, kind, SUM(avg_w * seconds), MAX(max_w), SUM(seconds)
+SELECT name, scope,
+       COALESCE(NULLIF(MAX(CASE WHEN kind <> 'other' THEN kind ELSE '' END), ''), 'other'),
+       SUM(avg_w * seconds), MAX(max_w), SUM(seconds)
 FROM pc_minutes WHERE source_id = ? AND minute >= ? AND minute < ?
-GROUP BY scope, name, kind ORDER BY SUM(avg_w * seconds) DESC`, id, f, t)
+GROUP BY scope, name ORDER BY SUM(avg_w * seconds) DESC`, id, f, t)
 	if err != nil {
 		return nil, err
 	}
