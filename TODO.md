@@ -154,9 +154,10 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     rate in use, the weekly refresh, the usage-weighted day price, the footnote) and the currency symbol are done, **not checked against the real OpenEI**. The Help tab (version,
     links, how to read the numbers) and the read-only database card are done.
   - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the
-    reason, and the setup form refuses a bad address and saves a good one). Still to do: a release (the tag namespace is shared with the
-    desktop app's Velopack releases, which read this repo's releases to find updates, so check that a second app's release cannot confuse them,
-    then KVG_Standards' `release-electron.yml` with `app_dir: shell` plus `electron-updater`), an icon (no logo exists and none is to be
+    reason, and the setup form refuses a bad address and saves a good one). A release workflow exists (`release-viewer.yml`: pre-release tagged `viewer-vX.Y.Z`, so the desktop app's
+    Velopack updater, which reads this repo's releases for non-pre-releases only, cannot see it; it is not KVG_Standards' `release-electron.yml`
+    because that tags `vX.Y.Z`: raise a tag-prefix option there), and Help > Check for updates only offers the download page (no silent updater on
+    an unsigned installer). Still to do: an icon (no logo exists and none is to be
     made up), VisualAssault theming for its two pages, and trying it off Windows. `npm run dist` was run once here: the packaged app starts and
     opens its setup page, and the one-click per-user installer (`shell/release/House Power Setup 0.1.0.exe`, about 107 MB, **unsigned**, so
     SmartScreen will warn) was built, but not installed or run.

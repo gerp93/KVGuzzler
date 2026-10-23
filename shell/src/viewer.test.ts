@@ -6,6 +6,7 @@ import { buildContextMenuTemplate } from './contextMenu';
 import { buildMenuTemplate, REPO_URL, type MenuOptions } from './menu';
 import { isLocalPage, isSafeExternalUrl, isServerUrl, normalizeServerAddress } from './serverAddress';
 import { loadSettings, saveSettings } from './settings';
+import { checkForUpdate, isNewer, newestViewerRelease, parseVersion } from './updateCheck';
 
 describe('the server address', () => {
   it('accepts a plain host, with or without a port, and says where it will go', () => {
@@ -86,7 +87,7 @@ describe('the saved settings', () => {
 describe('the application menu', () => {
   const options = (over: Partial<MenuOptions> = {}): MenuOptions => ({
     isPackaged: true, version: '1.2.3', platform: 'win32', appName: 'House Power',
-    changeServer: vi.fn(), zoom: vi.fn(), openExternal: vi.fn(), ...over,
+    changeServer: vi.fn(), checkForUpdates: vi.fn(), zoom: vi.fn(), openExternal: vi.fn(), ...over,
   });
   const labels = (t: ReturnType<typeof buildMenuTemplate>) => t.map((m) => m.label);
   const submenu = (t: ReturnType<typeof buildMenuTemplate>, label: string) => (t.find((m) => m.label === label)?.submenu ?? []) as { label?: string; role?: string; click?: () => void; enabled?: boolean; visible?: boolean }[];
@@ -123,9 +124,12 @@ describe('the application menu', () => {
     expect(changeServer).toHaveBeenCalledOnce();
   });
 
-  it('has a Help menu with the repository, issues and a disabled version line', () => {
+  it('has a Help menu with the repository, issues, a way to check for updates and a disabled version line', () => {
     const openExternal = vi.fn();
-    const help = submenu(buildMenuTemplate(options({ openExternal })), 'Help');
+    const checkForUpdates = vi.fn();
+    const help = submenu(buildMenuTemplate(options({ openExternal, checkForUpdates })), 'Help');
+    help.find((i) => i.label === 'Check for updates…')?.click?.();
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
     help.find((i) => i.label === 'KVGuzzler on GitHub')?.click?.();
     help.find((i) => i.label === 'Report an issue')?.click?.();
     expect(openExternal.mock.calls.map((c) => c[0])).toEqual([REPO_URL, `${REPO_URL}/issues`]);
@@ -148,5 +152,56 @@ describe('the right-click menu', () => {
     expect(roles({ isEditable: false, selectionText: 'a number', editFlags: flags({ canCopy: true }) })).toEqual(['copy']);
     expect(roles({ isEditable: false, selectionText: '  ', editFlags: flags({ canCopy: true }) })).toEqual([]);
     expect(roles({ isEditable: false, selectionText: '', editFlags: flags() })).toEqual([]);
+  });
+});
+
+describe('the update check', () => {
+  const release = (tag: string, over: Record<string, unknown> = {}) => ({
+    tag_name: tag, html_url: `https://github.com/gerp93/KVGuzzler/releases/tag/${tag}`, draft: false, prerelease: true, ...over,
+  });
+  const answer = (body: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  it('reads and compares plain three-number versions', () => {
+    expect(parseVersion('1.2.3')).toEqual([1, 2, 3]);
+    for (const bad of ['1.2', '1.2.3.4', 'v1.2.3', '1.2.x', '1.2.3-beta', '', '-1.0.0']) expect(parseVersion(bad), bad).toBeNull();
+    expect(isNewer([0, 2, 0], [0, 1, 9])).toBe(true);
+    expect(isNewer([1, 0, 0], [0, 99, 99])).toBe(true);
+    expect(isNewer([0, 1, 0], [0, 1, 0])).toBe(false);
+    expect(isNewer([0, 0, 9], [0, 1, 0])).toBe(false);
+  });
+
+  it('picks the highest viewer release and ignores the desktop app, drafts, junk and pages elsewhere', () => {
+    const list = [
+      release('v0.0.99'), // the desktop app's releases share the repository and are never the viewer
+      release('viewer-v0.1.0'),
+      release('viewer-v0.10.0'),
+      release('viewer-v0.9.0'),
+      release('viewer-v9.9.9', { draft: true }),
+      release('viewer-vnext'),
+      release('viewer-v8.0.0', { html_url: 'https://evil.example/releases/tag/viewer-v8.0.0' }),
+      release('viewer-v7.0.0', { html_url: 5 }),
+      null, 'text', 5,
+    ];
+    expect(newestViewerRelease(list)).toEqual({ version: '0.10.0', url: 'https://github.com/gerp93/KVGuzzler/releases/tag/viewer-v0.10.0' });
+    expect(newestViewerRelease([release('v1.0.0')])).toBeNull();
+    expect(newestViewerRelease({ not: 'a list' })).toBeNull();
+  });
+
+  it('says newer, current or failed, and asks nothing about the person', async () => {
+    const releases = [release('viewer-v0.2.0'), release('viewer-v0.1.0')];
+    const fetchFn = answer(releases);
+    expect(await checkForUpdate('0.1.0', fetchFn)).toEqual({ kind: 'newer', version: '0.2.0', url: 'https://github.com/gerp93/KVGuzzler/releases/tag/viewer-v0.2.0' });
+    const [url, init] = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.github.com/repos/gerp93/KVGuzzler/releases?per_page=50');
+    expect(init.method).toBeUndefined(); // a plain GET
+    expect(Object.keys(init.headers as object)).toEqual(['Accept']);
+
+    expect(await checkForUpdate('0.2.0', answer(releases))).toEqual({ kind: 'current', version: '0.2.0' });
+    expect(await checkForUpdate('0.3.0', answer(releases))).toEqual({ kind: 'current', version: '0.3.0' });
+    expect(await checkForUpdate('0.1.0', answer([]))).toEqual({ kind: 'current', version: '0.1.0' });
+    expect(await checkForUpdate('0.1.0', answer({ message: 'rate limited' }, 403))).toEqual({ kind: 'failed', reason: 'GitHub answered with an error (403).' });
+    const down = vi.fn(async () => { throw new Error('getaddrinfo ENOTFOUND api.github.com'); }) as unknown as typeof fetch;
+    expect(await checkForUpdate('0.1.0', down)).toMatchObject({ kind: 'failed', reason: expect.stringContaining('Could not reach GitHub') });
+    expect(await checkForUpdate('dev', answer(releases))).toMatchObject({ kind: 'failed' });
   });
 });

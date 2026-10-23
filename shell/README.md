@@ -25,11 +25,19 @@ npm run dist       # build the Windows installer into release/ (electron-builder
 - **Menu** (KVG_Standards' electron-menu.md): View and Help only (plus the app-name menu on macOS). Reload, force reload and dev tools exist only
   in a development run. A right-click menu keeps cut, copy, paste and select all reachable without an Edit menu.
 
+## Releasing
+
+Actions > **Release (viewer)** > Run workflow, with a version like `0.1.0`: it typechecks, tests, builds the unsigned installer on Windows and
+publishes `House-Power-Setup-0.1.0.exe` as a **pre-release** tagged `viewer-v0.1.0`. It is not KVG_Standards' `release-electron.yml` on purpose:
+that publishes with electron-builder, which tags `vX.Y.Z`, and this repository's plain `vX.Y.Z` tags and releases belong to the desktop app (its
+Velopack updater reads them; it asks for non-pre-releases only, so the viewer's pre-releases are invisible to it). The standard has no tag-prefix
+option yet; raise it there.
+
 ## Not done yet
 
-- **No release pipeline and no updater.** `npm run dist` builds an installer by hand. Publishing it needs the repo's release tags sorted out
-  first (the desktop app's Velopack releases use the plain `vX.Y.Z` tags and read this repo's releases to find updates), then
-  KVG_Standards' `release-electron.yml` with `app_dir: shell` and `electron-updater`.
+- **No automatic updater.** Help > Check for updates… looks at this repository's releases for a newer `viewer-vX.Y.Z` and offers its download page;
+  nothing is downloaded or replaced by the app (the installer is unsigned, so a silent replace would be the wrong thing to build). The dashboard
+  itself needs no update here: it is the server's.
 - **No logo or icon** (none is to be fabricated), so the installer and the window use Electron's default.
 - **Not themed**: its two pages use fixed colors, not the vendored VisualAssault themes the dashboard uses.
 - Windows is the only target tried.

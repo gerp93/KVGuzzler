@@ -1,0 +1,86 @@
+# Releases the installed viewer (shell/): builds the unsigned Windows installer and publishes it as a GitHub release tagged viewer-vX.Y.Z.
+#
+# Why this is its own workflow and not KVG_Standards' release-electron.yml: that one publishes with electron-builder, which always tags
+# the release vX.Y.Z. This repository's plain vX.Y.Z tags belong to the desktop app (auto-release.yml tags every push that touches src/),
+# and its Velopack updater reads this repository's releases to find updates. So the viewer uses its own tag prefix, and its releases are
+# marked pre-release (the updater asks for non-pre-releases only), and the desktop app's version counter never sees them.
+# The standard's gap (no tag prefix) is to be raised there; until then this is the documented exception.
+#
+# Run it by hand: Actions > Release (viewer) > Run workflow, with a version like 0.1.0.
+
+name: Release (viewer)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Viewer version to release, e.g. "0.1.0" (the tag will be viewer-v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: shell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version and that it is new
+        id: version
+        shell: bash
+        env:
+          RAW: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VERSION="${RAW#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: '$RAW' - expected X.Y.Z (e.g. 0.1.0)." >&2
+            exit 1
+          fi
+          if gh release view "viewer-v$VERSION" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release viewer-v$VERSION already exists." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: shell/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Set the package version from the release
+        shell: bash
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build the installer (unsigned)
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          FILE="release/House-Power-Setup-${VERSION}.exe"
+          test -f "$FILE"
+          NOTES=$(printf '## House Power viewer %s\n\nThe installed window for the house server: it loads the dashboard the server serves and keeps only the server address.\n\n**Install:** download `House-Power-Setup-%s.exe` below and run it (per-user, no admin needed). The first start asks for the server address, for example `192.168.68.110`.\n\nThis build is unsigned, so Windows SmartScreen will warn about an unrecognized publisher: choose More info, then Run anyway.\n\nIt is marked pre-release on purpose: the desktop app'"'"'s updater reads this repository'"'"'s releases and must not see this one.\n' "$VERSION" "$VERSION")
+          gh release create "viewer-v${VERSION}" "$FILE" \
+            --repo "${{ github.repository }}" \
+            --title "House Power viewer ${VERSION}" \
+            --notes "$NOTES" \
+            --prerelease \
+            --target "${{ github.sha }}"

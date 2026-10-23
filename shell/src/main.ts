@@ -1,11 +1,12 @@
 // The installed viewer for the house server: one window that loads the dashboard the server serves. It holds no data of its own and
 // bundles no copy of the dashboard, so updating the server updates what this shows. The only thing it keeps is the server's address.
-import { app, BrowserWindow, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron';
 import { join } from 'node:path';
 import { buildContextMenuTemplate } from './contextMenu';
 import { buildMenuTemplate } from './menu';
 import { isLocalPage, isSafeExternalUrl, isServerUrl, normalizeServerAddress } from './serverAddress';
 import { loadSettings, saveSettings, type Settings } from './settings';
+import { checkForUpdate } from './updateCheck';
 
 const PAGES = join(__dirname, 'pages');
 const ABORTED = -3; // a load that was cancelled by a newer one is not a failure
@@ -27,6 +28,20 @@ function showServer(): void {
 
 function openExternal(url: string): void {
   if (isSafeExternalUrl(url)) void shell.openExternal(url);
+}
+
+/** Help > Check for updates: says whether a newer viewer is published and offers its download page. Nothing is downloaded or replaced here. */
+async function checkUpdates(): Promise<void> {
+  const result = await checkForUpdate(app.getVersion());
+  const options = { type: 'info' as const, title: 'House Power', buttons: ['OK'], defaultId: 0, cancelId: 0 };
+  const message =
+    result.kind === 'newer'
+      ? { ...options, message: `Version ${result.version} is available.`, detail: `You have ${app.getVersion()}. The download page has the installer.`, buttons: ['Open the download page', 'Not now'], cancelId: 1 }
+      : result.kind === 'current'
+        ? { ...options, message: 'You have the newest viewer.', detail: `Version ${result.version}. The dashboard itself is always the server's, so it needs no update here.` }
+        : { ...options, type: 'warning' as const, message: "Couldn't check for updates.", detail: result.reason };
+  const answer = win ? await dialog.showMessageBox(win, message) : await dialog.showMessageBox(message);
+  if (result.kind === 'newer' && answer.response === 0) openExternal(result.url);
 }
 
 function setZoom(direction: 'in' | 'out' | 'reset'): void {
@@ -114,6 +129,7 @@ if (!app.requestSingleInstanceLock()) {
           platform: process.platform,
           appName: app.getName(),
           changeServer: () => loadPage('setup', { address: settings.serverAddress ?? '' }),
+          checkForUpdates: () => void checkUpdates(),
           zoom: setZoom,
           openExternal,
         }),

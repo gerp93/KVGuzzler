@@ -9,6 +9,7 @@ export interface MenuOptions {
   platform: NodeJS.Platform;
   appName: string;
   changeServer: () => void;
+  checkForUpdates: () => void;
   zoom: (direction: 'in' | 'out' | 'reset') => void;
   openExternal: (url: string) => void;
 }
@@ -44,6 +45,7 @@ export function buildMenuTemplate(o: MenuOptions): MenuItemConstructorOptions[] 
       { label: 'KVGuzzler on GitHub', click: () => o.openExternal(REPO_URL) },
       { label: 'Report an issue', click: () => o.openExternal(`${REPO_URL}/issues`) },
       { type: 'separator' },
+      { label: 'Check for updates…', click: o.checkForUpdates },
       { label: `Version ${o.version}`, enabled: false },
     ],
   };

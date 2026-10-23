@@ -81,7 +81,7 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **The viewer (`shell/`) shows only the server.** The address is a plain host and port, never a URL with a path/user/query (checked on the way in
   and again when read); the window only navigates to the server's origin or its own two pages, anything else opens in the browser (http/https
   only); sandboxed, context-isolated, and only its own `file:` pages may use the IPC (the remote dashboard gets no bridge). It bundles no copy of the
-  dashboard, so a server update updates every UI. No release pipeline or updater yet (see its README).
+  dashboard, so a server update updates every UI. **Releases:** `release-viewer.yml` (manual) publishes the unsigned installer as a **pre-release** tagged `viewer-vX.Y.Z`, never a plain `vX.Y.Z`: those tags are the desktop app's, and its Velopack updater reads this repo's releases (non-pre-releases only). The viewer's Help > Check for updates only offers the download page; there is no silent updater.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the

@@ -17,6 +17,7 @@
   "build": {
     "appId": "com.gerp93.kvguzzler.house",
     "productName": "House Power",
+    "artifactName": "House-Power-Setup-${version}.${ext}",
     "files": [
       "dist/**/*"
     ],
