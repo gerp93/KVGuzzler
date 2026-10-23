@@ -438,3 +438,28 @@ select:focus-visible {
     grid-column: 1 / -1;
   }
 }
+
+/* The four figures across the top of a computer */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.stat .caption {
+  display: block;
+  margin: 0 0 2px;
+}
+
+.notes {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 720px) {
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

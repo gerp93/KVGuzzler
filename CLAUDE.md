@@ -58,6 +58,13 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   that is away is retried every minute, a different `api_version` every 10, and a batch the server refuses three times in a row is skipped so it cannot
   hold up the rest (it stays in this PC's own history). The push's field names are checked against `contract/examples/ingest-pc.json` in the tests.
   The source id (`relay_source_id`) is made once and kept. The first push from a new source adopts the only computer when it has no collector.
+  **The live look** rides beside the minutes: every 5 s, when the collector saved a newer look than the last one sent, `RelayFeed.LiveStepAsync` pushes a
+  minutes-free batch with `live` (the readings with their kinds from the last saved minutes, the per-program watts only while fresh, notes, the learned
+  idle watts) and the 50 newest `runs` (a run still going grows, sending it again replaces it). It is not history: it never touches the watermark, has its
+  own retry timer and `LiveStatus` (a missed look never hides what happened to the history), and `live` is left out of a minutes push (the contract has
+  no null for it). The server keeps only the newest look per source (`pc_live`, by its `at`; a late older one does not replace it), drops a look whose
+  time makes no sense without refusing the minutes with it, and gives the dashboard its **age by the server's own clock** (`age_seconds`, never the PC's):
+  past 30 s the page calls it "not answering". `GET /api/v1/computers/{id}/live` is the one-row version the page asks for every 5 s.
 - **The viewer (`shell/`) shows only the server.** The address is a plain host and port, never a URL with a path/user/query (checked on the way in
   and again when read); the window only navigates to the server's origin or its own two pages, anything else opens in the browser (http/https
   only); sandboxed, context-isolated, and only its own `file:` pages may use the IPC (the remote dashboard gets no bridge). It bundles no copy of the

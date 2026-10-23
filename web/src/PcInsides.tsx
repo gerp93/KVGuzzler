@@ -1,7 +1,7 @@
 // What the PC's own collector reported about its insides: its sensors, the programs it blames, and the times it was not
 // recording. Shown inside a computer's detail; none of it is added to the house or circuit figures.
 import {
-  formatDuration, formatKwh, formatWatts, gapLabel, groupComponents,
+  formatDuration, formatKwh, formatWatts, gapLabel, groupComponents, runDuration, runKwh,
   type PcComponent, type PcSource,
 } from './lib';
 
@@ -78,6 +78,31 @@ export function PcInsides({ pc }: { pc: PcSource }) {
           <p class="caption">
             Only the power above the PC's idle level is shared out, by how busy each program kept the CPU and GPU. It is an
             estimate, not a measurement, and it splits energy already counted above.
+          </p>
+        </section>
+      )}
+
+      {(pc.runs ?? []).length > 0 && (
+        <section class="card">
+          <h2>Recent runs (an estimate)</h2>
+          <ul class="settings">
+            {(pc.runs ?? []).map((r) => (
+              <li key={`${r.name}-${r.start}`}>
+                <span class="grow">
+                  {r.name}
+                  <span class="caption">
+                    {' '}
+                    {r.still_running ? 'running now, since ' : ''}
+                    {new Date(r.start).toLocaleString()}, {formatDuration(runDuration(r))}
+                  </span>
+                </span>
+                <span class="num">{formatKwh(runKwh(r))}</span>
+              </li>
+            ))}
+          </ul>
+          <p class="caption">
+            What a program is estimated to have caused from when it started until its last process closed. A program with many
+            processes is one run.
           </p>
         </section>
       )}

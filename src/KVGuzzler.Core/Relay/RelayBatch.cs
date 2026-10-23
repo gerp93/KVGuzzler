@@ -34,13 +34,45 @@ public sealed record RelayGap(
     [property: JsonPropertyName("reason")] string Reason,
     [property: JsonPropertyName("plug_kwh")] double? PlugKwh);
 
-/// <summary>One push to the house server: some whole minutes of what this PC recorded, and the gaps around them.</summary>
+public sealed record RelayLiveReading(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("scope")] string Scope,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("watts")] double Watts);
+
+public sealed record RelayLiveProgram(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("cpu_watts")] double CpuWatts,
+    [property: JsonPropertyName("gpu_watts")] double GpuWatts);
+
+/// <summary>The PC's readings as of its last look: not history, the newest replaces the last on the server.</summary>
+public sealed record RelayLive(
+    [property: JsonPropertyName("at")] DateTimeOffset At,
+    [property: JsonPropertyName("readings")] IReadOnlyList<RelayLiveReading> Readings,
+    [property: JsonPropertyName("programs")] IReadOnlyList<RelayLiveProgram> Programs,
+    [property: JsonPropertyName("notes")] IReadOnlyList<string> Notes,
+    [property: JsonPropertyName("idle_cpu_watts")] double? IdleCpuWatts,
+    [property: JsonPropertyName("idle_gpu_watts")] double? IdleGpuWatts);
+
+public sealed record RelayRun(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("start")] DateTimeOffset Start,
+    [property: JsonPropertyName("end")] DateTimeOffset End,
+    [property: JsonPropertyName("cpu_kwh")] double CpuKwh,
+    [property: JsonPropertyName("gpu_kwh")] double GpuKwh,
+    [property: JsonPropertyName("active_seconds")] double ActiveSeconds,
+    [property: JsonPropertyName("still_running")] bool StillRunning);
+
+/// <summary>One push to the house server: some whole minutes of what this PC recorded, and the gaps around them; or, with no minutes,
+/// just the PC's latest look and its recent program runs.</summary>
 public sealed record RelayBatch(
     [property: JsonPropertyName("api_version")] int ApiVersion,
     [property: JsonPropertyName("source_id")] string SourceId,
     [property: JsonPropertyName("source_name")] string SourceName,
     [property: JsonPropertyName("minutes")] IReadOnlyList<RelayMinute> Minutes,
-    [property: JsonPropertyName("gaps")] IReadOnlyList<RelayGap> Gaps)
+    [property: JsonPropertyName("gaps")] IReadOnlyList<RelayGap> Gaps,
+    [property: JsonPropertyName("live"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RelayLive? Live = null,
+    [property: JsonPropertyName("runs"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<RelayRun>? Runs = null)
 {
     /// <summary>The contract's major version this collector speaks.</summary>
     public const int Version = 1;
@@ -96,6 +128,70 @@ public static class RelayBatchBuilder
             .ToList();
 
         return new RelayBatch(RelayBatch.Version, sourceId, sourceName, batchMinutes, gaps) { LastMinute = last };
+    }
+
+    public const int MaxLiveReadings = 100;
+    public const int MaxLivePrograms = 200;
+    public const int MaxNotes = 50;
+    public const int MaxNoteLength = 300;
+    public const int MaxRuns = 50;
+    public const double MaxRunKwh = 1000;
+    public static readonly TimeSpan MaxRunLength = TimeSpan.FromDays(31);
+
+    /// <summary>Per-program power older than this next to the readings is from a collector that stopped sharing it, and is left out.</summary>
+    public static readonly TimeSpan LiveProgramsFresh = TimeSpan.FromSeconds(30);
+
+    /// <summary>The PC's latest look and its recent program runs as a push with no minutes; null until the collector has saved a look.
+    /// Nothing here is history, so nothing is replayed: the next look replaces it on the server.</summary>
+    public static RelayBatch? BuildLive(HistoryStore store, string sourceId, string sourceName, DateTimeOffset now)
+    {
+        var live = store.GetLive();
+        if (live is null) return null;
+
+        // The live table does not keep a reading's kind, but the minutes do: use the kind a name was last saved with.
+        var through = now.ToUnixTimeSeconds() / 60 * 60;
+        var kinds = new Dictionary<(string, ReadingScope), PowerKind>();
+        foreach (var row in store.QueryMinuteRows(through - 600, through))
+            kinds[(row.Name, row.Scope)] = row.Kind;
+
+        var readings = new List<RelayLiveReading>();
+        foreach (var r in live.Readings)
+        {
+            var name = Clip(r.Name);
+            if (name.Length == 0 || !double.IsFinite(r.Watts) || r.Watts < 0 || readings.Count >= MaxLiveReadings) continue;
+            readings.Add(new RelayLiveReading(name, ScopeName(r.Scope), KindName(kinds.GetValueOrDefault((r.Name, r.Scope), r.Kind)), r.Watts));
+        }
+
+        var programs = new List<RelayLiveProgram>();
+        if (store.GetLivePrograms() is { } lp && live.UpdatedAt - lp.UpdatedAt < LiveProgramsFresh)
+        {
+            foreach (var p in lp.Rows)
+            {
+                var name = Clip(p.Program);
+                if (name.Length == 0 || !double.IsFinite(p.CpuWatts) || !double.IsFinite(p.GpuWatts) || programs.Count >= MaxLivePrograms) continue;
+                programs.Add(new RelayLiveProgram(name, Math.Max(0, p.CpuWatts), Math.Max(0, p.GpuWatts)));
+            }
+        }
+
+        var notes = live.Notes.Select(n => n.Length <= MaxNoteLength ? n : n[..MaxNoteLength]).Where(n => n.Length > 0).Take(MaxNotes).ToList();
+        var (idleCpu, idleGpu) = store.GetIdleBaseline();
+        var look = new RelayLive(live.UpdatedAt, readings, programs, notes,
+            idleCpu is { } c && double.IsFinite(c) && c >= 0 ? c : null,
+            idleGpu is { } g && double.IsFinite(g) && g >= 0 ? g : null);
+
+        var runs = new List<RelayRun>();
+        foreach (var r in store.GetRecentRuns(MaxRuns))
+        {
+            var name = Clip(r.Program);
+            // A run's end is the last time it was seen, so it is never after now; clamp anyway so a clock step cannot get the push refused.
+            var end = r.End > now ? now : r.End;
+            var start = r.Start > end ? end : r.Start;
+            if (name.Length == 0 || !double.IsFinite(r.CpuKwh) || !double.IsFinite(r.GpuKwh) || !double.IsFinite(r.ActiveSeconds)) continue;
+            runs.Add(new RelayRun(name, start, end, Math.Clamp(r.CpuKwh, 0, MaxRunKwh), Math.Clamp(r.GpuKwh, 0, MaxRunKwh),
+                Math.Clamp(r.ActiveSeconds, 0, MaxRunLength.TotalSeconds), r.StillRunning));
+        }
+
+        return new RelayBatch(RelayBatch.Version, sourceId, sourceName, Array.Empty<RelayMinute>(), Array.Empty<RelayGap>(), look, runs);
     }
 
     /// <summary>The average watts over the seconds actually sampled, as the contract wants it; null for a row that cannot be sent.</summary>

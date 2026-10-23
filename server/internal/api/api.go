@@ -76,6 +76,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/computers/{computerId}", s.updateComputer)
 	mux.HandleFunc("DELETE /api/v1/computers/{computerId}", s.removeComputer)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/detail", s.computerDetail)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/live", s.computerLive)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
 	for _, route := range []string{
 		"GET /api/v1/carbon", "PUT /api/v1/carbon",
@@ -747,8 +748,37 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		if detail.PC != nil && detail.PC.Live != nil {
+			// How old the PC's look is, by this server's clock: the PC's own clock is not trusted for it.
+			detail.PC.Live.AgeSeconds = max(0, s.now().Sub(detail.PC.Live.ReceivedAt).Seconds())
+		}
 	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// computerLive is only the PC's latest look, which the dashboard asks for every few seconds: the detail answer re-reads a whole
+// period, this reads one row. 204 when no collector reports for the computer or none has sent a look yet.
+func (s *Server) computerLive(w http.ResponseWriter, r *http.Request) {
+	comp, err := s.Store.Computer(r.Context(), r.PathValue("computerId"))
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	if comp.SourceID == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	live, err := s.Store.PcLive(r.Context(), *comp.SourceID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if live == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	live.AgeSeconds = max(0, s.now().Sub(live.ReceivedAt).Seconds())
+	writeJSON(w, http.StatusOK, live)
 }
 
 const ratesKey = "rates"

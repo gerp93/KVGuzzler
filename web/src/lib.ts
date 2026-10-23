@@ -20,6 +20,10 @@ export type ComputerDetail = S['ComputerDetail'];
 export type PcSource = S['PcSource'];
 export type PcComponent = S['PcComponent'];
 export type PcGap = S['PcGap'];
+export type PcLive = S['PcLive'];
+export type PcLiveReading = S['PcLiveReading'];
+export type PcLiveProgram = S['PcLiveProgram'];
+export type PcRun = S['PcRun'];
 export type Device = S['Device'];
 export type NewDevice = S['NewDevice'];
 export type RateConfig = S['RateConfig'];
@@ -241,4 +245,89 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
   }));
   comps.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
   return { appliances: rows, computers: comps };
+}
+
+/** A PC look older than this is shown as "not answering" rather than as live. */
+export const LIVE_STALE_SECONDS = 30;
+
+export function isLiveStale(live: Pick<PcLive, 'age_seconds'>): boolean {
+  return (live.age_seconds ?? 0) > LIVE_STALE_SECONDS;
+}
+
+/** "3 s ago", "4 min ago": how old a look is. */
+export function formatAge(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return s < 5 ? 'just now' : `${formatDuration(s)} ago`;
+}
+
+export interface LiveSplit {
+  /** Separate pieces of hardware, biggest first. These are what is summed. */
+  sensors: PcLiveReading[];
+  /** Parts of a sensor above (CPU cores inside the package): shown, never added. */
+  inside: PcLiveReading[];
+  /** The PC's own reading of its wall plug, when it has one. */
+  wall: PcLiveReading | undefined;
+  /** Other plugs the PC itself reads (monitor, speakers): separate devices, added to nothing. */
+  meters: PcLiveReading[];
+  sensorWatts: number;
+  /** What each share is a share of: the whole PC at the wall when it is measured, else the sensors' total. */
+  baseWatts: number;
+  baseIsWall: boolean;
+  /** The wall minus the sensors (fans, drives, power-supply loss), never below zero; null without a wall reading. */
+  otherWatts: number | null;
+}
+
+const byWatts = (a: PcLiveReading, b: PcLiveReading) => b.watts - a.watts;
+
+/** Sorts a look into the groups the page shows. Wall, sensors, inside and meters are never summed with each other. */
+export function liveSplit(live: Pick<PcLive, 'readings'>): LiveSplit {
+  const by = (scope: string) => (live.readings ?? []).filter((r) => r.scope === scope).sort(byWatts);
+  const sensors = by('component');
+  const wall = by('wall')[0];
+  const sensorWatts = sensors.reduce((t, r) => t + r.watts, 0);
+  return {
+    sensors,
+    inside: by('breakdown'),
+    wall,
+    meters: by('peripheral'),
+    sensorWatts,
+    baseWatts: wall ? wall.watts : sensorWatts,
+    baseIsWall: !!wall,
+    otherWatts: wall ? Math.max(0, wall.watts - sensorWatts) : null,
+  };
+}
+
+/** A share as a whole-number percent; null when there is nothing to share of. */
+export function sharePercent(watts: number, base: number): number | null {
+  return base > 0 ? Math.round((watts / base) * 100) : null;
+}
+
+export interface ProgramNow {
+  name: string;
+  cpuWatts: number;
+  gpuWatts: number;
+  watts: number;
+}
+
+/** The live per-program split, biggest first, leaving out programs causing next to nothing. */
+export function programsNow(live: Pick<PcLive, 'programs'>, minWatts = 0.5): ProgramNow[] {
+  return (live.programs ?? [])
+    .map((p) => ({ name: p.name, cpuWatts: p.cpu_watts, gpuWatts: p.gpu_watts, watts: p.cpu_watts + p.gpu_watts }))
+    .filter((p) => p.watts >= minWatts)
+    .sort((a, b) => b.watts - a.watts);
+}
+
+/** In words, what the per-program estimate is measured from. */
+export function idleText(live: Pick<PcLive, 'idle_cpu_watts' | 'idle_gpu_watts'>): string {
+  const part = (label: string, w: number | null | undefined) => (w == null ? `${label} not learned yet` : `${label} ${formatWatts(w)}`);
+  return `${part('CPU', live.idle_cpu_watts)}, ${part('GPU', live.idle_gpu_watts)}`;
+}
+
+export function runKwh(run: Pick<PcRun, 'cpu_kwh' | 'gpu_kwh'>): number {
+  return run.cpu_kwh + run.gpu_kwh;
+}
+
+/** How long a run lasted, start to end. */
+export function runDuration(run: Pick<PcRun, 'start' | 'end'>): number {
+  return Math.max(0, (Date.parse(run.end) - Date.parse(run.start)) / 1000);
 }

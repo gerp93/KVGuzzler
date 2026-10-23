@@ -29,6 +29,42 @@ type PcGap struct {
 	PlugKwh *float64  `json:"plug_kwh"`
 }
 
+type PcLiveReading struct {
+	Name  string  `json:"name"`
+	Scope string  `json:"scope"`
+	Kind  string  `json:"kind"`
+	Watts float64 `json:"watts"`
+}
+
+type PcLiveProgram struct {
+	Name     string  `json:"name"`
+	CPUWatts float64 `json:"cpu_watts"`
+	GPUWatts float64 `json:"gpu_watts"`
+}
+
+// PcLive is the PC's latest readings. ReceivedAt is when the server got it (by the server's clock) and is not sent on; AgeSeconds is
+// what the dashboard sees instead.
+type PcLive struct {
+	At           time.Time       `json:"at"`
+	Readings     []PcLiveReading `json:"readings"`
+	Programs     []PcLiveProgram `json:"programs"`
+	Notes        []string        `json:"notes"`
+	IdleCPUWatts *float64        `json:"idle_cpu_watts"`
+	IdleGPUWatts *float64        `json:"idle_gpu_watts"`
+	AgeSeconds   float64         `json:"age_seconds"`
+	ReceivedAt   time.Time       `json:"-"`
+}
+
+type PcRun struct {
+	Name          string    `json:"name"`
+	Start         time.Time `json:"start"`
+	End           time.Time `json:"end"`
+	CPUKwh        float64   `json:"cpu_kwh"`
+	GPUKwh        float64   `json:"gpu_kwh"`
+	ActiveSeconds float64   `json:"active_seconds"`
+	StillRunning  bool      `json:"still_running"`
+}
+
 type PcSource struct {
 	SourceID       string           `json:"source_id"`
 	Name           string           `json:"name"`
@@ -37,6 +73,8 @@ type PcSource struct {
 	Components     []PcComponent    `json:"components"`
 	Programs       []PcProgramTotal `json:"programs"`
 	Gaps           []PcGap          `json:"gaps"`
+	Live           *PcLive          `json:"live"`
+	Runs           []PcRun          `json:"runs"`
 }
 
 // Computer is a computer as the user sees it: a name, the collector that reports its insides (if any), the plug it is on

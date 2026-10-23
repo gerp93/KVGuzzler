@@ -2,8 +2,9 @@ import { api } from './api';
 import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PcInsides } from './PcInsides';
+import { PcLiveCard } from './PcLiveCard';
 import { PeriodPicker } from './Periods';
-import { formatKwh, formatMoney, formatWatts, periodRange, type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey } from './lib';
+import { formatKwh, formatMoney, formatWatts, isLiveStale, liveSplit, periodRange, type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey } from './lib';
 import { routePath } from './route';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
@@ -39,7 +40,13 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
     [id, period, channels],
   );
 
+  // The look is small and changes every few seconds, so it has its own quick poll; the period data above is slow.
+  const { data: look } = usePoll(() => api.computerLive(id), 5_000, [id]);
+
   const detail = data?.detail;
+  const liveNow = look ?? detail?.pc?.live ?? undefined;
+  const nowWatts = liveNow ? (isLiveStale(liveNow) ? null : liveSplit(liveNow).baseWatts) : null;
+  const peak = detail?.wall?.peak_watts ?? detail?.pc?.total_peak_watts ?? null;
   return (
     <>
       <a class="back" href={routePath('appliances')}>
@@ -60,13 +67,33 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <h2>{detail.computer.name}</h2>
               <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
             </div>
-            <p class="big">{detail.wall ? formatKwh(detail.wall.kwh) : '—'}</p>
+            <div class="stats">
+              <div class="stat">
+                <span class="caption">Energy</span>
+                <p class="big small">{detail.wall ? formatKwh(detail.wall.kwh) : '—'}</p>
+              </div>
+              <div class="stat">
+                <span class="caption">Cost</span>
+                <p class="big small">{detail.wall?.cost != null ? formatMoney(detail.wall.cost, detail.cost_estimated) : '—'}</p>
+              </div>
+              <div class="stat">
+                <span class="caption">Right now</span>
+                <p class="big small">{nowWatts != null ? formatWatts(nowWatts) : '—'}</p>
+              </div>
+              <div class="stat">
+                <span class="caption">Max draw</span>
+                <p class="big small">{peak != null ? formatWatts(peak) : '—'}</p>
+              </div>
+            </div>
             <p class="caption">
               {detail.wall
-                ? `The whole PC at the wall${detail.wall.cost != null ? `, ${formatMoney(detail.wall.cost, detail.cost_estimated)}` : ''}${detail.wall.peak_watts != null ? `, highest draw ${formatWatts(detail.wall.peak_watts)}` : ''}.`
+                ? 'The whole PC at the wall.'
                 : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
+              {peak != null && !detail.wall?.peak_watts ? " Max draw is the highest the sensors reached together; the wall is not measured." : ''}
             </p>
           </section>
+
+          {liveNow && <PcLiveCard live={liveNow} />}
 
           {detail.peripherals.length > 0 && detail.setup_kwh != null && (
             <section class="card">

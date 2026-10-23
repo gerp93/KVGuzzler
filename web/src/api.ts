@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, Channel, Computer, ComputerDetail, Device, GroupDetail, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
+import type { ApplianceGroup, Channel, Computer, ComputerDetail, Device, GroupDetail, Live, NewDevice, PcLive, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -71,6 +71,8 @@ export const api = {
   computers: () => request<{ computers: Computer[] }>('api/v1/computers').then((r) => r.computers),
   computerDetail: (id: string, from: string, to: string) =>
     request<ComputerDetail>(`api/v1/computers/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
+  /** The PC's latest look, small enough to ask for every few seconds; undefined when there is none yet. */
+  computerLive: (id: string) => request<PcLive | undefined>(`api/v1/computers/${encodeURIComponent(id)}/live`),
   addComputer: (name: string) =>
     request<Computer>('api/v1/computers', {
       method: 'POST',

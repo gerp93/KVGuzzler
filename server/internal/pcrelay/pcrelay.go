@@ -29,6 +29,13 @@ const (
 	maxProgramKwhPerMinute = 0.1
 	maxTotalPeakWatts      = 10000.0
 	maxName                = 80
+	MaxRuns                = 200
+	maxLiveReadings        = 100
+	maxLivePrograms        = 200
+	maxNotes               = 50
+	maxNoteLength          = 300
+	maxRunKwh              = 1000.0
+	maxRunSeconds          = 31 * 24 * 3600.0
 	maxSourceName          = 60
 	maxGap                 = 366 * 24 * time.Hour
 	clockSkew              = 5 * time.Minute
@@ -70,12 +77,49 @@ type Gap struct {
 	PlugKwh *float64  `json:"plug_kwh"`
 }
 
+// LiveReading is one reading as of the PC's last look; LiveProgram what one program is estimated to be causing right now.
+type LiveReading struct {
+	Name  string  `json:"name"`
+	Scope string  `json:"scope"`
+	Kind  string  `json:"kind"`
+	Watts float64 `json:"watts"`
+}
+
+type LiveProgram struct {
+	Name     string  `json:"name"`
+	CPUWatts float64 `json:"cpu_watts"`
+	GPUWatts float64 `json:"gpu_watts"`
+}
+
+// Live is the PC's latest readings: not history, the newest replaces the last.
+type Live struct {
+	At           time.Time     `json:"at"`
+	Readings     []LiveReading `json:"readings"`
+	Programs     []LiveProgram `json:"programs"`
+	Notes        []string      `json:"notes"`
+	IdleCPUWatts *float64      `json:"idle_cpu_watts"`
+	IdleGPUWatts *float64      `json:"idle_gpu_watts"`
+}
+
+// Run is what a program is estimated to have caused from when it started until it closed.
+type Run struct {
+	Name          string    `json:"name"`
+	Start         time.Time `json:"start"`
+	End           time.Time `json:"end"`
+	CPUKwh        float64   `json:"cpu_kwh"`
+	GPUKwh        float64   `json:"gpu_kwh"`
+	ActiveSeconds float64   `json:"active_seconds"`
+	StillRunning  bool      `json:"still_running"`
+}
+
 type Ingest struct {
 	APIVersion int      `json:"api_version"`
 	SourceID   string   `json:"source_id"`
 	SourceName string   `json:"source_name"`
 	Minutes    []Minute `json:"minutes"`
 	Gaps       []Gap    `json:"gaps"`
+	Live       *Live    `json:"live"`
+	Runs       []Run    `json:"runs"`
 }
 
 var (
@@ -218,8 +262,96 @@ func (in *Ingest) Validate(now time.Time) (notes []string, err error) {
 		}
 	}
 
+	dropped += in.validateLive(latest, earliest)
+	if err := in.validateRuns(latest, earliest); err != nil {
+		return nil, err
+	}
+
 	if dropped > 0 {
 		notes = append(notes, fmt.Sprintf("Dropped %d impossible reading(s) from the PC.", dropped))
 	}
 	return notes, nil
+}
+
+// validateLive cleans the live snapshot in place and returns how many impossible values it dropped. A snapshot that is itself wrong
+// (a time that makes no sense) is dropped whole: it is only the newest look, and the next one replaces it.
+func (in *Ingest) validateLive(latest, earliest time.Time) int {
+	l := in.Live
+	if l == nil {
+		return 0
+	}
+	l.At = l.At.UTC()
+	if l.At.After(latest) || l.At.Before(earliest) {
+		in.Live = nil
+		return 0
+	}
+	dropped := 0
+
+	readings := l.Readings[:0]
+	for _, r := range l.Readings {
+		limit, ok := scopes[r.Scope]
+		if len(readings) >= maxLiveReadings || r.Name == "" || utf8.RuneCountInString(r.Name) > maxName || !ok || !kinds[r.Kind] || !finite(r.Watts) || r.Watts < 0 {
+			dropped++
+			continue
+		}
+		if r.Watts > limit {
+			dropped++
+			continue
+		}
+		readings = append(readings, r)
+	}
+	l.Readings = readings
+
+	programs := l.Programs[:0]
+	for _, p := range l.Programs {
+		if len(programs) >= maxLivePrograms || p.Name == "" || utf8.RuneCountInString(p.Name) > maxName ||
+			!finite(p.CPUWatts, p.GPUWatts) || p.CPUWatts < 0 || p.GPUWatts < 0 || p.CPUWatts > MaxComponentWatts || p.GPUWatts > MaxComponentWatts {
+			dropped++
+			continue
+		}
+		programs = append(programs, p)
+	}
+	l.Programs = programs
+
+	notes := make([]string, 0, len(l.Notes))
+	for _, n := range l.Notes {
+		if len(notes) >= maxNotes {
+			break
+		}
+		if r := []rune(n); len(r) > maxNoteLength {
+			n = string(r[:maxNoteLength])
+		}
+		if n != "" {
+			notes = append(notes, n)
+		}
+	}
+	l.Notes = notes
+
+	for _, w := range []**float64{&l.IdleCPUWatts, &l.IdleGPUWatts} {
+		if *w != nil && (!finite(**w) || **w < 0 || **w > MaxComponentWatts) {
+			*w = nil
+		}
+	}
+	return dropped
+}
+
+func (in *Ingest) validateRuns(latest, earliest time.Time) error {
+	if len(in.Runs) > MaxRuns {
+		return bad("at most %d runs in one push", MaxRuns)
+	}
+	for i := range in.Runs {
+		r := &in.Runs[i]
+		r.Start, r.End = r.Start.UTC(), r.End.UTC()
+		if r.Name == "" || utf8.RuneCountInString(r.Name) > maxName {
+			return bad("a run's program name is 1 to %d characters", maxName)
+		}
+		if r.End.Before(r.Start) || r.End.After(latest) || r.Start.Before(earliest) {
+			return bad("a run must end after it starts and not be in the future")
+		}
+		if !finite(r.CPUKwh, r.GPUKwh, r.ActiveSeconds) || r.CPUKwh < 0 || r.GPUKwh < 0 || r.ActiveSeconds < 0 ||
+			r.CPUKwh > maxRunKwh || r.GPUKwh > maxRunKwh || r.ActiveSeconds > maxRunSeconds {
+			return bad("a run's energy and active seconds must be finite, not negative and plausible")
+		}
+	}
+	return nil
 }

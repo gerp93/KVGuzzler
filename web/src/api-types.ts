@@ -207,6 +207,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/computers/{computerId}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest look a computer's collector sent.
+         * @description Just the PC's latest readings and per-program power, small enough to ask for every few seconds (the detail answer re-reads a whole
+         *     period). 204 when no collector reports for this computer or none has sent a look yet.
+         */
+        get: operations["getComputerLive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -559,6 +580,55 @@ export interface components {
             /** @description How long the program was busy in the minute. */
             active_seconds?: number;
         };
+        PcLiveReading: {
+            name: string;
+            scope: components["schemas"]["IngestScope"];
+            /** @enum {string} */
+            kind?: "other" | "cpu" | "gpu";
+            watts: number;
+        };
+        /** @description What one program is estimated to be causing right now. An estimate, never a measurement. */
+        PcLiveProgram: {
+            name: string;
+            cpu_watts: number;
+            gpu_watts: number;
+        };
+        /**
+         * @description The PC's readings as of its last look, sent every few seconds while the collector is running (the newest one replaces the
+         *     last). It is not history: the minutes are. A client shows how old it is and treats a stale one as "not answering".
+         */
+        PcLive: {
+            /**
+             * Format: date-time
+             * @description When the PC took these readings.
+             */
+            at: string;
+            readings?: components["schemas"]["PcLiveReading"][];
+            /** @description Biggest first. */
+            programs?: components["schemas"]["PcLiveProgram"][];
+            /** @description Plain-language things the PC wants to say (a sensor that dropped out, an impossible reading it ignored). */
+            notes?: string[];
+            /** @description The idle baseline the per-program estimate shares power above. The lowest quiet 30-second average seen so far. */
+            idle_cpu_watts?: number | null;
+            idle_gpu_watts?: number | null;
+            /** @description Set by the server when the dashboard reads it. How long ago the server received this, by its own clock (the PC's clock is not trusted for it). Not part of a push. */
+            age_seconds?: number;
+        };
+        /**
+         * @description What a program is estimated to have caused from when it started until it closed (a program with several processes counts as
+         *     one run). An estimate.
+         */
+        PcRun: {
+            name: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            cpu_kwh: number;
+            gpu_kwh: number;
+            active_seconds: number;
+            still_running: boolean;
+        };
         PcGap: {
             /** Format: date-time */
             from: string;
@@ -588,6 +658,9 @@ export interface components {
             source_name?: string;
             minutes: components["schemas"]["PcMinute"][];
             gaps?: components["schemas"]["PcGap"][];
+            live?: components["schemas"]["PcLive"];
+            /** @description The PC's recent program runs. Sending one again replaces it (a run still going grows). */
+            runs?: components["schemas"]["PcRun"][];
         };
         ApplianceGroup: {
             id: string;
@@ -683,6 +756,10 @@ export interface components {
             programs: components["schemas"]["PcProgramTotal"][];
             /** @description Stretches the PC was not sampling (asleep, off, lost power), clipped to the period. */
             gaps: components["schemas"]["PcGap"][];
+            /** @description The PC's latest readings, or null when it has not sent any. */
+            live?: components["schemas"]["PcLive"] | null;
+            /** @description Program runs that overlapped the period, still-running first, then newest. */
+            runs?: components["schemas"]["PcRun"][];
         };
         IngestResult: {
             /** @constant */
@@ -1102,6 +1179,36 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getComputerLive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcLive"];
+                };
+            };
+            /** @description No collector reports for this computer, or none has sent a look yet. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             404: components["responses"]["Problem"];
         };
     };
