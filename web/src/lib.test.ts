@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, BASELINE, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -368,5 +368,11 @@ describe('the cost estimator', () => {
     expect(usageBasis({ ...use, days: 0.125 }, '30d')).toContain('over the 3 h recorded so far');
     expect(usageBasis({ ...use, includes_pc: false, peripheral_count: 2 }, '7d')).toContain('That is the 2 peripheral meters only, not the PC.');
     expect(usageBasis({ ...use, whole_pc: false, peripheral_count: 0 }, '7d')).toContain('sensors only (a wall plug would show the whole PC).');
+  });
+});
+
+describe('file sizes', () => {
+  it('reads in bytes, KB, MB and GB', () => {
+    expect([formatBytes(812), formatBytes(217_088), formatBytes(3_565_158), formatBytes(5_000_000_000)]).toEqual(['812 B', '212 KB', '3.4 MB', '4.7 GB']);
   });
 });

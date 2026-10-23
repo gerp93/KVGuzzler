@@ -461,6 +461,10 @@ export interface components {
             time: string;
             /** @description The IANA zone used for "day" buckets and bill dates. */
             time_zone?: string;
+            /** @description Where the server keeps its history database (read-only; it is moved on the box, not from the dashboard). */
+            database_path?: string;
+            /** @description The size of the database file, without its write-ahead log. */
+            database_bytes?: number;
             /** @description Plain-language things that need attention (a device stopped answering, a reading dropped). */
             notes: string[];
         };

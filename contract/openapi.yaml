@@ -755,6 +755,12 @@ components:
         time_zone:
           type: string
           description: The IANA zone used for "day" buckets and bill dates.
+        database_path:
+          type: string
+          description: Where the server keeps its history database (read-only; it is moved on the box, not from the dashboard).
+        database_bytes:
+          type: integer
+          description: The size of the database file, without its write-ahead log.
         notes:
           type: array
           description: Plain-language things that need attention (a device stopped answering, a reading dropped).

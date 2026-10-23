@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
 import { AppliancesView } from './AppliancesView';
+import { HelpView } from './HelpView';
 import { HistoryView } from './HistoryView';
 import { usePoll, useStored } from './hooks';
 import { LiveView } from './LiveView';
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'history', label: 'History' },
   { id: 'appliances', label: 'Appliances' },
   { id: 'settings', label: 'Settings' },
+  { id: 'help', label: 'Help' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -59,6 +61,8 @@ export function App() {
         ) : active === 'appliances' ? (
           <AppliancesView channels={channels} open={route.rest} />
 
+        ) : active === 'help' ? (
+          <HelpView />
         ) : (
           <SettingsView channels={channels} onChanged={() => setRev((n) => n + 1)} theme={theme} onTheme={setThemeName} />
         )}
