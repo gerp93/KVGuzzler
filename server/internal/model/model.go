@@ -96,4 +96,27 @@ type Summary struct {
 	HouseCost     *string          `json:"house_cost"`
 	CostEstimated bool             `json:"cost_estimated"`
 	UnmeteredKWh  *float64         `json:"unmetered_kwh"`
+	// HousePeakWatts is the mains' highest draws added: an upper bound, as the two legs need not peak in the same second.
+	HousePeakWatts *float64 `json:"house_peak_watts"`
+	// HouseCarbonG and HouseCarbonEstimatedKWh are the mains' carbon figures added (see ChannelSummary).
+	HouseCarbonG            *float64 `json:"house_carbon_g"`
+	HouseCarbonEstimatedKWh *float64 `json:"house_carbon_estimated_kwh"`
+}
+
+// HouseHistoryPeriod is one row of the house's energy history: a rolling period ending now.
+type HouseHistoryPeriod struct {
+	Key                string    `json:"key"`
+	Label              string    `json:"label"`
+	From               time.Time `json:"from"`
+	To                 time.Time `json:"to"`
+	KWh                float64   `json:"kwh"`
+	Cost               *string   `json:"cost"`
+	CostEstimated      bool      `json:"cost_estimated"`
+	PeakWatts          *float64  `json:"peak_watts"`
+	CarbonG            *float64  `json:"carbon_g"`
+	CarbonEstimatedKWh *float64  `json:"carbon_estimated_kwh"`
+}
+
+type HouseHistory struct {
+	Periods []HouseHistoryPeriod `json:"periods"`
 }

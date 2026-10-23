@@ -72,6 +72,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
+	mux.HandleFunc("GET /api/v1/history", s.houseHistory)
+	mux.HandleFunc("GET /api/v1/estimate", s.houseEstimate)
+	mux.HandleFunc("GET /api/v1/export.csv", s.houseExport)
 	mux.HandleFunc("POST /api/v1/devices", s.addDevice)
 	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
@@ -392,6 +395,8 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	var house, circuits float64
 	var houseCost rates.Money
 	haveMains, housePriced := false, true
+	var housePeak, houseCarbon, houseCarbonEst float64
+	havePeak, haveCarbon := false, false
 	for _, ch := range on {
 		cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
 		if err != nil {
@@ -406,6 +411,17 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		case model.ScopeMains:
 			house += cs.KWh
 			haveMains = true
+			if cs.PeakWatts != nil {
+				housePeak += *cs.PeakWatts
+				havePeak = true
+			}
+			if cs.CarbonG != nil {
+				houseCarbon += *cs.CarbonG
+				haveCarbon = true
+				if cs.CarbonEstimatedKWh != nil {
+					houseCarbonEst += *cs.CarbonEstimatedKWh
+				}
+			}
 			if priced.Unpriced {
 				housePriced = false
 			} else {
@@ -425,6 +441,12 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		if housePriced {
 			c := houseCost.String()
 			sum.HouseCost = &c
+		}
+		if havePeak {
+			sum.HousePeakWatts = &housePeak
+		}
+		if haveCarbon {
+			sum.HouseCarbonG, sum.HouseCarbonEstimatedKWh = &houseCarbon, &houseCarbonEst
 		}
 	}
 	writeJSON(w, http.StatusOK, sum)

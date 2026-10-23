@@ -1,9 +1,8 @@
 // What running the computer would cost at the saved price: at a load typed in, at what it draws right now, or at what it really used per day.
-import { api } from './api';
 import { usePoll, useStored } from './hooks';
 import {
-  ESTIMATE_WINDOWS, estimateLines, formatKwh, formatMoney, formatWatts, usageBasis,
-  type EstimateMode,
+  ESTIMATE_WINDOWS, estimateLines, formatKwh, formatMoney, formatWatts,
+  type AverageUse, type ComputerEstimate, type EstimateMode,
 } from './lib';
 
 const MODES: { key: EstimateMode; label: string }[] = [
@@ -12,11 +11,15 @@ const MODES: { key: EstimateMode; label: string }[] = [
   { key: 'usage', label: 'My usage' },
 ];
 
-export function Estimator({ id, plugIds, includePc, nowWatts, nowWhat }: {
-  id: string;
-  /** The ids of the plugs counted next to the PC. */
-  plugIds: string[];
-  includePc: boolean;
+export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
+  /** Asks the server for today's price and the real usage over a window ("24h", "7d", "30d", "all"). */
+  load: (window: string) => Promise<ComputerEstimate>;
+  /** What the loaded estimate depends on besides the window (what is counted), so it is read again when that changes. */
+  deps: unknown[];
+  /** Where a real-usage figure comes from, in words. */
+  basisOf: (use: AverageUse, window: string) => string;
+  /** What is being estimated: "the PC", "the house". */
+  who: string;
   /** What the counted parts draw right now, or null when unknown. */
   nowWatts: number | null;
   nowWhat: string;
@@ -26,7 +29,7 @@ export function Estimator({ id, plugIds, includePc, nowWatts, nowWhat }: {
   const [window, setWindow] = useStored('estimate-window', '7d');
 
   // The price and the real usage come from the server (it knows the bills); the other two modes only need the price.
-  const { data: est, error } = usePoll(() => api.computerEstimate(id, window, plugIds, includePc), 60_000, [id, window, plugIds.join(','), includePc]);
+  const { data: est, error } = usePoll(() => load(window), 60_000, [window, ...deps]);
 
   let kwhPerDay: number | null = null;
   let perHour = true;
@@ -37,10 +40,10 @@ export function Estimator({ id, plugIds, includePc, nowWatts, nowWhat }: {
     if (typed.trim() === '' || !Number.isFinite(watts) || watts < 0) message = 'Enter a number of watts, for example 400.';
     else {
       kwhPerDay = (watts * 24) / 1000;
-      basis = `If the PC drew ${watts} W all day, every day.`;
+      basis = `If ${who} drew ${watts} W all day, every day.`;
     }
   } else if (mode === 'now') {
-    if (nowWatts == null) message = 'Waiting for a power reading. Live readings need a plug on the PC or its collector running.';
+    if (nowWatts == null) message = 'Waiting for a power reading.';
     else {
       kwhPerDay = (nowWatts * 24) / 1000;
       basis = `If it kept drawing what it draws right now (${formatWatts(nowWatts)}, ${nowWhat}) all day, every day.`;
@@ -51,7 +54,7 @@ export function Estimator({ id, plugIds, includePc, nowWatts, nowWhat }: {
     else if (!est.usage) message = 'Not enough history yet: this needs at least an hour recorded, and something counted.';
     else {
       kwhPerDay = est.usage.kwh_per_day;
-      basis = usageBasis(est.usage, window);
+      basis = basisOf(est.usage, window);
     }
   }
 

@@ -28,6 +28,8 @@ export type PcProgramTotal = S['PcProgramTotal'];
 export type PcSeries = S['PcSeries'];
 export type ComputerHistory = S['ComputerHistory'];
 export type ComputerEstimate = S['ComputerEstimate'];
+export type HouseHistory = S['HouseHistory'];
+export type HouseHistoryPeriod = S['HouseHistoryPeriod'];
 export type TariffInfo = S['TariffInfo'];
 export type CarbonConfig = S['CarbonConfig'];
 export type TariffCandidate = S['TariffCandidate'];
@@ -643,3 +645,16 @@ export const CARBON_SOURCES = [
   { key: 'electricitymaps', label: 'Electricity Maps', placeLabel: 'Zone (like US-MIDW-MISO) or latitude, longitude', placeholder: 'US-MIDW-MISO' },
   { key: 'eia', label: 'EIA (US only)', placeLabel: "Balancing authority's code (like MISO)", placeholder: 'MISO' },
 ] as const;
+
+/** Where a house "my usage" estimate comes from, in words: the window and that every hour is in it. */
+export function houseUsageBasis(use: AverageUse, windowKey: string): string {
+  const w = ESTIMATE_WINDOWS.find((x) => x.key === windowKey) ?? ESTIMATE_WINDOWS[1]!;
+  const short = w.days == null || use.days < w.days * 0.95;
+  const covered = short ? `the ${formatDuration(use.days * 86400)} recorded so far` : w.label;
+  return `The house used ${formatKwh(use.kwh)} over ${covered}: ${formatKwh(use.kwh_per_day)} a day, an average of ${formatWatts(use.average_watts)} counting every hour. That is the mains clamps.`;
+}
+
+/** The share of the house a part of it used, as a whole-number percent; null when the house figure is missing or zero. */
+export function houseShare(kwh: number, houseKwh: number | null | undefined): number | null {
+  return houseKwh != null && houseKwh > 0 ? Math.round((kwh / houseKwh) * 100) : null;
+}

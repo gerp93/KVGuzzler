@@ -200,6 +200,64 @@ paths:
                 $ref: '#/components/schemas/Series'
         '400':
           $ref: '#/components/responses/Problem'
+  /api/v1/history:
+    get:
+      tags: [Read]
+      operationId: getHouseHistory
+      summary: The house's energy over the rolling periods (hour, day, week, month, year, all time).
+      description: "One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains channel is shown."
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseHistory'
+  /api/v1/estimate:
+    get:
+      tags: [Read]
+      operationId: getHouseEstimate
+      summary: What the cost estimator needs for the house.
+      description: |
+        Today's price per kWh, and what the house (the mains) really used per day over a window, counting every hour, averaged over the time
+        actually recorded. `usage` is null when less than an hour has been recorded.
+      parameters:
+        - name: window
+          in: query
+          required: false
+          description: How far back to average. Default 7d.
+          schema:
+            type: string
+            enum: ['24h', '7d', '30d', all]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerEstimate'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/export.csv:
+    get:
+      tags: [Read]
+      operationId: exportHouseCsv
+      summary: The house's daily energy and cost over a period, as a CSV download.
+      description: |
+        One row per local day: the house (the mains), each circuit on its own, the day's cost of the house at that day's price (blank when no
+        price is known), and its estimated CO2 once any grid intensity has been saved. A label a spreadsheet could run as a formula is written as text.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: The CSV, sent as an attachment.
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Problem'
   /api/v1/summary:
     get:
       tags: [Read]
@@ -1063,6 +1121,55 @@ components:
         carbon_estimated_share:
           type: [number, 'null']
           description: The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity.
+        house_peak_watts:
+          type: [number, 'null']
+          description: "The mains channels' highest draws added. An upper bound: the legs need not peak in the same second."
+        house_carbon_g:
+          type: [number, 'null']
+          description: The mains channels' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved.
+        house_carbon_estimated_kwh:
+          type: [number, 'null']
+          description: The part of the house's energy whose carbon was worked out at an average because its own hour had no saved intensity.
+    HouseHistoryPeriod:
+      type: object
+      required: [key, label, from, to, kwh, cost_estimated]
+      properties:
+        key:
+          type: string
+          enum: ['1h', '24h', '7d', '30d', '1y', all]
+        label:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        kwh:
+          type: number
+          description: The `mains` channels' energy only.
+        cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        cost_estimated:
+          type: boolean
+        peak_watts:
+          type: [number, 'null']
+          description: An upper bound (the mains legs' peaks added).
+        carbon_g:
+          type: [number, 'null']
+        carbon_estimated_kwh:
+          type: [number, 'null']
+    HouseHistory:
+      type: object
+      required: [periods]
+      properties:
+        periods:
+          type: array
+          description: Empty when no mains channel is shown.
+          items:
+            $ref: '#/components/schemas/HouseHistoryPeriod'
     RateMode:
       type: string
       enum: [one, bills, lookup]

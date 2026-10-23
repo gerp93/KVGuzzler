@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -104,6 +104,9 @@ export const api = {
   setCarbon: (body: { source: string; place: string; key?: string }) =>
     request<CarbonConfig>('api/v1/carbon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
+  houseHistory: () => request<HouseHistory>('api/v1/history'),
+  houseEstimate: (window: string) => request<ComputerEstimate>(`api/v1/estimate?${q({ window })}`),
+  houseExportUrl: (from: string, to: string) => `api/v1/export.csv?${q({ from, to })}`,
   openEi: () => request<OpenEiStatus>('api/v1/openei'),
   setOpenEiKey: (apiKey: string) =>
     request<OpenEiStatus>('api/v1/openei', {
