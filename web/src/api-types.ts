@@ -878,7 +878,10 @@ export interface components {
             asleep_seconds: number;
             off_seconds: number;
             lost_power_seconds: number;
-            /** @description Energy the plug's own counter recorded across gaps; already inside kwh. */
+            /**
+             * @description Energy the PC's collector read from its plug's own counter across gaps. Informational: the server reads the plug itself all the time, so the
+             *     time the PC slept is already in kwh and this is not added to it.
+             */
             plug_gap_kwh: number;
         };
         ComputerHistory: {
