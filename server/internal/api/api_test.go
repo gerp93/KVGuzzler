@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
+	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 	"github.com/gerp93/KVGuzzler/server/internal/sim"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
@@ -328,5 +330,106 @@ func TestBillPricesAreUsedAndEstimatesAreFlagged(t *testing.T) {
 	get(t, srv.URL+"/api/v1/summary"+q, &sum)
 	if sum.CostEstimated {
 		t.Error("cost_estimated should be false when a bill covers the period")
+	}
+}
+
+type fakeDevices struct {
+	addErr, removeErr error
+	got               devices.NewDevice
+}
+
+func (f *fakeDevices) Add(_ context.Context, nd devices.NewDevice) (model.Device, error) {
+	f.got = nd
+	if f.addErr != nil {
+		return model.Device{}, f.addErr
+	}
+	return model.Device{ID: "shelly-" + nd.Host, Kind: nd.Kind, Host: nd.Host, Name: nd.Name, Online: true}, nil
+}
+
+func (f *fakeDevices) Remove(_ context.Context, id string) error { return f.removeErr }
+
+func post(t *testing.T, url, body string) *http.Response {
+	t.Helper()
+	resp, err := http.Post(url, "application/json", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp
+}
+
+func del(t *testing.T, url string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodDelete, url, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp
+}
+
+func serverWithDevices(t *testing.T, fd *fakeDevices) *httptest.Server {
+	t.Helper()
+	s, err := store.Open(filepath.Join(t.TempDir(), "h.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	api := &Server{Store: s, Collector: collector.New(s, time.Second), Loc: time.UTC, Version: "test"}
+	if fd != nil {
+		api.Devices = fd
+	}
+	srv := httptest.NewServer(api.Handler())
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestAddAndRemoveDeviceAnswerEachFailureWithItsStatus(t *testing.T) {
+	cases := []struct {
+		err  error
+		want int
+	}{
+		{nil, http.StatusCreated},
+		{fmt.Errorf("%w: a path", devices.ErrInvalid), http.StatusBadRequest},
+		{fmt.Errorf("%w: refoss", devices.ErrUnsupported), http.StatusNotImplemented},
+		{fmt.Errorf("%w: twice", devices.ErrExists), http.StatusConflict},
+		{fmt.Errorf("%w: silent", devices.ErrUnreachable), http.StatusBadGateway},
+		{errors.New("disk full"), http.StatusInternalServerError},
+	}
+	for _, c := range cases {
+		fd := &fakeDevices{addErr: c.err}
+		srv := serverWithDevices(t, fd)
+		if r := post(t, srv.URL+"/api/v1/devices", `{"kind":"shelly_plug","host":"10.0.0.7","name":"PC","scope":"pc"}`); r.StatusCode != c.want {
+			t.Errorf("add with %v: %d, want %d", c.err, r.StatusCode, c.want)
+		}
+		if c.err == nil && (fd.got.Host != "10.0.0.7" || fd.got.Scope != "pc" || fd.got.Name != "PC") {
+			t.Errorf("manager was given %+v", fd.got)
+		}
+	}
+
+	srv := serverWithDevices(t, &fakeDevices{})
+	if r := post(t, srv.URL+"/api/v1/devices", `{"kind":"shelly_plug","hots":"10.0.0.7"}`); r.StatusCode != 400 {
+		t.Errorf("unknown field: %d, want 400", r.StatusCode)
+	}
+	if r := post(t, srv.URL+"/api/v1/devices", `nope`); r.StatusCode != 400 {
+		t.Errorf("bad json: %d, want 400", r.StatusCode)
+	}
+	if r := del(t, srv.URL+"/api/v1/devices/shelly-x"); r.StatusCode != http.StatusNoContent {
+		t.Errorf("remove: %d, want 204", r.StatusCode)
+	}
+	srv = serverWithDevices(t, &fakeDevices{removeErr: fmt.Errorf("%w: x", devices.ErrNotFound)})
+	if r := del(t, srv.URL+"/api/v1/devices/shelly-x"); r.StatusCode != http.StatusNotFound {
+		t.Errorf("remove unknown: %d, want 404", r.StatusCode)
+	}
+}
+
+func TestWithoutADeviceManagerAddAndRemoveSayNotImplemented(t *testing.T) {
+	srv := serverWithDevices(t, nil)
+	if r := post(t, srv.URL+"/api/v1/devices", `{"kind":"shelly_plug","host":"10.0.0.7"}`); r.StatusCode != http.StatusNotImplemented {
+		t.Errorf("add: %d, want 501", r.StatusCode)
+	}
+	if r := del(t, srv.URL+"/api/v1/devices/x"); r.StatusCode != http.StatusNotImplemented {
+		t.Errorf("remove: %d, want 501", r.StatusCode)
 	}
 }

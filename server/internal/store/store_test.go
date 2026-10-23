@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"math"
 	"path/filepath"
 	"testing"
@@ -127,5 +128,67 @@ func TestMetaRoundTrip(t *testing.T) {
 	}
 	if v, ok, err := s.Meta(ctx, "k"); v != "two" || !ok || err != nil {
 		t.Errorf("Meta = %q, %v, %v", v, ok, err)
+	}
+}
+
+func TestRemovedDevicesAreNotListedButTheirChannelsStayAndAReAddBringsThemBack(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	d := model.Device{ID: "shelly-1", Kind: "shelly_plug", Host: "10.0.0.7", Name: "Dryer plug"}
+	ch := model.Channel{ID: "shelly-1:plug", DeviceID: "shelly-1", Scope: model.ScopePlug, Label: "Dryer plug"}
+	if err := s.UpsertDevice(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertChannel(ctx, ch); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.RemoveDevice(ctx, "shelly-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Devices(ctx); len(got) != 0 {
+		t.Errorf("devices after removal = %v", got)
+	}
+	if got, _ := s.DeviceChannels(ctx, "shelly-1"); len(got) != 1 {
+		t.Errorf("channels after removal = %v, want the history's channel kept", got)
+	}
+	if err := s.RemoveDevice(ctx, "shelly-1"); err != ErrNotFound {
+		t.Errorf("removing twice: %v, want ErrNotFound", err)
+	}
+	if err := s.RemoveDevice(ctx, "nope"); err != ErrNotFound {
+		t.Errorf("removing unknown: %v, want ErrNotFound", err)
+	}
+
+	if err := s.UpsertDevice(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Devices(ctx); len(got) != 1 {
+		t.Errorf("devices after re-adding = %v", got)
+	}
+}
+
+func TestOpeningADatabaseFromBeforeDevicesCouldBeRemoved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`CREATE TABLE devices (id TEXT PRIMARY KEY, kind TEXT NOT NULL, host TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '');
+INSERT INTO devices(id, kind, host, name) VALUES ('shelly-1', 'shelly_plug', '10.0.0.7', 'Plug');`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	got, err := s.Devices(context.Background())
+	if err != nil || len(got) != 1 || got[0].ID != "shelly-1" {
+		t.Fatalf("devices = %v, %v", got, err)
+	}
+	if err := s.RemoveDevice(context.Background(), "shelly-1"); err != nil {
+		t.Errorf("RemoveDevice on a migrated database: %v", err)
 	}
 }

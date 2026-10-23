@@ -16,6 +16,7 @@ import (
 
 	"github.com/gerp93/KVGuzzler/server/internal/api"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
+	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/sim"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
 	"github.com/gerp93/KVGuzzler/server/internal/webui"
@@ -57,17 +58,21 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 	defer stop()
 
 	col := collector.New(st, time.Second)
+	mgr := &devices.Manager{Store: st, Collector: col}
+	if err := mgr.Restore(ctx); err != nil {
+		return err
+	}
 	if simulate {
 		if err := col.Add(ctx, sim.New()); err != nil {
 			return err
 		}
 		log.Print("polling a simulated house: nothing here is a measurement")
-	} else {
-		log.Print("no devices configured yet (real Refoss support is not built); use -sim to try the server")
+	} else if len(col.Devices()) == 0 {
+		log.Print("no devices yet: add a plug in the dashboard's Settings (Refoss monitors are not supported yet), or run with -sim")
 	}
 
 	root := http.NewServeMux()
-	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Loc: loc, Version: version}).Handler())
+	root.Handle("/api/", (&api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version}).Handler())
 	root.Handle("/", webui.Handler())
 	srv := &http.Server{Addr: listen, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	done := make(chan struct{})

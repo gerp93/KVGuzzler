@@ -58,6 +58,10 @@ func New(host string, hc *http.Client) (*Client, error) {
 	return newWithBase("http://"+host, hc), nil
 }
 
+// NewWithBase is New for an address that is not a plain host (a test server with a port, a tool run against a fixture).
+// Production code uses New, which only accepts a plain host or IP.
+func NewWithBase(base string, hc *http.Client) *Client { return newWithBase(base, hc) }
+
 func newWithBase(base string, hc *http.Client) *Client {
 	if hc == nil {
 		hc = &http.Client{Timeout: 5 * time.Second}

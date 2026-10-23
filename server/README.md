@@ -28,6 +28,8 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 |---|---|
 | `internal/hostcheck` | Accepts only a plain host or IP for a device (no URL, path, port). |
 | `internal/refoss` | Read-only client for a Refoss monitor (`GET /rpc/<Method>`); an allowlist means a `*.Set` call cannot be made. Only `DeviceInfo` is parsed. |
+| `internal/shelly` | Shelly plug (Gen2+) over one read-only GET (`/rpc/Switch.GetStatus?id=0`). A port of the desktop app's `ShellyPlug`, tested with the answer captured from a real Plug US Gen4. |
+| `internal/devices` | Adds, removes and restores devices: a plug is read once before it is kept, saved, and polled again after a restart. |
 | `internal/sim` | A simulated house with a dryer, range, EV charger and so on. |
 | `internal/store` | SQLite (WAL, pure Go): devices, channels, per-minute history, totals and bucketed series. |
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
@@ -35,9 +37,18 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
+## First call to a Refoss monitor
+
+```bash
+go run ./cmd/refoss-probe 192.168.1.50
+```
+
+Prints the monitor's device info and the raw `Refoss.Status.Get` answer (two read-only calls). Save that answer as a fixture; the
+server's Refoss mapping is written from it. Until then adding a Refoss monitor answers 501.
+
 ## Not built yet (answers 501)
 
-Adding devices, carbon, and the PC ingest. Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
+Carbon, and the PC ingest. Adding a Refoss monitor (only Shelly plugs can be added). Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
 `Refoss.Status.Get` (per-channel watts, volts, amps, kWh) has not been seen on a real device, so `StatusRaw` returns the body
 untouched and nothing guesses its fields. The first real device call decides the mapping.
 

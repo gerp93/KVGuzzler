@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS devices (
   kind  TEXT NOT NULL,
   host  TEXT NOT NULL DEFAULT '',
   name  TEXT NOT NULL DEFAULT '',
-  model TEXT NOT NULL DEFAULT ''
+  model TEXT NOT NULL DEFAULT '',
+  removed INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS channels (
   id        TEXT PRIMARY KEY,
@@ -86,6 +87,16 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');`)
 	if err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
+	// Databases made before devices could be removed have no such column.
+	var has int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name = 'removed'`).Scan(&has); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	if has == 0 {
+		if _, err := db.Exec(`ALTER TABLE devices ADD COLUMN removed INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -93,7 +104,7 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');`)
 func (s *Store) UpsertDevice(ctx context.Context, d model.Device) error {
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO devices(id, kind, host, name, model) VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, host = excluded.host, name = excluded.name, model = excluded.model`,
+ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, host = excluded.host, name = excluded.name, model = excluded.model, removed = 0`,
 		d.ID, d.Kind, d.Host, d.Name, d.Model)
 	return err
 }
@@ -116,7 +127,7 @@ ON CONFLICT(id) DO UPDATE SET device_id = excluded.device_id, idx = excluded.idx
 }
 
 func (s *Store) Devices(ctx context.Context) ([]model.Device, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, kind, host, name, model FROM devices ORDER BY id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, kind, host, name, model FROM devices WHERE removed = 0 ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -314,4 +325,34 @@ func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 INSERT INTO meta(key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	return err
+}
+
+// RemoveDevice marks a device as no longer polled. Its channels and history stay.
+func (s *Store) RemoveDevice(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE devices SET removed = 1 WHERE id = ? AND removed = 0`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeviceChannels returns the channels of one device.
+func (s *Store) DeviceChannels(ctx context.Context, deviceID string) ([]model.Channel, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels WHERE device_id = ? ORDER BY idx IS NULL, idx, id`, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.Channel
+	for rows.Next() {
+		c, err := scanChannel(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }

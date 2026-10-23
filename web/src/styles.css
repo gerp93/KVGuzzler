@@ -25,6 +25,14 @@ select {
 
 button {
   cursor: pointer;
+  padding: 6px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
 }
 
 .visually-hidden {
@@ -352,4 +360,31 @@ select:focus-visible {
   main > .card:has(.bill-form) {
     grid-column: 1 / -1;
   }
+}
+
+/* Devices */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-red);
+}
+
+.dot.on {
+  background: var(--color-accent-green);
+}
+
+.device-form {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 8px 12px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.device-form .check {
+  margin-top: 8px;
 }
