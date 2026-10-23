@@ -91,7 +91,7 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
       <fieldset class="device-form">
         <legend>Add a Shelly plug</legend>
         <label class="field">
-          <span>Address (like 192.168.68.106)</span>
+          <span>Address (like 192.168.1.50)</span>
           <input value={host} onInput={(e) => setHost((e.target as HTMLInputElement).value)} />
         </label>
         <label class="field">

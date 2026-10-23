@@ -6,7 +6,12 @@ Wants=network-online.target
 [Service]
 User=housed
 Group=housed
-ExecStart=/usr/local/bin/housed -listen :8080 -data /var/lib/housed -tz America/Chicago
+# Defaults for a plain install. Site-specific settings (the time zone, a different address) live on the box in
+# /etc/housed/housed.env, which overrides these; nothing about one site belongs in this file.
+Environment=HOUSED_LISTEN=:8080
+Environment=HOUSED_DATA=/var/lib/housed
+EnvironmentFile=-/etc/housed/housed.env
+ExecStart=/usr/local/bin/housed
 Restart=always
 RestartSec=5
 StateDirectory=housed
