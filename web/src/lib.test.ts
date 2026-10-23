@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, BASELINE, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -434,5 +434,32 @@ describe('the house figures', () => {
     const use = { kwh: 36.4, days: 7, kwh_per_day: 5.2, average_watts: 216.7, whole_pc: true, includes_pc: false, from: '', peripheral_count: 0 };
     expect(houseUsageBasis(use, '7d')).toBe('The house used 36.4 kWh over the last 7 days: 5.20 kWh a day, an average of 217 W counting every hour. That is the mains clamps.');
     expect(houseUsageBasis({ ...use, days: 0.125 }, '30d')).toContain('over the 3 h recorded so far');
+  });
+});
+
+describe('the list of rates found', () => {
+  const t = (utility: string, name: string) => ({ utility, name });
+
+  it('says a rate in short: one price, or the range by time of day', () => {
+    expect(formatRate(0.1558)).toBe('$0.1558');
+    expect(rateRange({ cheapest: 0.0727, dearest: 0.0727, varies_by_time: false })).toBe('$0.0727 per kWh');
+    expect(rateRange({ cheapest: 0.1558, dearest: 0.1745, varies_by_time: true })).toBe('$0.1558 to $0.1745 per kWh by time of day');
+  });
+
+  it('filters by every word typed, in the name or the utility, in any case', () => {
+    const list = [t('Northern States Power Co - Minnesota', 'Residential Service - Overhead Standard (A01)'), t('Northern States Power Co - Minnesota', 'Energy Controlled Service Non-demand metered Residential (A05)'), t('Other Co', 'Residential Service')];
+    expect(filterTariffs(list, '')).toHaveLength(3);
+    expect(filterTariffs(list, '  ')).toHaveLength(3);
+    expect(filterTariffs(list, 'residential service')).toHaveLength(3); // every word, anywhere in the name
+    expect(filterTariffs(list, 'energy controlled')).toEqual([list[1]]);
+    expect(filterTariffs(list, 'OVERHEAD a01')).toEqual([list[0]]);
+    expect(filterTariffs(list, 'other residential')).toEqual([list[2]]);
+    expect(filterTariffs(list, 'nothing like it')).toEqual([]);
+  });
+
+  it('names the utility once when every rate is from it', () => {
+    expect(sharedUtility([t('A', 'x'), t('A', 'y')])).toBe('A');
+    expect(sharedUtility([t('A', 'x'), t('B', 'y')])).toBeNull();
+    expect(sharedUtility([])).toBeNull();
   });
 });

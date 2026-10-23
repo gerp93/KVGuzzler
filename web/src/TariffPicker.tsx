@@ -1,8 +1,19 @@
-// "Price from a utility's published rate": the OpenEI key (write-only), a search by address, the rates found, and the one in use. The key is
-// saved on the server and never shown again; it is sent to api.openei.org only.
+// "Price from a utility's published rate". What it does, in order: you give the free OpenEI key once; you type your address or ZIP code and it lists
+// the residential rates for it; you pick the one your bill names; from then on costs are worked out from that rate. The key is saved on the server
+// (a private file, not the database), never shown again, and sent to api.openei.org only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import type { TariffCandidate, TariffInfo } from './lib';
+import { TARIFFS_SHOWN, filterTariffs, rateRange, sharedUtility, type TariffCandidate, type TariffInfo } from './lib';
+
+function Notes({ c, fixed = false }: { c: TariffCandidate | TariffInfo; fixed?: boolean }) {
+  const bits = [
+    'is_default' in c && c.is_default ? 'most common' : '',
+    'approved' in c && c.approved ? 'checked by OpenEI' : '',
+    c.tiers > 1 ? 'first usage tier only' : '',
+    fixed && c.fixed_charge ? `${c.fixed_charge} fixed charge not included in the price` : '',
+  ].filter(Boolean);
+  return bits.length > 0 ? <span class="caption block">{bits.join(' · ')}</span> : null;
+}
 
 export function TariffPicker({ current, label, onChoose }: {
   /** The tariff in use. */
@@ -15,6 +26,9 @@ export function TariffPicker({ current, label, onChoose }: {
   const [key, setKey] = useState('');
   const [address, setAddress] = useState('');
   const [found, setFound] = useState<TariffCandidate[]>();
+  const [filter, setFilter] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [changing, setChanging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -35,6 +49,8 @@ export function TariffPicker({ current, label, onChoose }: {
   const search = () => {
     setBusy(true);
     setMessage('');
+    setShowAll(false);
+    setFilter('');
     api.lookupRates(address.trim()).then(
       (list) => {
         setFound(list);
@@ -48,27 +64,39 @@ export function TariffPicker({ current, label, onChoose }: {
     );
   };
 
+  const matching = found ? filterTariffs(found, filter) : [];
+  const listed = showAll || filter.trim() ? matching : matching.slice(0, TARIFFS_SHOWN);
+  const utility = found ? sharedUtility(found) : null;
+  const chosenButNotSaved = label && label !== current?.label;
+  const searching = !current || changing;
+
   return (
     <div class="tariff">
       {current && (
-        <p class="note">
-          In use: {current.summary}. Read from OpenEI on {new Date(current.fetched_at).toLocaleDateString()}; read again by its label when a week old.
-        </p>
+        <div class="current-rate">
+          <h3>Your rate</h3>
+          <p>
+            <strong>{current.name}</strong>
+            <span class="caption block">
+              {current.utility} · {rateRange(current)}
+            </span>
+            <Notes c={current} fixed />
+          </p>
+          <p class="caption">Read from OpenEI on {new Date(current.fetched_at).toLocaleDateString()}, and read again when a week old.</p>
+          {!changing && (
+            <button type="button" onClick={() => setChanging(true)}>
+              Change rate
+            </button>
+          )}
+        </div>
       )}
 
-      <h3>OpenEI key</h3>
-      {hasKey ? (
-        <p class="caption">
-          A key is saved on the server and is not shown again.{' '}
-          <button type="button" onClick={() => void saveKey('')}>
-            Remove it
-          </button>
-        </p>
-      ) : (
+      {hasKey === false && (
         <>
+          <h3>OpenEI key</h3>
           <p class="caption">
-            Lookups use the free Utility Rate Database at openei.org: sign up there for an API key and paste it here once. The server keeps it and sends it
-            to api.openei.org only.
+            Rates come from the free Utility Rate Database at openei.org. Sign up there for an API key and paste it here once. The server keeps it in a private
+            file and sends it to OpenEI only.
           </p>
           <label class="field">
             <span>API key</span>
@@ -80,9 +108,10 @@ export function TariffPicker({ current, label, onChoose }: {
         </>
       )}
 
-      {hasKey && (
+      {hasKey && searching && (
         <>
-          <h3>Find your rate</h3>
+          <h3>{current ? 'Find a different rate' : 'Find your rate'}</h3>
+          <p class="caption">Type your address or ZIP code, then pick the rate your bill names (it is usually called something like "Residential Service").</p>
           <label class="field">
             <span>Address or ZIP code</span>
             <input value={address} onInput={(e) => setAddress((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && address.trim() && !busy && search()} />
@@ -90,33 +119,73 @@ export function TariffPicker({ current, label, onChoose }: {
           <button type="button" disabled={busy || !address.trim()} onClick={search}>
             {busy ? 'Looking…' : 'Look up rates'}
           </button>
+
           {found && found.length > 0 && (
-            <ul class="settings">
-              {found.map((c) => (
-                <li key={c.label}>
-                  <span class="grow">
-                    {c.summary}
-                    <span class="caption block">
-                      {c.is_default ? 'most common for its kind · ' : ''}
-                      {c.approved ? 'checked by an OpenEI expert · ' : ''}
-                      {c.tiers > 1 ? 'usage tiers: only the first is used · ' : ''}
-                      {c.fixed_charge ? `fixed charge ${c.fixed_charge} is not included` : 'fixed and demand charges are not included'}
-                    </span>
-                  </span>
-                  <button type="button" aria-pressed={label === c.label} onClick={() => onChoose(c.label)}>
-                    {label === c.label ? 'Chosen' : 'Use this rate'}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p class="caption">
+                {utility ? `${utility}. ` : ''}
+                {found.length} rate{found.length === 1 ? '' : 's'} found; the likeliest first.
+              </p>
+              {found.length > TARIFFS_SHOWN && (
+                <label class="field">
+                  <span>Narrow the list (words from the name)</span>
+                  <input value={filter} placeholder="residential service" onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
+                </label>
+              )}
+              {listed.length === 0 ? (
+                <p class="note">Nothing matches those words.</p>
+              ) : (
+                <ul class="settings rates">
+                  {listed.map((c) => (
+                    <li key={c.label}>
+                      <span class="grow">
+                        <strong>{c.name}</strong>
+                        <span class="caption block">
+                          {utility ? '' : `${c.utility} · `}
+                          {rateRange(c)}
+                        </span>
+                        <Notes c={c} />
+                      </span>
+                      <button type="button" aria-pressed={label === c.label} onClick={() => onChoose(c.label)}>
+                        {label === c.label ? 'Chosen' : 'Use this'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!showAll && !filter.trim() && matching.length > TARIFFS_SHOWN && (
+                <button type="button" onClick={() => setShowAll(true)}>
+                  Show all {matching.length}
+                </button>
+              )}
+            </>
           )}
         </>
       )}
-      {message && <p class="note" role="status">{message}</p>}
-      <p class="caption">
-        Only the energy charge is used, never fixed monthly or demand charges. Tiers depend on a whole house's monthly use, so the first tier applies.
-        A time-of-use price becomes one price per day, weighted by the hours the house really uses power (learned from the last 60 days).
-      </p>
+
+      {chosenButNotSaved && <p class="note">Chosen. Press "Save price" below to use it.</p>}
+      {message && (
+        <p class="note" role="status">
+          {message}
+        </p>
+      )}
+
+      {hasKey && (
+        <details>
+          <summary>How this works</summary>
+          <p class="note">
+            Only the energy charge is used: the rate's price per kWh. Fixed monthly charges and demand charges are left out, and where a rate has usage tiers
+            only the first applies. A rate that changes by time of day becomes one price per day, weighted by the hours the house really uses power (learned from
+            the last 60 days). Costs are estimates; your bill is the exact figure.
+          </p>
+          <p class="caption">
+            The OpenEI key is saved on the server, not shown again.{' '}
+            <button type="button" onClick={() => void saveKey('')}>
+              Remove the key
+            </button>
+          </p>
+        </details>
+      )}
     </div>
   );
 }
