@@ -43,6 +43,8 @@ type Channel struct {
 	MaxWatts *float64 `json:"max_watts"`
 	// ComputerID is the computer this plug belongs to (its wall plug if the scope is pc, a peripheral if plug), or nil.
 	ComputerID *string `json:"computer_id"`
+	// GroupID is the appliance group this plug is part of (shown as one appliance with the group's other plugs), or nil.
+	GroupID *string `json:"group_id"`
 }
 
 type Reading struct {
@@ -75,6 +77,7 @@ type Series struct {
 type ChannelSummary struct {
 	ChannelID      string   `json:"channel_id"`
 	ComputerID     *string  `json:"computer_id"`
+	GroupID        *string  `json:"group_id"`
 	Scope          Scope    `json:"scope"`
 	KWh            float64  `json:"kwh"`
 	Cost           *string  `json:"cost"`

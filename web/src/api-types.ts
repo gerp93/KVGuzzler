@@ -207,6 +207,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every appliance group, with its plugs.
+         * @description A group is several plugs shown as one appliance, for something that runs through more than one (an entertainment center on
+         *     two power strips). It only changes how they are shown: each plug still records its own energy.
+         */
+        get: operations["listGroups"];
+        put?: never;
+        /** Add an empty group. Put plugs in it with PATCH /channels/{id} group_id. */
+        post: operations["addGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{groupId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a group. Its plugs stay, as ordinary plugs. */
+        delete: operations["removeGroup"];
+        options?: never;
+        head?: never;
+        /** Rename a group. */
+        patch: operations["renameGroup"];
+        trace?: never;
+    };
+    "/api/v1/groups/{groupId}/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A group's energy and cost for a period, as one figure and by plug. */
+        get: operations["getGroupDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rates": {
         parameters: {
             query?: never;
@@ -342,6 +399,8 @@ export interface components {
             max_watts?: number | null;
             /** @description The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one. */
             computer_id?: string | null;
+            /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer. */
+            group_id?: string | null;
         };
         ChannelUpdate: {
             label?: string;
@@ -351,6 +410,11 @@ export interface components {
              *     any number of `plug` channels are its peripherals.
              */
             computer_id?: string | null;
+            /**
+             * @description Put the plug in an appliance group (its id), or null to take it out. A plug is shown in one place: it cannot be in a
+             *     group and belong to a computer (409).
+             */
+            group_id?: string | null;
         };
         Reading: {
             channel_id: string;
@@ -385,6 +449,8 @@ export interface components {
             channel_id: string;
             /** @description The computer the channel belongs to, so a client can group it with that computer instead of listing it alone. */
             computer_id?: string | null;
+            /** @description The appliance group the channel is part of, so a client can list the group once instead of each plug. */
+            group_id?: string | null;
             scope: components["schemas"]["Scope"];
             kwh: number;
             cost?: components["schemas"]["Money"] | null;
@@ -523,6 +589,27 @@ export interface components {
             minutes: components["schemas"]["PcMinute"][];
             gaps?: components["schemas"]["PcGap"][];
         };
+        ApplianceGroup: {
+            id: string;
+            name: string;
+            channel_ids: string[];
+        };
+        NewGroup: {
+            name: string;
+        };
+        GroupDetail: {
+            group: components["schemas"]["ApplianceGroup"];
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description Each plug that is shown (not hidden), with its own energy and cost. */
+            members: components["schemas"]["ChannelSummary"][];
+            /** @description The plugs' energy added together (all are ordinary plugs, so adding them is sound). */
+            total_kwh: number;
+            total_cost?: components["schemas"]["Money"] | null;
+            cost_estimated: boolean;
+        };
         Computer: {
             id: string;
             name: string;
@@ -618,6 +705,7 @@ export interface components {
     };
     parameters: {
         DeviceId: string;
+        GroupId: string;
         ComputerId: string;
         ChannelId: string;
         /** @description Start of the period (inclusive), RFC 3339. */
@@ -1011,6 +1099,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComputerDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["ApplianceGroup"][];
+                    };
+                };
+            };
+        };
+    };
+    addGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewGroup"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplianceGroup"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    removeGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    renameGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewGroup"];
+            };
+        };
+        responses: {
+            /** @description The updated group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplianceGroup"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getGroupDetail: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetail"];
                 };
             };
             400: components["responses"]["Problem"];

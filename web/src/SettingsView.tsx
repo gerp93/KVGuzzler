@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { api } from './api';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
+import { GroupsCard } from './GroupsCard';
 import { RatesCard } from './RatesCard';
 import { THEMES, type Channel, type Theme } from './lib';
 
@@ -57,6 +58,7 @@ export function SettingsView({
     <>
       <DevicesCard onChanged={onChanged} />
       <ComputersCard channels={channels} onChanged={onChanged} />
+      <GroupsCard channels={channels} onChanged={onChanged} />
       <RatesCard />
       <section class="card">
         <h2>Channels</h2>

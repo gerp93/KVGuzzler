@@ -14,6 +14,8 @@ export type Summary = S['Summary'];
 export type ChannelSummary = S['ChannelSummary'];
 export type Status = S['Status'];
 export type Computer = S['Computer'];
+export type ApplianceGroup = S['ApplianceGroup'];
+export type GroupDetail = S['GroupDetail'];
 export type ComputerDetail = S['ComputerDetail'];
 export type PcSource = S['PcSource'];
 export type PcComponent = S['PcComponent'];
@@ -182,9 +184,15 @@ export function formatDuration(seconds: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** One row of the Appliances list: an ordinary appliance (a circuit or a plug), or a group of plugs shown as one. */
 export interface ApplianceRow {
-  channel: ChannelSummary;
+  kind: 'channel' | 'group';
+  /** The channel's id, or the group's. */
+  id: string;
   label: string;
+  kwh: number;
+  /** The cost as a money string; null when any part of it has no price. */
+  cost: string | null;
 }
 
 export interface ComputerRow {
@@ -194,25 +202,43 @@ export interface ComputerRow {
 }
 
 export interface ApplianceList {
-  /** Circuits and plugs that belong to no computer, biggest first. */
+  /** Circuits, plugs and groups that belong to no computer, biggest first. */
   appliances: ApplianceRow[];
   /** Computers, with the figure of the plug they are on. */
   computers: ComputerRow[];
 }
 
-/** Splits the summary into what the Appliances list shows. A plug that belongs to a computer is listed under that computer and
- * never alone; a computer's figure is its wall plug's, so nothing is counted twice and no scope is added to another. */
-export function applianceList(summary: Summary, channels: Channel[], computers: Computer[]): ApplianceList {
+/** Adds money strings for display. Null if any is missing (a partly priced total would mislead). */
+export function sumMoney(parts: (string | null | undefined)[]): string | null {
+  if (parts.length === 0 || parts.some((p) => p === null || p === undefined)) return null;
+  return parts.reduce((t, p) => t + Number(p), 0).toFixed(2);
+}
+
+/** Splits the summary into what the Appliances list shows. A plug that belongs to a computer is listed under that computer and never
+ * alone; a plug in a group is listed once, as the group (all ordinary plugs, so their energy is added); a computer's figure is its wall
+ * plug's. No scope is added to another. */
+export function applianceList(summary: Summary, channels: Channel[], computers: Computer[], groups: ApplianceGroup[] = []): ApplianceList {
   const label = new Map(channels.map((c) => [c.id, c.label]));
   const byChannel = new Map(summary.channels.map((c) => [c.channel_id, c]));
-  const appliances = summary.channels
-    .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id)
-    .sort((a, b) => b.kwh - a.kwh)
-    .map((channel) => ({ channel, label: label.get(channel.channel_id) ?? channel.channel_id }));
-  const rows = computers.map((computer) => ({
+
+  const rows: ApplianceRow[] = summary.channels
+    .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id && !c.group_id)
+    .map((c) => ({ kind: 'channel' as const, id: c.channel_id, label: label.get(c.channel_id) ?? c.channel_id, kwh: c.kwh, cost: c.cost ?? null }));
+  for (const g of groups) {
+    const members = summary.channels.filter((c) => c.group_id === g.id);
+    if (members.length === 0) continue;
+    rows.push({
+      kind: 'group', id: g.id, label: g.name,
+      kwh: members.reduce((t, m) => t + m.kwh, 0),
+      cost: sumMoney(members.map((m) => m.cost)),
+    });
+  }
+  rows.sort((a, b) => b.kwh - a.kwh);
+
+  const comps = computers.map((computer) => ({
     computer,
     wall: computer.wall_channel_id ? byChannel.get(computer.wall_channel_id) : undefined,
   }));
-  rows.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
-  return { appliances, computers: rows };
+  comps.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
+  return { appliances: rows, computers: comps };
 }

@@ -129,9 +129,8 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   with an outbox), the Electron viewer that loads the dashboard from the server, then retiring the Avalonia window (only once the
   dashboard does everything it does; the collector service stays). The server box itself (Debian) is set up separately.
 - **House monitor: next** (see the whole-house item above for what exists):
-  - **Appliance groups.** An entertainment center runs through two plugs (one per power strip), and the display should show it as one thing:
-    group any plugs under a name and show their combined energy and cost, never changing what each plug records. A group is plain on/off,
-    unlike a computer, which has the full breakdown. Not built; a computer already groups a wall plug and its peripherals this way.
+  - **Appliance groups** are built (an entertainment center on two plugs shown as one; Settings > Appliance groups). Only Shelly plugs can be
+    added so far, so a group of other brands waits for their sources (below).
   - **The C# relay client** is built (`RelayFeed`, `relay.json`; see CLAUDE.md) and tested against a fake server and the contract's field
     names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
     `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the

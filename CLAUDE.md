@@ -46,6 +46,10 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a
   computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
   house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open one in Appliances for the Guzzler-style breakdown.
+- **Appliance groups** (`/api/v1/groups`): several ordinary plugs shown as one appliance (an entertainment center on two power strips). Only
+  `plug`-scope channels can be in a group, and not one that belongs to a computer (a plug is shown in one place; 409 either way). It changes
+  only the display: each plug still records its own energy, and the group's figure is the sum of its plugs' (one scope, so the sum is sound;
+  the cost is shown only when every plug has one). A hidden plug is neither shown nor counted.
 - The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
   cap is dropped and said so; a different major `api_version` is refused with 426. The C# client is `RelayFeed` in `KVGuzzler.Core/Relay`, run by the collector service beside the carbon feed: **`relay.json`** beside
   `wall-meter.json` (`{"host": "192.168.68.110"}`, or `host:port`; default port 8080; a plain host only, never a URL) says where the house server

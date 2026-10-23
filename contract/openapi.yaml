@@ -328,6 +328,101 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/groups:
+    get:
+      tags: [Read]
+      operationId: listGroups
+      summary: Every appliance group, with its plugs.
+      description: |
+        A group is several plugs shown as one appliance, for something that runs through more than one (an entertainment center on
+        two power strips). It only changes how they are shown: each plug still records its own energy.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApplianceGroup'
+    post:
+      tags: [Settings]
+      operationId: addGroup
+      summary: Add an empty group. Put plugs in it with PATCH /channels/{id} group_id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGroup'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceGroup'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/groups/{groupId}:
+    patch:
+      tags: [Settings]
+      operationId: renameGroup
+      summary: Rename a group.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGroup'
+      responses:
+        '200':
+          description: The updated group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceGroup'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: removeGroup
+      summary: Remove a group. Its plugs stay, as ordinary plugs.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/groups/{groupId}/detail:
+    get:
+      tags: [Read]
+      operationId: getGroupDetail
+      summary: A group's energy and cost for a period, as one figure and by plug.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetail'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/rates:
     get:
       tags: [Settings]
@@ -433,6 +528,12 @@ components:
   parameters:
     DeviceId:
       name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    GroupId:
+      name: groupId
       in: path
       required: true
       schema:
@@ -590,6 +691,9 @@ components:
         computer_id:
           type: [string, 'null']
           description: The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one.
+        group_id:
+          type: [string, 'null']
+          description: The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer.
     ChannelUpdate:
       type: object
       minProperties: 1
@@ -605,6 +709,11 @@ components:
           description: |
             Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
             any number of `plug` channels are its peripherals.
+        group_id:
+          type: [string, 'null']
+          description: |
+            Put the plug in an appliance group (its id), or null to take it out. A plug is shown in one place: it cannot be in a
+            group and belong to a computer (409).
     Reading:
       type: object
       required: [channel_id, watts]
@@ -670,6 +779,9 @@ components:
         computer_id:
           type: [string, 'null']
           description: The computer the channel belongs to, so a client can group it with that computer instead of listing it alone.
+        group_id:
+          type: [string, 'null']
+          description: The appliance group the channel is part of, so a client can list the group once instead of each plug.
         scope:
           $ref: '#/components/schemas/Scope'
         kwh:
@@ -901,6 +1013,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PcGap'
+    ApplianceGroup:
+      type: object
+      required: [id, name, channel_ids]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        channel_ids:
+          type: array
+          items:
+            type: string
+    NewGroup:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+    GroupDetail:
+      type: object
+      required: [group, from, to, members, total_kwh, cost_estimated]
+      properties:
+        group:
+          $ref: '#/components/schemas/ApplianceGroup'
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        members:
+          type: array
+          description: Each plug that is shown (not hidden), with its own energy and cost.
+          items:
+            $ref: '#/components/schemas/ChannelSummary'
+        total_kwh:
+          type: number
+          description: The plugs' energy added together (all are ordinary plugs, so adding them is sound).
+        total_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        cost_estimated:
+          type: boolean
     Computer:
       type: object
       required: [id, name, peripheral_channel_ids]
