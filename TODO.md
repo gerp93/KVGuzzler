@@ -135,7 +135,12 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
     `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the
     PC under Appliances. No window setting for it yet (the window is frozen).
-  - Carbon footprint and the OpenEI tariff lookup in Go; the Refoss mapping (run `refoss-probe` first); the Electron viewer.
+  - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the
+    reason, and the setup form refuses a bad address and saves a good one). Still to do: a release (the tag namespace is shared with the
+    desktop app's Velopack releases, which read this repo's releases to find updates, so check that a second app's release cannot confuse them,
+    then KVG_Standards' `release-electron.yml` with `app_dir: shell` plus `electron-updater`), an icon (no logo exists and none is to be
+    made up), VisualAssault theming for its two pages, and trying it off Windows.
+  - Carbon footprint and the OpenEI tariff lookup in Go; the Refoss mapping (run `refoss-probe` first).
   - Other plug brands (the entertainment center's are not Shelly): a source per brand behind the same `Source` interface (Tasmota, and Matter plugs through Home Assistant).
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /
