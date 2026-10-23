@@ -200,3 +200,54 @@ INSERT INTO channels(id, device_id, scope, label) VALUES ('shelly-1:plug', 'shel
 		t.Errorf("assigning on a migrated database: %v", err)
 	}
 }
+
+func TestAFirstPushAdoptsTheOnlyComputerThatHasNoCollectorButNeverGuessesBetweenTwo(t *testing.T) {
+	ctx := context.Background()
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	push := func(s *Store, id, name string) {
+		t.Helper()
+		in := pcrelay.Ingest{APIVersion: 1, SourceID: id, SourceName: name, Minutes: []pcrelay.Minute{pcMinute(at, 100)}}
+		if _, err := s.IngestPC(ctx, in, at.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The user made a computer and tied its plugs: the collector for that PC adopts it, and nothing is duplicated.
+	s := open(t)
+	addChannel(t, s, "wall", model.ScopePC)
+	mine, _ := s.CreateComputer(ctx, "kgerp_PC", nil)
+	if _, err := s.AssignChannel(ctx, "wall", &mine.ID); err != nil {
+		t.Fatal(err)
+	}
+	push(s, "pc-1", "KGERP-PC")
+	all, _ := s.Computers(ctx)
+	if len(all) != 1 || all[0].ID != mine.ID || all[0].SourceID == nil || *all[0].SourceID != "pc-1" || all[0].Name != "kgerp_PC" || all[0].WallChannelID == nil {
+		t.Fatalf("computers = %+v, want the user's computer, now reporting through pc-1, with its name and plug kept", all)
+	}
+
+	// A second PC's collector must not take it over: it gets a computer of its own.
+	push(s, "pc-2", "Laptop")
+	all, _ = s.Computers(ctx)
+	if len(all) != 2 {
+		t.Fatalf("computers = %+v, want a new one for the second collector", all)
+	}
+
+	// Two computers with no collector: never guess which one a collector is.
+	s2 := open(t)
+	if _, err := s2.CreateComputer(ctx, "A", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s2.CreateComputer(ctx, "B", nil); err != nil {
+		t.Fatal(err)
+	}
+	push(s2, "pc-9", "Whatever")
+	all, _ = s2.Computers(ctx)
+	if len(all) != 3 {
+		t.Errorf("computers = %+v, want a third, named after the collector", all)
+	}
+	for _, c := range all {
+		if (c.Name == "A" || c.Name == "B") && c.SourceID != nil {
+			t.Errorf("%s was adopted on a guess", c.Name)
+		}
+	}
+}

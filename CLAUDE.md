@@ -47,7 +47,13 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
   house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open one in Appliances for the Guzzler-style breakdown.
 - The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
-  cap is dropped and said so; a different major `api_version` is refused with 426. The C# client (`relay.json`, replaying `history.db`) is not built yet.
+  cap is dropped and said so; a different major `api_version` is refused with 426. The C# client is `RelayFeed` in `KVGuzzler.Core/Relay`, run by the collector service beside the carbon feed: **`relay.json`** beside
+  `wall-meter.json` (`{"host": "192.168.68.110"}`, or `host:port`; default port 8080; a plain host only, never a URL) says where the house server
+  is, and without it nothing is sent. It **replays `history.db`** (no separate outbox): the watermark of the last minute sent is in `meta`
+  (`relay_watermark`), only whole minutes older than two minutes are sent, the first time only the last 7 days, batches of up to 360 minutes. A server
+  that is away is retried every minute, a different `api_version` every 10, and a batch the server refuses three times in a row is skipped so it cannot
+  hold up the rest (it stays in this PC's own history). The push's field names are checked against `contract/examples/ingest-pc.json` in the tests.
+  The source id (`relay_source_id`) is made once and kept. The first push from a new source adopts the only computer when it has no collector.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the

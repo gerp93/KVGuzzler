@@ -999,6 +999,114 @@ public sealed class HistoryStore : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    // ----- Reading the history back out (the relay to the house server) --------------------
+
+    /// <summary>A small saved value by key (settings and bookkeeping kept as text), or null when there is none.</summary>
+    public string? GetMeta(string key)
+    {
+        using var c = Open();
+        return GetMeta(c, key);
+    }
+
+    /// <summary>Saves a small value by key, replacing any earlier one.</summary>
+    public void SetMeta(string key, string value)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        SetMeta(c, tx, key, value);
+        tx.Commit();
+    }
+
+    /// <summary>The next minutes (UTC, minute-aligned) that have anything saved after <paramref name="afterMinute"/> and up to
+    /// <paramref name="throughMinute"/>, oldest first, at most <paramref name="max"/> of them. A minute counts if it has energy rows,
+    /// program estimates or a total peak.</summary>
+    public IReadOnlyList<long> NextMinutes(long afterMinute, long throughMinute, int max)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT minute_start FROM (
+                SELECT minute_start FROM samples WHERE minute_start > $a AND minute_start <= $t
+                UNION SELECT minute_start FROM program_samples WHERE minute_start > $a AND minute_start <= $t
+                UNION SELECT minute_start FROM total_peaks WHERE minute_start > $a AND minute_start <= $t)
+            ORDER BY minute_start LIMIT $n
+            """;
+        cmd.Parameters.AddWithValue("$a", afterMinute);
+        cmd.Parameters.AddWithValue("$t", throughMinute);
+        cmd.Parameters.AddWithValue("$n", max);
+        var minutes = new List<long>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) minutes.Add(r.GetInt64(0));
+        return minutes;
+    }
+
+    /// <summary>Every energy row saved for the minutes after <paramref name="afterMinute"/> up to and including <paramref name="throughMinute"/>.</summary>
+    public IReadOnlyList<MinuteRow> QueryMinuteRows(long afterMinute, long throughMinute)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT minute_start, name, scope, kwh, seconds, peak_watts, kind FROM samples
+            WHERE minute_start > $a AND minute_start <= $t ORDER BY minute_start, name
+            """;
+        cmd.Parameters.AddWithValue("$a", afterMinute);
+        cmd.Parameters.AddWithValue("$t", throughMinute);
+        var rows = new List<MinuteRow>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            rows.Add(new MinuteRow(r.GetInt64(0), r.GetString(1), (ReadingScope)r.GetInt32(2), r.GetDouble(3), r.GetDouble(4), r.GetDouble(5), (PowerKind)r.GetInt32(6)));
+        return rows;
+    }
+
+    /// <summary>The per-program estimates saved for the minutes after <paramref name="afterMinute"/> up to and including <paramref name="throughMinute"/>.</summary>
+    public IReadOnlyList<(long MinuteStart, ProgramEnergy Row)> QueryProgramRows(long afterMinute, long throughMinute)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT minute_start, program, cpu_kwh, gpu_kwh, active_seconds FROM program_samples
+            WHERE minute_start > $a AND minute_start <= $t ORDER BY minute_start, program
+            """;
+        cmd.Parameters.AddWithValue("$a", afterMinute);
+        cmd.Parameters.AddWithValue("$t", throughMinute);
+        var rows = new List<(long, ProgramEnergy)>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            rows.Add((r.GetInt64(0), new ProgramEnergy(r.GetString(1), r.GetDouble(2), r.GetDouble(3), r.GetDouble(4))));
+        return rows;
+    }
+
+    /// <summary>The highest the sensors' total reached, per minute, for the minutes after <paramref name="afterMinute"/> up to and including <paramref name="throughMinute"/>.</summary>
+    public IReadOnlyDictionary<long, double> QueryTotalPeaks(long afterMinute, long throughMinute)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT minute_start, watts FROM total_peaks WHERE minute_start > $a AND minute_start <= $t";
+        cmd.Parameters.AddWithValue("$a", afterMinute);
+        cmd.Parameters.AddWithValue("$t", throughMinute);
+        var peaks = new Dictionary<long, double>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) peaks[r.GetInt64(0)] = r.GetDouble(1);
+        return peaks;
+    }
+
+    /// <summary>The gaps that ended after <paramref name="after"/> and by <paramref name="through"/>, whole (not clipped), oldest first.</summary>
+    public IReadOnlyList<Gap> QueryGapsEndingBetween(DateTimeOffset after, DateTimeOffset through)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT start_ms, end_ms, reason, plug_kwh FROM gaps WHERE end_ms > $a AND end_ms <= $t ORDER BY start_ms";
+        cmd.Parameters.AddWithValue("$a", after.ToUnixTimeMilliseconds());
+        cmd.Parameters.AddWithValue("$t", through.ToUnixTimeMilliseconds());
+        var gaps = new List<Gap>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            gaps.Add(new Gap(
+                DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(0)), DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(1)),
+                (GapReason)r.GetInt32(2), r.IsDBNull(3) ? null : r.GetDouble(3)));
+        return gaps;
+    }
+
     private static string? GetMeta(SqliteConnection c, string key)
     {
         using var cmd = c.CreateCommand();

@@ -95,8 +95,12 @@ func (s *Store) CreateComputer(ctx context.Context, name string, sourceID *strin
 	return s.Computer(ctx, id)
 }
 
-// ensureComputerForSource makes sure a computer reports through sourceID: the first time a PC collector pushes, a computer
-// named after it is added, so there is something to tie plugs to. An existing one is left alone.
+// ensureComputerForSource makes sure a computer reports through sourceID. The first time a PC collector pushes:
+//   - if a computer already reports through it, nothing changes (a rename, or plugs tied to it, are left alone);
+//   - if there is exactly one computer in all and it has no collector, the collector adopts it (the user made the computer and
+//     tied its plugs first, and this is plainly that PC);
+//   - otherwise a computer named after the collector is added, so there is something to tie plugs to. Two computers are never
+//     merged on a guess.
 func ensureComputerForSource(ctx context.Context, q querier, sourceID, name string) error {
 	var have string
 	err := q.QueryRowContext(ctx, `SELECT id FROM computers WHERE source_id = ?`, sourceID).Scan(&have)
@@ -106,6 +110,17 @@ func ensureComputerForSource(ctx context.Context, q querier, sourceID, name stri
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
+
+	var total int
+	var lone, loneSource sql.NullString
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*), MIN(id), MIN(source_id) FROM computers`).Scan(&total, &lone, &loneSource); err != nil {
+		return err
+	}
+	if total == 1 && lone.Valid && !loneSource.Valid {
+		_, err := q.ExecContext(ctx, `UPDATE computers SET source_id = ? WHERE id = ?`, sourceID, lone.String)
+		return err
+	}
+
 	if strings.TrimSpace(name) == "" {
 		name = sourceID
 	}

@@ -132,9 +132,10 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   - **Appliance groups.** An entertainment center runs through two plugs (one per power strip), and the display should show it as one thing:
     group any plugs under a name and show their combined energy and cost, never changing what each plug records. A group is plain on/off,
     unlike a computer, which has the full breakdown. Not built; a computer already groups a wall plug and its peripherals this way.
-  - **The C# relay client**: a worker in the collector that replays new minutes, programs and gaps from `history.db` to
-    `POST /api/v1/ingest/pc` (watermark in `meta`, only whole minutes, batches of at most 1440, a `relay.json` with the box's host and port,
-    a stable source id and the machine name). The server side exists and is tested; nothing sends to it yet.
+  - **The C# relay client** is built (`RelayFeed`, `relay.json`; see CLAUDE.md) and tested against a fake server and the contract's field
+    names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
+    `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the
+    PC under Appliances. No window setting for it yet (the window is frozen).
   - Carbon footprint and the OpenEI tariff lookup in Go; the Refoss mapping (run `refoss-probe` first); the Electron viewer.
   - Other plug brands (the entertainment center's are not Shelly): a source per brand behind the same `Source` interface (Tasmota, and Matter plugs through Home Assistant).
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
