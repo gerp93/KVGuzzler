@@ -37,6 +37,24 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
+## Deploying to the Linux box
+
+```bash
+scripts/deploy-server.sh            # target and settings come from ~/.config/kvguzzler/deploy.env
+scripts/deploy-server.sh --unit     # also install server/deploy/housed.service if it differs
+scripts/deploy-server.sh --env      # also write the box's /etc/housed/housed.env from your HOUSED_* settings
+```
+
+It builds the dashboard and a `linux/amd64` binary (the commit id is its version), copies it over SSH, keeps the old binary as
+`/usr/local/bin/housed.previous`, restarts the `housed` service, and checks that the new version answers on the LAN, putting the
+old binary back if it does not. The database is never touched. Rollback restores the binary only, not a changed unit or settings file.
+
+**Where settings live.** Nothing about one site is in the repository:
+
+- On your PC, `~/.config/kvguzzler/deploy.env` (outside the repo; `scripts/deploy.env.example` shows the fields): the box's `user@host`, the port, and the server settings.
+- On the box, `/etc/housed/housed.env`: `HOUSED_TZ` (which calendar day a bill or "day" bucket belongs to), and optionally `HOUSED_LISTEN` and `HOUSED_DATA`. The unit file in `server/deploy/` carries only plain defaults and reads that file. A command-line flag still wins over the environment.
+- Secrets are not kept in files at all: an API key (Electricity Maps, EIA, OpenEI) is typed into the dashboard once and stored in the database on the box.
+
 ## First call to a Refoss monitor
 
 ```bash

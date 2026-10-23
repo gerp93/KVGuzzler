@@ -25,11 +25,21 @@ import (
 // version is set at build time (-ldflags "-X main.version=...").
 var version = "dev"
 
+// envOr is the value of an environment variable, or def when it is unset or empty. It lets a service be configured from an
+// environment file on the machine (HOUSED_LISTEN, HOUSED_DATA, HOUSED_TZ) instead of from command-line flags in a unit file
+// that is kept in the repository. A flag given on the command line still wins.
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
 func main() {
-	listen := flag.String("listen", ":8080", "address to serve the API on")
-	data := flag.String("data", "data", "folder for house.db")
+	listen := flag.String("listen", envOr("HOUSED_LISTEN", ":8080"), "address to serve the API on (env HOUSED_LISTEN)")
+	data := flag.String("data", envOr("HOUSED_DATA", "data"), "folder for house.db (env HOUSED_DATA)")
 	simulate := flag.Bool("sim", false, "poll a made-up house instead of real devices (no hardware needed)")
-	tz := flag.String("tz", "", `IANA time zone for "day" buckets and bill dates, e.g. America/Chicago (default: this machine's)`)
+	tz := flag.String("tz", envOr("HOUSED_TZ", ""), `IANA time zone for "day" buckets and bill dates, e.g. America/Chicago (env HOUSED_TZ; default: this machine's)`)
 	flag.Parse()
 
 	loc := time.Local

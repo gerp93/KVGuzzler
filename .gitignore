@@ -8,3 +8,7 @@ obj/
 publish/
 Releases/
 releases/
+
+# Deployment settings live outside the repo (see scripts/deploy.env.example); never commit a real one.
+deploy.env
+*.local.env
