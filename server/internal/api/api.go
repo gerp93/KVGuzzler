@@ -66,6 +66,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
+	mux.HandleFunc("GET /api/v1/groups", s.listGroups)
+	mux.HandleFunc("POST /api/v1/groups", s.addGroup)
+	mux.HandleFunc("PATCH /api/v1/groups/{groupId}", s.renameGroup)
+	mux.HandleFunc("DELETE /api/v1/groups/{groupId}", s.removeGroup)
+	mux.HandleFunc("GET /api/v1/groups/{groupId}/detail", s.groupDetail)
 	mux.HandleFunc("GET /api/v1/computers", s.listComputers)
 	mux.HandleFunc("POST /api/v1/computers", s.addComputer)
 	mux.HandleFunc("PATCH /api/v1/computers/{computerId}", s.updateComputer)
@@ -186,11 +191,12 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		Label      *string         `json:"label"`
 		Enabled    *bool           `json:"enabled"`
 		ComputerID json.RawMessage `json:"computer_id"` // a computer's id, or null to let the plug go; absent leaves it alone
+		GroupID    json.RawMessage `json:"group_id"`    // an appliance group's id, or null to take the plug out; absent leaves it alone
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled and/or computer_id")
+	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id and/or group_id")
 		return
 	}
 	if body.Label != nil {
@@ -209,10 +215,21 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var groupID *string
+	if body.GroupID != nil {
+		if err := json.Unmarshal(body.GroupID, &groupID); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "group_id is a group's id or null")
+			return
+		}
+	}
+
 	id := r.PathValue("channelId")
 	ch, err := s.Store.UpdateChannel(r.Context(), id, body.Label, body.Enabled)
 	if err == nil && body.ComputerID != nil {
 		ch, err = s.Store.AssignChannel(r.Context(), id, computerID)
+	}
+	if err == nil && body.GroupID != nil {
+		ch, err = s.Store.AssignChannelToGroup(r.Context(), id, groupID)
 	}
 	switch {
 	case err == nil:
@@ -397,7 +414,7 @@ func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to 
 	if err != nil {
 		return model.ChannelSummary{}, rates.RatedCost{}, err
 	}
-	cs := model.ChannelSummary{ChannelID: ch.ID, ComputerID: ch.ComputerID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
+	cs := model.ChannelSummary{ChannelID: ch.ID, ComputerID: ch.ComputerID, GroupID: ch.GroupID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
 	if t.MonitoredHours > 0 {
 		peak := t.PeakWatts
 		cs.PeakWatts = &peak
@@ -453,6 +470,129 @@ func (s *Server) ingestPc(w http.ResponseWriter, r *http.Request) {
 		notes = []string{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"api_version": Version, "accepted": accepted, "notes": notes})
+}
+
+func groupError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeProblem(w, http.StatusNotFound, "unknown_group", "no such group")
+	case errors.Is(err, store.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "bad_group", err.Error())
+	case errors.Is(err, store.ErrConflict):
+		writeProblem(w, http.StatusConflict, "group_conflict", err.Error())
+	default:
+		serverError(w, err)
+	}
+}
+
+func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
+	all, err := s.Store.Groups(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"groups": all})
+}
+
+func decodeName(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_group", "send a name")
+		return "", false
+	}
+	return body.Name, true
+}
+
+func (s *Server) addGroup(w http.ResponseWriter, r *http.Request) {
+	name, ok := decodeName(w, r)
+	if !ok {
+		return
+	}
+	g, err := s.Store.CreateGroup(r.Context(), name)
+	if err != nil {
+		groupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, g)
+}
+
+func (s *Server) renameGroup(w http.ResponseWriter, r *http.Request) {
+	name, ok := decodeName(w, r)
+	if !ok {
+		return
+	}
+	g, err := s.Store.RenameGroup(r.Context(), r.PathValue("groupId"), name)
+	if err != nil {
+		groupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, g)
+}
+
+func (s *Server) removeGroup(w http.ResponseWriter, r *http.Request) {
+	if err := s.Store.DeleteGroup(r.Context(), r.PathValue("groupId")); err != nil {
+		groupError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// groupDetail is a group's energy and cost for a period: each plug on its own and their total. The plugs are all ordinary plugs
+// (one scope), so the total is a sound sum; a plug the user has hidden is neither shown nor counted.
+func (s *Server) groupDetail(w http.ResponseWriter, r *http.Request) {
+	from, to, err := parsePeriod(r)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+		return
+	}
+	g, err := s.Store.Group(r.Context(), r.PathValue("groupId"))
+	if err != nil {
+		groupError(w, err)
+		return
+	}
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	schedule := cfg.Schedule(s.Loc)
+	_, byID, err := s.enabledChannels(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	detail := model.GroupDetail{Group: g, From: from.UTC(), To: to.UTC(), Members: []model.ChannelSummary{}}
+	var cost rates.Money
+	priced := true
+	for _, id := range g.ChannelIDs {
+		ch, ok := byID[id]
+		if !ok || !ch.Enabled {
+			continue
+		}
+		cs, rc, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		detail.Members = append(detail.Members, cs)
+		detail.TotalKWh += cs.KWh
+		if rc.Unpriced {
+			priced = false
+		} else {
+			cost = cost.Add(rc.Cost)
+			detail.CostEstimated = detail.CostEstimated || rc.Estimated
+		}
+	}
+	if priced && len(detail.Members) > 0 {
+		c := cost.String()
+		detail.TotalCost = &c
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 func (s *Server) listComputers(w http.ResponseWriter, r *http.Request) {

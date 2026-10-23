@@ -1,17 +1,19 @@
 import { api } from './api';
 import { ApplianceView } from './ApplianceView';
 import { ComputerView } from './ComputerView';
+import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import {
   applianceList, formatKwh, formatMoney, periodRange,
-  type Channel, type Computer, type PeriodKey, type Summary,
+  type ApplianceGroup, type Channel, type Computer, type PeriodKey, type Summary,
 } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
   summary: Summary;
   computers: Computer[];
+  groups: ApplianceGroup[];
 }
 
 /** The Appliances tab: a list, and one thing open at a time (an ordinary appliance, or a computer with its full breakdown). */
@@ -19,6 +21,7 @@ export function AppliancesView({ channels, open }: { channels: Channel[]; open: 
   const [kind, id] = open;
   if (kind === 'computer' && id) return <ComputerView id={id} channels={channels} />;
   if (kind === 'channel' && id) return <ApplianceView id={id} channels={channels} />;
+  if (kind === 'group' && id) return <GroupView id={id} channels={channels} />;
   return <AppliancesList channels={channels} />;
 }
 
@@ -27,16 +30,16 @@ function AppliancesList({ channels }: { channels: Channel[] }) {
   const { data, error } = usePoll<Loaded>(
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
-      const [summary, computers] = await Promise.all([api.summary(from, to), api.computers()]);
-      return { summary, computers };
+      const [summary, computers, groups] = await Promise.all([api.summary(from, to), api.computers(), api.groups()]);
+      return { summary, computers, groups };
     },
     60_000,
     [period, channels],
   );
 
-  const list = data ? applianceList(data.summary, channels, data.computers) : undefined;
+  const list = data ? applianceList(data.summary, channels, data.computers, data.groups) : undefined;
   const estimated = data?.summary.cost_estimated;
-  const top = Math.max(0, ...(list?.appliances.map((a) => a.channel.kwh) ?? []), data?.summary.unmetered_kwh ?? 0);
+  const top = Math.max(0, ...(list?.appliances.map((a) => a.kwh) ?? []), data?.summary.unmetered_kwh ?? 0);
   const topComputer = Math.max(0, ...(list?.computers.map((c) => c.wall?.kwh ?? 0) ?? []));
 
   return (
@@ -67,14 +70,14 @@ function AppliancesList({ channels }: { channels: Channel[] }) {
           {list.appliances.length === 0 && <p class="note">No appliances on a clamp or plug yet.</p>}
           <ul class="bars wide">
             {list.appliances.map((a) => (
-              <li key={a.channel.channel_id}>
-                <a class="rowlink" href={routePath('appliances', 'channel', a.channel.channel_id)}>
-                  <span class="name">{a.label}</span>
+              <li key={`${a.kind}-${a.id}`}>
+                <a class="rowlink" href={routePath('appliances', a.kind, a.id)}>
+                  <span class="name" title={a.label}>{a.label}</span>
                   <span class="bar" aria-hidden="true">
-                    <i style={{ width: `${top > 0 ? (a.channel.kwh / top) * 100 : 0}%` }} />
+                    <i style={{ width: `${top > 0 ? (a.kwh / top) * 100 : 0}%` }} />
                   </span>
-                  <span class="num">{formatKwh(a.channel.kwh)}</span>
-                  <span class="num cost">{a.channel.cost != null ? formatMoney(a.channel.cost, estimated) : ''}</span>
+                  <span class="num">{formatKwh(a.kwh)}</span>
+                  <span class="num cost">{a.cost != null ? formatMoney(a.cost, estimated) : ''}</span>
                 </a>
               </li>
             ))}
@@ -95,7 +98,7 @@ function AppliancesList({ channels }: { channels: Channel[] }) {
             {list.computers.map(({ computer, wall }) => (
               <li key={computer.id}>
                 <a class="rowlink" href={routePath('appliances', 'computer', computer.id)}>
-                  <span class="name">{computer.name}</span>
+                  <span class="name" title={computer.name}>{computer.name}</span>
                   <span class="bar" aria-hidden="true">
                     <i style={{ width: `${topComputer > 0 ? ((wall?.kwh ?? 0) / topComputer) * 100 : 0}%` }} />
                   </span>

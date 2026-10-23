@@ -156,13 +156,13 @@ main {
 
 .bars li {
   display: grid;
-  grid-template-columns: minmax(0, 8rem) 1fr auto;
+  grid-template-columns: minmax(0, 10rem) 1fr auto;
   align-items: center;
   gap: 8px;
 }
 
 .bars.wide li {
-  grid-template-columns: minmax(0, 8rem) 1fr auto auto;
+  grid-template-columns: minmax(0, 10rem) 1fr auto auto;
 }
 
 .bars .name {
@@ -397,7 +397,7 @@ select:focus-visible {
 
 .bars a.rowlink {
   display: grid;
-  grid-template-columns: minmax(0, 8rem) 1fr auto;
+  grid-template-columns: minmax(0, 10rem) 1fr auto;
   align-items: center;
   gap: 8px;
   margin: -4px -6px;
@@ -408,7 +408,7 @@ select:focus-visible {
 }
 
 .bars.wide a.rowlink {
-  grid-template-columns: minmax(0, 8rem) 1fr auto auto;
+  grid-template-columns: minmax(0, 10rem) 1fr auto auto;
 }
 
 .bars a.rowlink:hover,

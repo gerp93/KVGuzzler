@@ -36,6 +36,7 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/api` | Status, devices (add, remove), channels (rename, hide, tie to a computer), computers (add, rename, remove, detail), live, series, summary, rates, the PC push. |
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/pcrelay` | What the PC collector pushes (`POST /api/v1/ingest/pc`) and the checks it must pass: impossible readings dropped and said so, a different major version refused. |
+| `internal/store` (groups) | Appliance groups: several ordinary plugs shown as one appliance; a plug is in a group or tied to a computer, not both. |
 | `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
 ## Deploying to the Linux box

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { Channel, Computer, ComputerDetail, Device, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
+import type { ApplianceGroup, Channel, Computer, ComputerDetail, Device, GroupDetail, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -52,6 +52,22 @@ export const api = {
       body: JSON.stringify(nd),
     }),
   removeDevice: (id: string) => request<void>(`api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  groups: () => request<{ groups: ApplianceGroup[] }>('api/v1/groups').then((r) => r.groups),
+  groupDetail: (id: string, from: string, to: string) =>
+    request<GroupDetail>(`api/v1/groups/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
+  addGroup: (name: string) =>
+    request<ApplianceGroup>('api/v1/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  renameGroup: (id: string, name: string) =>
+    request<ApplianceGroup>(`api/v1/groups/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  removeGroup: (id: string) => request<void>(`api/v1/groups/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   computers: () => request<{ computers: Computer[] }>('api/v1/computers').then((r) => r.computers),
   computerDetail: (id: string, from: string, to: string) =>
     request<ComputerDetail>(`api/v1/computers/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
@@ -75,7 +91,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null }) =>
+  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null }) =>
     request<Channel>(`api/v1/channels/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

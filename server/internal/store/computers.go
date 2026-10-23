@@ -308,6 +308,9 @@ func (s *Store) AssignChannel(ctx context.Context, channelID string, computerID 
 	if ch.Scope != model.ScopePC && ch.Scope != model.ScopePlug {
 		return model.Channel{}, invalid("Only a smart plug can belong to a computer, not a %s channel.", ch.Scope)
 	}
+	if ch.GroupID != nil {
+		return model.Channel{}, conflict("%s is part of a group. Take it out of the group first.", ch.Label)
+	}
 	comp, err := s.Computer(ctx, *computerID)
 	if errors.Is(err, ErrNotFound) {
 		return model.Channel{}, invalid("There is no such computer.")

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applianceList, circuitsByWatts, formatDuration, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type Channel, type Computer, type PcComponent, type Reading, type Series, type Summary,
+  type ApplianceGroup, type Channel, type Computer, type PcComponent, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -128,18 +128,34 @@ describe('the Appliances list', () => {
     from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
     channels: [
       { channel_id: 'mains-a', scope: 'mains', kwh: 20, monitored_hours: 1 },
-      { channel_id: 'dryer', scope: 'circuit', kwh: 6, monitored_hours: 1 },
+      { channel_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
       { channel_id: 'fridge', scope: 'plug', kwh: 2, monitored_hours: 1 },
       { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 5, monitored_hours: 1 },
       { channel_id: 'monitor', computer_id: 'comp-1', scope: 'plug', kwh: 1, monitored_hours: 1 },
+      { channel_id: 'strip-1', group_id: 'grp-1', scope: 'plug', kwh: 3, cost: '0.45', monitored_hours: 1 },
+      { channel_id: 'strip-2', group_id: 'grp-1', scope: 'plug', kwh: 1.5, cost: '0.23', monitored_hours: 1 },
     ],
   };
-  const channels = ['dryer', 'fridge', 'wall', 'monitor'].map((id) => ch(id, 'plug'));
+  const channels = ['dryer', 'fridge', 'wall', 'monitor', 'strip-1', 'strip-2'].map((id) => ch(id, 'plug'));
   const computer = (id: string, wall?: string): Computer => ({ id, name: id, peripheral_channel_ids: [], wall_channel_id: wall ?? null });
+  const group: ApplianceGroup = { id: 'grp-1', name: 'Entertainment center', channel_ids: ['strip-1', 'strip-2'] };
 
-  it('lists ordinary appliances without the ones that belong to a computer, and not the house', () => {
-    const list = applianceList(summary, channels, [computer('comp-1', 'wall')]);
-    expect(list.appliances.map((r) => r.channel.channel_id)).toEqual(['dryer', 'fridge']);
+  it('lists ordinary appliances without the plugs that belong to a computer or a group, and not the house', () => {
+    const list = applianceList(summary, channels, [computer('comp-1', 'wall')], [group]);
+    expect(list.appliances.map((r) => [r.kind, r.id])).toEqual([['channel', 'dryer'], ['group', 'grp-1'], ['channel', 'fridge']]);
+  });
+
+  it('shows a group once, as the sum of its plugs, with a cost only when every plug has one', () => {
+    const row = applianceList(summary, channels, [], [group]).appliances.find((r) => r.kind === 'group')!;
+    expect(row).toMatchObject({ label: 'Entertainment center', kwh: 4.5, cost: '0.68' });
+
+    const partly: Summary = { ...summary, channels: summary.channels.map((c) => (c.channel_id === 'strip-2' ? { ...c, cost: null } : c)) };
+    expect(applianceList(partly, channels, [], [group]).appliances.find((r) => r.kind === 'group')!.cost).toBeNull();
+  });
+
+  it('leaves out a group with no plugs reporting', () => {
+    const empty: ApplianceGroup = { id: 'grp-2', name: 'Nothing', channel_ids: [] };
+    expect(applianceList(summary, channels, [], [empty]).appliances.some((r) => r.id === 'grp-2')).toBe(false);
   });
 
   it('lists a computer with its wall plug figure, biggest first, and one with no wall plug last', () => {
