@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applianceList, circuitsByWatts, formatAge, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcLiveReading, type Reading, type Series, type Summary,
+  applianceList, BASELINE, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -225,5 +225,51 @@ describe('the inside-the-PC chart', () => {
     expect(gapShades([{ from: '2026-10-22T12:00:00Z', to: '2026-10-22T12:10:00Z' }, { from: '2026-10-22T13:00:00Z', to: '2026-10-22T13:00:00Z' }])).toEqual([
       { from: Date.parse('2026-10-22T12:00:00Z') / 1000, to: Date.parse('2026-10-22T12:10:00Z') / 1000 },
     ]);
+  });
+});
+
+const prog = (name: string, cpu: number, gpu: number, active = 0, cost: string | null = null): PcProgramTotal => ({
+  name, cpu_kwh: cpu, gpu_kwh: gpu, kwh: cpu + gpu, active_seconds: active, cost,
+});
+
+describe('programs over a period', () => {
+  const totals = [
+    prog(BASELINE, 0.05, 0.02),
+    prog('python.exe (ComfyUI)', 0.1, 0.4, 3600, '0.10'),
+    prog(UNATTRIBUTED, 0.001, 0),
+    prog('chrome.exe', 0.02, 0, 120, '0.004'),
+    prog('tiny-a.exe', 0.00001, 0, 3, '0.00000'),
+    prog('tiny-b.exe', 0.00002, 0, 5, '0.00001'),
+  ];
+
+  it('lists programs biggest first, rolls the tiny ones into one line, and ends with the two rows that belong to no program', () => {
+    const rows = programRows(totals, null);
+    expect(rows.map((r) => r.name)).toEqual(['python.exe (ComfyUI)', 'chrome.exe', '2 smaller programs', BASELINE, UNATTRIBUTED]);
+    expect(rows.map((r) => r.kind)).toEqual(['program', 'program', 'rollup', 'baseline', 'unattributed']);
+    expect(rows[0]!.note).toBe('GPU 0.40 kWh · CPU 0.10 kWh · active 1 h');
+    expect(rows[2]!.cost).toBe('0.00'); // 0.00000 + 0.00001, shown as the sum of the two
+  });
+
+  it('shares the yardstick: the whole PC when it is known, else what the CPU and GPU used', () => {
+    const own = programRows(totals, null);
+    expect(own[0]!.share).toBeCloseTo(0.5 / 0.59101, 4);
+    const wall = programRows(totals, 5);
+    expect(wall[0]!.share).toBeCloseTo(0.1, 6);
+    expect(wall.every((r) => r.share >= 0 && r.share <= 1)).toBe(true);
+  });
+
+  it('splits into programs, baseline, not attributed and, with the wall known, everything else', () => {
+    const noWall = programSplit(totals, null);
+    expect(noWall.map((p) => p.kind)).toEqual(['programs', 'baseline', 'unattributed']);
+    const wall = programSplit(totals, 5);
+    expect(wall.map((p) => p.kind)).toEqual(['programs', 'baseline', 'unattributed', 'rest']);
+    expect(wall[3]!.kwh).toBeCloseTo(5 - 0.52003 - 0.07 - 0.001, 5);
+    // a wall figure a hair under what the parts add up to is not shown as a negative rest
+    expect(programSplit(totals, 0.5).some((p) => p.kind === 'rest')).toBe(false);
+  });
+
+  it('names a program with the many-small-programs label', () => {
+    const rows = programRows([prog(OTHERS, 0.01, 0, 90)], null);
+    expect(rows[0]!.note).toBe('many small programs together · active up to 2 min');
   });
 });

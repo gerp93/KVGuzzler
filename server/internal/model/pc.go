@@ -20,6 +20,8 @@ type PcProgramTotal struct {
 	GPUKwh        float64 `json:"gpu_kwh"`
 	KWh           float64 `json:"kwh"`
 	ActiveSeconds float64 `json:"active_seconds"`
+	// Cost is the energy at the period's average price per kWh; null when no price is known. An estimate, like the energy.
+	Cost *string `json:"cost"`
 }
 
 type PcGap struct {
@@ -63,6 +65,8 @@ type PcRun struct {
 	GPUKwh        float64   `json:"gpu_kwh"`
 	ActiveSeconds float64   `json:"active_seconds"`
 	StillRunning  bool      `json:"still_running"`
+	// Cost is the run's energy at the price on the day it ended; null when no price is known.
+	Cost *string `json:"cost"`
 }
 
 // PcSeriesLine is one reading of the PC over time. Lines are never added together: the wall line already contains the sensors, and a

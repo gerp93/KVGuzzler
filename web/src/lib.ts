@@ -24,6 +24,7 @@ export type PcLive = S['PcLive'];
 export type PcLiveReading = S['PcLiveReading'];
 export type PcLiveProgram = S['PcLiveProgram'];
 export type PcRun = S['PcRun'];
+export type PcProgramTotal = S['PcProgramTotal'];
 export type PcSeries = S['PcSeries'];
 export type PcSeriesLine = S['PcSeriesLine'];
 export type Device = S['Device'];
@@ -347,4 +348,84 @@ export function pcLineStyle(line: Pick<PcSeriesLine, 'scope' | 'kind'>, index: n
 /** The gaps of a PC series as the seconds-since-epoch stretches the chart shades. */
 export function gapShades(gaps: Pick<PcGap, 'from' | 'to'>[]): { from: number; to: number }[] {
   return gaps.map((g) => ({ from: Date.parse(g.from) / 1000, to: Date.parse(g.to) / 1000 })).filter((g) => g.to > g.from);
+}
+
+/** The names the PC's collector gives the energy that belongs to no program. */
+export const BASELINE = '(system baseline)';
+export const UNATTRIBUTED = '(not attributed)';
+export const OTHERS = '(other small programs)';
+
+/** A program that caused less than this (0.05 Wh) over the period is not listed on its own. */
+export const MIN_LISTED_KWH = 0.00005;
+export const MAX_LISTED_PROGRAMS = 25;
+
+export interface ProgramRow {
+  name: string;
+  kwh: number;
+  cost: string | null;
+  /** What the row is, in words under its name. */
+  note: string;
+  /** Share of the yardstick, 0 to 1. */
+  share: number;
+  kind: 'program' | 'baseline' | 'unattributed' | 'rollup';
+}
+
+const isSpecial = (p: Pick<PcProgramTotal, 'name'>) => p.name === BASELINE || p.name === UNATTRIBUTED;
+
+/** Programs biggest first (those under 0.05 Wh rolled into one line), then the two rows that belong to no program. A share is of the
+ * whole PC at the wall when that is known, else of the CPU and GPU energy the programs were shared out of. */
+export function programRows(programs: PcProgramTotal[], wholeKwh: number | null | undefined, max = MAX_LISTED_PROGRAMS): ProgramRow[] {
+  const sum = (list: PcProgramTotal[]) => list.reduce((t, p) => t + p.kwh, 0);
+  const yardstick = wholeKwh != null && wholeKwh > 0 ? wholeKwh : sum(programs);
+  const share = (kwh: number) => (yardstick > 0 ? Math.min(1, Math.max(0, kwh / yardstick)) : 0);
+  const both = (p: PcProgramTotal) => `GPU ${formatKwh(p.gpu_kwh)} · CPU ${formatKwh(p.cpu_kwh)}`;
+
+  const row = (p: PcProgramTotal): ProgramRow => {
+    const active = p.active_seconds ?? 0;
+    if (p.name === BASELINE)
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: "the CPU's and GPU's idle power, not any program's doing", share: share(p.kwh), kind: 'baseline' };
+    if (p.name === UNATTRIBUTED)
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: 'power above idle that no program reported using', share: share(p.kwh), kind: 'unattributed' };
+    if (p.name === OTHERS)
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: `many small programs together${active > 0 ? ` · active up to ${formatDuration(active)}` : ''}`, share: share(p.kwh), kind: 'program' };
+    return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: both(p) + (active > 0 ? ` · active ${formatDuration(active)}` : ''), share: share(p.kwh), kind: 'program' };
+  };
+
+  const ranked = programs.filter((p) => !isSpecial(p)).sort((a, b) => b.kwh - a.kwh);
+  const shown = ranked.filter((p) => p.kwh >= MIN_LISTED_KWH).slice(0, max);
+  const rest = ranked.slice(shown.length);
+  const rows = shown.map(row);
+  if (rest.length > 0) {
+    const kwh = sum(rest);
+    rows.push({
+      name: `${rest.length} smaller program${rest.length === 1 ? '' : 's'}`, kwh, cost: sumMoney(rest.map((p) => p.cost)),
+      note: 'none of them caused enough to list on its own', share: share(kwh), kind: 'rollup',
+    });
+  }
+  rows.push(...programs.filter(isSpecial).map(row));
+  return rows;
+}
+
+export interface SplitPart {
+  label: string;
+  kwh: number;
+  kind: 'programs' | 'baseline' | 'unattributed' | 'rest';
+}
+
+/** The CPU and GPU energy split into the programs, the idle baseline and what no program claimed; with the whole PC known, the rest of it
+ * (fans, drives, memory, power-supply loss) is the last piece. Parts that are nothing are left out. */
+export function programSplit(programs: PcProgramTotal[], wholeKwh: number | null | undefined): SplitPart[] {
+  const total = (pred: (p: PcProgramTotal) => boolean) => programs.filter(pred).reduce((t, p) => t + p.kwh, 0);
+  const named = total((p) => !isSpecial(p));
+  const baseline = total((p) => p.name === BASELINE);
+  const unattributed = total((p) => p.name === UNATTRIBUTED);
+  const parts: SplitPart[] = [
+    { label: 'Programs', kwh: named, kind: 'programs' },
+    { label: 'Idle baseline', kwh: baseline, kind: 'baseline' },
+    { label: 'Not attributed', kwh: unattributed, kind: 'unattributed' },
+  ];
+  // The sensors and the plug are read a moment apart, so the rest can come out a hair negative: show it only when it is real.
+  const rest = wholeKwh != null ? wholeKwh - (named + baseline + unattributed) : 0;
+  if (rest > 0) parts.push({ label: 'Everything else', kwh: rest, kind: 'rest' });
+  return parts.filter((p) => p.kwh > 0);
 }

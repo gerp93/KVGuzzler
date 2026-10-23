@@ -179,3 +179,35 @@ func TestTheComputerSeriesHasALinePerPartAndGapsAnd204WithoutACollector(t *testi
 		}
 	}
 }
+
+func TestProgramsAndRunsAreEstimatedAtTheSavedPriceAndLeftUnpricedWithoutOne(t *testing.T) {
+	clock := time.Date(2026, 10, 22, 19, 0, 0, 0, time.UTC)
+	srv := movingServer(t, &clock)
+	postBody(t, srv.URL+"/api/v1/ingest/pc", contractExample(t, "ingest-pc.json"))
+
+	d := detailOf(t, srv)
+	for _, p := range d.PC.Programs {
+		if p.Cost != nil {
+			t.Errorf("%s priced as %s with no rate saved", p.Name, *p.Cost)
+		}
+	}
+	if d.PC.Runs[0].Cost != nil {
+		t.Errorf("run priced with no rate saved: %s", *d.PC.Runs[0].Cost)
+	}
+
+	if r, body := put(t, srv.URL+"/api/v1/rates", `{"mode":"one","fixed_rate":"0.20"}`); r.StatusCode != 200 {
+		t.Fatalf("set rate: %d %s", r.StatusCode, body)
+	}
+	d = detailOf(t, srv)
+	byName := map[string]model.PcProgramTotal{}
+	for _, p := range d.PC.Programs {
+		byName[p.Name] = p
+	}
+	comfy := byName["python.exe (ComfyUI)"]
+	if comfy.Cost == nil || *comfy.Cost != "0.00062" { // (0.0011 + 0.002) kWh at $0.20
+		t.Errorf("program cost = %v, want 0.00062", comfy.Cost)
+	}
+	if run := d.PC.Runs[0]; run.Cost == nil || *run.Cost != "0.0324" { // (0.021 + 0.141) kWh at $0.20
+		t.Errorf("run cost = %v, want 0.0324", run.Cost)
+	}
+}

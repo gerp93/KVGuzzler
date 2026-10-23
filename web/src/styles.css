@@ -463,3 +463,69 @@ select:focus-visible {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* The CPU and GPU energy split into programs, idle and the rest */
+.split {
+  display: flex;
+  height: 14px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--color-border);
+}
+
+.split .part {
+  display: block;
+  height: 100%;
+}
+
+.part.programs,
+.swatch.programs {
+  background: var(--color-accent-blue);
+}
+
+.part.baseline,
+.swatch.baseline {
+  background: var(--color-accent-muted);
+}
+
+.part.unattributed,
+.swatch.unattributed {
+  background: var(--color-accent-red);
+}
+
+.part.rest,
+.swatch.rest {
+  background: var(--color-text-muted);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.caption.block {
+  display: block;
+  margin: 0;
+}
+
+details {
+  margin-top: 8px;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}

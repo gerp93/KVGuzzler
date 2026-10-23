@@ -1097,6 +1097,9 @@ components:
           minimum: 0
         still_running:
           type: boolean
+        cost:
+          type: [string, 'null']
+          description: A money string, the run's energy at the price on the day it ended; null when no price is known. In a push this is not sent (the server prices it).
     PcSeriesLine:
       type: object
       required: [name, scope, kind, points]
@@ -1351,6 +1354,9 @@ components:
           description: cpu_kwh plus gpu_kwh. An estimate.
         active_seconds:
           type: number
+        cost:
+          type: [string, 'null']
+          description: A money string, the program's energy at the period's average price per kWh; null when no price is known. An estimate.
     PcSource:
       type: object
       required: [source_id, components, programs, gaps]
