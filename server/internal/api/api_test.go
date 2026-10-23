@@ -186,15 +186,6 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 	}
 }
 
-func TestUnbuiltRoutesSayNotImplemented(t *testing.T) {
-	srv, _ := newServer(t, 1)
-	for _, path := range []string{"/api/v1/carbon"} {
-		if r := get(t, srv.URL+path, nil); r.StatusCode != http.StatusNotImplemented {
-			t.Errorf("%s: %d, want 501", path, r.StatusCode)
-		}
-	}
-}
-
 func TestDefaultBucket(t *testing.T) {
 	cases := map[time.Duration]model.Bucket{
 		time.Hour:           model.BucketMinute,

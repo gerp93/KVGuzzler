@@ -75,15 +75,17 @@ type Series struct {
 }
 
 type ChannelSummary struct {
-	ChannelID      string   `json:"channel_id"`
-	ComputerID     *string  `json:"computer_id"`
-	GroupID        *string  `json:"group_id"`
-	Scope          Scope    `json:"scope"`
-	KWh            float64  `json:"kwh"`
-	Cost           *string  `json:"cost"`
-	CarbonG        *float64 `json:"carbon_g"`
-	PeakWatts      *float64 `json:"peak_watts"`
-	MonitoredHours float64  `json:"monitored_hours"`
+	ChannelID  string   `json:"channel_id"`
+	ComputerID *string  `json:"computer_id"`
+	GroupID    *string  `json:"group_id"`
+	Scope      Scope    `json:"scope"`
+	KWh        float64  `json:"kwh"`
+	Cost       *string  `json:"cost"`
+	CarbonG    *float64 `json:"carbon_g"`
+	// CarbonEstimatedKWh is the part of KWh whose carbon was worked out at an average because its own hour had no saved grid intensity.
+	CarbonEstimatedKWh *float64 `json:"carbon_estimated_kwh"`
+	PeakWatts          *float64 `json:"peak_watts"`
+	MonitoredHours     float64  `json:"monitored_hours"`
 }
 
 type Summary struct {

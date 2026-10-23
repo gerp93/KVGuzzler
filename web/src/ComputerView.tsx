@@ -8,7 +8,7 @@ import { PcLiveCard } from './PcLiveCard';
 import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
-  COUNT_PC, countedTotals, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
+  COUNT_PC, carbonNote, countedTotals, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
   type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
@@ -149,6 +149,9 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
                   : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
               {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
             </p>
+            {counted && carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh) && (
+              <p class="caption">{carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)}</p>
+            )}
             <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
           </section>
 

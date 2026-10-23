@@ -681,7 +681,10 @@ paths:
     put:
       tags: [Settings]
       operationId: setCarbon
-      summary: Save the place and, optionally, a new key. The key is write-only.
+      summary: Save the source, place and, optionally, a new key. The key is write-only.
+      description: |
+        A reading is taken first, and the setup is only kept if it got one, so a wrong key or place is said so at once. A key left out keeps the
+        saved one, but only for the same source: it is never sent to another.
       requestBody:
         required: true
         content:
@@ -697,6 +700,13 @@ paths:
                 $ref: '#/components/schemas/CarbonConfig'
         '400':
           $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: removeCarbon
+      summary: Remove the key and place. The hours already saved are kept.
+      responses:
+        '204':
+          description: Removed.
   /api/v1/ingest/pc:
     post:
       tags: [Ingest]
@@ -1010,7 +1020,10 @@ components:
             - type: 'null'
         carbon_g:
           type: [number, 'null']
-          description: Grams of CO2e, an average-grid estimate (always shown as approximate).
+          description: Grams of CO2e, an average-grid estimate (always shown as approximate). Each hour's energy at that hour's grid intensity; null when no intensity has ever been saved.
+        carbon_estimated_kwh:
+          type: [number, 'null']
+          description: The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity.
         peak_watts:
           type: [number, 'null']
         monitored_hours:
@@ -1180,18 +1193,33 @@ components:
         configured:
           type: boolean
           description: Whether a key is saved. The key itself is never returned.
+        source:
+          type: string
+          enum: [electricitymaps, eia]
+          description: Where the grid's carbon intensity comes from. Electricity Maps (a zone, or latitude and longitude) or the US EIA (a balancing authority like MISO).
         place:
           type: string
-          description: A zone code, or "lat, lon".
+          description: A zone code or "lat, lon" (Electricity Maps), or a balancing authority code (EIA).
         last_outcome:
           type: [string, 'null']
           description: What the last fetch said, in plain language.
         last_fetch:
           type: [string, 'null']
           format: date-time
+        last_grams:
+          type: [number, 'null']
+          description: The latest intensity read, in grams of CO2e per kWh.
+        last_hour:
+          type: [string, 'null']
+          format: date-time
+          description: The hour that reading is for.
     CarbonUpdate:
       type: object
       properties:
+        source:
+          type: string
+          enum: [electricitymaps, eia]
+          description: Default electricitymaps.
         place:
           type: string
         key:
@@ -1401,7 +1429,9 @@ components:
           type: number
         plug_gap_kwh:
           type: number
-          description: Energy the plug's own counter recorded across gaps; already inside kwh.
+          description: |
+            Energy the PC's collector read from its plug's own counter across gaps. Informational: the server reads the plug itself all the time, so the
+            time the PC slept is already in kwh and this is not added to it.
     ComputerHistory:
       type: object
       required: [periods]
@@ -1706,6 +1736,11 @@ components:
           description: Stretches the PC was not sampling (asleep, off, lost power), clipped to the period.
           items:
             $ref: '#/components/schemas/PcGap'
+        carbon_g:
+          type: [number, 'null']
+          description: The carbon of what the PC's sensors measured over the period, like a channel's carbon_g.
+        carbon_estimated_kwh:
+          type: [number, 'null']
         live:
           oneOf:
             - $ref: '#/components/schemas/PcLive'

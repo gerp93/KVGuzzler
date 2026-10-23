@@ -459,10 +459,15 @@ export interface paths {
         };
         /** Carbon-footprint settings and the last outcome of the grid-intensity fetch. Never returns the key. */
         get: operations["getCarbon"];
-        /** Save the place and, optionally, a new key. The key is write-only. */
+        /**
+         * Save the source, place and, optionally, a new key. The key is write-only.
+         * @description A reading is taken first, and the setup is only kept if it got one, so a wrong key or place is said so at once. A key left out keeps the
+         *     saved one, but only for the same source: it is never sent to another.
+         */
         put: operations["setCarbon"];
         post?: never;
-        delete?: never;
+        /** Remove the key and place. The hours already saved are kept. */
+        delete: operations["removeCarbon"];
         options?: never;
         head?: never;
         patch?: never;
@@ -626,8 +631,10 @@ export interface components {
             scope: components["schemas"]["Scope"];
             kwh: number;
             cost?: components["schemas"]["Money"] | null;
-            /** @description Grams of CO2e, an average-grid estimate (always shown as approximate). */
+            /** @description Grams of CO2e, an average-grid estimate (always shown as approximate). Each hour's energy at that hour's grid intensity; null when no intensity has ever been saved. */
             carbon_g?: number | null;
+            /** @description The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity. */
+            carbon_estimated_kwh?: number | null;
             peak_watts?: number | null;
             /** @description Hours inside the period in which this channel actually reported. */
             monitored_hours?: number;
@@ -728,14 +735,31 @@ export interface components {
         CarbonConfig: {
             /** @description Whether a key is saved. The key itself is never returned. */
             configured: boolean;
-            /** @description A zone code, or "lat, lon". */
+            /**
+             * @description Where the grid's carbon intensity comes from. Electricity Maps (a zone, or latitude and longitude) or the US EIA (a balancing authority like MISO).
+             * @enum {string}
+             */
+            source?: "electricitymaps" | "eia";
+            /** @description A zone code or "lat, lon" (Electricity Maps), or a balancing authority code (EIA). */
             place?: string;
             /** @description What the last fetch said, in plain language. */
             last_outcome?: string | null;
             /** Format: date-time */
             last_fetch?: string | null;
+            /** @description The latest intensity read, in grams of CO2e per kWh. */
+            last_grams?: number | null;
+            /**
+             * Format: date-time
+             * @description The hour that reading is for.
+             */
+            last_hour?: string | null;
         };
         CarbonUpdate: {
+            /**
+             * @description Default electricitymaps.
+             * @enum {string}
+             */
+            source?: "electricitymaps" | "eia";
             place?: string;
             /** @description Omit to keep the saved key. */
             key?: string;
@@ -1012,6 +1036,9 @@ export interface components {
             programs: components["schemas"]["PcProgramTotal"][];
             /** @description Stretches the PC was not sampling (asleep, off, lost power), clipped to the period. */
             gaps: components["schemas"]["PcGap"][];
+            /** @description The carbon of what the PC's sensors measured over the period, like a channel's carbon_g. */
+            carbon_g?: number | null;
+            carbon_estimated_kwh?: number | null;
             /** @description The PC's latest readings, or null when it has not sent any. */
             live?: components["schemas"]["PcLive"] | null;
             /** @description Program runs that overlapped the period, still-running first, then newest. */
@@ -1901,6 +1928,24 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    removeCarbon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ingestPc: {

@@ -34,11 +34,18 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - A reading above its channel's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
 - Pricing in the server (`server/internal/rates`) is a **port** of `KVGuzzler.Core.Billing` (bills, flat fees, `RateSchedule`); its tests are
   `BillingTests.cs` ported case for case. A change to a pricing rule goes in both places, with the test in both. Money is exact (`big.Rat`),
-  never a float; bill dates are local calendar days. "One rate", "my bills" and the **OpenEI lookup** exist there (carbon is not ported yet). The lookup is a port of `OpenEiClient`/`Tariff`/`UsageProfile`
+  never a float; bill dates are local calendar days. "One rate", "my bills" and the **OpenEI lookup** exist there (the carbon footprint is ported too, below). The lookup is a port of `OpenEiClient`/`Tariff`/`UsageProfile`
   (`server/internal/openei`, `rates/tariff.go`; the parsing cases are ported one for one): the free API key is saved **write-only** on the server (`PUT /openei`, never
   returned, sent to `api.openei.org` only, never in an error text), the chosen rate is read again by its label (a browser never sends a grid), a tariff over a week old is
   read again (the old one stays if that fails), and a day's price is the grid weighted by the hours the house really uses power (the mains clamps' last 60 days, else the
   computers' wall plugs; learned at most hourly) when the tariff varies by time. `RefreshRates` runs hourly from `housed`. **Not checked against the real service.**
+- **Carbon footprint in the house server** (`server/internal/carbon`, a port of `KVGuzzler.Core.Carbon` with its cases): the grid's intensity per hour from Electricity Maps
+  (`auth-token` header, zone or lat/lon) or the US EIA (generation by fuel for a balancing authority, IPCC life-cycle factors, storage and imports left out, partly reported hours
+  skipped), saved per hour in `carbon_intensity` by a feed run from `housed` (every 30 min, retry after 5 min or an hour when told to slow down, follows the saved setup).
+  `PUT /carbon` takes a reading first and **only keeps a setup that got one**; the key is write-only, kept as plain text in the server database (like the OpenEI key), never
+  returned, never in an error text, and a key left out is reused only for the same source. Each channel and the PC's sensors carry `carbon_g` (each hour's kWh at that hour's
+  intensity, the average of the hours that have one for hours that do not, and `carbon_estimated_kwh` says how much); it is the grid's average, never "what one more kWh would
+  cause", always shown as ≈. The daily CSV gets `pc_co2_kg`/`peripherals_co2_kg` once any intensity was saved. **Not checked against the real services.**
 - Plugs: `server/internal/shelly` is a port of `ShellyPlug` (one read-only GET; a plug often has the PC or a fridge on it, so nothing may
   switch it). A device is read once before it is saved, so a wrong address is refused with 502; a saved device is restored after a restart
   even if it is offline. The PC's own wall plug is added with scope `pc`: a slice, added to nothing.

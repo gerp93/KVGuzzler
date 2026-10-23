@@ -29,6 +29,7 @@ export type PcSeries = S['PcSeries'];
 export type ComputerHistory = S['ComputerHistory'];
 export type ComputerEstimate = S['ComputerEstimate'];
 export type TariffInfo = S['TariffInfo'];
+export type CarbonConfig = S['CarbonConfig'];
 export type TariffCandidate = S['TariffCandidate'];
 export type OpenEiStatus = S['OpenEiStatus'];
 export type AverageUse = S['AverageUse'];
@@ -483,7 +484,6 @@ export function historyDetail(p: PcHistoryPeriod): string {
     parts.push('CPU, GPU and memory sensors only');
   }
   if (p.asleep_seconds > 0) parts.push(`asleep ${formatDuration(p.asleep_seconds)}`);
-  if (p.basis === 'wall' && p.plug_gap_kwh > 0) parts.push(`${formatKwh(p.plug_gap_kwh)} of the whole PC is from the plug's own energy counter, for time the PC was asleep or off`);
   if (p.off_seconds > 0) parts.push(`off ${formatDuration(p.off_seconds)}`);
   if (p.lost_power_seconds > 0) parts.push(`lost power or crashed ${formatDuration(p.lost_power_seconds)}`);
   return parts.join(' · ');
@@ -513,6 +513,10 @@ export interface CountedTotals {
   peakIsBound: boolean;
   /** What is counted, in words: "the whole PC at the wall", "Monitor". */
   parts: string[];
+  /** The carbon of what is counted, in grams of CO2e: each part's own figure added. Null when no counted part has one. */
+  carbonG: number | null;
+  /** The part of the counted energy whose carbon was worked out at an average (its own hour had no saved intensity). */
+  carbonEstimatedKwh: number;
 }
 
 /** What a computer's figures add up to for the things ticked: the PC at its wall plug and the plugs next to it, each a separate device
@@ -523,7 +527,7 @@ export function countedTotals(
   const counted: { summary: ChannelSummary; name: string }[] = [];
   if (detail.wall && !off.has(COUNT_PC)) counted.push({ summary: detail.wall, name: 'the whole PC at the wall' });
   for (const p of detail.peripherals) if (!off.has(p.channel_id)) counted.push({ summary: p, name: label(p.channel_id) });
-  if (counted.length === 0) return { kwh: null, cost: null, peak: null, peakIsBound: false, parts: [] };
+  if (counted.length === 0) return { kwh: null, cost: null, peak: null, peakIsBound: false, parts: [], carbonG: null, carbonEstimatedKwh: 0 };
 
   const peaks = counted.map((c) => c.summary.peak_watts).filter((w): w is number => w != null);
   return {
@@ -532,6 +536,8 @@ export function countedTotals(
     peak: peaks.length > 0 ? peaks.reduce((t, w) => t + w, 0) : null,
     peakIsBound: peaks.length > 1,
     parts: counted.map((c) => c.name),
+    carbonG: counted.some((c) => c.summary.carbon_g != null) ? counted.reduce((t, c) => t + (c.summary.carbon_g ?? 0), 0) : null,
+    carbonEstimatedKwh: counted.reduce((t, c) => t + (c.summary.carbon_estimated_kwh ?? 0), 0),
   };
 }
 
@@ -608,3 +614,30 @@ export function tariffNote(t: Pick<TariffInfo, 'utility' | 'name' | 'tiers' | 'f
   if (t.tiers > 1) left.push('only the first usage tier is used');
   return `${parts.join('; ')}. ${left.join('; ')}.`;
 }
+
+/** An amount of carbon in words, always approximate: "≈ 412 g CO₂e", "≈ 1.24 kg CO₂e", "≈ 2.1 t CO₂e". */
+export function formatCarbon(grams: number): string {
+  const g = Math.abs(grams);
+  if (g < 1000) return `≈ ${Math.round(grams)} g CO₂e`;
+  if (g < 1_000_000) return `≈ ${(grams / 1000).toFixed(g < 10_000 ? 2 : 1)} kg CO₂e`;
+  return `≈ ${(grams / 1_000_000).toFixed(1)} t CO₂e`;
+}
+
+/** The carbon line under a computer's figures: the amount, the energy-weighted grid average it came to, and how much was valued at an average
+ * for want of its own hour's figure. Empty when there is no carbon to show. */
+export function carbonNote(carbonG: number | null | undefined, kwh: number | null | undefined, estimatedKwh: number): string {
+  if (carbonG == null || kwh == null) return '';
+  const parts = [`${formatCarbon(carbonG)} (the grid's average, not what one more kWh would cause)`];
+  if (kwh > 0) {
+    parts.push(`averaging ${Math.round((carbonG / kwh))} g per kWh`);
+    const share = Math.round(Math.min(1, Math.max(0, estimatedKwh / kwh)) * 100);
+    if (share > 0) parts.push(`${share}% of the energy valued at an average for want of its own hour's figure`);
+  }
+  return parts.join('; ') + '.';
+}
+
+/** The sources the grid's carbon intensity can come from, with what to type for the place. */
+export const CARBON_SOURCES = [
+  { key: 'electricitymaps', label: 'Electricity Maps', placeLabel: 'Zone (like US-MIDW-MISO) or latitude, longitude', placeholder: 'US-MIDW-MISO' },
+  { key: 'eia', label: 'EIA (US only)', placeLabel: "Balancing authority's code (like MISO)", placeholder: 'MISO' },
+] as const;
