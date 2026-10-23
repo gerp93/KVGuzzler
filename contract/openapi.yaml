@@ -381,6 +381,50 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/history:
+    get:
+      tags: [Read]
+      operationId: getComputerHistory
+      summary: A computer's energy over the rolling periods (hour, day, week, month, year, all time).
+      description: |
+        One row per period ending now. With the computer's wall plug the headline is the whole PC at the wall; without one it is what its
+        sensors measured. Each row also says how much of the sensors' measure that is, and how long nothing was being recorded (asleep, off,
+        lost power), so nothing is silently missing.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerHistory'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/export.csv:
+    get:
+      tags: [Read]
+      operationId: exportComputerCsv
+      summary: A computer's daily energy and cost over a period, as a CSV download.
+      description: |
+        One row per local day: the whole PC at its wall plug (blank without one), what its sensors measured, a column for each plug next to
+        it, and the day's cost of the PC and of those plugs at the price on that day (blank when no price is known). Numbers use a dot and no
+        thousands separator. A label a spreadsheet could run as a formula is written as text.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: The CSV, sent as an attachment.
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/groups:
     get:
       tags: [Read]
@@ -1131,6 +1175,53 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PcGap'
+    PcHistoryPeriod:
+      type: object
+      required: [key, label, from, to, kwh, basis, sensors_kwh, asleep_seconds, off_seconds, lost_power_seconds, plug_gap_kwh]
+      properties:
+        key:
+          type: string
+          enum: ['1h', '24h', '7d', '30d', '1y', all]
+        label:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        kwh:
+          type: number
+          description: The whole PC at its wall plug when it has one (basis wall), else what its sensors measured (basis sensors).
+        basis:
+          type: string
+          enum: [wall, sensors]
+        cost:
+          type: [string, 'null']
+          description: A money string; null when no price is known.
+        cost_estimated:
+          type: boolean
+          description: True when the price rests on a stand-in (a day outside any bill) or, with sensors only, on the period's average price.
+        sensors_kwh:
+          type: number
+          description: What the CPU, GPU and memory sensors measured. Part of the whole PC, never added to it.
+        asleep_seconds:
+          type: number
+        off_seconds:
+          type: number
+        lost_power_seconds:
+          type: number
+        plug_gap_kwh:
+          type: number
+          description: Energy the plug's own counter recorded across gaps; already inside kwh.
+    ComputerHistory:
+      type: object
+      required: [periods]
+      properties:
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcHistoryPeriod'
     PcGap:
       type: object
       required: [from, to, reason]

@@ -437,3 +437,19 @@ WHERE source_id = ? AND minute >= ? AND minute < ? AND scope IN ('component', 'w
 	}
 	return out, nil
 }
+
+// PcSensorsKwh is the energy the PC's sensors (the separate pieces of hardware, not the parts inside one) measured over [from, to).
+func (s *Store) PcSensorsKwh(ctx context.Context, sourceID string, from, to time.Time) (float64, error) {
+	var ws sql.NullFloat64
+	err := s.db.QueryRowContext(ctx, `SELECT SUM(avg_w * seconds) FROM pc_minutes WHERE source_id = ? AND scope = 'component' AND minute >= ? AND minute < ?`,
+		sourceID, from.Unix(), to.Unix()).Scan(&ws)
+	if err != nil {
+		return 0, err
+	}
+	return ws.Float64 / joulesPerKWh, nil
+}
+
+// PcGaps are the stretches the PC was not recording inside [from, to), clipped to it, with a plug counter's energy shared evenly.
+func (s *Store) PcGaps(ctx context.Context, sourceID string, from, to time.Time) ([]model.PcGap, error) {
+	return s.pcGaps(ctx, sourceID, from.Unix(), to.Unix())
+}

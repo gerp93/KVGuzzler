@@ -1,6 +1,7 @@
 import { api } from './api';
 import { Chart, lineFrom, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
+import { EnergyHistory } from './EnergyHistory';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
 import { PeriodPicker } from './Periods';
@@ -138,6 +139,8 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <p class="caption">Each plug on its own line. They are not added together.</p>
             </section>
           )}
+
+          <EnergyHistory id={id} period={period as PeriodKey} />
 
           {data.inside.some((l) => l.x.length > 0) && (
             <section class="card">

@@ -86,6 +86,29 @@ type PcSeries struct {
 	Gaps   []PcGap        `json:"gaps"`
 }
 
+// PcHistoryPeriod is one row of a computer's energy history: a rolling period ending now. With its wall plug the headline is the whole PC
+// (what the bill is made of); without one it is what the sensors measured. The sensors' own figure, and the stretches nothing was
+// recorded (by reason), say how much of it was measured.
+type PcHistoryPeriod struct {
+	Key              string    `json:"key"`
+	Label            string    `json:"label"`
+	From             time.Time `json:"from"`
+	To               time.Time `json:"to"`
+	KWh              float64   `json:"kwh"`
+	Basis            string    `json:"basis"`
+	Cost             *string   `json:"cost"`
+	CostEstimated    bool      `json:"cost_estimated"`
+	SensorsKWh       float64   `json:"sensors_kwh"`
+	AsleepSeconds    float64   `json:"asleep_seconds"`
+	OffSeconds       float64   `json:"off_seconds"`
+	LostPowerSeconds float64   `json:"lost_power_seconds"`
+	PlugGapKWh       float64   `json:"plug_gap_kwh"`
+}
+
+type ComputerHistory struct {
+	Periods []PcHistoryPeriod `json:"periods"`
+}
+
 type PcSource struct {
 	SourceID       string           `json:"source_id"`
 	Name           string           `json:"name"`

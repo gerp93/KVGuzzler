@@ -146,7 +146,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     PC under Appliances. No window setting for it yet (the window is frozen).
   - **Parity with the window, in progress** (the window stays until the dashboard does everything it does). Done: per-minute sensors, the wall
     breakdown and programs (relay), gaps with reasons, and now the **live look** (Right now with each part's share of the PC and "everything else",
-    live per-program watts with the idle level, notes, Max draw, Recent runs; the per-component chart with shaded gaps). Programs now carry a cost (estimated; at the period's average price, runs at the price on the day they ended), the split bar and legend, and "how this is worked out". Still to do, in order: the energy history list and CSV export; the cost estimator; year and all-time periods; the Count ticks for peripherals;
+    live per-program watts with the idle level, notes, Max draw, Recent runs; the per-component chart with shaded gaps). Programs now carry a cost (estimated; at the period's average price, runs at the price on the day they ended), the split bar and legend, and "how this is worked out". The energy history list (hour to all time, gaps by reason), the daily CSV export (formula-safe labels) and the year and all-time periods are done. Still to do, in order: the cost estimator; the Count ticks for peripherals;
     the OpenEI tariff lookup and the carbon footprint (both ports); Help/About; read-only database info.
   - **The Electron viewer** (`shell/`) is built and was run against the real box (loads the dashboard, shows the unreachable page with the
     reason, and the setup form refuses a bad address and saves a good one). Still to do: a release (the tag namespace is shared with the

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, Channel, Computer, ComputerDetail, Device, GroupDetail, Live, NewDevice, PcLive, PcSeries, RateConfig, Series, Status, Summary } from './lib';
+import type { ApplianceGroup, Channel, Computer, ComputerDetail, ComputerHistory, Device, GroupDetail, Live, NewDevice, PcLive, PcSeries, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -73,6 +73,10 @@ export const api = {
     request<ComputerDetail>(`api/v1/computers/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
   /** The PC's latest look, small enough to ask for every few seconds; undefined when there is none yet. */
   computerLive: (id: string) => request<PcLive | undefined>(`api/v1/computers/${encodeURIComponent(id)}/live`),
+  /** The computer's energy over the rolling periods, hour to all time. */
+  computerHistory: (id: string) => request<ComputerHistory>(`api/v1/computers/${encodeURIComponent(id)}/history`),
+  /** Where the daily CSV for a period can be downloaded (a plain link: the browser saves it). */
+  computerExportUrl: (id: string, from: string, to: string) => `api/v1/computers/${encodeURIComponent(id)}/export.csv?${q({ from, to })}`,
   /** What each part of the PC drew over a period, with the gaps to shade; undefined without a collector. */
   computerSeries: (id: string, from: string, to: string) =>
     request<PcSeries | undefined>(`api/v1/computers/${encodeURIComponent(id)}/series?${q({ from, to })}`),

@@ -74,6 +74,9 @@ func (m Money) String() string {
 	return s
 }
 
+// Fixed is the amount rounded to the given number of decimals, always with that many ("0.0020").
+func (m Money) Fixed(places int) string { return m.rat().FloatString(places) }
+
 func (m Money) MarshalJSON() ([]byte, error) { return json.Marshal(m.String()) }
 
 func (m *Money) UnmarshalJSON(b []byte) error {

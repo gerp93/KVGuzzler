@@ -211,3 +211,44 @@ func TestProgramsAndRunsAreEstimatedAtTheSavedPriceAndLeftUnpricedWithoutOne(t *
 		t.Errorf("run cost = %v, want 0.0324", run.Cost)
 	}
 }
+
+func TestTheEnergyHistoryHasARowPerPeriodWithGapsByReason(t *testing.T) {
+	clock := time.Date(2026, 10, 23, 3, 0, 0, 0, time.UTC)
+	srv := movingServer(t, &clock)
+	postBody(t, srv.URL+"/api/v1/ingest/pc", contractExample(t, "ingest-pc.json"))
+	var list struct{ Computers []model.Computer }
+	get(t, srv.URL+"/api/v1/computers", &list)
+	id := list.Computers[0].ID
+
+	var h model.ComputerHistory
+	if r := get(t, srv.URL+"/api/v1/computers/"+id+"/history", &h); r.StatusCode != http.StatusOK {
+		t.Fatalf("history: %d", r.StatusCode)
+	}
+	keys := []string{}
+	for _, p := range h.Periods {
+		keys = append(keys, p.Key)
+	}
+	if len(keys) != 6 || keys[0] != "1h" || keys[5] != "all" {
+		t.Fatalf("periods = %v", keys)
+	}
+	all := h.Periods[5]
+	// No wall plug is tied to this computer, so the headline is what the sensors measured, and no price is known.
+	if all.Basis != "sensors" || all.KWh <= 0 || all.KWh != all.SensorsKWh || all.Cost != nil {
+		t.Errorf("all = %+v", all)
+	}
+	// The example's sleep gap (3 h 50 min on the 21st) is in the week and the all-time row but not in the last hour.
+	if h.Periods[0].AsleepSeconds != 0 || all.AsleepSeconds < 3*3600 || all.PlugGapKWh <= 0 {
+		t.Errorf("hour %+v, all %+v: the gap belongs only to the longer periods", h.Periods[0], all)
+	}
+
+	if r := get(t, srv.URL+"/api/v1/computers/comp-nope/history", nil); r.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown computer: %d, want 404", r.StatusCode)
+	}
+
+	// With a rate, a sensors-only row is priced at the period's average price and said to be an estimate.
+	put(t, srv.URL+"/api/v1/rates", `{"mode":"one","fixed_rate":"0.20"}`)
+	get(t, srv.URL+"/api/v1/computers/"+id+"/history", &h)
+	if all := h.Periods[5]; all.Cost == nil || !all.CostEstimated {
+		t.Errorf("priced all = %+v", all)
+	}
+}
