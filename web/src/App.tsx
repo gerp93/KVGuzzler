@@ -52,7 +52,7 @@ export function App() {
         ) : !chan.data ? (
           <p class="note">{chan.error ? `Waiting for the server: ${chan.error.message}` : 'Loading…'}</p>
         ) : active === 'live' ? (
-          <LiveView channels={channels} />
+          <LiveView channels={channels} onOpenSettings={() => setTab('settings')} />
         ) : active === 'history' ? (
           <HistoryView channels={channels} />
         ) : active === 'appliances' ? (

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { Channel, Live, RateConfig, Series, Status, Summary } from './lib';
+import type { Channel, Device, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -27,6 +27,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(message);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -43,6 +44,14 @@ export const api = {
   series: (channelId: string, from: string, to: string, bucket?: string) =>
     request<Series>(`api/v1/series?${q({ channel_id: channelId, from, to, bucket })}`),
   summary: (from: string, to: string) => request<Summary>(`api/v1/summary?${q({ from, to })}`),
+  devices: () => request<{ devices: Device[] }>('api/v1/devices').then((r) => r.devices),
+  addDevice: (nd: NewDevice) =>
+    request<Device>('api/v1/devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nd),
+    }),
+  removeDevice: (id: string) => request<void>(`api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
   setRates: (cfg: RateConfig) =>
     request<RateConfig>('api/v1/rates', {

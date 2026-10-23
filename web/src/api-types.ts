@@ -31,7 +31,11 @@ export interface paths {
         /** Every configured device and whether it answered recently. */
         get: operations["listDevices"];
         put?: never;
-        /** Start polling a device. Only a plain host or IP is accepted, never a URL or path. */
+        /**
+         * Start polling a device. Only a plain host or IP is accepted, never a URL or path.
+         * @description The device is read once before anything is saved: one that does not answer like the kind named is refused with 502
+         *     and nothing is kept. Adding a Refoss monitor answers 501 until its readings are mapped from a real answer.
+         */
         post: operations["addDevice"];
         delete?: never;
         options?: never;
@@ -239,6 +243,14 @@ export interface components {
             host: string;
             /** @description A label for the device (a plug's reading is named after this). */
             name?: string;
+            /**
+             * @description What a plug measures: `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
+             *     circuit already counted, so it is shown beside the others and added to nothing. Ignored for a Refoss monitor,
+             *     whose channels say what they are.
+             * @default plug
+             * @enum {string}
+             */
+            scope: "plug" | "pc";
         };
         Device: {
             id: string;
@@ -535,6 +547,24 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+            /** @description That device is already being polled. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This kind of device is not supported yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description The device did not answer or did not look like the kind named. */
             502: {
                 headers: {

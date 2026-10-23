@@ -1,8 +1,8 @@
 // Package api serves the house API described in contract/openapi.yaml.
 //
-// Implemented so far: status, devices (read), channels (read, rename, switch off), live, series, summary (with cost
-// from the saved rates) and the rates settings. The rest of the contract (adding devices, carbon, the PC ingest)
-// answers 501 until it is built.
+// Implemented so far: status, devices (read, add, remove), channels (read, rename, switch off), live, series, summary
+// (with cost from the saved rates) and the rates settings. The rest of the contract (carbon, the PC ingest) answers 501
+// until it is built.
 package api
 
 import (
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
+	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 	"github.com/gerp93/KVGuzzler/server/internal/rates"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
@@ -22,9 +23,16 @@ import (
 // Version is the contract's major version this server speaks.
 const Version = 1
 
+// DeviceManager adds and removes the devices the server polls (see package devices). Nil means adding and removing answer 501.
+type DeviceManager interface {
+	Add(ctx context.Context, nd devices.NewDevice) (model.Device, error)
+	Remove(ctx context.Context, id string) error
+}
+
 type Server struct {
 	Store     *store.Store
 	Collector *collector.Collector
+	Devices   DeviceManager
 	Loc       *time.Location
 	Version   string
 	Now       func() time.Time
@@ -53,10 +61,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
+	mux.HandleFunc("POST /api/v1/devices", s.addDevice)
+	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
 	for _, route := range []string{
-		"POST /api/v1/devices", "DELETE /api/v1/devices/{deviceId}",
 		"GET /api/v1/carbon", "PUT /api/v1/carbon",
 		"POST /api/v1/ingest/pc",
 	} {
@@ -108,6 +117,50 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) devices(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"devices": s.Collector.Devices()})
+}
+
+func (s *Server) addDevice(w http.ResponseWriter, r *http.Request) {
+	if s.Devices == nil {
+		notImplemented(w, r)
+		return
+	}
+	var nd devices.NewDevice
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&nd); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_device", "send kind, host and optionally name and scope")
+		return
+	}
+	d, err := s.Devices.Add(r.Context(), nd)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusCreated, d)
+	case errors.Is(err, devices.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "bad_device", err.Error())
+	case errors.Is(err, devices.ErrUnsupported):
+		writeProblem(w, http.StatusNotImplemented, "not_implemented", err.Error())
+	case errors.Is(err, devices.ErrExists):
+		writeProblem(w, http.StatusConflict, "device_exists", err.Error())
+	case errors.Is(err, devices.ErrUnreachable):
+		writeProblem(w, http.StatusBadGateway, "device_unreachable", err.Error())
+	default:
+		serverError(w, err)
+	}
+}
+
+func (s *Server) removeDevice(w http.ResponseWriter, r *http.Request) {
+	if s.Devices == nil {
+		notImplemented(w, r)
+		return
+	}
+	switch err := s.Devices.Remove(r.Context(), r.PathValue("deviceId")); {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, devices.ErrNotFound):
+		writeProblem(w, http.StatusNotFound, "unknown_device", "no such device")
+	default:
+		serverError(w, err)
+	}
 }
 
 func (s *Server) channels(w http.ResponseWriter, r *http.Request) {

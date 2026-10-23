@@ -6,6 +6,7 @@ import (
 	"math"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -115,5 +116,67 @@ func TestSilenceIsNotCreditedAndIsReported(t *testing.T) {
 	}
 	if n := c.Notes(); len(n) != 0 {
 		t.Errorf("notes after recovery = %v", n)
+	}
+}
+
+type counting struct {
+	fake
+	polls atomic.Int32
+}
+
+func (c *counting) Poll(ctx context.Context) ([]model.Reading, error) {
+	c.polls.Add(1)
+	return c.fake.Poll(ctx)
+}
+
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for i := 0; i < 400; i++ {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", what)
+}
+
+func TestSourcesCanBeAddedAndRemovedWhileRunning(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s, err := store.Open(filepath.Join(t.TempDir(), "h.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	c := New(s, 10*time.Millisecond)
+
+	done := make(chan struct{})
+	go func() { c.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+
+	src := &counting{fake: fake{readings: []model.Reading{{ChannelID: "dev/ch-01", Watts: 100}}}}
+	if err := c.Add(context.Background(), src); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the added source to be polled", func() bool { return src.polls.Load() >= 3 })
+	waitFor(t, "a live reading", func() bool { return len(c.LiveReadings()) == 1 })
+
+	if err := c.Add(context.Background(), &counting{}); err == nil {
+		t.Error("adding the same device twice should fail")
+	}
+
+	if !c.Remove("dev") {
+		t.Fatal("Remove said the device was not being polled")
+	}
+	if c.Remove("dev") {
+		t.Error("removing twice should report false")
+	}
+	if len(c.LiveReadings()) != 0 || len(c.Devices()) != 0 {
+		t.Errorf("after removal: live %v, devices %v", c.LiveReadings(), c.Devices())
+	}
+	time.Sleep(60 * time.Millisecond) // let a loop that was mid-poll finish
+	n := src.polls.Load()
+	time.Sleep(80 * time.Millisecond)
+	if after := src.polls.Load(); after != n {
+		t.Errorf("polled %d more times after removal", after-n)
 	}
 }

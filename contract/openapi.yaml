@@ -72,6 +72,9 @@ paths:
       tags: [Settings]
       operationId: addDevice
       summary: Start polling a device. Only a plain host or IP is accepted, never a URL or path.
+      description: |
+        The device is read once before anything is saved: one that does not answer like the kind named is refused with 502
+        and nothing is kept. Adding a Refoss monitor answers 501 until its readings are mapped from a real answer.
       requestBody:
         required: true
         content:
@@ -87,6 +90,18 @@ paths:
                 $ref: '#/components/schemas/Device'
         '400':
           $ref: '#/components/responses/Problem'
+        '409':
+          description: That device is already being polled.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '501':
+          description: This kind of device is not supported yet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '502':
           description: The device did not answer or did not look like the kind named.
           content:
@@ -399,7 +414,16 @@ components:
           description: A plain host name or IP address only; a URL, path or port is refused.
         name:
           type: string
+          maxLength: 60
           description: A label for the device (a plug's reading is named after this).
+        scope:
+          type: string
+          enum: [plug, pc]
+          default: plug
+          description: |
+            What a plug measures: `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
+            circuit already counted, so it is shown beside the others and added to nothing. Ignored for a Refoss monitor,
+            whose channels say what they are.
     Device:
       type: object
       required: [id, kind, host, online]

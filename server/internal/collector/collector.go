@@ -28,6 +28,7 @@ type state struct {
 	src      source.Source
 	caps     map[string]float64
 	labels   map[string]string
+	cancel   context.CancelFunc // stops this source's loop; nil until the collector is running
 	online   bool
 	lastSeen time.Time
 	lastPoll time.Time
@@ -54,6 +55,9 @@ type Collector struct {
 	sources []*state
 	live    map[string]liveReading
 	notes   map[string]note
+
+	runCtx  context.Context // set while Run is running, so sources added later start at once
+	running sync.WaitGroup
 }
 
 func New(s *store.Store, interval time.Duration) *Collector {
@@ -77,36 +81,74 @@ func (c *Collector) Add(ctx context.Context, src source.Source) error {
 		}
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, other := range c.sources {
+		if other.src.Device().ID == d.ID {
+			return fmt.Errorf("device %s is already being polled", d.ID)
+		}
+	}
 	c.sources = append(c.sources, st)
-	c.mu.Unlock()
+	if c.runCtx != nil {
+		c.startLocked(st)
+	}
 	return nil
 }
 
-// Run polls every source until ctx ends, then writes the partial minute each one still holds.
+// Remove stops polling a device and drops its live readings. What it recorded stays in the history. It reports whether
+// the device was being polled.
+func (c *Collector) Remove(id string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, st := range c.sources {
+		if st.src.Device().ID != id {
+			continue
+		}
+		c.sources = append(c.sources[:i], c.sources[i+1:]...)
+		if st.cancel != nil {
+			st.cancel() // the loop writes the partial minute it holds, then ends
+		}
+		for chID := range st.labels {
+			delete(c.live, chID)
+		}
+		delete(c.notes, "device:"+id)
+		return true
+	}
+	return false
+}
+
+// startLocked runs a source's polling loop until its context ends. The caller holds c.mu and the collector is running.
+func (c *Collector) startLocked(st *state) {
+	ctx, cancel := context.WithCancel(c.runCtx)
+	st.cancel = cancel
+	c.running.Add(1)
+	go func() {
+		defer c.running.Done()
+		tick := time.NewTicker(c.interval)
+		defer tick.Stop()
+		for {
+			c.step(ctx, st, c.now())
+			select {
+			case <-ctx.Done():
+				c.flush(context.Background(), st)
+				return
+			case <-tick.C:
+			}
+		}
+	}()
+}
+
+// Run polls every source until ctx ends, then writes the partial minute each one still holds. Sources added while it
+// runs start polling at once.
 func (c *Collector) Run(ctx context.Context) {
 	c.mu.Lock()
-	sources := append([]*state(nil), c.sources...)
+	c.runCtx = ctx
+	for _, st := range c.sources {
+		c.startLocked(st)
+	}
 	c.mu.Unlock()
 
-	var wg sync.WaitGroup
-	for _, st := range sources {
-		wg.Add(1)
-		go func(st *state) {
-			defer wg.Done()
-			tick := time.NewTicker(c.interval)
-			defer tick.Stop()
-			for {
-				c.step(ctx, st, c.now())
-				select {
-				case <-ctx.Done():
-					c.flush(context.Background(), st)
-					return
-				case <-tick.C:
-				}
-			}
-		}(st)
-	}
-	wg.Wait()
+	<-ctx.Done()
+	c.running.Wait()
 }
 
 // step polls one source at time t and processes the answer.

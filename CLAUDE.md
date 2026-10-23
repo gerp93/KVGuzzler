@@ -35,6 +35,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - Pricing in the server (`server/internal/rates`) is a **port** of `KVGuzzler.Core.Billing` (bills, flat fees, `RateSchedule`); its tests are
   `BillingTests.cs` ported case for case. A change to a pricing rule goes in both places, with the test in both. Money is exact (`big.Rat`),
   never a float; bill dates are local calendar days. Only "one rate" and "my bills" exist there: the OpenEI lookup and carbon are not ported.
+- Plugs: `server/internal/shelly` is a port of `ShellyPlug` (one read-only GET; a plug often has the PC or a fridge on it, so nothing may
+  switch it). A device is read once before it is saved, so a wrong address is refused with 502; a saved device is restored after a restart
+  even if it is offline. The PC's own wall plug is added with scope `pc`: a slice, added to nothing.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the
