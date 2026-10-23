@@ -38,6 +38,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - Plugs: `server/internal/shelly` is a port of `ShellyPlug` (one read-only GET; a plug often has the PC or a fridge on it, so nothing may
   switch it). A device is read once before it is saved, so a wrong address is refused with 502; a saved device is restored after a restart
   even if it is offline. The PC's own wall plug is added with scope `pc`: a slice, added to nothing.
+- **Deployment settings are never committed.** The box's address, the port and the server settings (`HOUSED_TZ`...) live in
+  `~/.config/kvguzzler/deploy.env` on the PC and `/etc/housed/housed.env` on the box; the repo has only `scripts/deploy.env.example` with
+  placeholders. Deploy with `scripts/deploy-server.sh` (see `server/README.md`); it restores the old binary if the new one does not answer.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the
