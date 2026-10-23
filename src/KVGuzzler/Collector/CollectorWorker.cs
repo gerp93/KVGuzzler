@@ -2,6 +2,7 @@ using KVGuzzler.Core.Carbon;
 using KVGuzzler.Core.History;
 using KVGuzzler.Core.Power;
 using KVGuzzler.Core.Programs;
+using KVGuzzler.Core.Relay;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -29,6 +30,10 @@ internal sealed class CollectorWorker : BackgroundService
         // The grid's carbon intensity, fetched on its own timer so a slow network never holds up the once-a-second sampling.
         var carbon = new CarbonFeed(store, Path.Combine(_dataDir, CarbonConfig.FileName));
         var carbonTask = carbon.RunAsync(stop);
+        // What this PC recorded, sent on to the house server when relay.json says where it is. Also on its own timer.
+        var relay = new RelayFeed(store, Path.Combine(_dataDir, RelayConfig.FileName), Environment.MachineName);
+        relay.StatusChanged += status => _log.LogInformation("House server: {Status}", status);
+        var relayTask = relay.RunAsync(stop);
 
         collector.Start(DateTimeOffset.UtcNow);
         _log.LogInformation("KVGuzzler collector started. History: {Path}", store.Path);
@@ -58,6 +63,7 @@ internal sealed class CollectorWorker : BackgroundService
         {
             collector.Stop();
             try { await carbonTask; } catch (OperationCanceledException) { /* stopping */ }
+            try { await relayTask; } catch (OperationCanceledException) { /* stopping */ }
             _log.LogInformation("KVGuzzler collector stopped.");
         }
     }
