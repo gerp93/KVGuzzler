@@ -250,6 +250,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/computers/{computerId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A computer's energy over the rolling periods (hour, day, week, month, year, all time).
+         * @description One row per period ending now. With the computer's wall plug the headline is the whole PC at the wall; without one it is what its
+         *     sensors measured. Each row also says how much of the sensors' measure that is, and how long nothing was being recorded (asleep, off,
+         *     lost power), so nothing is silently missing.
+         */
+        get: operations["getComputerHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/computers/{computerId}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A computer's daily energy and cost over a period, as a CSV download.
+         * @description One row per local day: the whole PC at its wall plug (blank without one), what its sensors measured, a column for each plug next to
+         *     it, and the day's cost of the PC and of those plugs at the price on that day (blank when no price is known). Numbers use a dot and no
+         *     thousands separator. A label a spreadsheet could run as a formula is written as text.
+         */
+        get: operations["exportComputerCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -666,6 +710,33 @@ export interface components {
             /** @description The wall line first, then the sensors, then the meters. Never added together. */
             lines: components["schemas"]["PcSeriesLine"][];
             gaps: components["schemas"]["PcGap"][];
+        };
+        PcHistoryPeriod: {
+            /** @enum {string} */
+            key: "1h" | "24h" | "7d" | "30d" | "1y" | "all";
+            label: string;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description The whole PC at its wall plug when it has one (basis wall), else what its sensors measured (basis sensors). */
+            kwh: number;
+            /** @enum {string} */
+            basis: "wall" | "sensors";
+            /** @description A money string; null when no price is known. */
+            cost?: string | null;
+            /** @description True when the price rests on a stand-in (a day outside any bill) or, with sensors only, on the period's average price. */
+            cost_estimated?: boolean;
+            /** @description What the CPU, GPU and memory sensors measured. Part of the whole PC, never added to it. */
+            sensors_kwh: number;
+            asleep_seconds: number;
+            off_seconds: number;
+            lost_power_seconds: number;
+            /** @description Energy the plug's own counter recorded across gaps; already inside kwh. */
+            plug_gap_kwh: number;
+        };
+        ComputerHistory: {
+            periods: components["schemas"]["PcHistoryPeriod"][];
         };
         PcGap: {
             /** Format: date-time */
@@ -1285,6 +1356,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getComputerHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerHistory"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    exportComputerCsv: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, sent as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];

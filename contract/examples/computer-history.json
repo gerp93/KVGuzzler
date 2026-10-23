@@ -1,0 +1,49 @@
+{
+  "periods": [
+    {
+      "key": "1h",
+      "label": "Last hour",
+      "from": "2026-10-22T17:05:00Z",
+      "to": "2026-10-22T18:05:00Z",
+      "kwh": 0.31,
+      "basis": "wall",
+      "cost": "0.0434",
+      "cost_estimated": false,
+      "sensors_kwh": 0.24,
+      "asleep_seconds": 0,
+      "off_seconds": 0,
+      "lost_power_seconds": 0,
+      "plug_gap_kwh": 0
+    },
+    {
+      "key": "24h",
+      "label": "Last 24 hours",
+      "from": "2026-10-21T18:05:00Z",
+      "to": "2026-10-22T18:05:00Z",
+      "kwh": 4.9,
+      "basis": "wall",
+      "cost": "0.686",
+      "cost_estimated": false,
+      "sensors_kwh": 3.8,
+      "asleep_seconds": 13800,
+      "off_seconds": 0,
+      "lost_power_seconds": 0,
+      "plug_gap_kwh": 0.06
+    },
+    {
+      "key": "all",
+      "label": "All time",
+      "from": "2000-01-01T00:00:00Z",
+      "to": "2026-10-22T18:05:00Z",
+      "kwh": 41.2,
+      "basis": "sensors",
+      "cost": null,
+      "cost_estimated": false,
+      "sensors_kwh": 41.2,
+      "asleep_seconds": 13800,
+      "off_seconds": 7200,
+      "lost_power_seconds": 600,
+      "plug_gap_kwh": 0
+    }
+  ]
+}

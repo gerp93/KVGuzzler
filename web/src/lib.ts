@@ -26,6 +26,8 @@ export type PcLiveProgram = S['PcLiveProgram'];
 export type PcRun = S['PcRun'];
 export type PcProgramTotal = S['PcProgramTotal'];
 export type PcSeries = S['PcSeries'];
+export type ComputerHistory = S['ComputerHistory'];
+export type PcHistoryPeriod = S['PcHistoryPeriod'];
 export type PcSeriesLine = S['PcSeriesLine'];
 export type Device = S['Device'];
 export type NewDevice = S['NewDevice'];
@@ -33,13 +35,16 @@ export type RateConfig = S['RateConfig'];
 export type Bill = S['Bill'];
 export type FixedFee = S['FixedFee'];
 
-export type PeriodKey = '1h' | '24h' | '7d' | '30d';
+export type PeriodKey = '1h' | '24h' | '7d' | '30d' | '1y' | 'all';
 
 export const PERIODS: { key: PeriodKey; label: string; ms: number }[] = [
   { key: '1h', label: 'Hour', ms: 3600_000 },
   { key: '24h', label: '24 hours', ms: 24 * 3600_000 },
   { key: '7d', label: '7 days', ms: 7 * 24 * 3600_000 },
   { key: '30d', label: '30 days', ms: 30 * 24 * 3600_000 },
+  { key: '1y', label: 'Year', ms: 365 * 24 * 3600_000 },
+  // Everything ever recorded: it starts long before any data, and a chart narrows it to where the data starts (see `effectiveDomain`).
+  { key: 'all', label: 'All time', ms: 25 * 365 * 24 * 3600_000 },
 ];
 
 /** The period ending at the next whole minute after `now`, as the RFC 3339 strings the API wants. */
@@ -428,4 +433,20 @@ export function programSplit(programs: PcProgramTotal[], wholeKwh: number | null
   const rest = wholeKwh != null ? wholeKwh - (named + baseline + unattributed) : 0;
   if (rest > 0) parts.push({ label: 'Everything else', kwh: rest, kind: 'rest' });
   return parts.filter((p) => p.kwh > 0);
+}
+
+/** The second line of an energy-history row: what part of the figure the sensors account for, and every stretch nothing was recorded, by
+ * reason, so nothing is silently missing. */
+export function historyDetail(p: PcHistoryPeriod): string {
+  const parts: string[] = [];
+  if (p.basis === 'wall') {
+    parts.push(`of which CPU, GPU and memory ${formatKwh(p.sensors_kwh)}${p.kwh > 0 && p.sensors_kwh > 0 ? ` (${Math.round((p.sensors_kwh / p.kwh) * 100)}% of the whole PC)` : ''}`);
+  } else {
+    parts.push('CPU, GPU and memory sensors only');
+  }
+  if (p.asleep_seconds > 0) parts.push(`asleep ${formatDuration(p.asleep_seconds)}`);
+  if (p.basis === 'wall' && p.plug_gap_kwh > 0) parts.push(`${formatKwh(p.plug_gap_kwh)} of the whole PC is from the plug's own energy counter, for time the PC was asleep or off`);
+  if (p.off_seconds > 0) parts.push(`off ${formatDuration(p.off_seconds)}`);
+  if (p.lost_power_seconds > 0) parts.push(`lost power or crashed ${formatDuration(p.lost_power_seconds)}`);
+  return parts.join(' · ');
 }

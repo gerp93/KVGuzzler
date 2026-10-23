@@ -36,6 +36,16 @@ export function lineFrom(name: string, colorVar: string, points: { t: string; av
   return { name, colorVar, x: points.map((p) => Date.parse(p.t) / 1000), y: points.map((p) => p.avg_watts) };
 }
 
+/** The period a chart spans. A period that starts years before its first point (all time) starts at that point instead, so the
+ * recorded part is not squeezed into a corner. */
+export function effectiveDomain(domain: [number, number], lines: Pick<Line, 'x'>[]): [number, number] {
+  const firsts = lines.filter((l) => l.x.length > 0).map((l) => Math.min(...l.x));
+  if (firsts.length === 0) return domain;
+  const first = Math.min(...firsts);
+  const TWO_YEARS = 2 * 365 * 24 * 3600;
+  return first - domain[0] > TWO_YEARS ? [first, domain[1]] : domain;
+}
+
 /** `domain` is the period shown, in seconds since the epoch, so a chart with few points still spans the period. */
 export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
@@ -46,6 +56,7 @@ export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Lin
     const text = css('--color-text');
     const grid = css('--color-border');
     const shade = css('--color-accent-muted');
+    const span = effectiveDomain(domain, lines);
     const plot = new uPlot(
       {
         width: el.clientWidth || 600,
@@ -53,7 +64,7 @@ export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Lin
         legend: { show: true },
         cursor: { drag: { x: false, y: false } },
         scales: {
-          x: { time: true, range: () => domain },
+          x: { time: true, range: () => span },
           y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.05 : 1] },
         },
         axes: [

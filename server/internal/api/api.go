@@ -77,6 +77,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/computers/{computerId}", s.removeComputer)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/detail", s.computerDetail)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/live", s.computerLive)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/history", s.computerHistory)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/export.csv", s.computerExport)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/series", s.computerSeries)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
 	for _, route := range []string{
@@ -776,6 +778,103 @@ func priceProgramsAndRuns(pc *model.PcSource, schedule *rates.Schedule, from, to
 			pc.Runs[i].Cost = &c
 		}
 	}
+}
+
+// historyPeriods are the rolling periods of a computer's energy history, ending now. "All" starts long before any data.
+var historyPeriods = []struct {
+	key, label string
+	span       time.Duration
+}{
+	{"1h", "Last hour", time.Hour},
+	{"24h", "Last 24 hours", 24 * time.Hour},
+	{"7d", "Last 7 days", 7 * 24 * time.Hour},
+	{"30d", "Last 30 days", 30 * 24 * time.Hour},
+	{"1y", "Last year", 365 * 24 * time.Hour},
+	{"all", "All time", 0},
+}
+
+var allTimeFrom = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// computerHistory is one row per rolling period: the whole PC at its wall plug (else what its sensors measured), what that cost, and how
+// much of the period nothing was recorded, by reason. The cost is exact with a wall plug and an estimate (the period's average price)
+// from sensors alone, which is said so.
+func (s *Server) computerHistory(w http.ResponseWriter, r *http.Request) {
+	comp, err := s.Store.Computer(r.Context(), r.PathValue("computerId"))
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	schedule := cfg.Schedule(s.Loc)
+	_, byID, err := s.enabledChannels(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	to := s.now().Truncate(time.Minute).Add(time.Minute)
+	out := model.ComputerHistory{Periods: []model.PcHistoryPeriod{}}
+	for _, p := range historyPeriods {
+		from := allTimeFrom
+		if p.span > 0 {
+			from = to.Add(-p.span)
+		}
+		row := model.PcHistoryPeriod{Key: p.key, Label: p.label, From: from.UTC(), To: to.UTC(), Basis: "sensors"}
+
+		if comp.SourceID != nil {
+			if row.SensorsKWh, err = s.Store.PcSensorsKwh(r.Context(), *comp.SourceID, from, to); err != nil {
+				serverError(w, err)
+				return
+			}
+			gaps, err := s.Store.PcGaps(r.Context(), *comp.SourceID, from, to)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			for _, g := range gaps {
+				secs := g.To.Sub(g.From).Seconds()
+				switch g.Reason {
+				case "asleep":
+					row.AsleepSeconds += secs
+				case "off":
+					row.OffSeconds += secs
+				default:
+					row.LostPowerSeconds += secs
+				}
+				if g.PlugKwh != nil {
+					row.PlugGapKWh += *g.PlugKwh
+				}
+			}
+		}
+
+		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+			cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			row.KWh, row.Basis, row.Cost, row.CostEstimated = cs.KWh, "wall", cs.Cost, cs.Cost != nil && priced.Estimated
+		} else {
+			row.KWh = row.SensorsKWh
+			if avg := schedule.AverageRate(from, to); avg != nil && comp.SourceID != nil {
+				c := rates.MoneyFromFloat(row.KWh).Mul(*avg).String()
+				row.Cost, row.CostEstimated = &c, true
+			}
+		}
+		out.Periods = append(out.Periods, row)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // computerSeries is the PC collector's sensors, wall plug and meters over time, one line each, with the gaps to shade. It is the

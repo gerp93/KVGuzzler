@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
+  applianceList, BASELINE, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -271,5 +272,43 @@ describe('programs over a period', () => {
   it('names a program with the many-small-programs label', () => {
     const rows = programRows([prog(OTHERS, 0.01, 0, 90)], null);
     expect(rows[0]!.note).toBe('many small programs together · active up to 2 min');
+  });
+});
+
+describe('year and all-time periods', () => {
+  it('has a year and an all-time choice after the 30 days', () => {
+    expect(PERIODS.map((p) => p.key)).toEqual(['1h', '24h', '7d', '30d', '1y', 'all']);
+    const year = periodRange('1y', new Date('2026-10-22T18:04:11Z'));
+    expect(year.to).toBe('2026-10-22T18:05:00.000Z');
+    expect(Date.parse(year.to) - Date.parse(year.from)).toBe(365 * 24 * 3600_000);
+    expect(Date.parse(periodRange('all', new Date('2026-10-22T18:04:11Z')).from)).toBeLessThan(Date.parse('2005-01-01'));
+  });
+
+  it('starts a chart at its first point when the period begins years before it, and otherwise keeps the period', () => {
+    const t = (iso: string) => Date.parse(iso) / 1000;
+    const all = periodRange('all', new Date('2026-10-22T18:04:11Z'));
+    const lines = [{ x: [t('2026-09-01T00:00:00Z'), t('2026-10-01T00:00:00Z')] }, { x: [t('2026-09-10T00:00:00Z')] }];
+    expect(effectiveDomain([t(all.from), t(all.to)], lines)).toEqual([t('2026-09-01T00:00:00Z'), t(all.to)]);
+    const day = periodRange('24h', new Date('2026-10-22T18:04:11Z'));
+    expect(effectiveDomain([t(day.from), t(day.to)], lines)).toEqual([t(day.from), t(day.to)]);
+    expect(effectiveDomain([1, 2], [{ x: [] }])).toEqual([1, 2]);
+  });
+});
+
+describe('the energy history row detail', () => {
+  const row = (over: Partial<PcHistoryPeriod>): PcHistoryPeriod => ({
+    key: '24h', label: 'Last 24 hours', from: '', to: '', kwh: 4, basis: 'wall', cost: null, cost_estimated: false,
+    sensors_kwh: 3, asleep_seconds: 0, off_seconds: 0, lost_power_seconds: 0, plug_gap_kwh: 0, ...over,
+  });
+
+  it('says how much the sensors account for and every stretch nothing was recorded, by reason', () => {
+    expect(historyDetail(row({}))).toBe('of which CPU, GPU and memory 3.00 kWh (75% of the whole PC)');
+    expect(historyDetail(row({ asleep_seconds: 13800, plug_gap_kwh: 0.06, off_seconds: 7200, lost_power_seconds: 600 }))).toBe(
+      "of which CPU, GPU and memory 3.00 kWh (75% of the whole PC) · asleep 3 h 50 min · 0.06 kWh of the whole PC is from the plug's own energy counter, for time the PC was asleep or off · off 2 h · lost power or crashed 10 min",
+    );
+  });
+
+  it('without a wall plug says the figure is the sensors, and leaves out the plug counter it does not have', () => {
+    expect(historyDetail(row({ basis: 'sensors', plug_gap_kwh: 0.06, asleep_seconds: 600 }))).toBe('CPU, GPU and memory sensors only · asleep 10 min');
   });
 });
