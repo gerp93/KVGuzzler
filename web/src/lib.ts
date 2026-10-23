@@ -13,6 +13,11 @@ export type Point = S['SeriesPoint'];
 export type Summary = S['Summary'];
 export type ChannelSummary = S['ChannelSummary'];
 export type Status = S['Status'];
+export type Computer = S['Computer'];
+export type ComputerDetail = S['ComputerDetail'];
+export type PcSource = S['PcSource'];
+export type PcComponent = S['PcComponent'];
+export type PcGap = S['PcGap'];
 export type Device = S['Device'];
 export type NewDevice = S['NewDevice'];
 export type RateConfig = S['RateConfig'];
@@ -42,6 +47,7 @@ export function formatWatts(w: number | null | undefined): string {
 
 export function formatKwh(k: number | null | undefined): string {
   if (k === null || k === undefined) return '—';
+  if (k !== 0 && Math.abs(k) < 0.01) return `${(k * 1000).toFixed(1)} Wh`;
   return `${k < 10 ? k.toFixed(2) : k.toFixed(1)} kWh`;
 }
 
@@ -136,4 +142,77 @@ export const DEFAULT_THEME: Theme = 'blue-oval';
 
 export function isTheme(v: unknown): v is Theme {
   return typeof v === 'string' && (THEMES as readonly string[]).includes(v);
+}
+
+export interface PcGroups {
+  wall: PcComponent[];
+  sensors: PcComponent[];
+  inside: PcComponent[];
+  meters: PcComponent[];
+}
+
+/** Sorts the PC's readings into the groups the PC tab shows. The groups are never summed with each other: the wall figure
+ * already contains the sensors, the "inside" readings are parts of a sensor, and the meters are separate devices. */
+export function groupComponents(components: PcComponent[]): PcGroups {
+  const by = (scope: string) => components.filter((c) => c.scope === scope).sort((a, b) => b.kwh - a.kwh);
+  return { wall: by('wall'), sensors: by('component'), inside: by('breakdown'), meters: by('peripheral') };
+}
+
+export function gapLabel(reason: string): string {
+  switch (reason) {
+    case 'asleep':
+      return 'Asleep';
+    case 'off':
+      return 'Off or stopped';
+    case 'lost_power':
+      return 'Lost power';
+    default:
+      return reason;
+  }
+}
+
+/** A length of time in words: "45 s", "12 min", "4 h 30 min". */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} s`;
+  const minutes = Math.round(s / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+export interface ApplianceRow {
+  channel: ChannelSummary;
+  label: string;
+}
+
+export interface ComputerRow {
+  computer: Computer;
+  /** The whole PC at its wall plug, when it has one. */
+  wall?: ChannelSummary;
+}
+
+export interface ApplianceList {
+  /** Circuits and plugs that belong to no computer, biggest first. */
+  appliances: ApplianceRow[];
+  /** Computers, with the figure of the plug they are on. */
+  computers: ComputerRow[];
+}
+
+/** Splits the summary into what the Appliances list shows. A plug that belongs to a computer is listed under that computer and
+ * never alone; a computer's figure is its wall plug's, so nothing is counted twice and no scope is added to another. */
+export function applianceList(summary: Summary, channels: Channel[], computers: Computer[]): ApplianceList {
+  const label = new Map(channels.map((c) => [c.id, c.label]));
+  const byChannel = new Map(summary.channels.map((c) => [c.channel_id, c]));
+  const appliances = summary.channels
+    .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id)
+    .sort((a, b) => b.kwh - a.kwh)
+    .map((channel) => ({ channel, label: label.get(channel.channel_id) ?? channel.channel_id }));
+  const rows = computers.map((computer) => ({
+    computer,
+    wall: computer.wall_channel_id ? byChannel.get(computer.wall_channel_id) : undefined,
+  }));
+  rows.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
+  return { appliances, computers: rows };
 }

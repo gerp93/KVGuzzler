@@ -23,6 +23,11 @@ export function align(lines: Line[]): uPlot.AlignedData {
   return [xs, ...data] as uPlot.AlignedData;
 }
 
+/** A chart line from the API's series points (average watts per bucket). */
+export function lineFrom(name: string, colorVar: string, points: { t: string; avg_watts: number }[]): Line {
+  return { name, colorVar, x: points.map((p) => Date.parse(p.t) / 1000), y: points.map((p) => p.avg_watts) };
+}
+
 /** `domain` is the period shown, in seconds since the epoch, so a chart with few points still spans the period. */
 export function Chart({ lines, domain, height = 260 }: { lines: Line[]; domain: [number, number]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);

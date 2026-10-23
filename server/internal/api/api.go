@@ -16,6 +16,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/pcrelay"
 	"github.com/gerp93/KVGuzzler/server/internal/rates"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
 )
@@ -65,9 +66,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
+	mux.HandleFunc("GET /api/v1/computers", s.listComputers)
+	mux.HandleFunc("POST /api/v1/computers", s.addComputer)
+	mux.HandleFunc("PATCH /api/v1/computers/{computerId}", s.updateComputer)
+	mux.HandleFunc("DELETE /api/v1/computers/{computerId}", s.removeComputer)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/detail", s.computerDetail)
+	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
 	for _, route := range []string{
 		"GET /api/v1/carbon", "PUT /api/v1/carbon",
-		"POST /api/v1/ingest/pc",
 	} {
 		mux.HandleFunc(route, notImplemented)
 	}
@@ -177,13 +183,14 @@ func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Label   *string `json:"label"`
-		Enabled *bool   `json:"enabled"`
+		Label      *string         `json:"label"`
+		Enabled    *bool           `json:"enabled"`
+		ComputerID json.RawMessage `json:"computer_id"` // a computer's id, or null to let the plug go; absent leaves it alone
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label and/or enabled")
+	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled and/or computer_id")
 		return
 	}
 	if body.Label != nil {
@@ -194,16 +201,31 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 		body.Label = &l
 	}
-	ch, err := s.Store.UpdateChannel(r.Context(), r.PathValue("channelId"), body.Label, body.Enabled)
-	if errors.Is(err, store.ErrNotFound) {
+	var computerID *string
+	if body.ComputerID != nil {
+		if err := json.Unmarshal(body.ComputerID, &computerID); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "computer_id is a computer's id or null")
+			return
+		}
+	}
+
+	id := r.PathValue("channelId")
+	ch, err := s.Store.UpdateChannel(r.Context(), id, body.Label, body.Enabled)
+	if err == nil && body.ComputerID != nil {
+		ch, err = s.Store.AssignChannel(r.Context(), id, computerID)
+	}
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, ch)
+	case errors.Is(err, store.ErrNotFound):
 		writeProblem(w, http.StatusNotFound, "unknown_channel", "no such channel")
-		return
-	}
-	if err != nil {
+	case errors.Is(err, store.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "bad_computer", err.Error())
+	case errors.Is(err, store.ErrConflict):
+		writeProblem(w, http.StatusConflict, "computer_conflict", err.Error())
+	default:
 		serverError(w, err)
-		return
 	}
-	writeJSON(w, http.StatusOK, ch)
 }
 
 // enabledChannels returns the channels the user has not switched off, keyed by id.
@@ -331,41 +353,18 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	var houseCost rates.Money
 	haveMains, housePriced := false, true
 	for _, ch := range on {
-		t, err := s.Store.Totals(r.Context(), ch.ID, from, to)
+		cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
 		if err != nil {
 			serverError(w, err)
 			return
 		}
-		cs := model.ChannelSummary{ChannelID: ch.ID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
-		if t.MonitoredHours > 0 {
-			peak := t.PeakWatts
-			cs.PeakWatts = &peak
-		}
-
-		// Each stretch of the period is priced at its own day's rate (a period can span two bills).
-		var readErr error
-		priced := schedule.Cost(func(f, to time.Time) float64 {
-			tot, err := s.Store.Totals(r.Context(), ch.ID, f, to)
-			if err != nil && readErr == nil {
-				readErr = err
-			}
-			return tot.KWh
-		}, from, to)
-		if readErr != nil {
-			serverError(w, readErr)
-			return
-		}
-		if !priced.Unpriced {
-			c := priced.Cost.String()
-			cs.Cost = &c
-			sum.CostEstimated = sum.CostEstimated || priced.Estimated
-		}
+		sum.CostEstimated = sum.CostEstimated || (cs.Cost != nil && priced.Estimated)
 		sum.Channels = append(sum.Channels, cs)
 
 		// Scopes are never summed across each other: the house is the mains alone, circuits are summed on their own.
 		switch ch.Scope {
 		case model.ScopeMains:
-			house += t.KWh
+			house += cs.KWh
 			haveMains = true
 			if priced.Unpriced {
 				housePriced = false
@@ -373,7 +372,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 				houseCost = houseCost.Add(priced.Cost)
 			}
 		case model.ScopeCircuit:
-			circuits += t.KWh
+			circuits += cs.KWh
 		}
 	}
 	if haveMains {
@@ -389,6 +388,227 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, sum)
+}
+
+// channelSummary is one channel's energy, peak, covered time and cost over [from, to). Each stretch of the period is priced
+// at its own day's rate (a period can span two bills); the cost is nil when no price is known.
+func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to time.Time, schedule *rates.Schedule) (model.ChannelSummary, rates.RatedCost, error) {
+	t, err := s.Store.Totals(ctx, ch.ID, from, to)
+	if err != nil {
+		return model.ChannelSummary{}, rates.RatedCost{}, err
+	}
+	cs := model.ChannelSummary{ChannelID: ch.ID, ComputerID: ch.ComputerID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
+	if t.MonitoredHours > 0 {
+		peak := t.PeakWatts
+		cs.PeakWatts = &peak
+	}
+	var readErr error
+	priced := schedule.Cost(func(f, end time.Time) float64 {
+		tot, err := s.Store.Totals(ctx, ch.ID, f, end)
+		if err != nil && readErr == nil {
+			readErr = err
+		}
+		return tot.KWh
+	}, from, to)
+	if readErr != nil {
+		return model.ChannelSummary{}, rates.RatedCost{}, readErr
+	}
+	if !schedule.HasRate(from, to) {
+		priced.Unpriced = true // no price known: a channel that used nothing has no cost either, not "$0.00"
+	}
+	if !priced.Unpriced {
+		c := priced.Cost.String()
+		cs.Cost = &c
+	}
+	return cs, priced, nil
+}
+
+const maxIngestBody = 16 << 20
+
+// ingestPc stores what the PC collector pushed. Sending the same minutes again replaces them, so the collector can
+// resend its backlog after a failure. Unknown fields are ignored (a newer collector may send more than this server reads).
+func (s *Server) ingestPc(w http.ResponseWriter, r *http.Request) {
+	var in pcrelay.Ingest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxIngestBody)).Decode(&in); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_ingest", "the body is not a valid PC push: "+err.Error())
+		return
+	}
+	notes, err := in.Validate(s.now())
+	switch {
+	case errors.Is(err, pcrelay.ErrVersion):
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_ = json.NewEncoder(w).Encode(problem{Code: "api_version_mismatch", Message: err.Error(), ServerAPIVersion: Version})
+		return
+	case err != nil:
+		writeProblem(w, http.StatusBadRequest, "bad_ingest", err.Error())
+		return
+	}
+	accepted, err := s.Store.IngestPC(r.Context(), in, s.now())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if notes == nil {
+		notes = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"api_version": Version, "accepted": accepted, "notes": notes})
+}
+
+func (s *Server) listComputers(w http.ResponseWriter, r *http.Request) {
+	all, err := s.Store.Computers(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"computers": all})
+}
+
+func computerError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeProblem(w, http.StatusNotFound, "unknown_computer", "no such computer")
+	case errors.Is(err, store.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "bad_computer", err.Error())
+	case errors.Is(err, store.ErrConflict):
+		writeProblem(w, http.StatusConflict, "computer_conflict", err.Error())
+	default:
+		serverError(w, err)
+	}
+}
+
+func (s *Server) addComputer(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name     string  `json:"name"`
+		SourceID *string `json:"source_id"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_computer", "send a name and optionally source_id")
+		return
+	}
+	c, err := s.Store.CreateComputer(r.Context(), body.Name, body.SourceID)
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, c)
+}
+
+func (s *Server) updateComputer(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name     *string         `json:"name"`
+		SourceID json.RawMessage `json:"source_id"` // a collector's id, or null to stop using one; absent leaves it alone
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil || (body.Name == nil && body.SourceID == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_computer", "send a name and/or source_id")
+		return
+	}
+	var source *string
+	if body.SourceID != nil {
+		if err := json.Unmarshal(body.SourceID, &source); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_computer", "source_id is a collector's id or null")
+			return
+		}
+	}
+	c, err := s.Store.UpdateComputer(r.Context(), r.PathValue("computerId"), body.Name, body.SourceID != nil, source)
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+func (s *Server) removeComputer(w http.ResponseWriter, r *http.Request) {
+	if err := s.Store.DeleteComputer(r.Context(), r.PathValue("computerId")); err != nil {
+		computerError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// computerDetail is everything about one computer for a period: the whole PC at its wall plug, its peripherals, and what its
+// collector reported about its insides. "Setup" adds the wall figure and the peripherals for the whole desk; it is its own
+// labelled figure and is never part of the PC's, the circuits' or the house's.
+func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
+	from, to, err := parsePeriod(r)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+		return
+	}
+	comp, err := s.Store.Computer(r.Context(), r.PathValue("computerId"))
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	cfg, err := s.rateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	schedule := cfg.Schedule(s.Loc)
+	_, byID, err := s.enabledChannels(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	detail := model.ComputerDetail{Computer: comp, From: from.UTC(), To: to.UTC(), Peripherals: []model.ChannelSummary{}}
+	var setup float64
+	var setupCost rates.Money
+	setupPriced, haveAny := true, false
+	add := func(id string) (*model.ChannelSummary, error) {
+		ch, ok := byID[id]
+		if !ok || !ch.Enabled {
+			return nil, nil // a plug the user has hidden is neither shown nor counted
+		}
+		cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		if err != nil {
+			return nil, err
+		}
+		setup += cs.KWh
+		haveAny = true
+		if priced.Unpriced {
+			setupPriced = false
+		} else {
+			setupCost = setupCost.Add(priced.Cost)
+		}
+		detail.CostEstimated = detail.CostEstimated || (cs.Cost != nil && priced.Estimated)
+		return &cs, nil
+	}
+	if comp.WallChannelID != nil {
+		if detail.Wall, err = add(*comp.WallChannelID); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	for _, id := range comp.PeripheralChannelIDs {
+		cs, err := add(id)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if cs != nil {
+			detail.Peripherals = append(detail.Peripherals, *cs)
+		}
+	}
+	if haveAny {
+		detail.SetupKWh = &setup
+		if setupPriced {
+			c := setupCost.String()
+			detail.SetupCost = &c
+		}
+	}
+	if comp.SourceID != nil {
+		if detail.PC, err = s.Store.PcSourceSummary(r.Context(), *comp.SourceID, from, to); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 const ratesKey = "rates"

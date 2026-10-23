@@ -33,8 +33,9 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/sim` | A simulated house with a dryer, range, EV charger and so on. |
 | `internal/store` | SQLite (WAL, pure Go): devices, channels, per-minute history, totals and bucketed series. |
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
-| `internal/api` | Status, devices, channels (rename, switch off), live, series, summary. |
+| `internal/api` | Status, devices (add, remove), channels (rename, hide, tie to a computer), computers (add, rename, remove, detail), live, series, summary, rates, the PC push. |
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
+| `internal/pcrelay` | What the PC collector pushes (`POST /api/v1/ingest/pc`) and the checks it must pass: impossible readings dropped and said so, a different major version refused. |
 | `internal/webui` | Serves the dashboard that `web/` builds into `internal/webui/dist` (embedded in the binary; not committed, so build `web/` first). |
 
 ## Deploying to the Linux box
@@ -66,7 +67,7 @@ server's Refoss mapping is written from it. Until then adding a Refoss monitor a
 
 ## Not built yet (answers 501)
 
-Carbon, and the PC ingest. Adding a Refoss monitor (only Shelly plugs can be added). Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
+Carbon. Adding a Refoss monitor (only Shelly plugs can be added). The PC collector's client (the server side of the push is built). Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
 `Refoss.Status.Get` (per-channel watts, volts, amps, kWh) has not been seen on a real device, so `StatusRaw` returns the body
 untouched and nothing guesses its fields. The first real device call decides the mapping.
 

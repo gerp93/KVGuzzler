@@ -279,6 +279,19 @@ func TestWithNoPriceAtAllTheEnergyIsStillCountedAndFlaggedUnpriced(t *testing.T)
 	}
 }
 
+func TestHasRateIsTrueOnlyWhenSomePriceIsKnownInThePeriod(t *testing.T) {
+	from, to := ts("2026-10-01T00:00:00"), ts("2026-10-02T00:00:00")
+	if NewSchedule(ModeOne, nil, nil, time.UTC).HasRate(from, to) {
+		t.Error("no rate set: HasRate should be false")
+	}
+	if !NewSchedule(ModeOne, ptr("0.15"), nil, time.UTC).HasRate(from, to) {
+		t.Error("a rate is set: HasRate should be true")
+	}
+	if !NewSchedule(ModeBills, nil, []Bill{august}, time.UTC).HasRate(ts("2026-12-01T00:00:00"), ts("2026-12-02T00:00:00")) {
+		t.Error("after the only bill its price is the estimate: HasRate should be true")
+	}
+}
+
 func TestTheAveragePriceIsWeightedByTime(t *testing.T) {
 	s := NewSchedule(ModeBills, ptr("0.15"), []Bill{august, october}, time.UTC)
 	// 2 days at $0.20 (9/20 to 9/22) and 4 days at $0.18: (2 x 0.20 + 4 x 0.18) / 6

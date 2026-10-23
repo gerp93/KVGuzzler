@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS channels (
   scope     TEXT NOT NULL,
   label     TEXT NOT NULL,
   enabled   INTEGER NOT NULL DEFAULT 1,
-  max_watts REAL
+  max_watts REAL,
+  computer_id TEXT
 );
 CREATE TABLE IF NOT EXISTS minutes (
   channel_id TEXT NOT NULL,
@@ -83,7 +84,7 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');`)
+INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSchema + computersSchema)
 	if err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
@@ -94,6 +95,15 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');`)
 	}
 	if has == 0 {
 		if _, err := db.Exec(`ALTER TABLE devices ADD COLUMN removed INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+	}
+	// Databases made before plugs could belong to a computer have no such column.
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = 'computer_id'`).Scan(&has); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	if has == 0 {
+		if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN computer_id TEXT`); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
@@ -147,10 +157,14 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	var c model.Channel
 	var idx sql.NullInt64
 	var max sql.NullFloat64
+	var computer sql.NullString
 	var scope string
 	var enabled int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max); err != nil {
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer); err != nil {
 		return c, err
+	}
+	if computer.Valid {
+		c.ComputerID = &computer.String
 	}
 	c.Scope = model.Scope(scope)
 	c.Enabled = enabled != 0
@@ -164,7 +178,7 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	return c, nil
 }
 
-const channelCols = `id, device_id, idx, scope, label, enabled, max_watts`
+const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id`
 
 func (s *Store) Channels(ctx context.Context) ([]model.Channel, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels ORDER BY device_id, idx IS NULL, idx, id`)

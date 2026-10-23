@@ -69,19 +69,20 @@ button:hover:not(:disabled) {
   overflow-x: auto;
 }
 
-.top nav button {
+.top nav a {
   flex: 1 0 auto;
   padding: 8px 12px;
-  border: 0;
   border-radius: var(--radius);
-  background: transparent;
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
 }
 
-.top nav button:hover {
+.top nav a:hover {
   background: var(--color-top-bar-hover);
 }
 
-.top nav button[aria-current='page'] {
+.top nav a[aria-current='page'] {
   background: var(--color-primary-action);
   color: var(--color-primary-action-text, var(--color-text));
 }
@@ -387,4 +388,53 @@ select:focus-visible {
 
 .device-form .check {
   margin-top: 8px;
+}
+
+/* Appliances: rows that open something, and the back link */
+.bars li:has(> a.rowlink) {
+  display: block;
+}
+
+.bars a.rowlink {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.bars.wide a.rowlink {
+  grid-template-columns: minmax(0, 8rem) 1fr auto auto;
+}
+
+.bars a.rowlink:hover,
+.bars a.rowlink:focus-visible {
+  background: var(--color-bg-hover);
+}
+
+.back {
+  display: inline-block;
+  color: inherit;
+}
+
+.big.small {
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+}
+
+.computer-block {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+}
+
+@media (min-width: 720px) {
+  main > .back {
+    grid-column: 1 / -1;
+  }
 }

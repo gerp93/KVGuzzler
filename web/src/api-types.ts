@@ -145,6 +145,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/computers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every computer, with the plugs tied to it.
+         * @description A computer is its own kind of appliance: it can have a collector on it that reports its sensors and programs, one
+         *     wall plug (the whole PC at the wall) and any number of peripheral plugs (monitor, speakers).
+         */
+        get: operations["listComputers"];
+        put?: never;
+        /** Add a computer by hand. A PC collector that reports for the first time is added by the server itself. */
+        post: operations["addComputer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/computers/{computerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a computer. Its plugs stay as ordinary plugs; what its collector reported is kept. */
+        delete: operations["removeComputer"];
+        options?: never;
+        head?: never;
+        /** Rename a computer or change which collector reports for it. */
+        patch: operations["updateComputer"];
+        trace?: never;
+    };
+    "/api/v1/computers/{computerId}/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything about one computer for a period.
+         * @description The whole PC at the wall, its peripherals, and what its collector reported about its insides (sensors, the programs it
+         *     blames, the times it was not recording). The PC is on one of the circuits, so none of this is added to the house or
+         *     circuit figures. "Setup" is the wall figure plus the peripherals, a separate, labelled figure for the whole desk.
+         */
+        get: operations["getComputerDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rates": {
         parameters: {
             query?: never;
@@ -278,10 +340,17 @@ export interface components {
             enabled: boolean;
             /** @description The sanity cap; a reading above it is dropped. */
             max_watts?: number | null;
+            /** @description The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one. */
+            computer_id?: string | null;
         };
         ChannelUpdate: {
             label?: string;
             enabled?: boolean;
+            /**
+             * @description Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
+             *     any number of `plug` channels are its peripherals.
+             */
+            computer_id?: string | null;
         };
         Reading: {
             channel_id: string;
@@ -314,6 +383,8 @@ export interface components {
         };
         ChannelSummary: {
             channel_id: string;
+            /** @description The computer the channel belongs to, so a client can group it with that computer instead of listing it alone. */
+            computer_id?: string | null;
             scope: components["schemas"]["Scope"];
             kwh: number;
             cost?: components["schemas"]["Money"] | null;
@@ -409,11 +480,18 @@ export interface components {
             /** @description How many once-a-second readings the minute is made of. */
             samples: number;
         };
+        /**
+         * @description The estimated energy one program used in one minute, split into the CPU's and the GPU's share. An estimate: the
+         *     PC shares only the power above its idle baseline, by each program's share of CPU and GPU busy time. Never added to
+         *     the sensor or wall figures.
+         */
         PcProgram: {
             /** @description A short label such as `chrome.exe` or `python.exe (ComfyUI)`; never a command line. */
             name: string;
-            /** @description An estimate. Never added to the sensor or wall figures. */
-            kwh: number;
+            cpu_kwh: number;
+            gpu_kwh: number;
+            /** @description How long the program was busy in the minute. */
+            active_seconds?: number;
         };
         PcGap: {
             /** Format: date-time */
@@ -445,6 +523,80 @@ export interface components {
             minutes: components["schemas"]["PcMinute"][];
             gaps?: components["schemas"]["PcGap"][];
         };
+        Computer: {
+            id: string;
+            name: string;
+            /** @description The PC collector that reports for this computer, or null when none does. */
+            source_id?: string | null;
+            /** @description The plug the computer is on, measuring the whole PC at the wall (scope `pc`). */
+            wall_channel_id?: string | null;
+            /** @description Plugs next to the computer (monitor, speakers), each a separate device. */
+            peripheral_channel_ids: string[];
+            /**
+             * Format: date-time
+             * @description When its collector last sent anything.
+             */
+            last_seen?: string | null;
+        };
+        NewComputer: {
+            name: string;
+            source_id?: string | null;
+        };
+        ComputerUpdate: {
+            name?: string;
+            /** @description The collector to take readings from, or null to stop using one. */
+            source_id?: string | null;
+        };
+        ComputerDetail: {
+            computer: components["schemas"]["Computer"];
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description The whole PC at the wall, from its plug. */
+            wall?: components["schemas"]["ChannelSummary"] | null;
+            peripherals: components["schemas"]["ChannelSummary"][];
+            /** @description The wall figure plus the peripherals, for the whole desk. A separate figure, never part of the PC's own. */
+            setup_kwh?: number | null;
+            setup_cost?: components["schemas"]["Money"] | null;
+            cost_estimated: boolean;
+            /** @description What the PC's own collector reported; null when none reports for this computer. */
+            pc?: components["schemas"]["PcSource"] | null;
+        };
+        PcComponent: {
+            name: string;
+            scope: components["schemas"]["IngestScope"];
+            /** @enum {string} */
+            kind?: "other" | "cpu" | "gpu";
+            kwh: number;
+            avg_watts?: number | null;
+            peak_watts?: number | null;
+            monitored_hours?: number;
+        };
+        PcProgramTotal: {
+            name: string;
+            cpu_kwh: number;
+            gpu_kwh: number;
+            /** @description cpu_kwh plus gpu_kwh. An estimate. */
+            kwh: number;
+            active_seconds?: number;
+        };
+        PcSource: {
+            source_id: string;
+            name?: string;
+            /**
+             * Format: date-time
+             * @description When this PC last sent anything.
+             */
+            last_seen?: string | null;
+            /** @description The highest once-a-second reading of the PC's sensors in total during the period. */
+            total_peak_watts?: number | null;
+            components: components["schemas"]["PcComponent"][];
+            /** @description Biggest first. Estimates. */
+            programs: components["schemas"]["PcProgramTotal"][];
+            /** @description Stretches the PC was not sampling (asleep, off, lost power), clipped to the period. */
+            gaps: components["schemas"]["PcGap"][];
+        };
         IngestResult: {
             /** @constant */
             api_version: 1;
@@ -466,6 +618,7 @@ export interface components {
     };
     parameters: {
         DeviceId: string;
+        ComputerId: string;
         ChannelId: string;
         /** @description Start of the period (inclusive), RFC 3339. */
         From: string;
@@ -719,6 +872,149 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    listComputers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        computers: components["schemas"]["Computer"][];
+                    };
+                };
+            };
+        };
+    };
+    addComputer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewComputer"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Computer"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Another computer already uses that collector. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    removeComputer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateComputer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComputerUpdate"];
+            };
+        };
+        responses: {
+            /** @description The updated computer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Computer"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description Another computer already uses that collector. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getComputerDetail: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path: {
+                computerId: components["parameters"]["ComputerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     getRates: {

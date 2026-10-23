@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { Channel, Device, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
+import type { Channel, Computer, ComputerDetail, Device, Live, NewDevice, RateConfig, Series, Status, Summary } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -52,6 +52,22 @@ export const api = {
       body: JSON.stringify(nd),
     }),
   removeDevice: (id: string) => request<void>(`api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  computers: () => request<{ computers: Computer[] }>('api/v1/computers').then((r) => r.computers),
+  computerDetail: (id: string, from: string, to: string) =>
+    request<ComputerDetail>(`api/v1/computers/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
+  addComputer: (name: string) =>
+    request<Computer>('api/v1/computers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  updateComputer: (id: string, body: { name?: string; source_id?: string | null }) =>
+    request<Computer>(`api/v1/computers/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
   setRates: (cfg: RateConfig) =>
     request<RateConfig>('api/v1/rates', {
@@ -59,7 +75,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateChannel: (id: string, body: { label?: string; enabled?: boolean }) =>
+  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null }) =>
     request<Channel>(`api/v1/channels/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

@@ -151,6 +151,17 @@ func (s *Schedule) Cost(kwhBetween func(from, to time.Time) float64, from, to ti
 
 func priceOf(kwh float64, perKwh Money) Money { return MoneyFromFloat(kwh).Mul(perKwh) }
 
+// HasRate says whether any price is known for some part of [from, to). With none, nothing in the period can be priced, not
+// even energy of zero.
+func (s *Schedule) HasRate(from, to time.Time) bool {
+	for _, seg := range s.Segments(from, to) {
+		if seg.Rate != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // AverageRate is the price over a period weighted by time, for pricing many small amounts with one number.
 func (s *Schedule) AverageRate(from, to time.Time) *Money {
 	var weighted, seconds Money

@@ -5,6 +5,7 @@ import { HistoryView } from './HistoryView';
 import { usePoll, useStored } from './hooks';
 import { LiveView } from './LiveView';
 import { DEFAULT_THEME, isTheme, type Channel } from './lib';
+import { routePath, useRoute } from './route';
 import { SettingsView } from './SettingsView';
 
 const TABS = [
@@ -16,7 +17,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export function App() {
-  const [tab, setTab] = useStored('tab', 'live');
+  const [route] = useRoute('live');
   const [themeName, setThemeName] = useStored('theme', DEFAULT_THEME);
   const theme = isTheme(themeName) ? themeName : DEFAULT_THEME;
   useEffect(() => {
@@ -29,7 +30,7 @@ export function App() {
   const chan = usePoll<Channel[]>(() => api.channels(), 0, [rev]);
 
   const mismatch = [status.error, chan.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
-  const active: TabId = TABS.find((t) => t.id === tab)?.id ?? 'live';
+  const active: TabId = TABS.find((t) => t.id === route.tab)?.id ?? 'live';
   const channels = chan.data ?? [];
 
   return (
@@ -38,9 +39,9 @@ export function App() {
         <h1>House power</h1>
         <nav aria-label="Sections">
           {TABS.map((t) => (
-            <button key={t.id} type="button" aria-current={t.id === active ? 'page' : undefined} onClick={() => setTab(t.id)}>
+            <a key={t.id} href={routePath(t.id)} aria-current={t.id === active ? 'page' : undefined}>
               {t.label}
-            </button>
+            </a>
           ))}
         </nav>
       </header>
@@ -52,11 +53,12 @@ export function App() {
         ) : !chan.data ? (
           <p class="note">{chan.error ? `Waiting for the server: ${chan.error.message}` : 'Loading…'}</p>
         ) : active === 'live' ? (
-          <LiveView channels={channels} onOpenSettings={() => setTab('settings')} />
+          <LiveView channels={channels} onOpenSettings={() => (window.location.hash = routePath('settings'))} />
         ) : active === 'history' ? (
           <HistoryView channels={channels} />
         ) : active === 'appliances' ? (
-          <AppliancesView channels={channels} />
+          <AppliancesView channels={channels} open={route.rest} />
+
         ) : (
           <SettingsView channels={channels} onChanged={() => setRev((n) => n + 1)} theme={theme} onTheme={setThemeName} />
         )}

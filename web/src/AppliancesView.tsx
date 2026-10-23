@@ -1,38 +1,43 @@
 import { api } from './api';
+import { ApplianceView } from './ApplianceView';
+import { ComputerView } from './ComputerView';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import {
-  formatKwh, formatMoney, periodRange, splitSummary,
-  type Channel, type ChannelSummary, type PeriodKey, type Summary,
+  applianceList, formatKwh, formatMoney, periodRange,
+  type Channel, type Computer, type PeriodKey, type Summary,
 } from './lib';
+import { routePath } from './route';
 
-export function AppliancesView({ channels }: { channels: Channel[] }) {
+interface Loaded {
+  summary: Summary;
+  computers: Computer[];
+}
+
+/** The Appliances tab: a list, and one thing open at a time (an ordinary appliance, or a computer with its full breakdown). */
+export function AppliancesView({ channels, open }: { channels: Channel[]; open: string[] }) {
+  const [kind, id] = open;
+  if (kind === 'computer' && id) return <ComputerView id={id} channels={channels} />;
+  if (kind === 'channel' && id) return <ApplianceView id={id} channels={channels} />;
+  return <AppliancesList channels={channels} />;
+}
+
+function AppliancesList({ channels }: { channels: Channel[] }) {
   const [period, setPeriod] = useStored('period', '24h');
-  const { data, error } = usePoll<Summary>(
-    () => {
+  const { data, error } = usePoll<Loaded>(
+    async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
-      return api.summary(from, to);
+      const [summary, computers] = await Promise.all([api.summary(from, to), api.computers()]);
+      return { summary, computers };
     },
     60_000,
-    [period],
+    [period, channels],
   );
-  const label = (id: string) => channels.find((c) => c.id === id)?.label ?? id;
 
-  const split = data ? splitSummary(data) : undefined;
-  const top = Math.max(0, ...(split?.circuits.map((c) => c.kwh) ?? []), split?.unmeteredKwh ?? 0);
-
-  const Item = ({ c }: { c: ChannelSummary }) => (
-    <li>
-      <span class="name">{label(c.channel_id)}</span>
-      <span class="bar" aria-hidden="true">
-        <i style={{ width: `${top > 0 ? (c.kwh / top) * 100 : 0}%` }} />
-      </span>
-      <span class="num">{formatKwh(c.kwh)}</span>
-      {c.cost !== null && c.cost !== undefined && (
-        <span class="num cost">{formatMoney(c.cost, data?.cost_estimated)}</span>
-      )}
-    </li>
-  );
+  const list = data ? applianceList(data.summary, channels, data.computers) : undefined;
+  const estimated = data?.summary.cost_estimated;
+  const top = Math.max(0, ...(list?.appliances.map((a) => a.channel.kwh) ?? []), data?.summary.unmetered_kwh ?? 0);
+  const topComputer = Math.max(0, ...(list?.computers.map((c) => c.wall?.kwh ?? 0) ?? []));
 
   return (
     <>
@@ -41,11 +46,11 @@ export function AppliancesView({ channels }: { channels: Channel[] }) {
           <h2>House energy</h2>
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
-        <p class="big">{formatKwh(split?.houseKwh)}</p>
-        {data?.house_cost && (
+        <p class="big">{formatKwh(data?.summary.house_kwh)}</p>
+        {data?.summary.house_cost && (
           <p class="caption">
-            {formatMoney(data.house_cost, data.cost_estimated)}
-            {data.cost_estimated && ' (some days are priced at the latest bill, until the next one is entered)'}
+            {formatMoney(data.summary.house_cost, estimated)}
+            {estimated && ' (some days are priced at the latest bill, until the next one is entered)'}
           </p>
         )}
       </section>
@@ -56,32 +61,54 @@ export function AppliancesView({ channels }: { channels: Channel[] }) {
         </section>
       )}
 
-      {split && (
+      {list && (
         <section class="card">
           <h2>Where it went</h2>
+          {list.appliances.length === 0 && <p class="note">No appliances on a clamp or plug yet.</p>}
           <ul class="bars wide">
-            {split.circuits.map((c) => (
-              <Item key={c.channel_id} c={c} />
+            {list.appliances.map((a) => (
+              <li key={a.channel.channel_id}>
+                <a class="rowlink" href={routePath('appliances', 'channel', a.channel.channel_id)}>
+                  <span class="name">{a.label}</span>
+                  <span class="bar" aria-hidden="true">
+                    <i style={{ width: `${top > 0 ? (a.channel.kwh / top) * 100 : 0}%` }} />
+                  </span>
+                  <span class="num">{formatKwh(a.channel.kwh)}</span>
+                  <span class="num cost">{a.channel.cost != null ? formatMoney(a.channel.cost, estimated) : ''}</span>
+                </a>
+              </li>
             ))}
           </ul>
-          {split.unmeteredKwh !== null && (
+          {data?.summary.unmetered_kwh != null && (
             <p class="derived">
               <span>Everything else (no clamp on it)</span>
-              <span class="num">{formatKwh(split.unmeteredKwh)}</span>
+              <span class="num">{formatKwh(data.summary.unmetered_kwh)}</span>
             </p>
           )}
         </section>
       )}
 
-      {split && split.pc.length > 0 && (
+      {list && list.computers.length > 0 && (
         <section class="card">
-          <h2>Also measured</h2>
+          <h2>Computers</h2>
           <ul class="bars wide">
-            {split.pc.map((c) => (
-              <Item key={c.channel_id} c={c} />
+            {list.computers.map(({ computer, wall }) => (
+              <li key={computer.id}>
+                <a class="rowlink" href={routePath('appliances', 'computer', computer.id)}>
+                  <span class="name">{computer.name}</span>
+                  <span class="bar" aria-hidden="true">
+                    <i style={{ width: `${topComputer > 0 ? ((wall?.kwh ?? 0) / topComputer) * 100 : 0}%` }} />
+                  </span>
+                  <span class="num">{wall ? formatKwh(wall.kwh) : 'no plug'}</span>
+                  <span class="num cost">{wall?.cost != null ? formatMoney(wall.cost, estimated) : ''}</span>
+                </a>
+              </li>
             ))}
           </ul>
-          <p class="caption">The PC is part of one of the circuits above, so it is shown here and never added to them.</p>
+          <p class="caption">
+            A computer is on one of the circuits, so these are shown on their own and never added to the house or circuit figures.
+            Open one to see its sensors, programs and peripherals.
+          </p>
         </section>
       )}
     </>

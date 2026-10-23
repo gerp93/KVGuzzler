@@ -1,0 +1,37 @@
+{
+  "computer": {
+    "id": "comp-1a2b3c4d",
+    "name": "Desktop",
+    "source_id": "pc-7f3a9c1e",
+    "wall_channel_id": "shelly-192.168.1.106:plug",
+    "peripheral_channel_ids": ["shelly-192.168.1.67:plug"],
+    "last_seen": "2026-10-22T18:04:11Z"
+  },
+  "from": "2026-10-22T05:00:00Z",
+  "to": "2026-10-23T05:00:00Z",
+  "wall": { "channel_id": "shelly-192.168.1.106:plug", "computer_id": "comp-1a2b3c4d", "scope": "pc", "kwh": 3.1, "cost": "0.47", "carbon_g": null, "peak_watts": 355.0, "monitored_hours": 9.9 },
+  "peripherals": [
+    { "channel_id": "shelly-192.168.1.67:plug", "computer_id": "comp-1a2b3c4d", "scope": "plug", "kwh": 0.6, "cost": "0.09", "carbon_g": null, "peak_watts": 52.0, "monitored_hours": 9.9 }
+  ],
+  "setup_kwh": 3.7,
+  "setup_cost": "0.56",
+  "cost_estimated": false,
+  "pc": {
+    "source_id": "pc-7f3a9c1e",
+    "name": "Desktop",
+    "last_seen": "2026-10-22T18:04:11Z",
+    "total_peak_watts": 402.3,
+    "components": [
+      { "name": "CPU package", "scope": "component", "kind": "cpu", "kwh": 0.61, "avg_watts": 61.4, "peak_watts": 118.0, "monitored_hours": 9.9 },
+      { "name": "RTX 5070 Ti", "scope": "component", "kind": "gpu", "kwh": 2.12, "avg_watts": 214.7, "peak_watts": 301.5, "monitored_hours": 9.9 },
+      { "name": "Wall meter", "scope": "wall", "kind": "other", "kwh": 3.1, "avg_watts": 312.5, "peak_watts": 355.0, "monitored_hours": 9.9 }
+    ],
+    "programs": [
+      { "name": "python.exe (ComfyUI)", "cpu_kwh": 0.31, "gpu_kwh": 1.9, "kwh": 2.21, "active_seconds": 31200 },
+      { "name": "chrome.exe", "cpu_kwh": 0.12, "gpu_kwh": 0, "kwh": 0.12, "active_seconds": 4100 }
+    ],
+    "gaps": [
+      { "from": "2026-10-22T07:10:00Z", "to": "2026-10-22T11:41:00Z", "reason": "asleep", "plug_kwh": 0.071 }
+    ]
+  }
+}

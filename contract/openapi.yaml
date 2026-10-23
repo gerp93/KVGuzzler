@@ -217,6 +217,117 @@ paths:
                 $ref: '#/components/schemas/Summary'
         '400':
           $ref: '#/components/responses/Problem'
+  /api/v1/computers:
+    get:
+      tags: [Read]
+      operationId: listComputers
+      summary: Every computer, with the plugs tied to it.
+      description: |
+        A computer is its own kind of appliance: it can have a collector on it that reports its sensors and programs, one
+        wall plug (the whole PC at the wall) and any number of peripheral plugs (monitor, speakers).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [computers]
+                properties:
+                  computers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Computer'
+    post:
+      tags: [Settings]
+      operationId: addComputer
+      summary: Add a computer by hand. A PC collector that reports for the first time is added by the server itself.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewComputer'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Computer'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          description: Another computer already uses that collector.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/computers/{computerId}:
+    patch:
+      tags: [Settings]
+      operationId: updateComputer
+      summary: Rename a computer or change which collector reports for it.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputerUpdate'
+      responses:
+        '200':
+          description: The updated computer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Computer'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          description: Another computer already uses that collector.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags: [Settings]
+      operationId: removeComputer
+      summary: Remove a computer. Its plugs stay as ordinary plugs; what its collector reported is kept.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/detail:
+    get:
+      tags: [Read]
+      operationId: getComputerDetail
+      summary: Everything about one computer for a period.
+      description: |
+        The whole PC at the wall, its peripherals, and what its collector reported about its insides (sensors, the programs it
+        blames, the times it was not recording). The PC is on one of the circuits, so none of this is added to the house or
+        circuit figures. "Setup" is the wall figure plus the peripherals, a separate, labelled figure for the whole desk.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerDetail'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/rates:
     get:
       tags: [Settings]
@@ -322,6 +433,12 @@ components:
   parameters:
     DeviceId:
       name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    ComputerId:
+      name: computerId
       in: path
       required: true
       schema:
@@ -470,6 +587,9 @@ components:
         max_watts:
           type: [number, 'null']
           description: The sanity cap; a reading above it is dropped.
+        computer_id:
+          type: [string, 'null']
+          description: The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one.
     ChannelUpdate:
       type: object
       minProperties: 1
@@ -480,6 +600,11 @@ components:
           maxLength: 60
         enabled:
           type: boolean
+        computer_id:
+          type: [string, 'null']
+          description: |
+            Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
+            any number of `plug` channels are its peripherals.
     Reading:
       type: object
       required: [channel_id, watts]
@@ -542,6 +667,9 @@ components:
       properties:
         channel_id:
           type: string
+        computer_id:
+          type: [string, 'null']
+          description: The computer the channel belongs to, so a client can group it with that computer instead of listing it alone.
         scope:
           $ref: '#/components/schemas/Scope'
         kwh:
@@ -698,14 +826,25 @@ components:
           description: How many once-a-second readings the minute is made of.
     PcProgram:
       type: object
-      required: [name, kwh]
+      required: [name, cpu_kwh, gpu_kwh]
+      description: |
+        The estimated energy one program used in one minute, split into the CPU's and the GPU's share. An estimate: the
+        PC shares only the power above its idle baseline, by each program's share of CPU and GPU busy time. Never added to
+        the sensor or wall figures.
       properties:
         name:
           type: string
           description: A short label such as `chrome.exe` or `python.exe (ComfyUI)`; never a command line.
-        kwh:
+        cpu_kwh:
           type: number
-          description: An estimate. Never added to the sensor or wall figures.
+          minimum: 0
+        gpu_kwh:
+          type: number
+          minimum: 0
+        active_seconds:
+          type: number
+          minimum: 0
+          description: How long the program was busy in the minute.
     PcGap:
       type: object
       required: [from, to, reason]
@@ -760,6 +899,148 @@ components:
             $ref: '#/components/schemas/PcMinute'
         gaps:
           type: array
+          items:
+            $ref: '#/components/schemas/PcGap'
+    Computer:
+      type: object
+      required: [id, name, peripheral_channel_ids]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        source_id:
+          type: [string, 'null']
+          description: The PC collector that reports for this computer, or null when none does.
+        wall_channel_id:
+          type: [string, 'null']
+          description: The plug the computer is on, measuring the whole PC at the wall (scope `pc`).
+        peripheral_channel_ids:
+          type: array
+          description: Plugs next to the computer (monitor, speakers), each a separate device.
+          items:
+            type: string
+        last_seen:
+          type: [string, 'null']
+          format: date-time
+          description: When its collector last sent anything.
+    NewComputer:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        source_id:
+          type: [string, 'null']
+    ComputerUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        source_id:
+          type: [string, 'null']
+          description: The collector to take readings from, or null to stop using one.
+    ComputerDetail:
+      type: object
+      required: [computer, from, to, peripherals, cost_estimated]
+      properties:
+        computer:
+          $ref: '#/components/schemas/Computer'
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        wall:
+          oneOf:
+            - $ref: '#/components/schemas/ChannelSummary'
+            - type: 'null'
+          description: The whole PC at the wall, from its plug.
+        peripherals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelSummary'
+        setup_kwh:
+          type: [number, 'null']
+          description: The wall figure plus the peripherals, for the whole desk. A separate figure, never part of the PC's own.
+        setup_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        cost_estimated:
+          type: boolean
+        pc:
+          oneOf:
+            - $ref: '#/components/schemas/PcSource'
+            - type: 'null'
+          description: What the PC's own collector reported; null when none reports for this computer.
+    PcComponent:
+      type: object
+      required: [name, scope, kwh]
+      properties:
+        name:
+          type: string
+        scope:
+          $ref: '#/components/schemas/IngestScope'
+        kind:
+          type: string
+          enum: [other, cpu, gpu]
+        kwh:
+          type: number
+        avg_watts:
+          type: [number, 'null']
+        peak_watts:
+          type: [number, 'null']
+        monitored_hours:
+          type: number
+    PcProgramTotal:
+      type: object
+      required: [name, cpu_kwh, gpu_kwh, kwh]
+      properties:
+        name:
+          type: string
+        cpu_kwh:
+          type: number
+        gpu_kwh:
+          type: number
+        kwh:
+          type: number
+          description: cpu_kwh plus gpu_kwh. An estimate.
+        active_seconds:
+          type: number
+    PcSource:
+      type: object
+      required: [source_id, components, programs, gaps]
+      properties:
+        source_id:
+          type: string
+        name:
+          type: string
+        last_seen:
+          type: [string, 'null']
+          format: date-time
+          description: When this PC last sent anything.
+        total_peak_watts:
+          type: [number, 'null']
+          description: The highest once-a-second reading of the PC's sensors in total during the period.
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcComponent'
+        programs:
+          type: array
+          description: Biggest first. Estimates.
+          items:
+            $ref: '#/components/schemas/PcProgramTotal'
+        gaps:
+          type: array
+          description: Stretches the PC was not sampling (asleep, off, lost power), clipped to the period.
           items:
             $ref: '#/components/schemas/PcGap'
     IngestResult:

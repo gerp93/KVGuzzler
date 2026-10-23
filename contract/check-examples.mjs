@@ -11,6 +11,7 @@ const examples = {
   'summary.json': 'Summary',
   'ingest-pc.json': 'PcIngest',
   'rates.json': 'RateConfig',
+  'computer-detail.json': 'ComputerDetail',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });

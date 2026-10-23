@@ -1,17 +1,10 @@
 import { api } from './api';
-import { Chart, type Line } from './Chart';
+import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { periodRange, sumByTime, type Channel, type PeriodKey } from './lib';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red'];
-
-const toLine = (name: string, colorVar: string, points: { t: string; avg_watts: number }[]): Line => ({
-  name,
-  colorVar,
-  x: points.map((p) => Date.parse(p.t) / 1000),
-  y: points.map((p) => p.avg_watts),
-});
 
 export function HistoryView({ channels }: { channels: Channel[] }) {
   const [period, setPeriod] = useStored('period', '24h');
@@ -30,8 +23,8 @@ export function HistoryView({ channels }: { channels: Channel[] }) {
       ]);
       const out: Line[] = [];
       // The house line is the mains legs added together; every other line is drawn on its own, never added to it.
-      if (house.length > 0) out.push(toLine('House', '--color-text', sumByTime(house)));
-      rest.forEach((s, i) => out.push(toLine(chosen[i]?.label ?? s.channel_id, COLORS[i % COLORS.length]!, s.points)));
+      if (house.length > 0) out.push(lineFrom('House', '--color-text', sumByTime(house)));
+      rest.forEach((s, i) => out.push(lineFrom(chosen[i]?.label ?? s.channel_id, COLORS[i % COLORS.length]!, s.points)));
       return { lines: out, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] };
     },
     60_000,

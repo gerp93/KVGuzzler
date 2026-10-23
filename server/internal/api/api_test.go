@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -285,8 +286,8 @@ func TestSummaryCostFollowsTheRate(t *testing.T) {
 		t.Errorf("house cost %s with no rate set, want null", *before.HouseCost)
 	}
 	for _, c := range before.Channels {
-		if c.KWh > 0 && c.Cost != nil {
-			t.Errorf("%s priced with no rate", c.ChannelID)
+		if c.Cost != nil {
+			t.Errorf("%s has a cost (%s) with no rate set; it should have none, even when it used nothing", c.ChannelID, *c.Cost)
 		}
 	}
 
@@ -432,4 +433,40 @@ func TestWithoutADeviceManagerAddAndRemoveSayNotImplemented(t *testing.T) {
 	if r := del(t, srv.URL+"/api/v1/devices/x"); r.StatusCode != http.StatusNotImplemented {
 		t.Errorf("remove: %d, want 501", r.StatusCode)
 	}
+}
+
+// pcServer is a server whose clock is fixed just after the contract's ingest example, which is set at 18:03 UTC.
+func pcServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	s, err := store.Open(filepath.Join(t.TempDir(), "h.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	clock := time.Date(2026, 10, 22, 19, 0, 0, 0, time.UTC)
+	api := &Server{Store: s, Collector: collector.New(s, time.Second), Loc: time.UTC, Version: "test", Now: func() time.Time { return clock }}
+	srv := httptest.NewServer(api.Handler())
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func contractExample(t *testing.T, name string) string {
+	t.Helper()
+	body, err := os.ReadFile("../../../contract/examples/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+func postBody(t *testing.T, url, body string) (*http.Response, string) {
+	t.Helper()
+	resp, err := http.Post(url, "application/json", bytes.NewBufferString(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(resp.Body)
+	return resp, buf.String()
 }
