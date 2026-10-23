@@ -1,0 +1,19 @@
+[Unit]
+Description=KVGuzzler house energy server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=housed
+Group=housed
+ExecStart=/usr/local/bin/housed -listen :8080 -data /var/lib/housed -tz America/Chicago
+Restart=always
+RestartSec=5
+StateDirectory=housed
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
