@@ -126,9 +126,56 @@ func (m *Manager) Add(ctx context.Context, nd NewDevice) (model.Device, error) {
 	if err := m.Collector.Add(ctx, src); err != nil {
 		return model.Device{}, err
 	}
+	if scope == model.ScopePC {
+		// The device is added either way; if it cannot be tied to a computer now, the user can do it in Settings.
+		if err := m.tieToAComputer(ctx, src); err != nil {
+			log.Printf("could not tie %s to a computer: %v", src.Device().ID, err)
+		}
+	}
 	d := src.Device()
 	d.Online = true
 	return d, nil
+}
+
+// tieToAComputer makes a PC's wall plug part of a computer, so it is shown with the computer and not on its own: the one
+// computer that has no wall plug yet (a PC collector adds one when it first reports), or a new computer named after the plug
+// when there is none or more than one to choose from. A plug that already belongs to a computer (added again after being
+// removed) is left where it was.
+func (m *Manager) tieToAComputer(ctx context.Context, src source.Source) error {
+	chs := src.Channels()
+	if len(chs) == 0 {
+		return nil
+	}
+	id := chs[0].ID
+	if have, err := m.Store.Channel(ctx, id); err == nil && have.ComputerID != nil {
+		return nil
+	}
+	all, err := m.Store.Computers(ctx)
+	if err != nil {
+		return err
+	}
+	var free []model.Computer
+	for _, c := range all {
+		if c.WallChannelID == nil {
+			free = append(free, c)
+		}
+	}
+	var target string
+	if len(free) == 1 {
+		target = free[0].ID
+	} else {
+		name := src.Device().Name
+		if utf8.RuneCountInString(name) > maxName {
+			name = string([]rune(name)[:maxName])
+		}
+		c, err := m.Store.CreateComputer(ctx, name, nil)
+		if err != nil {
+			return err
+		}
+		target = c.ID
+	}
+	_, err = m.Store.AssignChannel(ctx, id, &target)
+	return err
 }
 
 // Remove stops polling a device. What it recorded stays in the history.

@@ -128,6 +128,15 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
   `pc` slice) but only tried against a stand-in plug, and `cmd/refoss-probe` is ready for the first real Refoss call), the PC relay (C# collector pushes per-minute summaries to `POST /api/v1/ingest/pc`
   with an outbox), the Electron viewer that loads the dashboard from the server, then retiring the Avalonia window (only once the
   dashboard does everything it does; the collector service stays). The server box itself (Debian) is set up separately.
+- **House monitor: next** (see the whole-house item above for what exists):
+  - **Appliance groups.** An entertainment center runs through two plugs (one per power strip), and the display should show it as one thing:
+    group any plugs under a name and show their combined energy and cost, never changing what each plug records. A group is plain on/off,
+    unlike a computer, which has the full breakdown. Not built; a computer already groups a wall plug and its peripherals this way.
+  - **The C# relay client**: a worker in the collector that replays new minutes, programs and gaps from `history.db` to
+    `POST /api/v1/ingest/pc` (watermark in `meta`, only whole minutes, batches of at most 1440, a `relay.json` with the box's host and port,
+    a stable source id and the machine name). The server side exists and is tested; nothing sends to it yet.
+  - Carbon footprint and the OpenEI tariff lookup in Go; the Refoss mapping (run `refoss-probe` first); the Electron viewer.
+  - Other plug brands (the entertainment center's are not Shelly): a source per brand behind the same `Source` interface (Tasmota, and Matter plugs through Home Assistant).
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /
   `icon_png` in both release workflows; add the logo to the README header and the app header.

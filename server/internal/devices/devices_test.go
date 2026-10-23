@@ -231,3 +231,79 @@ func TestADeviceThatIsOfflineAtRestartIsStillRestored(t *testing.T) {
 		t.Errorf("devices = %+v, want one that is not (yet) online", got)
 	}
 }
+
+func TestAPcPlugJoinsTheOneComputerWithoutAWallPlugOtherwiseGetsItsOwn(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, _ := f.manager()
+	wallOf := func(computerID string) *string {
+		c, err := f.st.Computer(ctx, computerID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c.WallChannelID
+	}
+
+	// A collector has already added a computer: the plug joins it.
+	desk, err := f.st.CreateComputer(ctx, "Desktop", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: "PC", Scope: "pc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := wallOf(desk.ID); w == nil || *w != pc.ID+":plug" {
+		t.Errorf("the desktop's wall plug = %v, want %s", w, pc.ID+":plug")
+	}
+
+	// No computer is free any more: another PC plug gets a computer of its own, named after it.
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.51", Name: "Laptop", Scope: "pc"}); err != nil {
+		t.Fatal(err)
+	}
+	all, _ := f.st.Computers(ctx)
+	if len(all) != 2 {
+		t.Fatalf("computers = %+v, want the desktop and a new laptop", all)
+	}
+	var laptop *model.Computer
+	for i := range all {
+		if all[i].Name == "Laptop" {
+			laptop = &all[i]
+		}
+	}
+	if laptop == nil || laptop.WallChannelID == nil {
+		t.Errorf("laptop = %+v", laptop)
+	}
+
+	// An ordinary plug does not create or join a computer.
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.60", Name: "Fridge"}); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := f.st.Computers(ctx); len(after) != 2 {
+		t.Errorf("an ordinary plug changed the computers: %+v", after)
+	}
+}
+
+func TestAPcPlugAddedAgainAfterBeingRemovedKeepsItsComputer(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, _ := f.manager()
+	pc, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: "PC", Scope: "pc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := f.st.Computers(ctx)
+	if len(before) != 1 {
+		t.Fatalf("computers = %+v", before)
+	}
+	if err := m.Remove(ctx, pc.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: "PC", Scope: "pc"}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := f.st.Computers(ctx)
+	if len(after) != 1 || after[0].ID != before[0].ID || after[0].WallChannelID == nil {
+		t.Errorf("computers = %+v, want the same one with its wall plug still tied", after)
+	}
+}

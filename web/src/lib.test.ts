@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  circuitsByWatts, formatKwh, formatMoney, formatWatts, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type Channel, type Reading, type Series, type Summary,
+  applianceList, circuitsByWatts, formatDuration, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type Channel, type Computer, type PcComponent, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
@@ -71,6 +71,8 @@ describe('formatting and periods', () => {
     expect(formatWatts(null)).toBe('—');
     expect(formatKwh(3.456)).toBe('3.46 kWh');
     expect(formatKwh(120.04)).toBe('120.0 kWh');
+    expect(formatKwh(0.0036)).toBe('3.6 Wh'); // a few watt-hours is not "0.00 kWh"
+    expect(formatKwh(0)).toBe('0.00 kWh');
   });
 
   it('formats money as dollars and cents, marking an estimate', () => {
@@ -92,5 +94,56 @@ describe('formatting and periods', () => {
     expect(isTheme('blue-oval')).toBe(true);
     expect(isTheme('nope')).toBe(false);
     expect(isTheme(undefined)).toBe(false);
+  });
+});
+
+describe('the PC tab helpers', () => {
+  const comp = (name: string, scope: PcComponent['scope'], kwh: number): PcComponent => ({ name, scope, kind: 'other', kwh, monitored_hours: 1 });
+
+  it('groups the PC readings by what they are and never mixes the groups', () => {
+    const g = groupComponents([
+      comp('CPU cores', 'breakdown', 0.4), comp('GPU', 'component', 2), comp('Wall meter', 'wall', 3),
+      comp('CPU package', 'component', 0.6), comp('Monitor', 'peripheral', 0.2),
+    ]);
+    expect(g.wall.map((c) => c.name)).toEqual(['Wall meter']);
+    expect(g.sensors.map((c) => c.name)).toEqual(['GPU', 'CPU package']); // biggest first
+    expect(g.inside.map((c) => c.name)).toEqual(['CPU cores']);
+    expect(g.meters.map((c) => c.name)).toEqual(['Monitor']);
+  });
+
+  it('words the gap reasons and durations', () => {
+    expect(gapLabel('asleep')).toBe('Asleep');
+    expect(gapLabel('off')).toBe('Off or stopped');
+    expect(gapLabel('lost_power')).toBe('Lost power');
+    expect(formatDuration(45)).toBe('45 s');
+    expect(formatDuration(12 * 60)).toBe('12 min');
+    expect(formatDuration(4.5 * 3600)).toBe('4 h 30 min');
+    expect(formatDuration(2 * 3600)).toBe('2 h');
+    expect(formatDuration(-5)).toBe('0 s');
+  });
+});
+
+describe('the Appliances list', () => {
+  const summary: Summary = {
+    from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
+    channels: [
+      { channel_id: 'mains-a', scope: 'mains', kwh: 20, monitored_hours: 1 },
+      { channel_id: 'dryer', scope: 'circuit', kwh: 6, monitored_hours: 1 },
+      { channel_id: 'fridge', scope: 'plug', kwh: 2, monitored_hours: 1 },
+      { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 5, monitored_hours: 1 },
+      { channel_id: 'monitor', computer_id: 'comp-1', scope: 'plug', kwh: 1, monitored_hours: 1 },
+    ],
+  };
+  const channels = ['dryer', 'fridge', 'wall', 'monitor'].map((id) => ch(id, 'plug'));
+  const computer = (id: string, wall?: string): Computer => ({ id, name: id, peripheral_channel_ids: [], wall_channel_id: wall ?? null });
+
+  it('lists ordinary appliances without the ones that belong to a computer, and not the house', () => {
+    const list = applianceList(summary, channels, [computer('comp-1', 'wall')]);
+    expect(list.appliances.map((r) => r.channel.channel_id)).toEqual(['dryer', 'fridge']);
+  });
+
+  it('lists a computer with its wall plug figure, biggest first, and one with no wall plug last', () => {
+    const list = applianceList(summary, channels, [computer('empty'), computer('comp-1', 'wall')]);
+    expect(list.computers.map((r) => [r.computer.id, r.wall?.kwh])).toEqual([['comp-1', 5], ['empty', undefined]]);
   });
 });

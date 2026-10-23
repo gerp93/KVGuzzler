@@ -41,6 +41,13 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **Deployment settings are never committed.** The box's address, the port and the server settings (`HOUSED_TZ`...) live in
   `~/.config/kvguzzler/deploy.env` on the PC and `/etc/housed/housed.env` on the box; the repo has only `scripts/deploy.env.example` with
   placeholders. Deploy with `scripts/deploy-server.sh` (see `server/README.md`); it restores the old binary if the new one does not answer.
+- **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
+  (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
+  device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a
+  computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
+  house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open one in Appliances for the Guzzler-style breakdown.
+- The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
+  cap is dropped and said so; a different major `api_version` is refused with 426. The C# client (`relay.json`, replaying `history.db`) is not built yet.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
 - **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the

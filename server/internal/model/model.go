@@ -41,6 +41,8 @@ type Channel struct {
 	Label    string   `json:"label"`
 	Enabled  bool     `json:"enabled"`
 	MaxWatts *float64 `json:"max_watts"`
+	// ComputerID is the computer this plug belongs to (its wall plug if the scope is pc, a peripheral if plug), or nil.
+	ComputerID *string `json:"computer_id"`
 }
 
 type Reading struct {
@@ -72,6 +74,7 @@ type Series struct {
 
 type ChannelSummary struct {
 	ChannelID      string   `json:"channel_id"`
+	ComputerID     *string  `json:"computer_id"`
 	Scope          Scope    `json:"scope"`
 	KWh            float64  `json:"kwh"`
 	Cost           *string  `json:"cost"`

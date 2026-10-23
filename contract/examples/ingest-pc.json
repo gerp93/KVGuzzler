@@ -13,8 +13,8 @@
         { "name": "Monitor", "scope": "peripheral", "kind": "other", "avg_watts": 28.1, "max_watts": 31.0, "samples": 59 }
       ],
       "programs": [
-        { "name": "python.exe (ComfyUI)", "kwh": 0.0031 },
-        { "name": "chrome.exe", "kwh": 0.0004 }
+        { "name": "python.exe (ComfyUI)", "cpu_kwh": 0.0011, "gpu_kwh": 0.0020, "active_seconds": 52.4 },
+        { "name": "chrome.exe", "cpu_kwh": 0.0004, "gpu_kwh": 0, "active_seconds": 9.1 }
       ],
       "total_peak_watts": 402.3
     }
