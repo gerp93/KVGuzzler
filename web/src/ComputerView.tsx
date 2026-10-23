@@ -1,10 +1,10 @@
 import { api } from './api';
-import { Chart, lineFrom, type Line } from './Chart';
+import { Chart, lineFrom, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
 import { PeriodPicker } from './Periods';
-import { formatKwh, formatMoney, formatWatts, isLiveStale, liveSplit, periodRange, type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey } from './lib';
+import { formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, pcLineStyle, periodRange, type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey } from './lib';
 import { routePath } from './route';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
@@ -12,6 +12,9 @@ const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-r
 interface Loaded {
   detail: ComputerDetail;
   lines: Line[];
+  /** What each part of the PC drew, from its collector; empty without one. */
+  inside: Line[];
+  shades: Shade[];
   domain: [number, number];
 }
 
@@ -32,9 +35,19 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
       const detail = await api.computerDetail(id, from, to);
       // Each plug is drawn on its own line; the lines are never added together.
       const plugs = [detail.wall, ...detail.peripherals].filter((p): p is ChannelSummary => !!p);
-      const series = await Promise.all(plugs.map((p) => api.series(p.channel_id, from, to)));
+      const [series, pcSeries] = await Promise.all([
+        Promise.all(plugs.map((p) => api.series(p.channel_id, from, to))),
+        detail.computer.source_id ? api.computerSeries(id, from, to) : Promise.resolve(undefined),
+      ]);
       const lines = series.map((s, i) => lineFrom(label(s.channel_id), i === 0 && detail.wall ? '--color-text' : COLORS[i % COLORS.length]!, s.points));
-      return { detail, lines, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
+      const perScope = new Map<string, number>();
+      const inside = (pcSeries?.lines ?? []).map((l) => {
+        const index = perScope.get(l.scope) ?? 0;
+        perScope.set(l.scope, index + 1);
+        const style = pcLineStyle(l, index);
+        return { ...lineFrom(l.name, style.colorVar, l.points), dashed: style.dashed };
+      });
+      return { detail, lines, inside, shades: gapShades(pcSeries?.gaps ?? []), domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
     },
     60_000,
     [id, period, channels],
@@ -123,6 +136,17 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               <h2>Power over time</h2>
               <Chart lines={data.lines} domain={data.domain} />
               <p class="caption">Each plug on its own line. They are not added together.</p>
+            </section>
+          )}
+
+          {data.inside.some((l) => l.x.length > 0) && (
+            <section class="card">
+              <h2>Inside the PC over time</h2>
+              <Chart lines={data.inside} domain={data.domain} shades={data.shades} />
+              <p class="caption">
+                What the PC's own collector recorded: the wall as it read it, each sensor, and the plugs it reads (dashed). The lines are not added
+                together. Shaded stretches are times nothing was being recorded.
+              </p>
             </section>
           )}
 

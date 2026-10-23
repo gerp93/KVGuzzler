@@ -65,6 +65,23 @@ type PcRun struct {
 	StillRunning  bool      `json:"still_running"`
 }
 
+// PcSeriesLine is one reading of the PC over time. Lines are never added together: the wall line already contains the sensors, and a
+// meter is a separate device.
+type PcSeriesLine struct {
+	Name   string  `json:"name"`
+	Scope  string  `json:"scope"`
+	Kind   string  `json:"kind"`
+	Points []Point `json:"points"`
+}
+
+// PcSeries is what the PC's collector reported over time, one line per sensor, the wall plug and each meter, plus the stretches it
+// was not recording so a chart can shade them instead of drawing a line across them.
+type PcSeries struct {
+	Bucket Bucket         `json:"bucket"`
+	Lines  []PcSeriesLine `json:"lines"`
+	Gaps   []PcGap        `json:"gaps"`
+}
+
 type PcSource struct {
 	SourceID       string           `json:"source_id"`
 	Name           string           `json:"name"`

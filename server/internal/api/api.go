@@ -77,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/computers/{computerId}", s.removeComputer)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/detail", s.computerDetail)
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/live", s.computerLive)
+	mux.HandleFunc("GET /api/v1/computers/{computerId}/series", s.computerSeries)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
 	for _, route := range []string{
 		"GET /api/v1/carbon", "PUT /api/v1/carbon",
@@ -754,6 +755,44 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// computerSeries is the PC collector's sensors, wall plug and meters over time, one line each, with the gaps to shade. It is the
+// detail the per-plug series cannot give: what each part of the PC was drawing. 204 when no collector reports for the computer.
+func (s *Server) computerSeries(w http.ResponseWriter, r *http.Request) {
+	from, to, err := parsePeriod(r)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+		return
+	}
+	bucket := model.Bucket(r.URL.Query().Get("bucket"))
+	switch bucket {
+	case "":
+		bucket = defaultBucket(to.Sub(from))
+	case model.BucketMinute, model.BucketHour, model.BucketDay:
+	default:
+		writeProblem(w, http.StatusBadRequest, "bad_bucket", "bucket is minute, hour or day")
+		return
+	}
+	comp, err := s.Store.Computer(r.Context(), r.PathValue("computerId"))
+	if err != nil {
+		computerError(w, err)
+		return
+	}
+	if comp.SourceID == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	series, err := s.Store.PcSeries(r.Context(), *comp.SourceID, from, to, bucket, s.Loc)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if series == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, series)
 }
 
 // computerLive is only the PC's latest look, which the dashboard asks for every few seconds: the detail answer re-reads a whole

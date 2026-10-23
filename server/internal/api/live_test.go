@@ -144,3 +144,38 @@ func TestTheLightLiveEndpointGivesJustTheLookWithItsAgeAnd204WhenThereIsNone(t *
 		t.Errorf("live = %+v", live)
 	}
 }
+
+func TestTheComputerSeriesHasALinePerPartAndGapsAnd204WithoutACollector(t *testing.T) {
+	clock := time.Date(2026, 10, 22, 19, 0, 0, 0, time.UTC)
+	srv := movingServer(t, &clock)
+	period := "?from=2026-10-22T00:00:00Z&to=2026-10-23T00:00:00Z"
+
+	_, body := postBody(t, srv.URL+"/api/v1/computers", `{"name":"Lonely"}`)
+	var made model.Computer
+	if err := json.Unmarshal([]byte(body), &made); err != nil {
+		t.Fatal(err)
+	}
+	if r := get(t, srv.URL+"/api/v1/computers/"+made.ID+"/series"+period, nil); r.StatusCode != http.StatusNoContent {
+		t.Errorf("no collector: %d, want 204", r.StatusCode)
+	}
+	if r := get(t, srv.URL+"/api/v1/computers/"+made.ID+"/series"+period+"&bucket=week", nil); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("bad bucket: %d, want 400", r.StatusCode)
+	}
+	if r := get(t, srv.URL+"/api/v1/computers/comp-nope/series"+period, nil); r.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown computer: %d, want 404", r.StatusCode)
+	}
+
+	postBody(t, srv.URL+"/api/v1/ingest/pc", contractExample(t, "ingest-pc.json"))
+	var series model.PcSeries
+	if r := get(t, srv.URL+"/api/v1/computers/"+made.ID+"/series"+period, &series); r.StatusCode != http.StatusOK {
+		t.Fatalf("series: %d", r.StatusCode)
+	}
+	if len(series.Lines) == 0 || series.Lines[0].Scope != "wall" || len(series.Gaps) == 0 {
+		t.Errorf("series = %+v", series)
+	}
+	for _, l := range series.Lines {
+		if l.Scope == "breakdown" {
+			t.Errorf("a part of a sensor became a line: %+v", l)
+		}
+	}
+}

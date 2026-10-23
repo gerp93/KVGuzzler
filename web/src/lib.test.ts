@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applianceList, circuitsByWatts, formatAge, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, circuitsByWatts, formatAge, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type Computer, type PcComponent, type PcLiveReading, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -210,5 +210,20 @@ describe('the PC right now', () => {
     const run = { name: 'x', start: '2026-10-22T12:00:00Z', end: '2026-10-22T12:20:00Z', cpu_kwh: 0.01, gpu_kwh: 0.04, active_seconds: 1, still_running: false };
     expect(runKwh(run)).toBeCloseTo(0.05);
     expect(runDuration(run)).toBe(1200);
+  });
+});
+
+describe('the inside-the-PC chart', () => {
+  it('draws the wall in the text colour, sensors by kind and meters dashed', () => {
+    expect(pcLineStyle({ scope: 'wall', kind: 'other' }, 0)).toEqual({ colorVar: '--color-text', dashed: false });
+    expect(pcLineStyle({ scope: 'component', kind: 'cpu' }, 1).colorVar).toBe('--color-accent-blue');
+    expect(pcLineStyle({ scope: 'component', kind: 'gpu' }, 2).colorVar).toBe('--color-accent-green');
+    expect(pcLineStyle({ scope: 'peripheral', kind: 'other' }, 0).dashed).toBe(true);
+  });
+
+  it('turns gaps into shaded stretches and ignores an empty one', () => {
+    expect(gapShades([{ from: '2026-10-22T12:00:00Z', to: '2026-10-22T12:10:00Z' }, { from: '2026-10-22T13:00:00Z', to: '2026-10-22T13:00:00Z' }])).toEqual([
+      { from: Date.parse('2026-10-22T12:00:00Z') / 1000, to: Date.parse('2026-10-22T12:10:00Z') / 1000 },
+    ]);
   });
 });

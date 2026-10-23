@@ -349,6 +349,38 @@ paths:
           description: No collector reports for this computer, or none has sent a look yet.
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/computers/{computerId}/series:
+    get:
+      tags: [Read]
+      operationId: getComputerSeries
+      summary: What each part of a computer drew over a period.
+      description: |
+        One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a channel's series,
+        plus the stretches the collector was not recording so a chart can shade them. The lines are never added together. 204 when no
+        collector reports for this computer or it has never reported.
+      parameters:
+        - $ref: '#/components/parameters/ComputerId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: bucket
+          in: query
+          required: false
+          description: Defaults to the coarsest bucket that keeps the period under about 400 points.
+          schema:
+            $ref: '#/components/schemas/Bucket'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcSeries'
+        '204':
+          description: No collector reports for this computer, or it has never reported.
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/groups:
     get:
       tags: [Read]
@@ -1065,6 +1097,37 @@ components:
           minimum: 0
         still_running:
           type: boolean
+    PcSeriesLine:
+      type: object
+      required: [name, scope, kind, points]
+      properties:
+        name:
+          type: string
+        scope:
+          type: string
+          enum: [component, wall, peripheral]
+        kind:
+          type: string
+          enum: [cpu, gpu, other]
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesPoint'
+    PcSeries:
+      type: object
+      required: [bucket, lines, gaps]
+      properties:
+        bucket:
+          $ref: '#/components/schemas/Bucket'
+        lines:
+          type: array
+          description: The wall line first, then the sensors, then the meters. Never added together.
+          items:
+            $ref: '#/components/schemas/PcSeriesLine'
+        gaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PcGap'
     PcGap:
       type: object
       required: [from, to, reason]

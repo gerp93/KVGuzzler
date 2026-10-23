@@ -24,6 +24,8 @@ export type PcLive = S['PcLive'];
 export type PcLiveReading = S['PcLiveReading'];
 export type PcLiveProgram = S['PcLiveProgram'];
 export type PcRun = S['PcRun'];
+export type PcSeries = S['PcSeries'];
+export type PcSeriesLine = S['PcSeriesLine'];
 export type Device = S['Device'];
 export type NewDevice = S['NewDevice'];
 export type RateConfig = S['RateConfig'];
@@ -330,4 +332,19 @@ export function runKwh(run: Pick<PcRun, 'cpu_kwh' | 'gpu_kwh'>): number {
 /** How long a run lasted, start to end. */
 export function runDuration(run: Pick<PcRun, 'start' | 'end'>): number {
   return Math.max(0, (Date.parse(run.end) - Date.parse(run.start)) / 1000);
+}
+
+/** How a line of the inside-the-PC chart is drawn: the wall in the text colour, sensors by kind, meters dashed. The colour is a theme
+ * custom property so every theme gets lines it can show. `index` is the line's place among those of its group. */
+export function pcLineStyle(line: Pick<PcSeriesLine, 'scope' | 'kind'>, index: number): { colorVar: string; dashed: boolean } {
+  if (line.scope === 'wall') return { colorVar: '--color-text', dashed: false };
+  if (line.scope === 'peripheral') return { colorVar: index % 2 === 0 ? '--color-accent-muted' : '--color-accent-red', dashed: true };
+  if (line.kind === 'cpu') return { colorVar: '--color-accent-blue', dashed: false };
+  if (line.kind === 'gpu') return { colorVar: '--color-accent-green', dashed: false };
+  return { colorVar: ['--color-accent-red', '--color-accent-muted'][index % 2]!, dashed: false };
+}
+
+/** The gaps of a PC series as the seconds-since-epoch stretches the chart shades. */
+export function gapShades(gaps: Pick<PcGap, 'from' | 'to'>[]): { from: number; to: number }[] {
+  return gaps.map((g) => ({ from: Date.parse(g.from) / 1000, to: Date.parse(g.to) / 1000 })).filter((g) => g.to > g.from);
 }
