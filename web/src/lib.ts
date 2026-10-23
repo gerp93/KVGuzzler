@@ -653,3 +653,28 @@ export function houseUsageBasis(use: AverageUse, windowKey: string): string {
 export function houseShare(kwh: number, houseKwh: number | null | undefined): number | null {
   return houseKwh != null && houseKwh > 0 ? Math.round((kwh / houseKwh) * 100) : null;
 }
+
+/** A price per kWh in the saved currency, four decimals: "$0.1558". */
+export function formatRate(perKwh: number): string {
+  return `${symbol}${perKwh.toFixed(4)}`;
+}
+
+/** What a rate costs, short: "$0.0727 per kWh" or "$0.1558 to $0.1745 per kWh by time of day". */
+export function rateRange(t: Pick<TariffInfo, 'cheapest' | 'dearest' | 'varies_by_time'>): string {
+  return t.varies_by_time ? `${formatRate(t.cheapest)} to ${formatRate(t.dearest)} per kWh by time of day` : `${formatRate(t.cheapest)} per kWh`;
+}
+
+/** The rates whose name or utility has every word typed (any case); everything for an empty filter. */
+export function filterTariffs<T extends Pick<TariffInfo, 'name' | 'utility'>>(list: T[], text: string): T[] {
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  return words.length === 0 ? list : list.filter((t) => words.every((w) => `${t.utility} ${t.name}`.toLowerCase().includes(w)));
+}
+
+/** How many rates are listed before "Show all": the first few are the likeliest (the server sorts the most common and expert-checked first). */
+export const TARIFFS_SHOWN = 5;
+
+/** The utility that most of the rates share, so it can be said once instead of on every row; null when they are from several. */
+export function sharedUtility(list: Pick<TariffInfo, 'utility'>[]): string | null {
+  const first = list[0]?.utility;
+  return first !== undefined && list.every((t) => t.utility === first) ? first : null;
+}
