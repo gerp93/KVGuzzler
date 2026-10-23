@@ -602,6 +602,8 @@ export function formatBytes(bytes: number): string {
 
 export const PROJECT_URL = 'https://github.com/gerp93/KVGuzzler';
 export const ISSUES_URL = 'https://github.com/gerp93/KVGuzzler/issues';
+/** The viewer's installers are pre-releases tagged viewer-vX.Y.Z (see .github/workflows/release-viewer.yml). */
+export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases?q=viewer-v';
 
 /** What a looked-up price comes to over a period, in words: the rate, what the period averaged to per kWh and what is left out. With no
  * energy to average over the line says only which rate it is and what is left out. */

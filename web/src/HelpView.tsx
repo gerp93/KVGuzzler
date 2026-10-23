@@ -2,7 +2,7 @@
 // the version the box is running; the box is updated by deploying from the repository, not from here.
 import { api } from './api';
 import { usePoll } from './hooks';
-import { ISSUES_URL, PROJECT_URL } from './lib';
+import { ISSUES_URL, PROJECT_URL, VIEWER_RELEASES_URL } from './lib';
 
 export function HelpView() {
   const { data: status } = usePoll(api.status, 30_000, []);
@@ -33,6 +33,19 @@ export function HelpView() {
           This page is served by the house server, so it is always the version the server is running (above). The server is updated by
           running the deploy script from the repository on a PC that can reach the box; the Windows collector and the old window update
           themselves from their own Help tab.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Desktop viewer</h2>
+        <p class="note">
+          An installed window for this dashboard (Windows). It loads this page from the server and keeps only the server's address. The installer is
+          unsigned, so Windows will warn about the publisher the first time.
+        </p>
+        <p>
+          <a class="button" href={VIEWER_RELEASES_URL} target="_blank" rel="noreferrer noopener">
+            Download the viewer
+          </a>
         </p>
       </section>
 
