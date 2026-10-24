@@ -62,6 +62,13 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   `plug`-scope channels can be in a group, and not one that belongs to a computer (a plug is shown in one place; 409 either way). It changes
   only the display: each plug still records its own energy, and the group's figure is the sum of its plugs' (one scope, so the sum is sound;
   the cost is shown only when every plug has one). A hidden plug is neither shown nor counted.
+- **Panels nest** (`parent_id` on a channel, `store/parent.go`): a `circuit` that feeds a sub-panel holds the circuits clamped inside it, and a plug, a computer's
+  wall plug (`pc`) or a peripheral says which circuit it is on. A circuit with no parent is on the main panel, under the house; there can be several top-level
+  entries and nothing needs a main monitor to exist. The parent's own reading already contains its children's, so they
+  are **never added to it**: what is left is shown as "Everything else" (parent minus children, in the dashboard, per parent), and the house's `unmetered_kwh`
+  takes off only the top-level circuits. Any channel but the mains can have a parent, the parent is a circuit, a loop is refused (409), and a channel that becomes the
+  mains or the second leg of a pair leaves the tree (its children go to the top). The parent may be on another device (a garage monitor's feed is a circuit of the
+  main panel's monitor). Settings > Channels (`web/src/ChannelsCard.tsx`) groups inputs by device, hides unused ones, and puts the fiddly options behind "Wiring".
 - The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
   cap is dropped and said so; a different major `api_version` is refused with 426. The C# client is `RelayFeed` in `KVGuzzler.Core/Relay`, run by the collector service beside the carbon feed: **`relay.json`** beside
   `wall-meter.json` (`{"host": "192.168.68.110"}`, or `host:port`; default port 8080; a plain host only, never a URL) says where the house server

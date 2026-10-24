@@ -3,7 +3,7 @@ import { api } from './api';
 import { usePoll } from './hooks';
 import type { Device } from './lib';
 
-const KIND_NAMES: Record<string, string> = { shelly_plug: 'Shelly plug', refoss: 'Refoss monitor', pc: 'PC' };
+export const KIND_NAMES: Record<string, string> = { shelly_plug: 'Shelly plug', refoss: 'Refoss monitor', pc: 'PC' };
 
 function lastSeen(d: Device): string {
   if (!d.last_seen) return 'not answered yet';

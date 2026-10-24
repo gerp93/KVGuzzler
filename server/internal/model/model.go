@@ -50,6 +50,9 @@ type Channel struct {
 	// PairWith is the channel of the other leg of the same 240 V breaker: this channel then reports both legs added, and that one is
 	// not reported on its own. Only Refoss channels have it.
 	PairWith *string `json:"pair_with"`
+	// ParentID is the circuit this one is part of: a circuit that feeds a sub-panel holds the circuits of that panel. Its own figure already
+	// contains theirs, so a parent and its children are never added together. Only a circuit has one.
+	ParentID *string `json:"parent_id"`
 }
 
 type Reading struct {

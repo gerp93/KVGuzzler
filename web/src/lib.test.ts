@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, BASELINE, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, arrangeByPanel, BASELINE, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -27,6 +27,26 @@ describe('scopes are never summed across each other', () => {
     expect(unmetered(9000, rows)).toBe(9000 - 5200); // the plug's 50 W is not a circuit
     expect(unmetered(100, rows)).toBe(0);
     expect(unmetered(null, rows)).toBeNull();
+  });
+
+  it('a sub-panel feed holds its circuits: they are listed under it, taken off the house only once, and what is left is its own line', () => {
+    const wired = [
+      ch('mains-a', 'mains'), ch('garage', 'circuit'), { ...ch('ev', 'circuit'), parent_id: 'garage' }, { ...ch('lights', 'circuit'), parent_id: 'garage' },
+      ch('dryer', 'circuit'), { ...ch('orphan', 'circuit'), parent_id: 'switched-off' }, ch('switched-off', 'circuit', false),
+    ];
+    const reads = [rd('mains-a', 12000), rd('garage', 7500), rd('ev', 7300), rd('lights', 50), rd('dryer', 4000), rd('orphan', 20), rd('switched-off', 99)];
+    const rows = nestCircuits(circuitsByWatts(wired, reads));
+    expect(rows.map((r) => [r.channel.id, r.depth, !!r.remainder])).toEqual([
+      ['garage', 0, false], ['ev', 1, false], ['lights', 1, false], ['garage', 1, true], ['dryer', 0, false], ['orphan', 0, false],
+    ]);
+    expect(rows.find((r) => r.remainder)!.watts).toBe(7500 - 7300 - 50);
+    // The garage's circuits are inside the garage's figure: only the top level comes off the house.
+    expect(unmetered(12000, rows)).toBe(12000 - 7500 - 4000 - 20);
+  });
+
+  it('arrangeByPanel puts a sub-panel feed before the circuits inside it and keeps the order otherwise', () => {
+    const list = [ch('a', 'circuit'), { ...ch('c', 'circuit'), parent_id: 'b' }, ch('b', 'circuit'), { ...ch('d', 'circuit'), parent_id: 'gone' }];
+    expect(arrangeByPanel(list).map((r) => [r.channel.id, r.depth])).toEqual([['a', 0], ['b', 0], ['c', 1], ['d', 0]]);
   });
 
   it('splitSummary does not fold the PC into the circuits', () => {
@@ -144,6 +164,36 @@ describe('the Appliances list', () => {
   it('lists ordinary appliances without the plugs that belong to a computer or a group, and not the house', () => {
     const list = applianceList(summary, channels, [computer('comp-1', 'wall')], [group]);
     expect(list.appliances.map((r) => [r.kind, r.id])).toEqual([['channel', 'dryer'], ['group', 'grp-1'], ['channel', 'fridge']]);
+  });
+
+  it('lists a sub-panel feed with its circuits under it and the rest of the feed as a derived line', () => {
+    const s: Summary = {
+      from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
+      channels: [
+        { channel_id: 'garage', scope: 'circuit', kwh: 8, cost: '1.20', monitored_hours: 1 },
+        { channel_id: 'ev', scope: 'circuit', kwh: 7, cost: '1.05', monitored_hours: 1 },
+        { channel_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
+      ],
+    };
+    const wired = [ch('garage', 'circuit'), { ...ch('ev', 'circuit'), parent_id: 'garage' }, ch('dryer', 'circuit')];
+    const rows = applianceList(s, wired, [], []).appliances;
+    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['channel', 'garage', 0], ['channel', 'ev', 1], ['rest', 'garage', 1], ['channel', 'dryer', 0]]);
+    expect(rows[2]).toMatchObject({ kwh: 1, cost: '0.15', label: 'Everything else on garage' });
+  });
+
+  it('takes a computer\'s plug that is on a circuit off that circuit\'s rest, although the computer lists it itself', () => {
+    const s: Summary = {
+      from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
+      channels: [
+        { channel_id: 'office', scope: 'circuit', kwh: 5, monitored_hours: 1 },
+        { channel_id: 'lamp', scope: 'plug', kwh: 1, monitored_hours: 1 },
+        { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 3, monitored_hours: 1 },
+      ],
+    };
+    const wired = [ch('office', 'circuit'), { ...ch('lamp', 'plug'), parent_id: 'office' }, { ...ch('wall', 'pc'), parent_id: 'office' }];
+    const rows = applianceList(s, wired, [], []).appliances;
+    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['channel', 'office', 0], ['channel', 'lamp', 1], ['rest', 'office', 1]]);
+    expect(rows[2]!.kwh).toBe(1); // 5 - 1 (the lamp) - 3 (the PC at its wall)
   });
 
   it('shows a group once, as the sum of its plugs, with a cost only when every plug has one', () => {

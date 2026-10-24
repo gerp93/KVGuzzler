@@ -112,7 +112,8 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 		}
 	}
 	// And before a clamp's sign could be flipped and its two legs paired.
-	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT"} {
+	// And before a circuit could be part of a sub-panel's feed.
+	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT"} {
 		name := col[:strings.IndexByte(col, ' ')]
 		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = ?`, name).Scan(&has); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
@@ -182,13 +183,16 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	var c model.Channel
 	var idx sql.NullInt64
 	var max sql.NullFloat64
-	var computer, group, pair sql.NullString
+	var computer, group, pair, parent sql.NullString
 	var scope string
 	var enabled, invert int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair); err != nil {
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent); err != nil {
 		return c, err
 	}
 	c.Invert = invert == 1
+	if parent.Valid {
+		c.ParentID = &parent.String
+	}
 	if pair.Valid {
 		c.PairWith = &pair.String
 	}
@@ -210,7 +214,7 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	return c, nil
 }
 
-const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with`
+const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id`
 
 func (s *Store) Channels(ctx context.Context) ([]model.Channel, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels ORDER BY device_id, idx IS NULL, idx, id`)

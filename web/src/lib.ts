@@ -120,6 +120,10 @@ export const SUSPICIOUSLY_HIGH_RATE = 1;
 export interface Row {
   channel: Channel;
   watts: number;
+  /** How deep in a sub-panel this circuit sits: 0 for a circuit of the main panel (or one with no panel shown). */
+  depth?: number;
+  /** A line for what a sub-panel's feed carries that none of its circuits account for. `channel` is the feed; `of` lists its circuits' ids. */
+  remainder?: { of: string[] };
 }
 
 const byId = (channels: Channel[]) => new Map(channels.map((c) => [c.id, c]));
@@ -135,6 +139,58 @@ export function circuitsByWatts(channels: Channel[], readings: Reading[]): Row[]
   return rows.sort((a, b) => b.watts - a.watts);
 }
 
+/** Lays rows out as the panels are wired: a circuit that feeds a sub-panel is followed by the circuits inside it (indented one level, highest
+ * first), then by a line for what the feed carries that none of them account for. A circuit whose feed is not among the rows (switched off, no
+ * reading) stands on its own. A feed already contains its circuits, so none of this is ever added up. */
+export function nestCircuits(rows: Row[]): Row[] {
+  const present = new Map(rows.map((r) => [r.channel.id, r]));
+  const kids = new Map<string, Row[]>();
+  const roots: Row[] = [];
+  for (const r of rows) {
+    const p = r.channel.parent_id;
+    if (p && p !== r.channel.id && present.has(p)) kids.set(p, [...(kids.get(p) ?? []), r]);
+    else roots.push(r);
+  }
+  const out: Row[] = [];
+  const seen = new Set<string>();
+  const walk = (r: Row, depth: number) => {
+    if (seen.has(r.channel.id)) return; // a loop in the wiring cannot happen (the server refuses it), but never spin on one
+    seen.add(r.channel.id);
+    out.push({ ...r, depth });
+    const mine = (kids.get(r.channel.id) ?? []).sort((a, b) => b.watts - a.watts);
+    for (const k of mine) walk(k, depth + 1);
+    if (mine.length > 0) {
+      const inside = mine.reduce((t, k) => t + k.watts, 0);
+      out.push({ channel: r.channel, watts: Math.max(0, r.watts - inside), depth: depth + 1, remainder: { of: mine.map((k) => k.channel.id) } });
+    }
+  };
+  for (const r of roots.sort((a, b) => b.watts - a.watts)) walk(r, 0);
+  return out;
+}
+
+/** Orders channels as the panels are wired: a circuit that feeds a sub-panel is followed by the circuits inside it. The order the channels came
+ * in is kept at every level. A channel whose feed is not in the list stands at the top. */
+export function arrangeByPanel(list: Channel[]): { channel: Channel; depth: number }[] {
+  const ids = new Set(list.map((c) => c.id));
+  const kids = new Map<string, Channel[]>();
+  const top: Channel[] = [];
+  for (const c of list) {
+    const p = c.parent_id;
+    if (p && p !== c.id && ids.has(p)) kids.set(p, [...(kids.get(p) ?? []), c]);
+    else top.push(c);
+  }
+  const out: { channel: Channel; depth: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (c: Channel, depth: number) => {
+    if (seen.has(c.id)) return;
+    seen.add(c.id);
+    out.push({ channel: c, depth });
+    for (const k of kids.get(c.id) ?? []) walk(k, depth + 1);
+  };
+  for (const c of top) walk(c, 0);
+  return out;
+}
+
 /** The PC's own wall plugs, kept apart from everything else. */
 export function pcSlices(channels: Channel[], readings: Reading[]): Row[] {
   const ch = byId(channels);
@@ -146,10 +202,11 @@ export function pcSlices(channels: Channel[], readings: Reading[]): Row[] {
   return rows;
 }
 
-/** What no circuit clamp accounts for: the house minus the circuits, never below zero. Null without a house figure. */
+/** What no circuit clamp accounts for: the house minus the circuits of the main panel, never below zero. Null without a house figure.
+ * A circuit inside a sub-panel is already in its feed's figure, so only the top level is taken off. */
 export function unmetered(house: number | null | undefined, circuits: Row[]): number | null {
   if (house === null || house === undefined) return null;
-  const sum = circuits.reduce((t, r) => t + (r.channel.scope === 'circuit' ? r.watts : 0), 0);
+  const sum = circuits.reduce((t, r) => t + (r.channel.scope === 'circuit' && !r.remainder && (r.depth ?? 0) === 0 ? r.watts : 0), 0);
   return Math.max(0, house - sum);
 }
 
@@ -239,13 +296,16 @@ export function formatDuration(seconds: number): string {
 
 /** One row of the Appliances list: an ordinary appliance (a circuit or a plug), or a group of plugs shown as one. */
 export interface ApplianceRow {
-  kind: 'channel' | 'group';
-  /** The channel's id, or the group's. */
+  /** `rest` is what a sub-panel's feed carries that none of its circuits account for: a derived line, not something to open. */
+  kind: 'channel' | 'group' | 'rest';
+  /** The channel's id, or the group's (for `rest`, the feed's). */
   id: string;
   label: string;
   kwh: number;
   /** The cost as a money string; null when any part of it has no price. */
   cost: string | null;
+  /** How deep in a sub-panel the row sits; 0 or absent at the top. */
+  depth?: number;
 }
 
 export interface ComputerRow {
@@ -274,19 +334,45 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
   const label = new Map(channels.map((c) => [c.id, c.label]));
   const byChannel = new Map(summary.channels.map((c) => [c.channel_id, c]));
 
-  const rows: ApplianceRow[] = summary.channels
+  const own: ApplianceRow[] = summary.channels
     .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id && !c.group_id)
     .map((c) => ({ kind: 'channel' as const, id: c.channel_id, label: label.get(c.channel_id) ?? c.channel_id, kwh: c.kwh, cost: c.cost ?? null }));
+  const parentOf = new Map(channels.map((c) => [c.id, c.parent_id ?? null]));
+  const ownIds = new Set(own.map((r) => r.id));
+  const kids = new Map<string, ApplianceRow[]>();
+  const top: ApplianceRow[] = [];
+  for (const r of own) {
+    const p = parentOf.get(r.id);
+    if (p && p !== r.id && ownIds.has(p)) kids.set(p, [...(kids.get(p) ?? []), r]);
+    else top.push(r);
+  }
   for (const g of groups) {
     const members = summary.channels.filter((c) => c.group_id === g.id);
     if (members.length === 0) continue;
-    rows.push({
+    top.push({
       kind: 'group', id: g.id, label: g.name,
       kwh: members.reduce((t, m) => t + m.kwh, 0),
       cost: sumMoney(members.map((m) => m.cost)),
     });
   }
-  rows.sort((a, b) => b.kwh - a.kwh);
+  // A sub-panel's feed is followed by its circuits and by what it carries that none of them account for. The feed already contains them.
+  const rows: ApplianceRow[] = [];
+  const seen = new Set<string>();
+  const walk = (r: ApplianceRow, depth: number) => {
+    if (seen.has(r.id)) return;
+    seen.add(r.id);
+    rows.push({ ...r, depth });
+    const mine = (kids.get(r.id) ?? []).sort((a, b) => b.kwh - a.kwh);
+    for (const k of mine) walk(k, depth + 1);
+    if (mine.length > 0) {
+      // Whatever is plugged into it counts, listed here or (a computer's plugs, a group's) on its own card.
+      const inside = summary.channels.filter((c) => parentOf.get(c.channel_id) === r.id);
+      const costs = [r.cost, ...inside.map((k) => k.cost ?? null)];
+      const left = costs.every((c) => c !== null) ? Math.max(0, Number(r.cost) - inside.reduce((t, k) => t + Number(k.cost), 0)).toFixed(2) : null;
+      rows.push({ kind: 'rest', id: r.id, label: `Everything else on ${r.label}`, kwh: Math.max(0, r.kwh - inside.reduce((t, k) => t + k.kwh, 0)), cost: left, depth: depth + 1 });
+    }
+  };
+  for (const r of top.sort((a, b) => b.kwh - a.kwh)) walk(r, 0);
 
   const comps = computers.map((computer) => ({
     computer,

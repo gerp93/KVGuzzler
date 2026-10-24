@@ -172,6 +172,26 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 		t.Errorf("house %v - circuits %v != unmetered %v", *sum.HouseKWh, circuits, *sum.UnmeteredKWh)
 	}
 
+	// A circuit that is part of another (a sub-panel's circuit inside its feed) is already in the feed's figure: it is not taken off the house
+	// a second time.
+	var kids []model.ChannelSummary
+	for _, c := range sum.Channels {
+		if c.Scope == model.ScopeCircuit {
+			kids = append(kids, c)
+		}
+	}
+	if len(kids) < 2 {
+		t.Fatalf("the simulator has %d circuits", len(kids))
+	}
+	if r, body := send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+kids[1].ChannelID, `{"parent_id":"`+kids[0].ChannelID+`"}`); r.StatusCode != 200 {
+		t.Fatalf("nesting: %d %s", r.StatusCode, body)
+	}
+	var nested model.Summary
+	get(t, srv.URL+"/api/v1/summary"+q, &nested)
+	if want := *sum.UnmeteredKWh + kids[1].KWh; math.Abs(*nested.UnmeteredKWh-want) > 1e-9 && *nested.UnmeteredKWh != 0 {
+		t.Errorf("unmetered with a nested circuit = %v, want %v (the inner circuit is not taken off the house twice)", *nested.UnmeteredKWh, want)
+	}
+
 	var ser model.Series
 	get(t, srv.URL+"/api/v1/series"+q+"&channel_id=sim-em16p:mains-a", &ser)
 	if ser.Bucket != model.BucketMinute || len(ser.Points) < 29 {

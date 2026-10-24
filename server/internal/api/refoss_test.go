@@ -57,6 +57,21 @@ func TestARefossClampsSignPairAndScopeAreSetThroughTheChannelPatch(t *testing.T)
 		t.Errorf("unpair: %d %s", r.StatusCode, body)
 	}
 
+	// A circuit can be part of a sub-panel's feed, and the feed is not counted twice against the house.
+	r, body = patch("refoss-h:em8", `{"parent_id":"refoss-h:em2"}`)
+	if ch := decode[model.Channel](t, body); r.StatusCode != 200 || ch.ParentID == nil || *ch.ParentID != "refoss-h:em2" {
+		t.Fatalf("parent: %d %s", r.StatusCode, body)
+	}
+	if r, _ := patch("refoss-h:em2", `{"parent_id":"refoss-h:em8"}`); r.StatusCode != http.StatusConflict {
+		t.Errorf("a loop: %d, want 409", r.StatusCode)
+	}
+	if r, _ := patch("refoss-h:em8", `{"parent_id":"nope"}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("no such parent: %d, want 400", r.StatusCode)
+	}
+	if r, body := patch("refoss-h:em8", `{"parent_id":null}`); r.StatusCode != 200 || decode[model.Channel](t, body).ParentID != nil {
+		t.Errorf("out of the panel: %d %s", r.StatusCode, body)
+	}
+
 	// A plug is not a monitor: it has no clamp to flip.
 	if err := st.UpsertDevice(ctx, model.Device{ID: "shelly-x", Kind: "shelly_plug", Host: "x", Model: "plug"}); err != nil {
 		t.Fatal(err)

@@ -9,7 +9,7 @@ import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { RateNote } from './RateNote';
 import {
-  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseShare, houseUsageBasis, periodRange, pcSlices, sumByTime, unmetered,
+  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseShare, houseUsageBasis, nestCircuits, periodRange, pcSlices, sumByTime, unmetered,
   type Channel, type Live, type PeriodKey, type Row, type Summary,
 } from './lib';
 
@@ -24,11 +24,24 @@ function Bars({ rows, of, summary }: { rows: Row[]; of: number; summary?: Summar
   return (
     <ul class="bars wide">
       {rows.map((r) => {
-        const mine = summary?.channels.find((c) => c.channel_id === r.channel.id);
+        const find = (id: string) => summary?.channels.find((c) => c.channel_id === id);
+        // A sub-panel's feed already holds its circuits: what it carries beyond them is the feed's figure less theirs.
+        let mine = find(r.channel.id);
+        if (mine && r.remainder) {
+          const inside = r.remainder.of.map(find);
+          const costs = [mine.cost, ...inside.map((c) => c?.cost)];
+          mine = {
+            ...mine,
+            kwh: Math.max(0, mine.kwh - inside.reduce((t, c) => t + (c?.kwh ?? 0), 0)),
+            cost: costs.every((c) => c != null) ? Math.max(0, Number(mine.cost) - inside.reduce((t, c) => t + Number(c?.cost), 0)).toFixed(2) : null,
+          };
+        }
         const share = mine ? houseShare(mine.kwh, houseKwh) : null;
         return (
-          <li key={r.channel.id}>
-            <span class="name">{r.channel.label}</span>
+          <li key={r.remainder ? `rest-${r.channel.id}` : r.channel.id} class={r.remainder ? 'rest' : undefined} style={r.depth ? { paddingLeft: `${r.depth * 1.25}rem` } : undefined}>
+            <span class="name" title={r.remainder ? `Everything else on ${r.channel.label}` : r.channel.label}>
+              {r.remainder ? 'Everything else' : r.channel.label}
+            </span>
             <span class="bar" aria-hidden="true">
               <i style={{ width: `${of > 0 ? Math.min(100, (r.watts / of) * 100) : 0}%` }} />
             </span>
@@ -81,11 +94,16 @@ export function LiveView({ channels, onOpenSettings }: { channels: Channel[]; on
     );
   }
 
-  const circuits = circuitsByWatts(channels, live.readings);
+  // A sub-panel's feed is followed by the circuits inside it; the house is compared with the top level only.
+  // The PC's wall plug is a slice of a circuit: once it says which circuit, it is shown beneath it (and counted in what that circuit carries).
+  const base = circuitsByWatts(channels, live.readings);
+  const slices = pcSlices(channels, live.readings);
+  const placed = slices.filter((r) => r.channel.parent_id && base.some((b) => b.channel.id === r.channel.parent_id));
+  const circuits = nestCircuits([...base, ...placed]);
   const house = live.house_watts ?? null;
   const rest = unmetered(house, circuits);
   // Bars are shares of the house when there is a house figure, else of the biggest load shown.
-  const pc = pcSlices(channels, live.readings);
+  const pc = slices.filter((r) => !placed.includes(r));
   const scale = house ?? Math.max(0, ...circuits.map((r) => r.watts), ...pc.map((r) => r.watts));
 
   const summary = figures?.summary;
