@@ -58,7 +58,7 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a
   computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
-  house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open its wall plug in the Hierarchy tab for the Guzzler-style breakdown.
+  house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open its wall plug in the Hierarchy tab for the Guzzler-style breakdown. In the Hierarchy tab each computer is a row in the tree's columns (`ComputersCard.tsx`) showing that setup total (Now, Energy, Cost over the picked period), with an arrow that opens its name, wall plug and peripherals.
 - **Groups** (`/api/v1/groups`) are **logical groupings, not places in the wiring**: any meters except the mains (a plug, a circuit, a computer's plug) shown as one line
   with their total over the period, for things like an entertainment center on two power strips or a desk and its computer. A meter is in one group at a time, and a
   group never moves a meter in the tree or changes any figure of the meter itself. The group's total adds its members' energy and cost, **except a member that another

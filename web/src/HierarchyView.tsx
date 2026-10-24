@@ -444,7 +444,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         )}
       </section>
       <DevicesCard meters={meters} onChanged={onChanged} />
-      <ComputersCard meters={meters} onChanged={onChanged} />
+      <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
       <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
     </>
   );
