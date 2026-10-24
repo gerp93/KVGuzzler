@@ -8,7 +8,7 @@ import (
 )
 
 // A circuit can be the feed of a sub-panel: its figure is everything on that panel, and the circuits clamped inside the panel say they are
-// part of it (parent_id). A plug can say which circuit it is plugged into the same way. The parent already contains its children, so a parent
+// part of it (parent_id). A plug, a computer's wall plug or any other channel that is not the mains says which circuit it is on the same way. The parent already contains its children, so a parent
 // and its children are never added together; what the parent has that no child accounts for is shown as the remainder. A feed can itself be a
 // circuit of a bigger panel, so the chain is as deep as the wiring is. A circuit with no parent is on the main panel, under the house.
 
@@ -27,8 +27,8 @@ func (s *Store) SetChannelParent(ctx context.Context, id string, parent *string)
 		}
 		return s.Channel(ctx, id)
 	}
-	if c.Scope != model.ScopeCircuit && c.Scope != model.ScopePlug {
-		return model.Channel{}, invalid("Only a circuit or a plug can be put inside a circuit.")
+	if c.Scope == model.ScopeMains {
+		return model.Channel{}, invalid("The mains is the house itself: it is not inside anything.")
 	}
 	if *parent == id {
 		return model.Channel{}, invalid("A circuit cannot be part of itself.")

@@ -95,11 +95,15 @@ export function LiveView({ channels, onOpenSettings }: { channels: Channel[]; on
   }
 
   // A sub-panel's feed is followed by the circuits inside it; the house is compared with the top level only.
-  const circuits = nestCircuits(circuitsByWatts(channels, live.readings));
+  // The PC's wall plug is a slice of a circuit: once it says which circuit, it is shown beneath it (and counted in what that circuit carries).
+  const base = circuitsByWatts(channels, live.readings);
+  const slices = pcSlices(channels, live.readings);
+  const placed = slices.filter((r) => r.channel.parent_id && base.some((b) => b.channel.id === r.channel.parent_id));
+  const circuits = nestCircuits([...base, ...placed]);
   const house = live.house_watts ?? null;
   const rest = unmetered(house, circuits);
   // Bars are shares of the house when there is a house figure, else of the biggest load shown.
-  const pc = pcSlices(channels, live.readings);
+  const pc = slices.filter((r) => !placed.includes(r));
   const scale = house ?? Math.max(0, ...circuits.map((r) => r.watts), ...pc.map((r) => r.watts));
 
   const summary = figures?.summary;

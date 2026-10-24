@@ -56,8 +56,8 @@ function ChannelRow({ channel, all, depth, onChanged }: { channel: Channel; all:
   const feeds = all.filter((c) => c.scope === 'circuit' && c.enabled && !inside.has(c.id));
   const feed = channel.parent_id ? all.find((c) => c.id === channel.parent_id) : undefined;
 
-  // A plug on a computer or in a group is shown there; any other plug can say which circuit it is on.
-  const placeable = inPanel || (channel.scope === 'plug' && !channel.computer_id && !channel.group_id);
+  // Anything but the mains can say which circuit it is on: a plug, the PC's wall plug, a sub-panel's circuit.
+  const placeable = channel.scope !== 'mains';
   const hasWiring = refoss || placeable;
   const summary = [legs !== label ? legs : '', channel.scope === 'mains' ? 'the whole house' : '', feed && !feed.enabled ? `inside ${feed.label} (hidden)` : '']
     .filter(Boolean)

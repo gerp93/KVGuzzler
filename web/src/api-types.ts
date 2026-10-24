@@ -642,7 +642,8 @@ export interface components {
             /**
              * @description The circuit this one is part of, or null. A circuit that feeds a sub-panel holds the circuits clamped inside that panel, and a plug
              *     says which circuit it is plugged into. The parent's own figure already contains its children's, so a parent and its children are never
-             *     added together; what the parent has that none of them account for is the remainder. Only a `circuit` or `plug` channel has one.
+             *     added together; what the parent has that none of them account for is the remainder. Any channel but `mains` can have one (a computer's wall
+             *     plug and peripherals included: the circuit they are on).
              */
             parent_id?: string | null;
             /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it. */
@@ -669,8 +670,8 @@ export interface components {
              */
             scope?: "circuit" | "mains";
             /**
-             * @description Put this circuit or plug inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out.
-             *     The parent must be a `circuit`; neither may be the second leg of a pair. 409 when it would make a loop.
+             * @description Put this channel inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
+             *     must be a `circuit` and the channel anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.
              */
             parent_id?: string | null;
             /**

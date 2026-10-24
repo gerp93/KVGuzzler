@@ -181,6 +181,21 @@ describe('the Appliances list', () => {
     expect(rows[2]).toMatchObject({ kwh: 1, cost: '0.15', label: 'Everything else on garage' });
   });
 
+  it('takes a computer\'s plug that is on a circuit off that circuit\'s rest, although the computer lists it itself', () => {
+    const s: Summary = {
+      from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
+      channels: [
+        { channel_id: 'office', scope: 'circuit', kwh: 5, monitored_hours: 1 },
+        { channel_id: 'lamp', scope: 'plug', kwh: 1, monitored_hours: 1 },
+        { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 3, monitored_hours: 1 },
+      ],
+    };
+    const wired = [ch('office', 'circuit'), { ...ch('lamp', 'plug'), parent_id: 'office' }, { ...ch('wall', 'pc'), parent_id: 'office' }];
+    const rows = applianceList(s, wired, [], []).appliances;
+    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['channel', 'office', 0], ['channel', 'lamp', 1], ['rest', 'office', 1]]);
+    expect(rows[2]!.kwh).toBe(1); // 5 - 1 (the lamp) - 3 (the PC at its wall)
+  });
+
   it('shows a group once, as the sum of its plugs, with a cost only when every plug has one', () => {
     const row = applianceList(summary, channels, [], [group]).appliances.find((r) => r.kind === 'group')!;
     expect(row).toMatchObject({ label: 'Entertainment center', kwh: 4.5, cost: '0.68' });

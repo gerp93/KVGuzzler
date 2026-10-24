@@ -65,7 +65,13 @@ func TestACircuitCanBePartOfASubPanelsFeedAndTheChainHasNoLoops(t *testing.T) {
 	if _, err := st.SetChannelParent(ctx, "ev", &nope); !errors.Is(err, ErrInvalid) {
 		t.Errorf("no such parent: %v, want invalid", err)
 	}
-	// A plug can be put on a circuit, but a plug cannot hold anything and the PC's wall plug is no circuit.
+	// A plug, or the PC's wall plug, can be put on a circuit; a plug cannot hold anything.
+	if err := st.UpsertChannel(ctx, model.Channel{ID: "pcwall", DeviceID: "refoss-h", Scope: model.ScopePC, Label: "PC"}); err != nil {
+		t.Fatal(err)
+	}
+	if c, err := st.SetChannelParent(ctx, "pcwall", &rest); err != nil || c.ParentID == nil {
+		t.Errorf("the PC's plug on a circuit: %+v %v", c, err)
+	}
 	if err := st.UpsertChannel(ctx, model.Channel{ID: "fridge", DeviceID: "refoss-h", Scope: model.ScopePlug, Label: "fridge"}); err != nil {
 		t.Fatal(err)
 	}

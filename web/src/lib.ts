@@ -365,9 +365,11 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
     const mine = (kids.get(r.id) ?? []).sort((a, b) => b.kwh - a.kwh);
     for (const k of mine) walk(k, depth + 1);
     if (mine.length > 0) {
-      const costs = [r.cost, ...mine.map((k) => k.cost)];
-      const left = costs.every((c) => c !== null) ? Math.max(0, Number(r.cost) - mine.reduce((t, k) => t + Number(k.cost), 0)).toFixed(2) : null;
-      rows.push({ kind: 'rest', id: r.id, label: `Everything else on ${r.label}`, kwh: Math.max(0, r.kwh - mine.reduce((t, k) => t + k.kwh, 0)), cost: left, depth: depth + 1 });
+      // Whatever is plugged into it counts, listed here or (a computer's plugs, a group's) on its own card.
+      const inside = summary.channels.filter((c) => parentOf.get(c.channel_id) === r.id);
+      const costs = [r.cost, ...inside.map((k) => k.cost ?? null)];
+      const left = costs.every((c) => c !== null) ? Math.max(0, Number(r.cost) - inside.reduce((t, k) => t + Number(k.cost), 0)).toFixed(2) : null;
+      rows.push({ kind: 'rest', id: r.id, label: `Everything else on ${r.label}`, kwh: Math.max(0, r.kwh - inside.reduce((t, k) => t + k.kwh, 0)), cost: left, depth: depth + 1 });
     }
   };
   for (const r of top.sort((a, b) => b.kwh - a.kwh)) walk(r, 0);
