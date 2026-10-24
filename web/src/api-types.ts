@@ -57,7 +57,12 @@ export interface paths {
         delete: operations["removeDevice"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change a device's name or address (a plug that got a new one from the router).
+         * @description A new address is read once first: if nothing answers there like the device did, nothing changes and the old address keeps being
+         *     polled (502). The device keeps its id and its meters keep theirs, so their settings and their history stay what they were.
+         */
+        patch: operations["updateDevice"];
         trace?: never;
     };
     "/api/v1/meters": {
@@ -593,6 +598,12 @@ export interface components {
             database_bytes?: number;
             /** @description Plain-language things that need attention (a device stopped answering, a reading dropped). */
             notes: string[];
+        };
+        DeviceUpdate: {
+            /** @description The new address, a plain host name or IP address only. */
+            host?: string;
+            /** @description The device's name. (A meter's own name is changed on the meter.) */
+            name?: string;
         };
         NewDevice: {
             /** @enum {string} */
@@ -1324,6 +1335,52 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    updateDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: components["parameters"]["DeviceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Device"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description Another device is already polled at that address. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing at the new address answered like this device. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listMeters: {

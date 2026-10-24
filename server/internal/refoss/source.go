@@ -115,6 +115,7 @@ type SettingsFunc func(ctx context.Context) (map[string]Setting, error)
 // Source polls one monitor. It only ever reads.
 type Source struct {
 	host, name, model string
+	id                string // the device id: made from the address when the monitor is added, and kept if the address changes
 	client            *Client
 	settings          SettingsFunc
 
@@ -132,26 +133,33 @@ func NewSource(host, name, model string, settings SettingsFunc, hc *http.Client)
 	if err != nil {
 		return nil, err
 	}
-	return &Source{host: host, name: name, model: strings.ToLower(model), client: c, settings: settings}, nil
+	return &Source{id: DeviceID(host), host: host, name: name, model: strings.ToLower(model), client: c, settings: settings}, nil
 }
 
 // NewSourceWithBase is NewSource for a monitor at an address that is not a plain host (a test server with a port). Production code uses
 // NewSource, which only accepts a plain host or IP.
 func NewSourceWithBase(base, host, name, model string, settings SettingsFunc, hc *http.Client) *Source {
-	return &Source{host: host, name: name, model: strings.ToLower(model), client: NewWithBase(base, hc), settings: settings}
+	return &Source{id: DeviceID(host), host: host, name: name, model: strings.ToLower(model), client: NewWithBase(base, hc), settings: settings}
 }
 
 // DeviceID is the id a monitor at host has.
 func DeviceID(host string) string { return "refoss-" + host }
 
-func (s *Source) meterID(n int) string { return fmt.Sprintf("%s:em%d", DeviceID(s.host), n) }
+// SetIdentity gives the source the device id it was first saved under, and the settings of that device. A monitor's id is made from its
+// address when it is added; if it later moves to another address it keeps that id, so its meters, their wiring and their history stay what they were.
+func (s *Source) SetIdentity(id string, settings SettingsFunc) {
+	s.id = id
+	s.settings = settings
+}
+
+func (s *Source) meterID(n int) string { return fmt.Sprintf("%s:em%d", s.id, n) }
 
 func (s *Source) Device() model.Device {
 	name := s.name
 	if name == "" {
 		name = "Refoss " + strings.ToUpper(s.model)
 	}
-	return model.Device{ID: DeviceID(s.host), Kind: "refoss", Host: s.host, Name: name, Model: s.model}
+	return model.Device{ID: s.id, Kind: "refoss", Host: s.host, Name: name, Model: s.model}
 }
 
 // Meters are every input of the monitor, named as the monitor names them. The ones nothing is clamped on are switched off when the
@@ -162,7 +170,7 @@ func (s *Source) Meters() []model.Meter {
 	for n := 1; n <= inputsOf; n++ {
 		idx := n
 		out = append(out, model.Meter{
-			ID: s.meterID(n), DeviceID: DeviceID(s.host), Index: &idx, Scope: model.ScopeCircuit, Label: InputLabel(n), Enabled: true, MaxWatts: &max,
+			ID: s.meterID(n), DeviceID: s.id, Index: &idx, Scope: model.ScopeCircuit, Label: InputLabel(n), Enabled: true, MaxWatts: &max,
 		})
 	}
 	return out

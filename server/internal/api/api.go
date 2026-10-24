@@ -30,6 +30,7 @@ const Version = 1
 // DeviceManager adds and removes the devices the server polls (see package devices). Nil means adding and removing answer 501.
 type DeviceManager interface {
 	Add(ctx context.Context, nd devices.NewDevice) (model.Device, error)
+	Update(ctx context.Context, id string, u devices.UpdateDevice) (model.Device, error)
 	Remove(ctx context.Context, id string) error
 }
 
@@ -76,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/estimate", s.houseEstimate)
 	mux.HandleFunc("GET /api/v1/export.csv", s.houseExport)
 	mux.HandleFunc("POST /api/v1/devices", s.addDevice)
+	mux.HandleFunc("PATCH /api/v1/devices/{deviceId}", s.updateDevice)
 	mux.HandleFunc("DELETE /api/v1/devices/{deviceId}", s.removeDevice)
 	mux.HandleFunc("GET /api/v1/rates", s.getRates)
 	mux.HandleFunc("GET /api/v1/rates/lookup", s.lookupRates)
@@ -176,6 +178,35 @@ func (s *Server) addDevice(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_device", err.Error())
 	case errors.Is(err, devices.ErrUnsupported):
 		writeProblem(w, http.StatusNotImplemented, "not_implemented", err.Error())
+	case errors.Is(err, devices.ErrExists):
+		writeProblem(w, http.StatusConflict, "device_exists", err.Error())
+	case errors.Is(err, devices.ErrUnreachable):
+		writeProblem(w, http.StatusBadGateway, "device_unreachable", err.Error())
+	default:
+		serverError(w, err)
+	}
+}
+
+func (s *Server) updateDevice(w http.ResponseWriter, r *http.Request) {
+	if s.Devices == nil {
+		notImplemented(w, r)
+		return
+	}
+	var u devices.UpdateDevice
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&u); err != nil || (u.Name == nil && u.Host == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_device", "send a name and/or a host")
+		return
+	}
+	d, err := s.Devices.Update(r.Context(), r.PathValue("deviceId"), u)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, d)
+	case errors.Is(err, devices.ErrNotFound):
+		writeProblem(w, http.StatusNotFound, "unknown_device", "no such device")
+	case errors.Is(err, devices.ErrInvalid):
+		writeProblem(w, http.StatusBadRequest, "bad_device", err.Error())
 	case errors.Is(err, devices.ErrExists):
 		writeProblem(w, http.StatusConflict, "device_exists", err.Error())
 	case errors.Is(err, devices.ErrUnreachable):
