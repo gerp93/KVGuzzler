@@ -156,7 +156,7 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
         {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
         {rest !== null && (
           <p class="derived">
-            <span>Everything else (no clamp on it)</span>
+            <span>Other (not metered)</span>
             <span class="num">{formatWatts(rest)}</span>
           </p>
         )}

@@ -1,5 +1,5 @@
 // One meter's page: how much it used over a period, what that cost, its highest draw and carbon, what is inside it (a sub-panel's circuits, a
-// circuit's plugs, nested as wired, with what is left over as "Everything else"), and a chart of it with the meters directly inside it. The
+// circuit's plugs, nested as wired, with what is left over as "Other (not metered)"), and a chart of it with the meters directly inside it. The
 // parent's own reading already contains the ones inside, so none of this is added up.
 import { api } from './api';
 import { Bars } from './Bars';
@@ -104,7 +104,7 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
         <section class="card">
           <h2>Inside it</h2>
           <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} />
-          <p class="caption">Shares are of this meter. "Everything else" is its own reading less the meters listed, so nothing is added twice.</p>
+          <p class="caption">Shares are of this meter. "Other (not metered)" is its own reading less the meters listed, so nothing is added twice.</p>
         </section>
       )}
 

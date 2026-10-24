@@ -21,7 +21,7 @@ describe('the flow chart tree', () => {
     expect(tree).toMatchObject({ id: 'house', kwh: 20, cost: '3.00' });
     expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['rest-house', 3]]);
     expect(tree.children[0]!.children.map((c) => [c.id, c.kwh])).toEqual([['ev', 8], ['lights', 1], ['rest-garage', 1]]);
-    expect(tree.children[2]).toMatchObject({ meterId: null, label: 'Everything else', cost: '0.45' });
+    expect(tree.children[2]).toMatchObject({ meterId: null, label: 'Other (not metered)', cost: '0.45' });
     expect(tree.children[1]!.children.map((c) => c.id)).toEqual(['fridge', 'rest-dryer']); // a plug on a circuit
   });
 
@@ -46,12 +46,12 @@ describe('the flow chart tree', () => {
 });
 
 describe('a computer in the flow chart', () => {
-  it("has its collector's parts as bands and what they do not account for as Not metered", () => {
+  it("has its collector's parts as bands and what they do not account for as Other (not metered)", () => {
     const withPc = [...meters, m('wall', 'pc', { type: 'computer', computer_id: 'c1', parent_id: 'dryer' })];
     const sum: Summary = { ...summary, meters: [...summary.meters, f('wall', 'pc', 2, '0.30')] };
     const virtual = new Map([['wall', [{ label: 'GPU', kwh: 1, cost: '0.15' }, { label: 'CPU package', kwh: 0.6, cost: '0.09' }]]]);
     const wall = flowTree(withPc, sum, 'wall', virtual)!;
-    expect(wall.children.map((c) => [c.label, Math.round(c.kwh * 10) / 10, !!c.rest])).toEqual([['GPU', 1, false], ['CPU package', 0.6, false], ['Not metered', 0.4, true]]);
+    expect(wall.children.map((c) => [c.label, Math.round(c.kwh * 10) / 10, !!c.rest])).toEqual([['GPU', 1, false], ['CPU package', 0.6, false], ['Other (not metered)', 0.4, true]]);
     // Without parts it is as before: nothing under it.
     expect(flowTree(withPc, sum, 'wall')!.children).toEqual([]);
     // Inside the house, the computer sits in the circuit it is on.

@@ -1,5 +1,5 @@
 // A list of meters as bars: name, live watts, and (over a period) energy, cost and share. A meter that holds others is followed by the ones
-// inside it and by a "Everything else" line (its figure less theirs). Each real meter opens its own page.
+// inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
 import { formatKwh, formatMoney, formatWatts, houseShare, type MeterSummary, type Row, type Summary } from './lib';
 import { routePath } from './route';
 
@@ -20,11 +20,11 @@ export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; 
           };
         }
         const share = mine ? houseShare(mine.kwh, baseKwh) : null;
-        const title = r.remainder ? `Everything else on ${r.meter.label}` : r.meter.label;
+        const title = r.remainder ? `Other (not metered) on ${r.meter.label}` : r.meter.label;
         return (
           <li key={r.remainder ? `rest-${r.meter.id}` : r.meter.id} class={r.remainder ? 'rest' : undefined} style={r.depth ? { paddingLeft: `${r.depth * 1.25}rem` } : undefined}>
             <span class="name" title={title}>
-              {r.remainder ? 'Everything else' : <a href={meterPath(r.meter)}>{r.meter.label}</a>}
+              {r.remainder ? 'Other (not metered)' : <a href={meterPath(r.meter)}>{r.meter.label}</a>}
             </span>
             <span class="bar" aria-hidden="true">
               <i style={{ width: `${of > 0 ? Math.min(100, (r.watts / of) * 100) : 0}%` }} />

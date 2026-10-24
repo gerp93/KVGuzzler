@@ -1,6 +1,6 @@
 // The energy flow chart's data and layout, with no drawing in it. A flow chart is a tree laid out left to right: the whole on the left, its
 // parts to the right, each band as wide as the energy that went through it. The same rule as everywhere else holds: a parent's own reading
-// already contains its children, so what is left over is its own band ("Everything else"); nothing is added twice.
+// already contains its children, so what is left over is its own band ("Other (not metered)"); nothing is added twice.
 import { shownMeters, sumMoney, type Meter, type Summary } from './lib';
 
 export interface FlowNode {
@@ -9,9 +9,9 @@ export interface FlowNode {
   /** Energy over the period: the meter's own reading. */
   kwh: number;
   cost: string | null;
-  /** The meter it stands for, or null for a derived line ("Everything else", the whole house). */
+  /** The meter it stands for, or null for a derived line ("Other (not metered)", the whole house). */
   meterId: string | null;
-  /** The line for what a parent's own reading carries beyond its parts ("Everything else", "Not metered"). */
+  /** The line for what a parent's own reading carries beyond its parts ("Other (not metered)"). */
   rest?: boolean;
   children: FlowNode[];
 }
@@ -46,7 +46,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     const own = f?.kwh ?? 0;
     if (children.length > 0) {
       const left = own - children.reduce((t, c) => t + c.kwh, 0);
-      if (left > 0) children.push(rest(m.id, parts.length > 0 ? 'Not metered' : 'Everything else', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
+      if (left > 0) children.push(rest(m.id, 'Other (not metered)', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
     }
     return { id: m.id, label: m.label, kwh: own, cost: f?.cost ?? null, meterId: m.id, children };
   };
@@ -63,7 +63,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
   const inside = top.reduce((t, c) => t + c.kwh, 0);
   if (summary.house_kwh != null) {
     const left = summary.house_kwh - inside;
-    const children = left > 0 ? [...top, rest('house', 'Everything else', left, moneyLeft(summary.house_cost, top.map((c) => c.cost)))] : top;
+    const children = left > 0 ? [...top, rest('house', 'Other (not metered)', left, moneyLeft(summary.house_cost, top.map((c) => c.cost)))] : top;
     return { id: 'house', label: 'House', kwh: summary.house_kwh, cost: summary.house_cost ?? null, meterId: null, children };
   }
   return { id: 'all', label: 'All circuits', kwh: inside, cost: sumMoney(top.map((c) => c.cost)), meterId: null, children: top };
