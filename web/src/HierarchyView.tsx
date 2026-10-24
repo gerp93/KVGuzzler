@@ -4,6 +4,7 @@
 // it only changes how this dashboard reads and shows them.
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
+import { Hint } from './Hint';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
@@ -359,10 +360,10 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
         {summary ? <FlowChart meters={meters} summary={summary} /> : <p class="note">Loading…</p>}
-        <p class="caption">
+        <Hint>
           Each band is as wide as the energy that went through it over the period. A meter's band already counts what is inside it, so the parts of a band
           never add to more than the band itself: what is left over is "Other (not metered)". The Energy and Cost columns below follow the same period.
-        </p>
+        </Hint>
       </section>
       <section class="card wide">
         <div class="row">
@@ -380,11 +381,11 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
             onCancel={() => setAdding(false)}
           />
         )}
-        <p class="caption">
+        <Hint>
           Every meter, laid out as the house is wired. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
           Nothing here is sent to a device.
-        </p>
+        </Hint>
         {error && <p class="note error">{error}</p>}
         {dragging && (
           <div

@@ -105,7 +105,7 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
             <li key={l.label}>
               <span class="grow">{l.label}</span>
               <span class="num">{formatKwh(l.kwh)}</span>
-              <span class="num cost">{l.cost != null ? formatMoney(l.cost, est?.rate_estimated ?? false) : ''}</span>
+              {l.cost != null && <span class="num cost">{formatMoney(l.cost, est?.rate_estimated ?? false)}</span>}
             </li>
           ))}
         </ul>

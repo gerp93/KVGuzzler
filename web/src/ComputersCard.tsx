@@ -2,6 +2,7 @@
 // columns as the tree. The arrow opens what it is made of: its name, its wall plug, its peripherals. The wall plug and a peripheral stay where they
 // are plugged in in the tree; this is only the grouping, like a group.
 import { useState } from 'preact/hooks';
+import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import { formatKwh, formatMoney, formatWatts, type Computer, type ComputerDetail, type Meter } from './lib';
@@ -49,11 +50,11 @@ export function ComputersCard({
   return (
     <section class="card wide">
       <h2>Computers</h2>
-      <p class="caption">
+      <Hint>
         A computer is its wall plug (which measures the whole PC) plus its peripherals (each a separate plug: the monitor, the speakers). The row shows that setup's
         total; each plug stays where it is plugged in in the tree. Open a row to choose its plugs. A PC that has the KVGuzzler collector adds itself the first time it
         reports; add one by hand with + Add.
-      </p>
+      </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.computers.length === 0 && <p class="note">No computers yet.</p>}
       {data && data.computers.length > 0 && (

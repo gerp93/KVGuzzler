@@ -11,6 +11,9 @@ import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
+import { Skeleton } from './Skeleton';
+import { Spark, useTrail } from './Spark';
+import { routePath } from './route';
 import { RateNote } from './RateNote';
 import {
   carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, pcSlices, sumByTime, unmetered,
@@ -57,6 +60,7 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
   const [period, setPeriod] = useStored('period', '24h');
   const { data: live, error } = usePoll<Live>(api.live, 2000, []);
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
+  const trail = useTrail(live?.house_watts, live?.time);
 
   // The period's figures change slowly: read them once a minute, and when the period or the clamps change.
   const { data: figures } = usePoll<Period>(
@@ -75,7 +79,7 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
     [period, mains.map((m) => m.id).join(',')],
   );
 
-  if (!live) return <p class="note">{error ? `Waiting for the server: ${error.message}` : 'Loading…'}</p>;
+  if (!live) return error ? <p class="note">{`Waiting for the server: ${error.message}`}</p> : <Skeleton />;
 
   if (meters.length === 0) {
     return (
@@ -116,7 +120,17 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
           <h2>House</h2>
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
-        <div class="stats">
+        <div class="livefig">
+          <div>
+            <span class="caption">
+              <i aria-hidden="true" />
+              Right now
+            </span>
+            <p class="big">{formatWatts(house)}</p>
+          </div>
+          <Spark values={trail} label="The last few minutes of the house's draw" />
+        </div>
+        <div class="stats three">
           <div class="stat">
             <span class="caption">Energy</span>
             <p class="big small">{kwh != null ? formatKwh(kwh) : '—'}</p>
@@ -124,10 +138,11 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
           <div class="stat">
             <span class="caption">Cost</span>
             <p class="big small">{cost != null ? formatMoney(cost, summary?.cost_estimated) : '—'}</p>
-          </div>
-          <div class="stat">
-            <span class="caption">Right now</span>
-            <p class="big small">{formatWatts(house)}</p>
+            {cost == null && kwh != null && (
+              <a class="hintlink" href={routePath('settings')}>
+                Set a price
+              </a>
+            )}
           </div>
           <div class="stat">
             <span class="caption">Max draw</span>
@@ -148,6 +163,14 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
           {live.notes.map((n) => (
             <p key={n}>{n}</p>
           ))}
+        </section>
+      )}
+
+      {figures?.line && (
+        <section class="card wide">
+          <h2>Power over time</h2>
+          <Chart lines={[figures.line]} domain={figures.domain} />
+          <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
         </section>
       )}
 
@@ -193,14 +216,6 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
           nowWatts={house}
           nowWhat="the mains clamps"
         />
-      )}
-
-      {figures?.line && (
-        <section class="card">
-          <h2>Power over time</h2>
-          <Chart lines={[figures.line]} domain={figures.domain} />
-          <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
-        </section>
       )}
 
       {mains.length > 0 && <HouseHistoryCard period={period as PeriodKey} />}

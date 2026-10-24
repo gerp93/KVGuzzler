@@ -2,6 +2,7 @@
 // members stay where they are in the tree. A member that another member already contains (a plug on a circuit that is in the same group) is
 // listed but not added a second time. A row opens (the arrow) to choose the members.
 import { useState } from 'preact/hooks';
+import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import { formatKwh, formatMoney, formatWatts, type ApplianceGroup, type GroupDetail, type Meter } from './lib';
@@ -50,11 +51,11 @@ export function GroupsCard({
   return (
     <section class="card wide">
       <h2>Groups</h2>
-      <p class="caption">
+      <Hint>
         A group is a logical grouping, not a place in the wiring: put any meters in one (the plugs of an entertainment center, a desk and its computer) and it shows
         their total as one line. Every meter stays where it is in the tree. If a meter is inside another in the same group (a plug on a circuit), it is listed but not
         added again, because the one that holds it already counts it. Add a group with + Add.
-      </p>
+      </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.groups.length === 0 && <p class="note">No groups yet.</p>}
       {data && data.groups.length > 0 && (

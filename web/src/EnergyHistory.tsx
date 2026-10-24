@@ -22,7 +22,7 @@ export function EnergyHistory({ id, period }: { id: string; period: PeriodKey })
                 <span class="caption block">{historyDetail(p)}</span>
               </span>
               <span class="num">{formatKwh(p.kwh)}</span>
-              <span class="num cost">{p.cost != null ? formatMoney(p.cost, p.cost_estimated) : ''}</span>
+              {p.cost != null && <span class="num cost">{formatMoney(p.cost, p.cost_estimated)}</span>}
             </li>
           ))}
         </ul>
