@@ -876,3 +876,9 @@ a.button {
   padding: 8px;
   font-weight: 600;
 }
+
+/* The column titles above a list of bars */
+.bars li.head {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}

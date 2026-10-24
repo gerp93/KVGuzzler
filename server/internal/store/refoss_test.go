@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
+	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 )
@@ -117,5 +119,78 @@ func TestPairingMakesOneMeterOfTwoLegsAndUnpairingBringsTheLegBack(t *testing.T)
 	}
 	if back, _ := s.Meter(ctx, ids[2]); !back.Enabled {
 		t.Error("an unpaired leg comes back")
+	}
+}
+
+func TestPairingTwoClampsAddsWhatEachRecordedBeforeAndNeverTwice(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	ids := monitor(t, s, "refoss-p", 3)
+	a, b := ids[0], ids[1]
+	t0 := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+
+	// Apart, each clamp recorded one leg: 3 kW for an hour (60 minutes), the second leg also for a minute the first did not record.
+	for i := 0; i < 60; i++ {
+		if err := s.AddMinute(ctx, a, t0.Add(time.Duration(i)*time.Minute), 3000, 3100, 60); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.AddMinute(ctx, b, t0.Add(time.Duration(i)*time.Minute), 3000, 3050, 60); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.AddMinute(ctx, b, t0.Add(-time.Minute), 3000, 3000, 60); err != nil {
+		t.Fatal(err)
+	}
+	total := func(id string) float64 {
+		tot, err := s.Totals(ctx, id, t0.Add(-time.Hour), t0.Add(2*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tot.KWh
+	}
+	if total(a) != 3 || total(b) < 3.04 {
+		t.Fatalf("before pairing: %v and %v kWh", total(a), total(b))
+	}
+
+	if _, err := s.SetMeterWiring(ctx, a, WiringChange{SetPair: true, PairWith: &b}); err != nil {
+		t.Fatal(err)
+	}
+	want := 6.05 // 3 + 3 for the hour both recorded, and the 0.05 kWh minute only the second recorded
+	if got := total(a); math.Abs(got-want) > 1e-9 {
+		t.Errorf("the circuit has %v kWh, want %v: both legs, added", got, want)
+	}
+	tot, _ := s.Totals(ctx, a, t0, t0.Add(time.Hour))
+	if tot.PeakWatts != 6150 {
+		t.Errorf("peak %v W, want the two legs' highest added (6150)", tot.PeakWatts)
+	}
+	if got := total(b); got != 0 {
+		t.Errorf("the second leg still has %v kWh of its own", got)
+	}
+
+	// Unpairing and pairing again must not add the same history a second time.
+	if _, err := s.SetMeterWiring(ctx, a, WiringChange{SetPair: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetMeterWiring(ctx, a, WiringChange{SetPair: true, PairWith: &b}); err != nil {
+		t.Fatal(err)
+	}
+	if got := total(a); math.Abs(got-want) > 1e-9 {
+		t.Errorf("after pairing again: %v kWh, want it unchanged at %v", got, want)
+	}
+
+	// A minute both recorded partly (the moment of pairing) adds up exactly: 20 s of 100 W + 20 s of 50 W on the leg, 40 s of 100 W on the circuit.
+	ids2 := monitor(t, s, "refoss-q", 2)
+	if err := s.AddMinute(ctx, ids2[0], t0, 100, 100, 40); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMinute(ctx, ids2[1], t0, 50, 50, 20); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetMeterWiring(ctx, ids2[0], WiringChange{SetPair: true, PairWith: &ids2[1]}); err != nil {
+		t.Fatal(err)
+	}
+	tot, _ = s.Totals(ctx, ids2[0], t0, t0.Add(time.Minute))
+	if wantKwh := (100.0*40 + 50.0*20) / 3.6e6; math.Abs(tot.KWh-wantKwh) > 1e-12 {
+		t.Errorf("a minute both recorded: %v kWh, want %v", tot.KWh, wantKwh)
 	}
 }
