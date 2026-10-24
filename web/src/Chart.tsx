@@ -21,6 +21,12 @@ export interface Shade {
 
 const css = (name: string) => getComputedStyle(document.body).getPropertyValue(name).trim() || '#888';
 
+/** The same colour, see-through, for the soft fill under a line; a colour that is not plain rgb() gets no fill. */
+export function withAlpha(color: string, alpha: number): string | undefined {
+  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(color);
+  return m ? `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})` : undefined;
+}
+
 /** Merges lines onto one shared time axis, leaving a gap (null) where a line has no point. */
 export function align(lines: Line[]): uPlot.AlignedData {
   const xs = [...new Set(lines.flatMap((l) => l.x))].sort((a, b) => a - b);
@@ -74,10 +80,18 @@ export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Lin
             grid: { stroke: grid, width: 0.5 },
             ticks: { stroke: grid },
             values: (_u, v) => v.map((w) => (w >= 1000 ? `${w / 1000} kW` : `${w} W`)),
-            size: 64,
+            size: el.clientWidth < 420 ? 52 : 64,
           },
         ],
-        series: [{}, ...lines.map((l) => ({ label: l.name, stroke: css(l.colorVar), width: 2, spanGaps: false, dash: l.dashed ? [6, 4] : undefined }))],
+        series: [
+          {},
+          ...lines.map((l, i) => {
+            const stroke = css(l.colorVar);
+            // The first solid line gets a soft fill, so the shape of the day reads at a glance; the rest stay plain lines.
+            const fill = i === 0 && !l.dashed ? withAlpha(stroke, 0.14) : undefined;
+            return { label: l.name, stroke, fill, width: 2, spanGaps: false, dash: l.dashed ? [6, 4] : undefined, points: { size: 5 } };
+          }),
+        ],
         hooks: {
           // Shade the times nothing was recorded, behind the lines.
           drawClear: [

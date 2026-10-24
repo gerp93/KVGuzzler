@@ -1427,3 +1427,59 @@ main:has(> .page-narrow) {
 .back:hover {
   text-decoration: underline;
 }
+
+/* A phone: the choices in a segmented control share the card's width, one line each */
+@media (max-width: 559px) {
+  .seg:not(.period) {
+    display: flex;
+    width: 100%;
+  }
+
+  .seg:not(.period) button {
+    flex: 1 1 0;
+    padding-inline: 4px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (pointer: coarse) {
+  button.icon,
+  a.button.icon,
+  button.twisty,
+  button.show-btn {
+    min-width: var(--tap);
+    min-height: var(--tap);
+  }
+}
+
+/* A page arrives, it does not jump */
+main > * {
+  animation: rise 0.28s ease-out both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The compare list: a swatch shows which line is whose */
+.chips button .swatch {
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+.chart .u-legend {
+  font-size: 0.8rem;
+}
+
+.chart .u-legend .u-marker {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 2px;
+}
+
+.chart .u-legend .u-series th {
+  padding-right: 4px;
+}

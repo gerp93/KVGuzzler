@@ -39,7 +39,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
 
   return (
     <>
-      <section class="card">
+      <section class="card wide">
         <div class="row">
           <h2>Power over time</h2>
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
@@ -53,14 +53,18 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         <p class="caption">Average watts per point. The house line is the mains clamps; the others are drawn separately.</p>
       </section>
 
-      <section class="card">
+      <section class="card wide">
         <h2>Compare with the house (up to 3)</h2>
         <div class="chips">
-          {others.map((c) => (
-            <button key={c.id} type="button" aria-pressed={chosen.some((x) => x.id === c.id)} onClick={() => toggle(c.id)}>
-              {c.label}
-            </button>
-          ))}
+          {others.map((c) => {
+            const at = chosen.findIndex((x) => x.id === c.id);
+            return (
+              <button key={c.id} type="button" aria-pressed={at >= 0} disabled={at < 0 && chosen.length >= 3} onClick={() => toggle(c.id)}>
+                {at >= 0 && <i class="swatch" style={{ background: `var(${COLORS[at % COLORS.length]})` }} aria-hidden="true" />}
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </section>
     </>
