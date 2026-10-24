@@ -40,6 +40,7 @@ func main() {
 	listen := flag.String("listen", envOr("HOUSED_LISTEN", ":8080"), "address to serve the API on (env HOUSED_LISTEN)")
 	data := flag.String("data", envOr("HOUSED_DATA", "data"), "folder for house.db (env HOUSED_DATA)")
 	simulate := flag.Bool("sim", false, "poll a made-up house instead of real devices (no hardware needed)")
+	simDays := flag.Int("sim-days", 0, "with -sim: also make this many days of made-up history, once, so a demo has something behind it")
 	tz := flag.String("tz", envOr("HOUSED_TZ", ""), `IANA time zone for "day" buckets and bill dates, e.g. America/Chicago (env HOUSED_TZ; default: this machine's)`)
 	flag.Parse()
 
@@ -50,12 +51,12 @@ func main() {
 			log.Fatalf("-tz %q: %v", *tz, err)
 		}
 	}
-	if err := run(*listen, *data, *simulate, loc); err != nil {
+	if err := run(*listen, *data, *simulate, *simDays, loc); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(listen, dataDir string, simulate bool, loc *time.Location) error {
+func run(listen, dataDir string, simulate bool, simDays int, loc *time.Location) error {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return err
 	}
@@ -75,10 +76,16 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 		return err
 	}
 	if simulate {
-		if err := col.Add(ctx, sim.New()); err != nil {
+		src := sim.New()
+		if err := col.Add(ctx, src); err != nil {
 			return err
 		}
 		log.Print("polling a simulated house: nothing here is a measurement")
+		if simDays > 0 {
+			if err := seedSimHistory(ctx, st, src, simDays); err != nil {
+				return err
+			}
+		}
 	} else if len(col.Devices()) == 0 {
 		log.Print("no devices yet: add a plug in the dashboard's Settings (Refoss monitors are not supported yet), or run with -sim")
 	}
@@ -105,4 +112,20 @@ func run(listen, dataDir string, simulate bool, loc *time.Location) error {
 	}
 	<-done
 	return nil
+}
+
+// seedSimHistory writes the simulated house's past, once: when the database already has history for it, nothing is added.
+func seedSimHistory(ctx context.Context, st *store.Store, src *sim.Source, days int) error {
+	first := src.Meters()[0].ID
+	if _, have, err := st.FirstMinute(ctx, first); err != nil || have {
+		return err
+	}
+	log.Printf("making %d days of made-up history for the simulated house", days)
+	return sim.History(ctx, time.Now(), days, func(rows []sim.MinuteRow) error {
+		out := make([]store.MinuteRow, len(rows))
+		for i, r := range rows {
+			out[i] = store.MinuteRow{MeterID: r.MeterID, Minute: r.Minute, AvgW: r.AvgW, MaxW: r.MaxW, Seconds: r.Seconds}
+		}
+		return st.AddMinutes(ctx, out)
+	})
 }

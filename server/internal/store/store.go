@@ -393,6 +393,43 @@ ON CONFLICT(meter_id, minute) DO UPDATE SET
 	return err
 }
 
+// MinuteRow is one minute of one meter's history, for writing many at once.
+type MinuteRow struct {
+	MeterID string
+	Minute  time.Time
+	AvgW    float64
+	MaxW    float64
+	Seconds float64
+}
+
+// AddMinutes writes many minutes in one transaction, merging into any minute that already has rows exactly as AddMinute does.
+func (s *Store) AddMinutes(ctx context.Context, rows []MinuteRow) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.PrepareContext(ctx, `
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(meter_id, minute) DO UPDATE SET
+  avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / (seconds + excluded.seconds),
+  max_w   = max(max_w, excluded.max_w),
+  seconds = seconds + excluded.seconds`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range rows {
+		if r.Seconds <= 0 {
+			continue
+		}
+		if _, err := stmt.ExecContext(ctx, r.MeterID, r.Minute.Unix(), r.AvgW, r.MaxW, r.Seconds); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 type Totals struct {
 	KWh            float64
 	PeakWatts      float64

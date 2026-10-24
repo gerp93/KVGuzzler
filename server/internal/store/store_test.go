@@ -192,3 +192,29 @@ INSERT INTO devices(id, kind, host, name) VALUES ('shelly-1', 'shelly_plug', '10
 		t.Errorf("RemoveDevice on a migrated database: %v", err)
 	}
 }
+
+func TestAddMinutesWritesManyAtOnceAndMergesLikeAddMinute(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	t0 := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	var rows []MinuteRow
+	for i := 0; i < 100; i++ {
+		rows = append(rows, MinuteRow{MeterID: "m", Minute: t0.Add(time.Duration(i) * time.Minute), AvgW: 600, MaxW: 650, Seconds: 60})
+	}
+	rows = append(rows, MinuteRow{MeterID: "m", Minute: t0, AvgW: 0, MaxW: 0, Seconds: 0}) // nothing was covered: nothing is written
+	if err := s.AddMinutes(ctx, rows); err != nil {
+		t.Fatal(err)
+	}
+	tot, err := s.Totals(ctx, "m", t0, t0.Add(3*time.Hour))
+	if err != nil || math.Abs(tot.KWh-1.0) > 1e-9 || tot.PeakWatts != 650 {
+		t.Fatalf("totals %+v %v, want 1 kWh (100 minutes at 600 W) and a 650 W peak", tot, err)
+	}
+	// A minute that already has rows is merged, weighted by seconds.
+	if err := s.AddMinutes(ctx, []MinuteRow{{MeterID: "m", Minute: t0, AvgW: 1200, MaxW: 1300, Seconds: 60}}); err != nil {
+		t.Fatal(err)
+	}
+	tot, _ = s.Totals(ctx, "m", t0, t0.Add(time.Minute))
+	if want := (600.0*60 + 1200.0*60) / 3.6e6; math.Abs(tot.KWh-want) > 1e-12 || tot.PeakWatts != 1300 {
+		t.Errorf("merged minute %+v, want %v kWh", tot, want)
+	}
+}
