@@ -17,6 +17,8 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
   const [host, setHost] = useState('');
   const [name, setName] = useState('');
   const [isPc, setIsPc] = useState(false);
+  const [refossHost, setRefossHost] = useState('');
+  const [refossName, setRefossName] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState('');
@@ -43,6 +45,22 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
       .finally(() => setBusy(false));
   };
 
+  const addRefoss = () => {
+    setBusy(true);
+    setMessage('');
+    api
+      .addDevice({ kind: 'refoss', host: refossHost.trim(), name: refossName.trim() })
+      .then(
+        () => {
+          setRefossHost('');
+          setRefossName('');
+          changed();
+        },
+        (e: Error) => setMessage(e.message),
+      )
+      .finally(() => setBusy(false));
+  };
+
   const remove = (id: string) =>
     api.removeDevice(id).then(
       () => {
@@ -56,7 +74,7 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
     <section class="card">
       <h2>Devices</h2>
       {error && <p class="note">{error.message}</p>}
-      {devices && devices.length === 0 && <p class="note">No devices yet. Add a smart plug below.</p>}
+      {devices && devices.length === 0 && <p class="note">No devices yet. Add a smart plug or a Refoss monitor below.</p>}
       {devices && devices.length > 0 && (
         <ul class="settings">
           {devices.map((d) => (
@@ -113,10 +131,27 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
           </button>
         </div>
       </fieldset>
-      <p class="caption">
-        The server reads the plug once before it keeps it, and only ever reads: it cannot switch it. Refoss monitors are not
-        supported yet; they need a real one on the network first.
-      </p>
+      <fieldset class="device-form">
+        <legend>Add a Refoss energy monitor</legend>
+        <label class="field">
+          <span>Address (like 192.168.68.88)</span>
+          <input value={refossHost} onInput={(e) => setRefossHost((e.target as HTMLInputElement).value)} />
+        </label>
+        <label class="field">
+          <span>Name (where it is, like Garage panel)</span>
+          <input value={refossName} maxLength={60} onInput={(e) => setRefossName((e.target as HTMLInputElement).value)} />
+        </label>
+        <p class="caption">
+          Only the EM16P has been tried. Its local login must be off in the Refoss app. Every input is added; the ones with nothing clamped on them are hidden, and
+          you rename, flip and pair the rest under Channels below.
+        </p>
+        <div class="chips">
+          <button type="button" onClick={addRefoss} disabled={busy || refossHost.trim() === ''}>
+            {busy ? 'Checking the monitor…' : 'Add monitor'}
+          </button>
+        </div>
+      </fieldset>
+      <p class="caption">The server reads a device once before it keeps it, and only ever reads: it cannot switch a plug or change a monitor.</p>
       {message && (
         <p class="note error" role="alert">
           {message}

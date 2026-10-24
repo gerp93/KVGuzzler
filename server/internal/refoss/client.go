@@ -3,8 +3,8 @@
 // It is read-only by construction: get refuses any method that is not on the allowlist, so no `*.Set` call can be
 // made from here. Local authentication is expected to be off on the device (a 401 is reported as such).
 //
-// Only DeviceInfo.Get is parsed. The shape of Status.Get (the per-channel watts, volts, amps and kWh) is not confirmed
-// against a real device yet, so StatusRaw returns the body untouched and nothing here guesses its fields.
+// DeviceInfo.Get is parsed here; Status.Get is returned untouched by StatusRaw and read in source.go, whose mapping was written
+// from a real EM16P's answer (testdata/status-em16p.json).
 package refoss
 
 import (

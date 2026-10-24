@@ -111,6 +111,18 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
+	// And before a clamp's sign could be flipped and its two legs paired.
+	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT"} {
+		name := col[:strings.IndexByte(col, ' ')]
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = ?`, name).Scan(&has); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+		if has == 0 {
+			if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN ` + col); err != nil {
+				return fmt.Errorf("store: migrate: %w", err)
+			}
+		}
+	}
 	// And before plugs could be grouped.
 	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = 'group_id'`).Scan(&has); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
@@ -170,11 +182,15 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	var c model.Channel
 	var idx sql.NullInt64
 	var max sql.NullFloat64
-	var computer, group sql.NullString
+	var computer, group, pair sql.NullString
 	var scope string
-	var enabled int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group); err != nil {
+	var enabled, invert int
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair); err != nil {
 		return c, err
+	}
+	c.Invert = invert == 1
+	if pair.Valid {
+		c.PairWith = &pair.String
 	}
 	if computer.Valid {
 		c.ComputerID = &computer.String
@@ -194,7 +210,7 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	return c, nil
 }
 
-const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id`
+const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with`
 
 func (s *Store) Channels(ctx context.Context) ([]model.Channel, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels ORDER BY device_id, idx IS NULL, idx, id`)

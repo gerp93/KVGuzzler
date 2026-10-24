@@ -218,11 +218,16 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		Enabled    *bool           `json:"enabled"`
 		ComputerID json.RawMessage `json:"computer_id"` // a computer's id, or null to let the plug go; absent leaves it alone
 		GroupID    json.RawMessage `json:"group_id"`    // an appliance group's id, or null to take the plug out; absent leaves it alone
+		// How a Refoss monitor's clamp is wired: its sign, the other leg of its breaker, and whether it measures a circuit or the mains.
+		Invert   *bool           `json:"invert"`
+		PairWith json.RawMessage `json:"pair_with"` // another input's channel id, or null to unpair; absent leaves it alone
+		Scope    *string         `json:"scope"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id and/or group_id")
+	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
+		body.Invert == nil && body.PairWith == nil && body.Scope == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with and/or scope")
 		return
 	}
 	if body.Label != nil {
@@ -249,8 +254,24 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var pairWith *string
+	if body.PairWith != nil {
+		if err := json.Unmarshal(body.PairWith, &pairWith); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "pair_with is another input's channel id or null")
+			return
+		}
+	}
+	var scope *model.Scope
+	if body.Scope != nil {
+		sc := model.Scope(*body.Scope)
+		scope = &sc
+	}
+
 	id := r.PathValue("channelId")
 	ch, err := s.Store.UpdateChannel(r.Context(), id, body.Label, body.Enabled)
+	if err == nil && (body.Invert != nil || body.PairWith != nil || scope != nil) {
+		ch, err = s.Store.SetChannelWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Scope: scope})
+	}
 	if err == nil && body.ComputerID != nil {
 		ch, err = s.Store.AssignChannel(r.Context(), id, computerID)
 	}

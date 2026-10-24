@@ -88,8 +88,15 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   `GET /history` and `GET /export.csv` (the house and each circuit per day) and a house chart. None of it adds a circuit or plug to the house.
 - Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
   changes only for a breaking change, and the server and its clients move together.
-- **Not checked against a real Refoss monitor**: `Refoss.Status.Get`'s fields are unknown, so nothing may guess them; write the
-  mapping from a real answer and keep it as a test fixture.
+- **Refoss monitors** (`internal/refoss`, only the **EM16P** has been seen: `testdata/status-em16p.json` is a real answer, with the network details taken out; a repository
+  fixture must never hold the Wi-Fi name, MAC or address). `Refoss.Status.Get` answers one object per input, `em:1` to `em:18`, with signed `power`: A1-A6 (`em:1-6`), B1-B6 (`em:7-12`)
+  and C1-C6 (`em:13-18`), named for the phase whose voltage they use. A US split-phase panel reads about 118 V on A and B and nothing on C. A **240 V breaker has a clamp on each of
+  its two legs, one on an A input and one on a B input, and is one circuit: the two added** (`pair_with` on the channel; the other leg is switched off and not reported on its own).
+  A clamp on backwards reads negative on a load: `invert` (Flip sign) fixes it in software; a reading still negative after that is dropped and **said so by name** in the notes (the
+  `source.Noter` interface), never counted as zero. Every input is a channel when the monitor is added, and the ones with nothing on them at that moment are switched off (they come
+  back in Settings). All are circuits until set to `mains` per channel (a monitor on the main panel). A clamp's sign and pairing are the user's: **never change them for the user**.
+  The monitor is only ever read (`Refoss.DeviceInfo.Get`, `Refoss.Status.Get`); the energy is integrated by the collector from the instantaneous power, as for a plug.
+  **Not checked on an EM06P or on the main panel** (only a garage sub-panel's three circuits).
 
 ## Rules that are easy to break
 

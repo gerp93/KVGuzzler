@@ -1,0 +1,9 @@
+{
+  "name": "Refoss Smart Energy Monitor",
+  "model": "em16p",
+  "dev_id": "refoss-em16p-000000000000",
+  "api_ver": "1.0",
+  "fw_ver": "3.1.11",
+  "hw_ver": "3.0.0",
+  "auth_en": false
+}

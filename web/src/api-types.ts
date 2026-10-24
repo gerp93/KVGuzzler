@@ -90,7 +90,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rename a channel or switch it off. Changes only the server's own label, never the device. */
+        /** Rename a channel, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device. */
         patch: operations["updateChannel"];
         trace?: never;
     };
@@ -602,13 +602,12 @@ export interface components {
             /** @description A label for the device (a plug's reading is named after this). */
             name?: string;
             /**
-             * @description What a plug measures: `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
-             *     circuit already counted, so it is shown beside the others and added to nothing. Ignored for a Refoss monitor,
-             *     whose channels say what they are.
-             * @default plug
+             * @description What a plug measures (`plug` when left out): `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
+             *     circuit already counted, so it is shown beside the others and added to nothing. Not allowed for a Refoss monitor
+             *     (400): its inputs are circuits until set otherwise per channel.
              * @enum {string}
              */
-            scope: "plug" | "pc";
+            scope?: "plug" | "pc";
         };
         Device: {
             id: string;
@@ -640,10 +639,29 @@ export interface components {
             computer_id?: string | null;
             /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer. */
             group_id?: string | null;
+            /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it. */
+            invert?: boolean;
+            /**
+             * @description The channel of the other leg of the same 240 V breaker. This channel then reports both legs added, and that one is switched off and
+             *     not reported on its own. Only a Refoss channel has it.
+             */
+            pair_with?: string | null;
         };
         ChannelUpdate: {
             label?: string;
             enabled?: boolean;
+            /** @description Refoss only. Flip the sign of the clamp's reading (a load reads positive when the clamp is the right way round). */
+            invert?: boolean;
+            /**
+             * @description Refoss only. The channel of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
+             *     circuit (this channel reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
+             */
+            pair_with?: string | null;
+            /**
+             * @description Refoss only. A monitor on the main panel measures the mains; one on a sub-panel measures circuits.
+             * @enum {string}
+             */
+            scope?: "circuit" | "mains";
             /**
              * @description Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
              *     any number of `plug` channels are its peripherals.
