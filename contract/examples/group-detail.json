@@ -8,5 +8,6 @@
   ],
   "total_kwh": 2.0,
   "total_cost": "0.30",
-  "cost_estimated": false
+  "cost_estimated": false,
+  "not_added": []
 }

@@ -697,9 +697,29 @@ func (s *Server) groupDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	detail := model.GroupDetail{Group: g, From: from.UTC(), To: to.UTC(), Members: []model.MeterSummary{}}
+	detail := model.GroupDetail{Group: g, From: from.UTC(), To: to.UTC(), Members: []model.MeterSummary{}, NotAdded: []string{}}
 	var cost rates.Money
 	priced := true
+	inGroup := map[string]bool{}
+	for _, id := range g.MeterIDs {
+		if ch, ok := byID[id]; ok && ch.Enabled {
+			inGroup[id] = true
+		}
+	}
+	// Inside another member (its parent, or the parent's parent...): already in that member's reading.
+	held := func(ch model.Meter) bool {
+		for seen := 0; ch.ParentID != nil && seen < 16; seen++ {
+			if inGroup[*ch.ParentID] {
+				return true
+			}
+			next, ok := byID[*ch.ParentID]
+			if !ok {
+				return false
+			}
+			ch = next
+		}
+		return false
+	}
 	for _, id := range g.MeterIDs {
 		ch, ok := byID[id]
 		if !ok || !ch.Enabled {
@@ -711,6 +731,10 @@ func (s *Server) groupDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		detail.Members = append(detail.Members, cs)
+		if held(ch) {
+			detail.NotAdded = append(detail.NotAdded, id)
+			continue
+		}
 		detail.TotalKWh += cs.KWh
 		if rc.Unpriced {
 			priced = false

@@ -20,6 +20,7 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 		{ID: "strip-3", DeviceID: "d3", Scope: model.ScopePlug, Label: "Hidden strip"},
 		{ID: "pc-wall", DeviceID: "d4", Scope: model.ScopePC, Label: "PC"},
 		{ID: "desk-plug", DeviceID: "d5", Scope: model.ScopePlug, Label: "Monitor"},
+		{ID: "house-mains", DeviceID: "d6", Scope: model.ScopeMains, Label: "Mains"},
 	} {
 		if err := st.UpsertMeter(ctx, ch); err != nil {
 			t.Fatal(err)
@@ -53,8 +54,8 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 			t.Fatalf("put %s in the group: %d", ch, code)
 		}
 	}
-	if code := put("pc-wall", quoted); code != 400 {
-		t.Errorf("a PC's plug in a group: %d, want 400", code)
+	if code := put("house-mains", quoted); code != 400 {
+		t.Errorf("the mains in a group: %d, want 400", code)
 	}
 	if code := put("strip-1", `"grp-nope"`); code != 400 {
 		t.Errorf("an unknown group: %d, want 400", code)
@@ -63,15 +64,18 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 		t.Errorf("a number for the group: %d, want 400", code)
 	}
 
-	// A plug is shown in one place: a grouped plug cannot join a computer, and a computer's plug cannot join a group.
+	// A group is only a grouping: a grouped plug can be on a computer, and a computer's plug can be in a group (taken out again here).
 	_, cbody := send(t, http.MethodPost, srv.URL+"/api/v1/computers", `{"name":"Desktop"}`)
 	comp := decode[model.Computer](t, cbody)
-	if r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/strip-1", `{"computer_id":"`+comp.ID+`"}`); r.StatusCode != 409 {
-		t.Errorf("a grouped plug on a computer: %d, want 409", r.StatusCode)
+	if r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/strip-1", `{"computer_id":"`+comp.ID+`"}`); r.StatusCode != 200 {
+		t.Errorf("a grouped plug on a computer: %d, want 200", r.StatusCode)
 	}
 	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/desk-plug", `{"computer_id":"`+comp.ID+`"}`)
-	if code := put("desk-plug", quoted); code != 409 {
-		t.Errorf("a computer's plug in a group: %d, want 409", code)
+	if code := put("desk-plug", quoted); code != 200 {
+		t.Errorf("a computer's plug in a group: %d, want 200", code)
+	}
+	if code := put("desk-plug", `null`); code != 200 {
+		t.Errorf("taking it out again: %d", code)
 	}
 
 	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/strip-3", `{"enabled":false}`)
@@ -131,5 +135,50 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 	}
 	if chs, _ := st.Meter(ctx, "strip-1"); chs.GroupID != nil {
 		t.Error("a plug still belongs to a removed group")
+	}
+}
+
+func TestAGroupNeverCountsAMemberTwiceWhenAnotherMemberContainsIt(t *testing.T) {
+	srv, st := computerServer(t)
+	ctx := t.Context()
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	for _, m := range []model.Meter{
+		{ID: "panel", DeviceID: "d1", Scope: model.ScopeCircuit, Label: "Garage panel"},
+		{ID: "ev", DeviceID: "d1", Scope: model.ScopeCircuit, Label: "EV charger"},
+		{ID: "tv", DeviceID: "d2", Scope: model.ScopePlug, Label: "TV"},
+		{ID: "lamp", DeviceID: "d3", Scope: model.ScopePlug, Label: "Lamp"},
+	} {
+		if err := st.UpsertMeter(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	panel := "panel"
+	for _, id := range []string{"ev", "tv"} {
+		if _, err := st.SetMeterParent(ctx, id, &panel); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for id, w := range map[string]float64{"panel": 500, "ev": 300, "tv": 100, "lamp": 20} {
+		if err := st.AddMinute(ctx, id, at, w, w, 60); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g, err := st.CreateGroup(ctx, "Everything in the garage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"panel", "ev", "tv", "lamp"} {
+		if _, err := st.AssignMeterToGroup(ctx, id, &g.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var d model.GroupDetail
+	get(t, srv.URL+"/api/v1/groups/"+g.ID+"/detail"+period, &d)
+	want := (500.0 + 20) * 60 / 3.6e6 // the panel already holds the EV and the TV; the lamp is on its own
+	if len(d.Members) != 4 || math.Abs(d.TotalKWh-want) > 1e-12 {
+		t.Errorf("members %d, total %v kWh, want 4 members and %v (the panel and the lamp)", len(d.Members), d.TotalKWh, want)
+	}
+	if len(d.NotAdded) != 2 || !((d.NotAdded[0] == "ev" && d.NotAdded[1] == "tv") || (d.NotAdded[0] == "tv" && d.NotAdded[1] == "ev")) {
+		t.Errorf("not added = %v, want the EV and the TV, which the panel holds", d.NotAdded)
 	}
 }
