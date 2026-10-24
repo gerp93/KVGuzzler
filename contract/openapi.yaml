@@ -1137,6 +1137,11 @@ components:
           description: |
             The meter of the other leg of the same 240 V breaker. This meter then reports both legs added, and that one is switched off and
             not reported on its own. Only a Refoss meter has it.
+        breaker_amps:
+          type: [number, 'null']
+          description: |
+            The size of the breaker this meter is on, in amps, as the user said; null when not said. Only used to say how much of the breaker a
+            current is (the continuous-load rule keeps a load that runs for hours under 80% of it).
     MeterUpdate:
       type: object
       minProperties: 1
@@ -1179,6 +1184,11 @@ components:
           description: |
             Put the meter in a group (its id), or null to take it out. Any meter but the mains can be in a group (400 for the mains); a group
             is only a grouping, so it may also be a computer's plug or sit inside another meter.
+        breaker_amps:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          maximum: 1000
+          description: The size of the breaker the meter is on, in amps, or null to forget it.
     Reading:
       type: object
       required: [meter_id, watts]
@@ -1189,8 +1199,10 @@ components:
           type: number
         volts:
           type: [number, 'null']
+          description: The voltage the reading is measured against. A 240 V pair reports its two legs added.
         amps:
           type: [number, 'null']
+          description: The current. A 240 V pair carries the same current in both legs, so this is the larger leg's, never the two added.
     Live:
       type: object
       required: [time, readings, house_watts, notes]
@@ -1223,6 +1235,9 @@ components:
           type: number
         kwh:
           type: number
+        max_amps:
+          type: [number, 'null']
+          description: The highest current in the bucket (a 240 V pair's is the larger leg's); null for a meter that reports none.
     Series:
       type: object
       required: [meter_id, bucket, points]
@@ -1405,6 +1420,9 @@ components:
           description: The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity.
         peak_watts:
           type: [number, 'null']
+        peak_amps:
+          type: [number, 'null']
+          description: The highest current in the period; null when the meter reports none. For a 240 V pair it is the larger leg's, never the two added.
         monitored_hours:
           type: number
           description: Hours inside the period in which this meter actually reported.

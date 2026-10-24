@@ -742,6 +742,11 @@ export interface components {
              *     not reported on its own. Only a Refoss meter has it.
              */
             pair_with?: string | null;
+            /**
+             * @description The size of the breaker this meter is on, in amps, as the user said; null when not said. Only used to say how much of the breaker a
+             *     current is (the continuous-load rule keeps a load that runs for hours under 80% of it).
+             */
+            breaker_amps?: number | null;
         };
         MeterUpdate: {
             label?: string;
@@ -776,11 +781,15 @@ export interface components {
              *     is only a grouping, so it may also be a computer's plug or sit inside another meter.
              */
             group_id?: string | null;
+            /** @description The size of the breaker the meter is on, in amps, or null to forget it. */
+            breaker_amps?: number | null;
         };
         Reading: {
             meter_id: string;
             watts: number;
+            /** @description The voltage the reading is measured against. A 240 V pair reports its two legs added. */
             volts?: number | null;
+            /** @description The current. A 240 V pair carries the same current in both legs, so this is the larger leg's, never the two added. */
             amps?: number | null;
         };
         Live: {
@@ -800,6 +809,8 @@ export interface components {
             avg_watts: number;
             max_watts: number;
             kwh: number;
+            /** @description The highest current in the bucket (a 240 V pair's is the larger leg's); null for a meter that reports none. */
+            max_amps?: number | null;
         };
         Series: {
             meter_id: string;
@@ -901,6 +912,8 @@ export interface components {
             /** @description The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity. */
             carbon_estimated_kwh?: number | null;
             peak_watts?: number | null;
+            /** @description The highest current in the period; null when the meter reports none. For a 240 V pair it is the larger leg's, never the two added. */
+            peak_amps?: number | null;
             /** @description Hours inside the period in which this meter actually reported. */
             monitored_hours?: number;
         };

@@ -187,3 +187,43 @@ func TestAProblemReadingTheSettingsDoesNotStopTheReadings(t *testing.T) {
 		t.Errorf("readings = %v", got)
 	}
 }
+
+// pollAll is poll, keeping each reading whole.
+func pollAll(t *testing.T, s *Source) map[string]struct{ Volts, Amps *float64 } {
+	t.Helper()
+	rs, err := s.Poll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]struct{ Volts, Amps *float64 }{}
+	for _, r := range rs {
+		out[r.MeterID] = struct{ Volts, Amps *float64 }{r.Volts, r.Amps}
+	}
+	return out
+}
+
+func TestAReadingCarriesItsVoltsAndAmpsAndAPairKeepsTheLargerLegsCurrent(t *testing.T) {
+	status := `{"em:1":{"current":25.4,"voltage":118.2,"power":3000,"pf":1},"em:7":{"current":25.0,"voltage":118.6,"power":2950,"pf":1},"em:2":{"current":3.0,"voltage":118.2,"power":-350,"pf":1}}`
+	one := pollAll(t, source(t, status, nil))
+	if r := one[dev+"1"]; r.Amps == nil || *r.Amps != 25.4 || r.Volts == nil || *r.Volts != 118.2 {
+		t.Errorf("A1 = %+v, want its own 25.4 A at 118.2 V", r)
+	}
+	// A clamp's current is never negative, whichever way round the clamp is.
+	if r := pollAll(t, source(t, status, map[string]Setting{dev + "2": {Invert: true}}))[dev+"2"]; r.Amps == nil || *r.Amps != 3 {
+		t.Errorf("flipped A2 = %+v", r)
+	}
+
+	// One 240 V breaker carries the same current in both legs: the pair's amps are the larger leg's (25.4), never the sum (50.4);
+	// its voltage is the two legs added, about 237 V.
+	pair := pollAll(t, source(t, status, map[string]Setting{dev + "1": {PairWith: dev + "7"}}))
+	r := pair[dev+"1"]
+	if r.Amps == nil || *r.Amps != 25.4 {
+		t.Errorf("the pair's amps = %v, want 25.4 (the larger leg), not the 50.4 the legs add to", r.Amps)
+	}
+	if r.Volts == nil || *r.Volts < 236.7 || *r.Volts > 236.9 {
+		t.Errorf("the pair's volts = %v, want the two legs added (236.8)", r.Volts)
+	}
+	if _, ok := pair[dev+"7"]; ok {
+		t.Error("the second leg is reported on its own")
+	}
+}

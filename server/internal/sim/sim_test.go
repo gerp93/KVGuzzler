@@ -2,6 +2,7 @@ package sim
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -85,6 +86,9 @@ func TestHistoryHasEveryMeterEveryMinuteAndTheSameDayAlwaysLooksTheSame(t *testi
 		if r.Seconds != 60 || r.AvgW < 0 || r.MaxW < r.AvgW {
 			t.Fatalf("a bad minute: %+v", r)
 		}
+		if r.MaxA == nil || *r.MaxA < 0 {
+			t.Fatalf("a minute without a current: %+v", r)
+		}
 		if c, ok := caps[r.MeterID]; !ok || r.MaxW > c {
 			t.Fatalf("%s: %+v over its cap %v or not a meter of the house", r.MeterID, r, c)
 		}
@@ -93,7 +97,7 @@ func TestHistoryHasEveryMeterEveryMinuteAndTheSameDayAlwaysLooksTheSame(t *testi
 	var again []MinuteRow
 	_ = History(context.Background(), end, 2, func(b []MinuteRow) error { again = append(again, b...); return nil })
 	for i := range rows {
-		if rows[i] != again[i] {
+		if !reflect.DeepEqual(rows[i], again[i]) {
 			t.Fatalf("row %d differs between two runs: %+v and %+v", i, rows[i], again[i])
 		}
 	}

@@ -58,6 +58,10 @@ inside = {
 for child, parent in inside.items():
     call('PATCH', f'/api/v1/meters/{need(child)}', {'parent_id': need(parent)})
 
+# Breaker sizes (amps). The water heater's is made too small on purpose, so the demo shows a breaker running near its limit.
+for label, amps in {'EV charger': 40, 'Dryer': 30, 'HVAC': 30, 'Water heater': 20, 'Range': 50, 'Garage panel': 60}.items():
+    call('PATCH', f'/api/v1/meters/{need(label)}', {'breaker_amps': amps})
+
 # A price, so every figure has a cost.
 call('PUT', '/api/v1/rates', {'mode': 'one', 'currency': 'USD', 'fixed_rate': '0.158', 'bills': []})
 

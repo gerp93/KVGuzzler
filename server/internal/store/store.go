@@ -192,6 +192,24 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 			}
 		}
 	}
+	// And before the highest current of each minute was kept next to its highest power.
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('minutes') WHERE name = 'max_a'`).Scan(&has); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	if has == 0 {
+		if _, err := db.Exec(`ALTER TABLE minutes ADD COLUMN max_a REAL`); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+	}
+	// And before a meter could say how big its breaker is.
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = 'breaker_amps'`).Scan(&has); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	if has == 0 {
+		if _, err := db.Exec(`ALTER TABLE meters ADD COLUMN breaker_amps REAL`); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+	}
 	// And before plugs could be grouped.
 	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = 'group_id'`).Scan(&has); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
@@ -250,14 +268,17 @@ func (s *Store) Devices(ctx context.Context) ([]model.Device, error) {
 func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	var c model.Meter
 	var idx sql.NullInt64
-	var max sql.NullFloat64
+	var max, breaker sql.NullFloat64
 	var computer, group, pair, parent, typ sql.NullString
 	var scope string
 	var enabled, invert, favorite int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent, &typ, &favorite); err != nil {
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent, &typ, &favorite, &breaker); err != nil {
 		return c, err
 	}
 	c.Invert = invert == 1
+	if breaker.Valid {
+		c.BreakerAmps = &breaker.Float64
+	}
 	c.Favorite = favorite == 1
 	c.Type = model.MeterType(typ.String) // as saved; settleTypes turns it into what the meter is
 	if parent.Valid {
@@ -284,7 +305,7 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	return c, nil
 }
 
-const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id, type, favorite`
+const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id, type, favorite, breaker_amps`
 
 // settleTypes fills in each meter's Type: the mains is the house, plugs are devices, and a circuit is a sub-panel when circuits sit inside it
 // (or the user said so) and a circuit otherwise. The user's own choice, kept in the type column, wins for a circuit.
@@ -380,17 +401,33 @@ func (s *Store) UpdateMeter(ctx context.Context, id string, label *string, enabl
 // AddMinute adds covered time to a meter's minute. Adding to a minute that already has rows merges them (the
 // averages are weighted by seconds), so a restart in the middle of a minute loses nothing.
 func (s *Store) AddMinute(ctx context.Context, meterID string, minute time.Time, avgW, maxW, seconds float64) error {
-	if seconds <= 0 {
-		return nil
-	}
-	_, err := s.db.ExecContext(ctx, `
-INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds) VALUES (?, ?, ?, ?, ?)
+	return s.AddMinuteAmps(ctx, meterID, minute, avgW, maxW, nil, seconds)
+}
+
+// upsertMinute adds covered time to a minute that may already have rows. The highest current is kept like the highest power, and stays null for
+// a meter that never reported one (a minute with a current in one half and none in the other keeps the one there is).
+const upsertMinute = `
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a) VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(meter_id, minute) DO UPDATE SET
   avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / (seconds + excluded.seconds),
   max_w   = max(max_w, excluded.max_w),
-  seconds = seconds + excluded.seconds`,
-		meterID, minute.Unix(), avgW, maxW, seconds)
+  max_a   = CASE WHEN max_a IS NULL THEN excluded.max_a WHEN excluded.max_a IS NULL THEN max_a ELSE max(max_a, excluded.max_a) END,
+  seconds = seconds + excluded.seconds`
+
+// AddMinuteAmps is AddMinute with the highest current (amps) seen in the covered time; nil when the meter does not report one.
+func (s *Store) AddMinuteAmps(ctx context.Context, meterID string, minute time.Time, avgW, maxW float64, maxA *float64, seconds float64) error {
+	if seconds <= 0 {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, upsertMinute, meterID, minute.Unix(), avgW, maxW, seconds, nullFloat(maxA))
 	return err
+}
+
+func nullFloat(f *float64) any {
+	if f == nil {
+		return nil
+	}
+	return *f
 }
 
 // MinuteRow is one minute of one meter's history, for writing many at once.
@@ -400,6 +437,8 @@ type MinuteRow struct {
 	AvgW    float64
 	MaxW    float64
 	Seconds float64
+	// MaxA is the highest current (amps) in the minute; nil when the meter does not report one.
+	MaxA *float64
 }
 
 // AddMinutes writes many minutes in one transaction, merging into any minute that already has rows exactly as AddMinute does.
@@ -409,12 +448,7 @@ func (s *Store) AddMinutes(ctx context.Context, rows []MinuteRow) error {
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.PrepareContext(ctx, `
-INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds) VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(meter_id, minute) DO UPDATE SET
-  avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / (seconds + excluded.seconds),
-  max_w   = max(max_w, excluded.max_w),
-  seconds = seconds + excluded.seconds`)
+	stmt, err := tx.PrepareContext(ctx, upsertMinute)
 	if err != nil {
 		return err
 	}
@@ -423,7 +457,7 @@ ON CONFLICT(meter_id, minute) DO UPDATE SET
 		if r.Seconds <= 0 {
 			continue
 		}
-		if _, err := stmt.ExecContext(ctx, r.MeterID, r.Minute.Unix(), r.AvgW, r.MaxW, r.Seconds); err != nil {
+		if _, err := stmt.ExecContext(ctx, r.MeterID, r.Minute.Unix(), r.AvgW, r.MaxW, r.Seconds, nullFloat(r.MaxA)); err != nil {
 			return err
 		}
 	}
@@ -434,6 +468,8 @@ type Totals struct {
 	KWh            float64
 	PeakWatts      float64
 	MonitoredHours float64
+	// PeakAmps is the highest current in the period; nil when the meter reported none.
+	PeakAmps *float64
 }
 
 // FirstMinute is the first minute a meter has any energy recorded, or false when it has none.
@@ -451,24 +487,32 @@ func (s *Store) FirstMinute(ctx context.Context, meterID string) (time.Time, boo
 // Totals is a meter's energy, highest reading and covered time in [from, to).
 func (s *Store) Totals(ctx context.Context, meterID string, from, to time.Time) (Totals, error) {
 	var ws, peak, secs float64
+	var amps sql.NullFloat64
 	err := s.db.QueryRowContext(ctx, `
-SELECT COALESCE(SUM(avg_w * seconds), 0), COALESCE(MAX(max_w), 0), COALESCE(SUM(seconds), 0)
+SELECT COALESCE(SUM(avg_w * seconds), 0), COALESCE(MAX(max_w), 0), COALESCE(SUM(seconds), 0), MAX(max_a)
 FROM minutes WHERE meter_id = ? AND minute >= ? AND minute < ?`,
-		meterID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs)
+		meterID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs, &amps)
 	if err != nil {
 		return Totals{}, err
 	}
-	return Totals{KWh: ws / joulesPerKWh, PeakWatts: peak, MonitoredHours: secs / 3600}, nil
+	t := Totals{KWh: ws / joulesPerKWh, PeakWatts: peak, MonitoredHours: secs / 3600}
+	if amps.Valid {
+		t.PeakAmps = &amps.Float64
+	}
+	return t, nil
 }
 
-type agg struct{ ws, max, secs float64 }
+type agg struct {
+	ws, max, secs float64
+	amps          sql.NullFloat64
+}
 
 // Series is a meter's power over [from, to), bucketed. A "day" is a day of loc.
 func (s *Store) Series(ctx context.Context, meterID string, from, to time.Time, bucket model.Bucket, loc *time.Location) ([]model.Point, error) {
-	q := `SELECT minute, avg_w * seconds, max_w, seconds FROM minutes
+	q := `SELECT minute, avg_w * seconds, max_w, seconds, max_a FROM minutes
 WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`
 	if bucket != model.BucketMinute {
-		q = `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds), MAX(max_w), SUM(seconds) FROM minutes
+		q = `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds), MAX(max_w), SUM(seconds), MAX(max_a) FROM minutes
 WHERE meter_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
 	}
 	rows, err := s.db.QueryContext(ctx, q, meterID, from.Unix(), to.Unix())
@@ -481,7 +525,7 @@ WHERE meter_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
 	for rows.Next() {
 		var t int64
 		var a agg
-		if err := rows.Scan(&t, &a.ws, &a.max, &a.secs); err != nil {
+		if err := rows.Scan(&t, &a.ws, &a.max, &a.secs, &a.amps); err != nil {
 			return nil, err
 		}
 		key := bucketStart(time.Unix(t, 0), bucket, loc).Unix()
@@ -489,6 +533,9 @@ WHERE meter_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
 			b.ws += a.ws
 			b.secs += a.secs
 			b.max = maxF(b.max, a.max)
+			if a.amps.Valid && (!b.amps.Valid || a.amps.Float64 > b.amps.Float64) {
+				b.amps = a.amps
+			}
 		} else {
 			buckets[key] = &a
 		}
@@ -505,7 +552,11 @@ WHERE meter_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
 	points := make([]model.Point, 0, len(keys))
 	for _, k := range keys {
 		b := buckets[k]
-		points = append(points, model.Point{T: time.Unix(k, 0).UTC(), AvgWatts: b.ws / b.secs, MaxWatts: b.max, KWh: b.ws / joulesPerKWh})
+		p := model.Point{T: time.Unix(k, 0).UTC(), AvgWatts: b.ws / b.secs, MaxWatts: b.max, KWh: b.ws / joulesPerKWh}
+		if b.amps.Valid {
+			p.MaxAmps = &b.amps.Float64
+		}
+		points = append(points, p)
 	}
 	return points, nil
 }
