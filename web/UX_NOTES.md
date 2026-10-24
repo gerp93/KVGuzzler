@@ -8,6 +8,13 @@ display helpers. No change to `api.ts`, `api-types.ts`, `lib.ts` logic, `themes/
 - A feature that needs a new card or tab: add it, then make it use the shared pieces below instead of its own CSS.
 - Merge `origin/main` before each push; keep pushes small.
 
+## Who is working on what (updated 2026-10-24)
+- The feature session ("Overnight build on a demo branch", branch `claude/overnight-build-0d0d9b`) adds runs and always-on cards
+  (`RunsCard.tsx`, `BaseLoadCard.tsx`) and the demo house. It touches `LiveView.tsx`, `MeterPage.tsx`, `api.ts`, `api-types.ts` and appends to
+  `styles.css`; a trial merge conflicts only in `styles.css` (both append at the end). Its CSS should live in its own file or above the
+  "UX pass" marker; whoever lands second merges main.
+- New cards should be `<section class="card">` with `Hint`, `Skeleton`, `.bars`, `var(--muted)` so they fit phone, desktop and ultra-wide.
+
 ## Shared pieces added
 - `Hint` (`Hint.tsx`): long explanations go under an "About this" link, not in the card body.
 - `Skeleton` (`Skeleton.tsx`): the first-load placeholder.
