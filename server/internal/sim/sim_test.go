@@ -109,7 +109,7 @@ func TestHistoryHasEveryMeterEveryMinuteAndTheSameDayAlwaysLooksTheSame(t *testi
 func TestAWindowCanRunPastMidnight(t *testing.T) {
 	for _, c := range []struct {
 		h, start, length float64
-		want              bool
+		want             bool
 	}{{23.5, 23, 2, true}, {0.5, 23, 2, true}, {1.5, 23, 2, false}, {22.9, 23, 2, false}, {12, 11.5, 1, true}} {
 		if got := window(c.h, c.start, c.length); got != c.want {
 			t.Errorf("window(%v, %v, %v) = %v", c.h, c.start, c.length, got)
