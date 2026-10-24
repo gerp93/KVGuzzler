@@ -52,6 +52,11 @@ func (s *Store) SetChannelWiring(ctx context.Context, id string, ch WiringChange
 		if _, err := s.db.ExecContext(ctx, `UPDATE channels SET scope = ? WHERE id = ?`, string(*ch.Scope), id); err != nil {
 			return model.Channel{}, err
 		}
+		if *ch.Scope == model.ScopeMains {
+			if err := s.forgetPlace(ctx, id); err != nil {
+				return model.Channel{}, err
+			}
+		}
 	}
 	if ch.Invert != nil {
 		v := 0
@@ -116,6 +121,8 @@ func (s *Store) setPair(ctx context.Context, c model.Channel, with *string) erro
 	if _, err := s.db.ExecContext(ctx, `UPDATE channels SET pair_with = ? WHERE id = ?`, other.ID, c.ID); err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE channels SET enabled = 0 WHERE id = ?`, other.ID)
-	return err
+	if _, err = s.db.ExecContext(ctx, `UPDATE channels SET enabled = 0 WHERE id = ?`, other.ID); err != nil {
+		return err
+	}
+	return s.forgetPlace(ctx, other.ID) // the second leg is no longer a circuit of its own
 }

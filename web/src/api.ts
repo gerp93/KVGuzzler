@@ -122,7 +122,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains' }) =>
+  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains'; parent_id?: string | null }) =>
     request<Channel>(`api/v1/channels/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

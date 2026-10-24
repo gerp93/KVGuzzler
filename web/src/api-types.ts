@@ -639,6 +639,12 @@ export interface components {
             computer_id?: string | null;
             /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer. */
             group_id?: string | null;
+            /**
+             * @description The circuit this one is part of, or null. A circuit that feeds a sub-panel holds the circuits clamped inside that panel, and a plug
+             *     says which circuit it is plugged into. The parent's own figure already contains its children's, so a parent and its children are never
+             *     added together; what the parent has that none of them account for is the remainder. Only a `circuit` or `plug` channel has one.
+             */
+            parent_id?: string | null;
             /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it. */
             invert?: boolean;
             /**
@@ -662,6 +668,11 @@ export interface components {
              * @enum {string}
              */
             scope?: "circuit" | "mains";
+            /**
+             * @description Put this circuit or plug inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out.
+             *     The parent must be a `circuit`; neither may be the second leg of a pair. 409 when it would make a loop.
+             */
+            parent_id?: string | null;
             /**
              * @description Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
              *     any number of `plug` channels are its peripherals.
@@ -729,8 +740,9 @@ export interface components {
             house_kwh: number | null;
             house_cost?: components["schemas"]["Money"] | null;
             /**
-             * @description `house_kwh` minus the energy of the enabled `circuit` channels, never below zero: what no circuit
-             *     clamp accounts for. Derived, so shown as its own row and never added to anything.
+             * @description `house_kwh` minus the energy of the enabled top-level `circuit` channels (those with no `parent_id`, or whose parent is not
+             *     shown), never below zero: what no circuit clamp accounts for. A circuit inside a sub-panel's feed is part of the feed's figure
+             *     and is not taken off a second time. Derived, so shown as its own row and never added to anything.
              */
             unmetered_kwh?: number | null;
             /**

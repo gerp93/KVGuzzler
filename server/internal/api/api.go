@@ -222,12 +222,14 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		Invert   *bool           `json:"invert"`
 		PairWith json.RawMessage `json:"pair_with"` // another input's channel id, or null to unpair; absent leaves it alone
 		Scope    *string         `json:"scope"`
+		// The circuit this one is part of (a sub-panel's feed), or null to take it out; absent leaves it alone.
+		ParentID json.RawMessage `json:"parent_id"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
-		body.Invert == nil && body.PairWith == nil && body.Scope == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with and/or scope")
+		body.Invert == nil && body.PairWith == nil && body.Scope == nil && body.ParentID == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, scope and/or parent_id")
 		return
 	}
 	if body.Label != nil {
@@ -261,6 +263,13 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var parentID *string
+	if body.ParentID != nil {
+		if err := json.Unmarshal(body.ParentID, &parentID); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "parent_id is a circuit's channel id or null")
+			return
+		}
+	}
 	var scope *model.Scope
 	if body.Scope != nil {
 		sc := model.Scope(*body.Scope)
@@ -271,6 +280,9 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 	ch, err := s.Store.UpdateChannel(r.Context(), id, body.Label, body.Enabled)
 	if err == nil && (body.Invert != nil || body.PairWith != nil || scope != nil) {
 		ch, err = s.Store.SetChannelWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Scope: scope})
+	}
+	if err == nil && body.ParentID != nil {
+		ch, err = s.Store.SetChannelParent(r.Context(), id, parentID)
 	}
 	if err == nil && body.ComputerID != nil {
 		ch, err = s.Store.AssignChannel(r.Context(), id, computerID)
@@ -413,6 +425,13 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	schedule := cfg.Schedule(s.Loc)
 
 	sum := model.Summary{From: from.UTC(), To: to.UTC(), Channels: []model.ChannelSummary{}}
+	// A circuit inside a sub-panel is part of that panel's feed, which is a circuit itself: only the top-level circuits are taken off the house.
+	shown := map[string]bool{}
+	for _, ch := range on {
+		if ch.Scope == model.ScopeCircuit {
+			shown[ch.ID] = true
+		}
+	}
 	var house, circuits float64
 	var houseCost rates.Money
 	haveMains, housePriced := false, true
@@ -449,7 +468,9 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 				houseCost = houseCost.Add(priced.Cost)
 			}
 		case model.ScopeCircuit:
-			circuits += cs.KWh
+			if ch.ParentID == nil || !shown[*ch.ParentID] {
+				circuits += cs.KWh
+			}
 		}
 	}
 	if haveMains {

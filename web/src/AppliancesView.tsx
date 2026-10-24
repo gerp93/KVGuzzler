@@ -69,18 +69,31 @@ function AppliancesList({ channels }: { channels: Channel[] }) {
           <h2>Where it went</h2>
           {list.appliances.length === 0 && <p class="note">No appliances on a clamp or plug yet.</p>}
           <ul class="bars wide">
-            {list.appliances.map((a) => (
-              <li key={`${a.kind}-${a.id}`}>
-                <a class="rowlink" href={routePath('appliances', a.kind, a.id)}>
-                  <span class="name" title={a.label}>{a.label}</span>
+            {list.appliances.map((a) => {
+              const indent = a.depth ? { paddingLeft: `${a.depth * 1.25}rem` } : undefined;
+              const cells = (
+                <>
+                  <span class="name" title={a.label}>{a.kind === 'rest' ? 'Everything else' : a.label}</span>
                   <span class="bar" aria-hidden="true">
                     <i style={{ width: `${top > 0 ? (a.kwh / top) * 100 : 0}%` }} />
                   </span>
                   <span class="num">{formatKwh(a.kwh)}</span>
                   <span class="num cost">{a.cost != null ? formatMoney(a.cost, estimated) : ''}</span>
-                </a>
-              </li>
-            ))}
+                </>
+              );
+              // What a sub-panel's feed carries beyond its own circuits is derived, so it has nothing to open.
+              return a.kind === 'rest' ? (
+                <li key={`rest-${a.id}`} class="rest" style={indent}>
+                  {cells}
+                </li>
+              ) : (
+                <li key={`${a.kind}-${a.id}`} style={indent}>
+                  <a class="rowlink" href={routePath('appliances', a.kind, a.id)}>
+                    {cells}
+                  </a>
+                </li>
+              );
+            })}
           </ul>
           {data?.summary.unmetered_kwh != null && (
             <p class="derived">
