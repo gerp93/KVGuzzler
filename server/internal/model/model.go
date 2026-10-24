@@ -57,9 +57,9 @@ type Meter struct {
 
 type Reading struct {
 	MeterID string   `json:"meter_id"`
-	Watts     float64  `json:"watts"`
-	Volts     *float64 `json:"volts"`
-	Amps      *float64 `json:"amps"`
+	Watts   float64  `json:"watts"`
+	Volts   *float64 `json:"volts"`
+	Amps    *float64 `json:"amps"`
 }
 
 type Live struct {
@@ -78,12 +78,12 @@ type Point struct {
 
 type Series struct {
 	MeterID string  `json:"meter_id"`
-	Bucket    Bucket  `json:"bucket"`
-	Points    []Point `json:"points"`
+	Bucket  Bucket  `json:"bucket"`
+	Points  []Point `json:"points"`
 }
 
 type MeterSummary struct {
-	MeterID  string   `json:"meter_id"`
+	MeterID    string   `json:"meter_id"`
 	ComputerID *string  `json:"computer_id"`
 	GroupID    *string  `json:"group_id"`
 	Scope      Scope    `json:"scope"`
@@ -97,13 +97,13 @@ type MeterSummary struct {
 }
 
 type Summary struct {
-	From          time.Time        `json:"from"`
-	To            time.Time        `json:"to"`
-	Meters      []MeterSummary `json:"meters"`
-	HouseKWh      *float64         `json:"house_kwh"`
-	HouseCost     *string          `json:"house_cost"`
-	CostEstimated bool             `json:"cost_estimated"`
-	UnmeteredKWh  *float64         `json:"unmetered_kwh"`
+	From          time.Time      `json:"from"`
+	To            time.Time      `json:"to"`
+	Meters        []MeterSummary `json:"meters"`
+	HouseKWh      *float64       `json:"house_kwh"`
+	HouseCost     *string        `json:"house_cost"`
+	CostEstimated bool           `json:"cost_estimated"`
+	UnmeteredKWh  *float64       `json:"unmetered_kwh"`
 	// HousePeakWatts is the mains' highest draws added: an upper bound, as the two legs need not peak in the same second.
 	HousePeakWatts *float64 `json:"house_peak_watts"`
 	// HouseCarbonG and HouseCarbonEstimatedKWh are the mains' carbon figures added (see MeterSummary).

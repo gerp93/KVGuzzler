@@ -89,12 +89,12 @@ func TestPairingMakesOneMeterOfTwoLegsAndUnpairingBringsTheLegBack(t *testing.T)
 		with string
 		want error
 	}{
-		"itself":                       {ids[2], ids[2], ErrInvalid},
+		"itself":                     {ids[2], ids[2], ErrInvalid},
 		"a meter that is not there":  {ids[2], "nope", ErrInvalid},
-		"a leg of another monitor":     {ids[2], other[0], ErrInvalid},
-		"a leg that is already one":    {ids[2], ids[1], ErrConflict},
+		"a leg of another monitor":   {ids[2], other[0], ErrInvalid},
+		"a leg that is already one":  {ids[2], ids[1], ErrConflict},
 		"a meter that has a partner": {ids[2], ids[0], ErrConflict},
-		"a leg taking a partner":       {ids[1], ids[3], ErrConflict},
+		"a leg taking a partner":     {ids[1], ids[3], ErrConflict},
 	} {
 		w := c.with
 		if _, err := pair(c.a, &w); !errors.Is(err, c.want) {

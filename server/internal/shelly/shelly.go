@@ -149,9 +149,9 @@ func isTimeout(err error) bool {
 
 // Source is a plug as the collector's source: one meter, the plug itself.
 type Source struct {
-	device  model.Device
-	meter model.Meter
-	client  *Client
+	device model.Device
+	meter  model.Meter
+	client *Client
 }
 
 var idUnsafe = regexp.MustCompile(`[^a-z0-9.-]+`)
@@ -178,13 +178,13 @@ func newSource(c *Client, host, name string, scope model.Scope) *Source {
 	id := DeviceID(host)
 	max := MaxWatts
 	return &Source{
-		device:  model.Device{ID: id, Kind: "shelly_plug", Host: host, Name: name, Model: "shelly"},
-		meter: model.Meter{ID: id + ":plug", DeviceID: id, Scope: scope, Label: name, Enabled: true, MaxWatts: &max},
-		client:  c,
+		device: model.Device{ID: id, Kind: "shelly_plug", Host: host, Name: name, Model: "shelly"},
+		meter:  model.Meter{ID: id + ":plug", DeviceID: id, Scope: scope, Label: name, Enabled: true, MaxWatts: &max},
+		client: c,
 	}
 }
 
-func (s *Source) Device() model.Device      { return s.device }
+func (s *Source) Device() model.Device  { return s.device }
 func (s *Source) Meters() []model.Meter { return []model.Meter{s.meter} }
 
 func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {

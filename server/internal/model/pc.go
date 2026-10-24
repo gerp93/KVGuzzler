@@ -148,26 +148,26 @@ type PcSource struct {
 // Computer is a computer as the user sees it: a name, the collector that reports its insides (if any), the plug it is on
 // (its whole-PC figure at the wall) and the plugs next to it (monitor, speakers).
 type Computer struct {
-	ID                   string     `json:"id"`
-	Name                 string     `json:"name"`
-	SourceID             *string    `json:"source_id"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	SourceID           *string    `json:"source_id"`
 	WallMeterID        *string    `json:"wall_meter_id"`
 	PeripheralMeterIDs []string   `json:"peripheral_meter_ids"`
-	LastSeen             *time.Time `json:"last_seen"`
+	LastSeen           *time.Time `json:"last_seen"`
 }
 
 // ComputerDetail is everything about one computer for a period. Setup is the wall figure plus the peripherals, a separate
 // labelled figure for the whole desk; none of it is added to the house or circuit figures.
 type ComputerDetail struct {
-	Computer      Computer         `json:"computer"`
-	From          time.Time        `json:"from"`
-	To            time.Time        `json:"to"`
+	Computer      Computer       `json:"computer"`
+	From          time.Time      `json:"from"`
+	To            time.Time      `json:"to"`
 	Wall          *MeterSummary  `json:"wall"`
 	Peripherals   []MeterSummary `json:"peripherals"`
-	SetupKWh      *float64         `json:"setup_kwh"`
-	SetupCost     *string          `json:"setup_cost"`
-	CostEstimated bool             `json:"cost_estimated"`
-	PC            *PcSource        `json:"pc"`
+	SetupKWh      *float64       `json:"setup_kwh"`
+	SetupCost     *string        `json:"setup_cost"`
+	CostEstimated bool           `json:"cost_estimated"`
+	PC            *PcSource      `json:"pc"`
 }
 
 // OpenEiStatus says whether an OpenEI API key is saved. The key itself is never sent back.
