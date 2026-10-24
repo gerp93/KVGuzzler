@@ -7,6 +7,7 @@ import { Chart, lineFrom, type Line } from './Chart';
 import { FlowChart } from './FlowChart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
+import { BaseLoadCard } from './BaseLoadCard';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
@@ -123,6 +124,8 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
           <FlowChart meters={meters} summary={data.summary} root={id} />
         </section>
       )}
+
+      {meter && <BaseLoadCard meterId={id} period={period as PeriodKey} />}
 
       {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} />}
 

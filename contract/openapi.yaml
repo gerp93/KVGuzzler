@@ -230,6 +230,54 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/baseload:
+    get:
+      tags: [Read]
+      operationId: getMeterBaseLoad
+      summary: The power a meter never goes below over a period, its yearly cost and its share of what it uses.
+      description: |
+        The 5th percentile of the meter's minute averages (not the lowest minute: a dropout must not set it), with the average of the same
+        minutes so the always-on share can be said. A year of it is priced at today's price. 204 when under an hour of minutes was recorded.
+        A view of the meter's own reading: never added to any other meter's figure.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseLoad'
+        '204':
+          description: Under an hour of minutes was recorded in the period.
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/baseload:
+    get:
+      tags: [Read]
+      operationId: getHouseBaseLoad
+      summary: The power the whole house never goes below over a period.
+      description: |
+        Same as a meter's base load, for the mains legs added minute by minute (a minute where one leg is missing is left out, so the sum is
+        never one leg short). 204 when no mains meter is shown or under an hour of minutes was recorded.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseLoad'
+        '204':
+          description: Nothing to say yet.
+        '400':
+          $ref: '#/components/responses/Problem'
   /api/v1/live:
     get:
       tags: [Read]
@@ -1187,6 +1235,71 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SeriesPoint'
+    BaseLoad:
+      type: object
+      required: [scope, watts, avg_watts, share, minutes, kwh_per_year, cost_per_year, rate, rate_estimated, from, to]
+      properties:
+        scope:
+          type: string
+          enum: [house, meter]
+        meter_id:
+          type: string
+        watts:
+          type: number
+          description: The 5th percentile of the minute averages, the power it hardly ever goes below.
+        avg_watts:
+          type: number
+          description: The average of the same minutes.
+        share:
+          type: number
+          description: The part (0 to 1) of what it uses that is always on.
+        minutes:
+          type: integer
+          description: How many recorded minutes the figure rests on.
+        kwh_per_year:
+          type: number
+        cost_per_year:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: A year of that power at today's price; null when no price is known.
+        rate:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Today's price per kWh that the yearly cost used.
+        rate_estimated:
+          type: boolean
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        parts:
+          type: array
+          description: |
+            House only: the always-on power of the meters that hold no other meter (the fridge, the workshop, the desk PC), biggest first, at
+            most 8. Each is that meter's own floor; they are never added to the house's or to each other, because the lowest minutes of
+            different meters need not coincide.
+          items:
+            $ref: '#/components/schemas/BaseLoadPart'
+    BaseLoadPart:
+      type: object
+      required: [meter_id, label, watts, kwh_per_year, cost_per_year]
+      properties:
+        meter_id:
+          type: string
+        label:
+          type: string
+        watts:
+          type: number
+        kwh_per_year:
+          type: number
+        cost_per_year:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
     MeterRun:
       type: object
       required: [start, end, minutes, kwh, avg_watts, peak_watts, cost]

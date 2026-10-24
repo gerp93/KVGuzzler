@@ -5,6 +5,7 @@ import { api } from './api';
 import { Bars } from './Bars';
 import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
+import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, type Line } from './Chart';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
@@ -142,6 +143,8 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
         {carbon && <p class="caption">{carbon}</p>}
         <RateNote kwh={kwh} cost={cost} />
       </section>
+
+      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
 
       {live.notes.length > 0 && (
         <section class="card warn" aria-live="polite">

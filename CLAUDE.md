@@ -58,6 +58,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   10th to its 95th percentile (never below 10 W), learned from at least the last 30 days so an hour is judged like a month, or `min_watts`; a meter whose spread is under 15 W has no level and no runs (`threshold_watts` null,
   the card hides). A dip of up to 5 minutes does not end a run, under 3 minutes is not a run. A run is listed in the period it **starts** in and is followed 12 h past the period's end; its cost is its energy at the price of the
   day it started (null without a price, never zero), the totals count all runs even past the 500 listed. Runs are a view of one meter's own reading: never added to anything.
+- **Always on** (`server/internal/baseload`, `GET /api/v1/baseload` for the house, `GET /api/v1/meters/{id}/baseload`, `web/src/BaseLoadCard.tsx`): the 5th percentile of a meter's minute averages over the period (not the lowest minute),
+  with the average of the same minutes for its share, and a year of it priced at today's price (null without a price); under 60 minutes of data answers 204. The house is the mains legs added minute by minute, leaving out
+  a minute where a leg is missing. `parts` (house only) are the floors of the meters that hold no other meter: **each is its own floor, never added to each other or to the house's**.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

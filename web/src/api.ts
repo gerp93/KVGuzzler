@@ -1,5 +1,6 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
 import type { ApplianceGroup, CarbonConfig, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { BaseLoad } from './baseload';
 import type { MeterRuns } from './runs';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
@@ -45,6 +46,9 @@ export const api = {
   series: (meterId: string, from: string, to: string, bucket?: string) =>
     request<Series>(`api/v1/series?${q({ meter_id: meterId, from, to, bucket })}`),
   summary: (from: string, to: string) => request<Summary>(`api/v1/summary?${q({ from, to })}`),
+  /** The power a meter (or the house) hardly ever goes below; undefined when under an hour was recorded. */
+  meterBaseLoad: (meterId: string, from: string, to: string) => request<BaseLoad | undefined>(`api/v1/meters/${encodeURIComponent(meterId)}/baseload?${q({ from, to })}`),
+  houseBaseLoad: (from: string, to: string) => request<BaseLoad | undefined>(`api/v1/baseload?${q({ from, to })}`),
   /** The times a meter was working over a period (a car charging, a dryer drying). */
   meterRuns: (meterId: string, from: string, to: string) => request<MeterRuns>(`api/v1/meters/${encodeURIComponent(meterId)}/runs?${q({ from, to })}`),
   devices: () => request<{ devices: Device[] }>('api/v1/devices').then((r) => r.devices),

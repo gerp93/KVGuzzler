@@ -46,8 +46,12 @@ func runsServer(t *testing.T) (*httptest.Server, time.Time) {
 	if err := s.UpsertDevice(ctx, model.Device{ID: "d", Kind: "refoss", Name: "d"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"charger", "fridge"} {
-		if err := s.UpsertMeter(ctx, model.Meter{ID: id, DeviceID: "d", Scope: model.ScopeCircuit, Label: id}); err != nil {
+	for _, id := range []string{"charger", "fridge", "ma", "mb"} {
+		scope := model.ScopeCircuit
+		if id[0] == 'm' {
+			scope = model.ScopeMains
+		}
+		if err := s.UpsertMeter(ctx, model.Meter{ID: id, DeviceID: "d", Scope: scope, Label: id}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -62,7 +66,12 @@ func runsServer(t *testing.T) (*httptest.Server, time.Time) {
 			}
 			rows = append(rows,
 				store.MinuteRow{MeterID: "charger", Minute: at, AvgW: w, MaxW: w, Seconds: 60},
-				store.MinuteRow{MeterID: "fridge", Minute: at, AvgW: 90 + float64(m%3), MaxW: 95, Seconds: 60})
+				store.MinuteRow{MeterID: "fridge", Minute: at, AvgW: 90 + float64(m%3), MaxW: 95, Seconds: 60},
+				// The mains: leg A carries the charger's 7.2 kW on top of 500 W, leg B 400 W. Leg B is missing for the first hour of day one.
+				store.MinuteRow{MeterID: "ma", Minute: at, AvgW: 500 + w - 3, MaxW: 600 + w, Seconds: 60})
+			if day > 0 || m >= 60 {
+				rows = append(rows, store.MinuteRow{MeterID: "mb", Minute: at, AvgW: 400, MaxW: 410, Seconds: 60})
+			}
 		}
 	}
 	if err := s.AddMinutes(ctx, rows); err != nil {

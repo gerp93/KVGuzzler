@@ -56,6 +56,32 @@
     "contract/openapi.yaml"
    ],
    "notes": "Not verified: on your real house (only the simulator's charger was looked at), and with a car that tapers its charge in many small steps (the 5-minute dip rule may split such a charge). A compressor that cycles (a fridge) also gets a Runs card, with many short runs: that is true to what it does but not very useful; the card could be hidden for runs shorter than ten minutes on average."
+  },
+  {
+   "id": "baseload",
+   "title": "Always on: the power the house never goes below",
+   "kind": "insight",
+   "summary": "A new <strong>Always on</strong> card on the Live page (for the house) and on every meter's page: the power it hardly ever drops below, what a year of that costs, and what share of everything it uses is on all day and night. In the demo house: <em>460 W, $637 a year, 12% of use</em>.",
+   "details": [
+    "<strong>Why it matters:</strong> the always-on floor is the part of the bill you pay for doing nothing, and the easiest part to cut (a standby box, an old freezer, a monitor that never sleeps). Seeing it as a yearly dollar figure makes it concrete.",
+    "<strong>How it is worked out:</strong> the 5th percentile of the minute averages over the period picked (not the single lowest minute, so one dropped reading or glitched clamp cannot set it). A year of it is priced at today's price; the share is the floor divided by the average of the same minutes. Under an hour of recorded minutes it says nothing (the endpoint answers 204 and the card is not drawn).",
+    "<strong>The house</strong> is the two mains legs added minute by minute; a minute where one leg is missing is left out, so the sum is never one leg short. Nothing is added to anything else.",
+    "<strong>\"What each meter rests at\"</strong> (house card only): each meter that holds no other meter, biggest first. They are explicitly <em>not</em> added to each other or to the house's floor, because the quietest minutes of different meters need not coincide; the card says so.",
+    "<strong>API:</strong> <code>GET /api/v1/baseload?from&to</code> and <code>GET /api/v1/meters/{id}/baseload?from&to</code>; contract schema <code>BaseLoad</code> and example <code>baseload.json</code>."
+   ],
+   "images": [
+    {
+     "path": "img/baseload-mcp-Claude_Browser-blob-1792844570024-t2j8fl.jpg",
+     "caption": "The Live page over seven days: the house never goes below 460 W; a year of that is $637. The list beneath shows what each meter rests at."
+    },
+    {
+     "path": "img/baseload-mcp-Claude_Browser-blob-1792844570025-732dvz.jpg",
+     "caption": "The same card on the Office circuit's page at phone width."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: <code>baseload</code> package tests (what it rests at, one glitched minute does not set it, under an hour says nothing, negative and broken readings are not power, a meter that uses nothing has no share) and API tests (a meter's floor, its yearly cost at the saved price with no cost when no price is saved, the house floor never one leg short, the breakdown lists only meters that hold nothing, 204/404/400 cases). Web: <code>baseload.test.ts</code>. Contract example validates.",
+   "notes": "Finding in the demo: the house floor (460 W) is much larger than any meter's own floor (the biggest is 40 W), because the simulator has about 300 W of unmetered base load. On a real house that gap (the floor of the house minus the floors of what is metered) would say how much always-on power no clamp sees; I did not turn it into a number, because floors of different meters are not additive. A cycling appliance (the fridge) rests at its off level between cycles, so its floor reads as 4 W rather than its average; the card says so. Not verified on your real house."
   }
  ]
 }

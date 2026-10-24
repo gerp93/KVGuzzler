@@ -122,6 +122,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/baseload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The power a meter never goes below over a period, its yearly cost and its share of what it uses.
+         * @description The 5th percentile of the meter's minute averages (not the lowest minute: a dropout must not set it), with the average of the same
+         *     minutes so the always-on share can be said. A year of it is priced at today's price. 204 when under an hour of minutes was recorded.
+         *     A view of the meter's own reading: never added to any other meter's figure.
+         */
+        get: operations["getMeterBaseLoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/baseload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The power the whole house never goes below over a period.
+         * @description Same as a meter's base load, for the mains legs added minute by minute (a minute where one leg is missing is left out, so the sum is
+         *     never one leg short). 204 when no mains meter is shown or under an hour of minutes was recorded.
+         */
+        get: operations["getHouseBaseLoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/live": {
         parameters: {
             query?: never;
@@ -762,6 +805,42 @@ export interface components {
             meter_id: string;
             bucket: components["schemas"]["Bucket"];
             points: components["schemas"]["SeriesPoint"][];
+        };
+        BaseLoad: {
+            /** @enum {string} */
+            scope: "house" | "meter";
+            meter_id?: string;
+            /** @description The 5th percentile of the minute averages, the power it hardly ever goes below. */
+            watts: number;
+            /** @description The average of the same minutes. */
+            avg_watts: number;
+            /** @description The part (0 to 1) of what it uses that is always on. */
+            share: number;
+            /** @description How many recorded minutes the figure rests on. */
+            minutes: number;
+            kwh_per_year: number;
+            /** @description A year of that power at today's price; null when no price is known. */
+            cost_per_year: components["schemas"]["Money"] | null;
+            /** @description Today's price per kWh that the yearly cost used. */
+            rate: components["schemas"]["Money"] | null;
+            rate_estimated: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /**
+             * @description House only: the always-on power of the meters that hold no other meter (the fridge, the workshop, the desk PC), biggest first, at
+             *     most 8. Each is that meter's own floor; they are never added to the house's or to each other, because the lowest minutes of
+             *     different meters need not coincide.
+             */
+            parts?: components["schemas"]["BaseLoadPart"][];
+        };
+        BaseLoadPart: {
+            meter_id: string;
+            label: string;
+            watts: number;
+            kwh_per_year: number;
+            cost_per_year: components["schemas"]["Money"] | null;
         };
         MeterRun: {
             /** Format: date-time */
@@ -1535,6 +1614,75 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getMeterBaseLoad: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseLoad"];
+                };
+            };
+            /** @description Under an hour of minutes was recorded in the period. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getHouseBaseLoad: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseLoad"];
+                };
+            };
+            /** @description Nothing to say yet. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
         };
     };
     getLive: {

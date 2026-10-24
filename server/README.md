@@ -35,6 +35,7 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
 | `internal/api` | Status, devices (add, remove), meters (rename, hide, tie to a computer), computers (add, rename, remove, detail), live, series, summary, rates, the PC push. |
 | `internal/runs` | Finds the times a meter was working (a car charging, a dryer drying) from its recorded minutes: pure, tested on made-up minutes. Served by `GET /api/v1/meters/{id}/runs`. |
+| `internal/baseload` | The power a meter or the house never goes below (5th percentile of the minute averages); pure. Served by `GET /api/v1/baseload` and `GET /api/v1/meters/{id}/baseload`. |
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/pcrelay` | What the PC collector pushes (`POST /api/v1/ingest/pc`) and the checks it must pass: impossible readings dropped and said so, a different major version refused. |
 | `internal/store` (groups) | Appliance groups: several ordinary plugs shown as one appliance; a plug is in a group or tied to a computer, not both. |
