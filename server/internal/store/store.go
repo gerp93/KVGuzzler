@@ -289,7 +289,7 @@ const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, compute
 // settleTypes fills in each meter's Type: the mains is the house, plugs are devices, and a circuit is a sub-panel when circuits sit inside it
 // (or the user said so) and a circuit otherwise. The user's own choice, kept in the type column, wins for a circuit.
 func (s *Store) settleTypes(ctx context.Context, list ...*model.Meter) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT parent_id FROM meters WHERE parent_id IS NOT NULL`)
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT parent_id FROM meters WHERE parent_id IS NOT NULL AND scope = 'circuit'`)
 	if err != nil {
 		return err
 	}
@@ -309,6 +309,8 @@ func (s *Store) settleTypes(ctx context.Context, list ...*model.Meter) error {
 		switch {
 		case c.Scope == model.ScopeMains:
 			c.Type = model.TypeHouse
+		case c.Scope == model.ScopePC && c.ComputerID != nil:
+			c.Type = model.TypeComputer
 		case c.Scope == model.ScopePlug || c.Scope == model.ScopePC:
 			c.Type = model.TypeDevice
 		case c.Type == model.TypeSubPanel || c.Type == model.TypeCircuit:

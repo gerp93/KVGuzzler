@@ -827,3 +827,17 @@ a.button {
 .flow a:hover text {
   text-decoration: underline;
 }
+
+/* A part of a computer in the tree: read-only, quieter than a meter */
+.hier-row.virtual {
+  border-left-style: dotted;
+}
+
+.hier-row.virtual .part-name {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.hier-row.virtual .part-name a {
+  color: inherit;
+}

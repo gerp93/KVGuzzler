@@ -11,10 +11,15 @@ export interface FlowNode {
   cost: string | null;
   /** The meter it stands for, or null for a derived line ("Everything else", the whole house). */
   meterId: string | null;
+  /** The line for what a parent's own reading carries beyond its parts ("Everything else", "Not metered"). */
+  rest?: boolean;
   children: FlowNode[];
 }
 
-const rest = (id: string, label: string, kwh: number, cost: string | null): FlowNode => ({ id: `rest-${id}`, label, kwh, cost, meterId: null, children: [] });
+/** Parts a meter has that are not meters of their own (a computer's CPU, GPU and memory), by the meter's id. */
+export type VirtualParts = Map<string, { label: string; kwh: number; cost: string | null }[]>;
+
+const rest = (id: string, label: string, kwh: number, cost: string | null): FlowNode => ({ id: `rest-${id}`, label, kwh, cost, meterId: null, rest: true, children: [] });
 
 /** The money left after taking some of it away; null unless every figure is known. */
 function moneyLeft(whole: string | null | undefined, parts: (string | null)[]): string | null {
@@ -25,7 +30,7 @@ function moneyLeft(whole: string | null | undefined, parts: (string | null)[]): 
 /** The tree to draw over a period. With a `rootId`, that meter and everything inside it. Without one, the house: the whole-house clamps as the
  * whole, the top-level circuits as its parts and what no circuit accounts for as the remainder; with no whole-house clamp at all, the
  * top-level circuits added up stand in for it. Undefined when there is nothing recorded to draw. */
-export function flowTree(meters: Meter[], summary: Summary, rootId?: string): FlowNode | undefined {
+export function flowTree(meters: Meter[], summary: Summary, rootId?: string, virtual?: VirtualParts): FlowNode | undefined {
   const shown = shownMeters(meters);
   const byId = new Map(shown.map((m) => [m.id, m]));
   const figures = new Map(summary.meters.map((f) => [f.meter_id, f]));
@@ -33,14 +38,15 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string): Fl
   const build = (m: Meter, path: Set<string>): FlowNode => {
     const f = figures.get(m.id);
     const here = new Set(path).add(m.id);
-    const children = shown
-      .filter((k) => k.parent_id === m.id && !here.has(k.id) && figures.has(k.id))
-      .map((k) => build(k, here))
-      .sort((a, b) => b.kwh - a.kwh);
+    const parts = (virtual?.get(m.id) ?? []).map((p): FlowNode => ({ id: `${m.id}:${p.label}`, label: p.label, kwh: p.kwh, cost: p.cost, meterId: null, children: [] }));
+    const children = [
+      ...shown.filter((k) => k.parent_id === m.id && !here.has(k.id) && figures.has(k.id)).map((k) => build(k, here)),
+      ...parts,
+    ].sort((a, b) => b.kwh - a.kwh);
     const own = f?.kwh ?? 0;
     if (children.length > 0) {
       const left = own - children.reduce((t, c) => t + c.kwh, 0);
-      if (left > 0) children.push(rest(m.id, 'Everything else', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
+      if (left > 0) children.push(rest(m.id, parts.length > 0 ? 'Not metered' : 'Everything else', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
     }
     return { id: m.id, label: m.label, kwh: own, cost: f?.cost ?? null, meterId: m.id, children };
   };

@@ -45,6 +45,22 @@ describe('the flow chart tree', () => {
   });
 });
 
+describe('a computer in the flow chart', () => {
+  it("has its collector's parts as bands and what they do not account for as Not metered", () => {
+    const withPc = [...meters, m('wall', 'pc', { type: 'computer', computer_id: 'c1', parent_id: 'dryer' })];
+    const sum: Summary = { ...summary, meters: [...summary.meters, f('wall', 'pc', 2, '0.30')] };
+    const virtual = new Map([['wall', [{ label: 'GPU', kwh: 1, cost: '0.15' }, { label: 'CPU package', kwh: 0.6, cost: '0.09' }]]]);
+    const wall = flowTree(withPc, sum, 'wall', virtual)!;
+    expect(wall.children.map((c) => [c.label, Math.round(c.kwh * 10) / 10, !!c.rest])).toEqual([['GPU', 1, false], ['CPU package', 0.6, false], ['Not metered', 0.4, true]]);
+    // Without parts it is as before: nothing under it.
+    expect(flowTree(withPc, sum, 'wall')!.children).toEqual([]);
+    // Inside the house, the computer sits in the circuit it is on.
+    const house = flowTree(withPc, sum, undefined, virtual)!;
+    const dryer = house.children.find((c) => c.id === 'dryer')!;
+    expect(dryer.children.find((c) => c.id === 'wall')!.children).toHaveLength(3);
+  });
+});
+
 describe('the flow chart layout', () => {
   const tree = flowTree(meters, summary)!;
   const layout = layoutFlow(tree, 720);

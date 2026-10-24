@@ -2,6 +2,7 @@
 // it; there can be several top-level entries, and none of it needs a main monitor. Each row opens (the arrow at its left) to the wiring of that
 // meter, and moves in the tree by the arrows, by dragging onto another meter, or from its "which panel" list. Nothing here is sent to a device:
 // it only changes how this dashboard reads and shows them.
+import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { meterPath } from './Bars';
@@ -15,6 +16,7 @@ import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { MeterPage } from './MeterPage';
+import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import {
   arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, usualPartner,
@@ -23,7 +25,7 @@ import {
 
 type Change = Parameters<typeof api.updateMeter>[1];
 
-const TYPE_WORDS: Record<string, string> = { house: 'whole house', sub_panel: 'sub-panel' };
+const TYPE_WORDS: Record<string, string> = { house: 'whole house', sub_panel: 'sub-panel', computer: 'computer' };
 
 function EyeIcon({ off }: { off?: boolean }) {
   return (
@@ -252,6 +254,31 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
   );
 }
 
+/** A part of a computer (its CPU, GPU, memory, and what they leave out): read-only, from its collector, and it opens the computer's page. It is not
+ * a meter, so it has no wiring and cannot be moved. */
+function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: string }) {
+  return (
+    <li class="hier-row virtual" style={{ marginLeft: `${depth * 1.25}rem` }}>
+      <div class="hier-main">
+        <span />
+        <span />
+        <span class="grow part-name" title={part.remainder ? 'The wall plug less the parts above: fans, drives, the motherboard, power-supply losses' : 'As its collector reports it'}>
+          {part.label}
+        </span>
+        <span class="caption hier-tag">{part.remainder ? 'wall plug less the parts' : 'from its collector'}</span>
+        <span class="num hier-watts">{part.watts != null ? formatWatts(part.watts) : ''}</span>
+        <span class="num hier-energy">{formatKwh(part.kwh)}</span>
+        <span class="num hier-cost">{part.cost != null ? formatMoney(part.cost, true) : '—'}</span>
+        <div class="hier-actions">
+          <a class="button icon" href={href} title="Open the computer's page" aria-label={`Open the computer's page for ${part.label}`}>
+            ›
+          </a>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 function Hidden({ meter, deviceName, onChanged }: { meter: Meter; deviceName: string; onChanged: () => void }) {
   const [error, setError] = useState('');
   return (
@@ -294,6 +321,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
     [period, meters.length],
   );
   const figures = new Map((summary?.meters ?? []).map((m) => [m.meter_id, m]));
+  // A computer's own collector reports its CPU, GPU and memory: shown under its wall plug, not stored as meters.
+  const pcDetails = usePcDetails(meters, summary?.from, summary?.to);
 
   const names = new Map((devices ?? []).map((d) => [d.id, d.name || d.host]));
   const deviceName = (id: string) => names.get(id) ?? '';
@@ -366,9 +395,31 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
               <span class="num">Cost</span>
             </div>
             <ul class="hier">
-              {rows.map(({ meter }, at) => (
-                <Row key={meter.id} meter={meter} rows={rows} at={at} shared={shared} />
-              ))}
+              {rows.map(({ meter, depth }, at) => {
+                const detail = pcDetails.get(meter.id);
+                const parts = detail ? pcParts(detail, watts.get(meter.id) ?? null) : [];
+                const page = detail ? routePath('hierarchy', 'computer', detail.computer.id) : '';
+                return (
+                  <Fragment key={meter.id}>
+                    <Row meter={meter} rows={rows} at={at} shared={shared} />
+                    {parts.map((p) => (
+                      <PartRow key={`${meter.id}:${p.key}`} part={p} depth={depth + 1} href={page} />
+                    ))}
+                    {parts.length > 0 && (
+                      <li class="hier-row virtual" style={{ marginLeft: `${(depth + 1) * 1.25}rem` }}>
+                        <div class="hier-main">
+                          <span />
+                          <span />
+                          <span class="grow part-name">
+                            <a href={page}>Programs</a>
+                          </span>
+                          <span class="caption hier-tag">estimates, on the computer's page</span>
+                        </div>
+                      </li>
+                    )}
+                  </Fragment>
+                );
+              })}
             </ul>
           </>
         )}

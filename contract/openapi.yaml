@@ -966,11 +966,13 @@ components:
           $ref: '#/components/schemas/Scope'
         type:
           type: string
-          enum: [house, sub_panel, circuit, device]
+          enum: [house, sub_panel, circuit, device, computer]
           description: |
             What the meter is, as the user would name it: the whole `house`, a `sub_panel`'s feed (it holds other circuits), one `circuit`
-            (breaker), or a `device` (a plug, the PC's wall plug). Filled in by the server: a Refoss meter's is the user's choice, the rest follow
-            from the scope, and a circuit with circuits inside it is a sub-panel until told otherwise. It describes; the math still follows `scope`.
+            (breaker), a `device` (a plug), or a `computer` (the wall plug of a computer: it opens the computer's page, and the parts its
+            collector reports (CPU, GPU, memory) are shown under it). Filled in by the server: a Refoss meter's is the user's choice, the rest follow
+            from the scope (a PC's wall plug that belongs to a computer is a `computer`), and a circuit with circuits inside it is a sub-panel
+            until told otherwise. It describes; the math still follows `scope`.
         label:
           type: string
           description: What the user calls it, for example "Dryer" or "EV charger".
