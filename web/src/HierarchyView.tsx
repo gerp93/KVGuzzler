@@ -405,7 +405,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           </div>
         )}
         {rows.length === 0 ? (
-          <p class="note">No meters are shown. Add a device in Settings, or show one below.</p>
+          <p class="note">No meters are shown. Use ＋ Add to add a device, or show a hidden one below.</p>
         ) : (
           <>
             <div class="hier-head" aria-hidden="true">

@@ -28,11 +28,11 @@ interface Period {
 
 /** The live page: the whole house, or (when some meters are marked as favorites) one click to any of them instead: the computer, the EV
  * charger, a sub-panel. A favorite opens the same page it has in the Hierarchy tab. */
-export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: () => void }) {
+export function LiveView({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => void }) {
   const [focus, setFocus] = useStored('live-focus', '');
   const favorites = meters.filter((m) => m.favorite && m.enabled);
   const chosen = favorites.find((m) => m.id === focus);
-  if (favorites.length === 0) return <House meters={meters} onOpenSettings={onOpenSettings} />;
+  if (favorites.length === 0) return <House meters={meters} onAddDevice={onAddDevice} />;
   return (
     <>
       <div class="chips" role="group" aria-label="What to show">
@@ -46,7 +46,7 @@ export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSe
         ))}
       </div>
       {!chosen ? (
-        <House meters={meters} onOpenSettings={onOpenSettings} />
+        <House meters={meters} onAddDevice={onAddDevice} />
       ) : chosen.scope === 'pc' && chosen.computer_id ? (
         <ComputerView id={chosen.computer_id} meters={meters} embedded />
       ) : (
@@ -56,7 +56,7 @@ export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSe
   );
 }
 
-function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: () => void }) {
+function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => void }) {
   const [period, setPeriod] = useStored('period', '24h');
   const { data: live, error } = usePoll<Live>(api.live, 2000, []);
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
@@ -85,10 +85,10 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
     return (
       <section class="card">
         <h2>Nothing to show yet</h2>
-        <p>No devices are being read. Add a smart plug to start, then the live figures appear here.</p>
+        <p>No devices are being read yet. Add a Shelly plug or a Refoss monitor and the live figures appear here within seconds.</p>
         <div class="chips">
-          <button type="button" onClick={onOpenSettings}>
-            Add a device in Settings
+          <button type="button" onClick={onAddDevice}>
+            Add a device
           </button>
         </div>
       </section>

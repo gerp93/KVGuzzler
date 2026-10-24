@@ -1,5 +1,6 @@
 // What running the computer would cost at the saved price: at a load typed in, at what it draws right now, or at what it really used per day.
 import { usePoll, useStored } from './hooks';
+import { routePath } from './route';
 import {
   ESTIMATE_WINDOWS, estimateLines, formatKwh, formatMoney, formatWatts,
   type AverageUse, type ComputerEstimate, type EstimateMode,
@@ -110,7 +111,7 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
           ))}
         </ul>
       )}
-      {lines.length > 0 && rate == null && <p class="caption">Save your electricity rate in Settings to see the cost.</p>}
+      {lines.length > 0 && rate == null && <p class="caption">Save your electricity rate in <a href={routePath('settings')}>Settings</a> to see the cost.</p>}
     </section>
   );
 }

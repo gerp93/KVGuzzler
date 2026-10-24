@@ -1407,3 +1407,23 @@ main > .caption {
 .chart .u-legend .u-series:first-child {
   color: var(--color-text-muted);
 }
+
+/* Forms and prose read best in one column of a sensible width */
+main:has(> .page-narrow) {
+  grid-template-columns: minmax(0, 44rem);
+  justify-content: center;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 2rem;
+  font-size: 0.95rem;
+  text-decoration: none;
+  color: var(--color-accent-blue);
+}
+
+.back:hover {
+  text-decoration: underline;
+}

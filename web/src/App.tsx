@@ -77,7 +77,7 @@ export function App() {
         ) : !loaded.data ? (
           loaded.error ? <p class="note">{`Waiting for the server: ${loaded.error.message}`}</p> : <Skeleton />
         ) : active === 'live' ? (
-          <LiveView meters={meters} onOpenSettings={() => (window.location.hash = routePath('settings'))} />
+          <LiveView meters={meters} onAddDevice={() => (window.location.hash = routePath('hierarchy'))} />
         ) : active === 'history' ? (
           <HistoryView meters={meters} />
         ) : active === 'hierarchy' ? (

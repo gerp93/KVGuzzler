@@ -8,7 +8,7 @@ export function HelpView() {
   const { data: status } = usePoll(api.status, 30_000, []);
   return (
     <>
-      <section class="card">
+      <section class="card page-narrow">
         <h2>KVGuzzler house server</h2>
         <p>{status ? `Version ${status.server_version}` : 'Reading the version…'}</p>
         {status && (
