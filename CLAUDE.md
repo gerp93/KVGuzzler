@@ -68,7 +68,7 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   are **never added to it**: what is left is shown as "Everything else" (parent minus children, in the dashboard, per parent), and the house's `unmetered_kwh`
   takes off only the top-level circuits. Any meter but the mains can have a parent, the parent is a circuit, a loop is refused (409), and a meter that becomes the
   mains or the second leg of a pair leaves the tree (its children go to the top). The parent may be on another device (a garage monitor's feed is a circuit of the
-  main panel's monitor). Settings > Meters (`web/src/MetersCard.tsx`) groups inputs by device, hides unused ones, and puts the fiddly options behind "Wiring".
+  main panel's monitor). The **Hierarchy tab** (`web/src/HierarchyView.tsx`) is where meters are laid out and wired: one tree across all monitors, an arrow on each row opens its wiring (clamp direction, 120/240 V with the other clamp, type, which panel), meters move by the arrows, by dragging onto the meter they are inside, or from the "which panel" list, and the eye hides one. Settings no longer lists meters.
   **A meter has a `type`** (`house | sub_panel | circuit | device`, `model.MeterType`): what it is, in the user's words. It describes; the math still follows `scope` and the tree.
   A Refoss meter's type is the user's to choose (house = the mains scope; sub_panel and circuit are both the circuit scope, told apart by the saved `type` column), a plug or the
   PC's wall plug is a device, and a circuit with circuits inside it reads as a sub-panel until the user says otherwise (`Store.settleTypes`).
