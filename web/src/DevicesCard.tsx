@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import type { Device, Meter } from './lib';
@@ -130,10 +131,10 @@ export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged:
   return (
     <section class="card wide">
       <h2>Devices</h2>
-      <p class="caption">
+      <Hint>
         What the server reads. Add one with the + Add button at the top; change a device's name or address, or stop polling it, here. The server only ever reads a
         device: it cannot switch a plug or change a monitor.
-      </p>
+      </Hint>
       {error && <p class="note">{error.message}</p>}
       {devices && devices.length === 0 && <p class="note">No devices yet.</p>}
       {devices && devices.length > 0 && (

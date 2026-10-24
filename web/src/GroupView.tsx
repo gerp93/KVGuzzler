@@ -1,4 +1,5 @@
 import { api } from './api';
+import { Skeleton } from './Skeleton';
 import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
@@ -47,7 +48,7 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
           <p>{error.message}</p>
         </section>
       )}
-      {!data && !error && <p class="note">Loading…</p>}
+      {!data && !error && <Skeleton />}
 
       {detail && (
         <>
@@ -85,7 +86,7 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
           </section>
 
           {data.lines.some((l) => l.x.length > 0) && (
-            <section class="card">
+            <section class="card wide">
               <h2>Power over time</h2>
               <Chart lines={data.lines} domain={data.domain} />
             </section>

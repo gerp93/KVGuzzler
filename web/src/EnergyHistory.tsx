@@ -1,6 +1,7 @@
 // A computer's energy over the rolling periods, one row each, and the daily CSV of the period being looked at.
 import { api } from './api';
 import { usePoll } from './hooks';
+import { routePath } from './route';
 import { formatKwh, formatMoney, historyDetail, periodRange, type PeriodKey } from './lib';
 
 export function EnergyHistory({ id, period }: { id: string; period: PeriodKey }) {
@@ -22,7 +23,7 @@ export function EnergyHistory({ id, period }: { id: string; period: PeriodKey })
                 <span class="caption block">{historyDetail(p)}</span>
               </span>
               <span class="num">{formatKwh(p.kwh)}</span>
-              <span class="num cost">{p.cost != null ? formatMoney(p.cost, p.cost_estimated) : ''}</span>
+              {p.cost != null && <span class="num cost">{formatMoney(p.cost, p.cost_estimated)}</span>}
             </li>
           ))}
         </ul>
@@ -30,7 +31,7 @@ export function EnergyHistory({ id, period }: { id: string; period: PeriodKey })
       {data?.periods.some((p) => p.basis === 'sensors') && (
         <p class="caption">No wall plug is tied to this computer, so these figures are what its sensors measured. They leave out fans, drives and power-supply loss.</p>
       )}
-      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in Settings to see costs.</p>}
+      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
       <p>
         <a class="button" href={api.computerExportUrl(id, from, to)} download>
           Export to CSV…

@@ -1,6 +1,7 @@
 // The house's energy over the rolling periods, one row each, and the daily CSV of the period being looked at.
 import { api } from './api';
 import { usePoll } from './hooks';
+import { routePath } from './route';
 import { formatCarbon, formatKwh, formatMoney, formatWatts, periodRange, type PeriodKey } from './lib';
 
 export function HouseHistoryCard({ period }: { period: PeriodKey }) {
@@ -26,12 +27,12 @@ export function HouseHistoryCard({ period }: { period: PeriodKey }) {
                 </span>
               </span>
               <span class="num">{formatKwh(p.kwh)}</span>
-              <span class="num cost">{p.cost != null ? formatMoney(p.cost, p.cost_estimated) : ''}</span>
+              {p.cost != null && <span class="num cost">{formatMoney(p.cost, p.cost_estimated)}</span>}
             </li>
           ))}
         </ul>
       )}
-      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in Settings to see costs.</p>}
+      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
       <p>
         <a class="button" href={api.houseExportUrl(from, to)} download>
           Export to CSV…

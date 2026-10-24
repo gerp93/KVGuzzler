@@ -7,7 +7,7 @@ import { routePath } from './route';
 export function SettingsView({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
   return (
     <>
-      <section class="card">
+      <section class="card page-narrow">
         <h2>Setting up the system</h2>
         <p class="caption">
           Devices, computers and appliance groups, and how the meters are laid out, are set up in the <a href={routePath('hierarchy')}>Hierarchy</a> tab (the + Add
