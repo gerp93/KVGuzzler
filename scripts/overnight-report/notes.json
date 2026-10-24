@@ -1,0 +1,28 @@
+{
+ "meta": {
+  "intro": "A branch of ideas built on top of everything merged so far, run against a made-up house on this computer. Each section is one thing that was built, with what it does, how it was checked, and a screenshot of it running.",
+  "how": "<p>Everything here lives on one branch that was never merged or deployed, so your real server, its history and its settings are exactly as you left them. The numbers on the screenshots belong to a <strong>made-up house</strong> (a simulator with three weeks of generated history), so they are not your electricity. The screenshots are of the real dashboard code, running locally.</p><p>Each section says <em>feature</em> (something new), <em>insight</em> (something the data can now tell you), <em>fix</em> (something that was wrong) or <em>finding</em> (something I noticed). If you like a piece, ask for it to be made into a pull request; the commits are small and in order, so pieces can be picked one at a time.</p>"
+ },
+ "entries": [
+  {
+   "id": "demo",
+   "title": "A demo house to run all of this on",
+   "kind": "feature",
+   "summary": "The simulator now behaves like a believable house instead of a repeating pattern, so every feature below could be shown with realistic data without touching your real server.",
+   "details": [
+    "A <strong>garage sub-panel</strong> (the EV charger and a workshop inside it) and a <strong>desk PC and monitor</strong> on the office circuit, next to the circuits it already had.",
+    "Each day has its own plan worked out from the date: the car charges on about 70% of nights and tapers off at the end, the dryer runs on some days, the air conditioner works harder on a hot day, the office is quiet at the weekend. The same day always looks the same, and the live readings follow the same plans as the history.",
+    "<code>-sim-days 21</code> writes three weeks of made-up history once; <code>scripts/demo.sh</code> runs everything on its own port with its own temporary database and <code>scripts/demo-seed.py</code> lays it out the way you have yours: nesting, a computer with its collector's CPU, GPU and memory, a group, favorites and a price.",
+    "Tests: the history has every meter for every minute, is identical when made twice, never exceeds a meter's cap, and a window can run past midnight."
+   ],
+   "images": [
+    {
+     "path": "C:\\Users\\kgerp\\source\\repos\\_worktrees\\KVGuzzler-overnight\\.overnight-report\\img\\demo-mcp-Claude_Browser-blob-1792827427941-u4sxet.jpg",
+     "caption": "The flow chart over seven days of the demo house: the house, the garage panel holding the EV charger and the workshop, and the desk PC's parts."
+    }
+   ],
+   "commit": "a99f39f",
+   "tests": "go test ./... passes"
+  }
+ ]
+}
