@@ -59,10 +59,12 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a
   computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
   house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open its wall plug in the Hierarchy tab for the Guzzler-style breakdown.
-- **Appliance groups** (`/api/v1/groups`): several ordinary plugs shown as one appliance (an entertainment center on two power strips). Only
-  `plug`-scope meters can be in a group, and not one that belongs to a computer (a plug is shown in one place; 409 either way). It changes
-  only the display: each plug still records its own energy, and the group's figure is the sum of its plugs' (one scope, so the sum is sound;
-  the cost is shown only when every plug has one). A hidden plug is neither shown nor counted.
+- **Groups** (`/api/v1/groups`) are **logical groupings, not places in the wiring**: any meters except the mains (a plug, a circuit, a computer's plug) shown as one line
+  with their total over the period, for things like an entertainment center on two power strips or a desk and its computer. A meter is in one group at a time, and a
+  group never moves a meter in the tree or changes any figure of the meter itself. The group's total adds its members' energy and cost, **except a member that another
+  member already contains** (a plug on a circuit that is in the same group, through `parent_id`, however deep): it is listed (`not_added` in the detail) but not
+  added a second time. The cost is shown only when every counted member has one. A hidden meter is neither shown nor counted. Groups are managed in the Hierarchy
+  tab (`GroupsCard.tsx`: name, members chosen from a list, totals in the same columns as the tree) and each has a page (`#/hierarchy/group/<id>`).
 - **Panels nest** (`parent_id` on a meter, `store/parent.go`): a `circuit` that feeds a sub-panel holds the circuits clamped inside it, and a plug, a computer's
   wall plug (`pc`) or a peripheral says which circuit it is on. A circuit with no parent is on the main panel, under the house; there can be several top-level
   entries and nothing needs a main monitor to exist. The parent's own reading already contains its children's, so they

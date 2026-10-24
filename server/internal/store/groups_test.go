@@ -11,7 +11,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 )
 
-func TestGroupsHoldOrdinaryPlugsAndAPlugIsShownInOnePlace(t *testing.T) {
+func TestAGroupIsALogicalGroupingOfAnyMeterExceptTheMains(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
 	addMeter(t, s, "strip-1", model.ScopePlug)
@@ -19,6 +19,7 @@ func TestGroupsHoldOrdinaryPlugsAndAPlugIsShownInOnePlace(t *testing.T) {
 	addMeter(t, s, "desk-plug", model.ScopePlug)
 	addMeter(t, s, "pc-wall", model.ScopePC)
 	addMeter(t, s, "dryer", model.ScopeCircuit)
+	addMeter(t, s, "mains-a", model.ScopeMains)
 
 	tv, err := s.CreateGroup(ctx, "  Entertainment center ")
 	if err != nil || tv.Name != "Entertainment center" || !strings.HasPrefix(tv.ID, "grp-") || tv.MeterIDs == nil || len(tv.MeterIDs) != 0 {
@@ -33,10 +34,14 @@ func TestGroupsHoldOrdinaryPlugsAndAPlugIsShownInOnePlace(t *testing.T) {
 	if _, err := s.AssignMeterToGroup(ctx, "strip-1", &tv.ID); err != nil {
 		t.Errorf("putting a plug in the group it is already in: %v", err)
 	}
+	// Any meter can be grouped, whatever it is: a circuit, a computer's plug. Only the mains is the house itself.
 	for _, ch := range []string{"pc-wall", "dryer"} {
-		if _, err := s.AssignMeterToGroup(ctx, ch, &tv.ID); !errors.Is(err, ErrInvalid) {
-			t.Errorf("%s: %v, want ErrInvalid (only an ordinary plug can be in a group)", ch, err)
+		if _, err := s.AssignMeterToGroup(ctx, ch, &tv.ID); err != nil {
+			t.Errorf("%s in a group: %v", ch, err)
 		}
+	}
+	if _, err := s.AssignMeterToGroup(ctx, "mains-a", &tv.ID); !errors.Is(err, ErrInvalid) {
+		t.Errorf("the mains in a group: %v, want ErrInvalid", err)
 	}
 	if _, err := s.AssignMeterToGroup(ctx, "strip-1", str("grp-nope")); !errors.Is(err, ErrInvalid) {
 		t.Errorf("unknown group: %v, want ErrInvalid", err)
@@ -45,21 +50,21 @@ func TestGroupsHoldOrdinaryPlugsAndAPlugIsShownInOnePlace(t *testing.T) {
 		t.Errorf("unknown meter: %v, want ErrNotFound", err)
 	}
 
-	// A plug is shown in one place: a computer's plug cannot join a group, and a grouped plug cannot join a computer.
+	// A group is only a grouping: a computer's plug can be in one, and a grouped plug can belong to a computer.
 	desk, _ := s.CreateComputer(ctx, "Desktop", nil)
 	if _, err := s.AssignMeter(ctx, "desk-plug", &desk.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AssignMeterToGroup(ctx, "desk-plug", &tv.ID); !errors.Is(err, ErrConflict) {
-		t.Errorf("a computer's plug in a group: %v, want ErrConflict", err)
+	if _, err := s.AssignMeterToGroup(ctx, "desk-plug", &tv.ID); err != nil {
+		t.Errorf("a computer's plug in a group: %v", err)
 	}
-	if _, err := s.AssignMeter(ctx, "strip-1", &desk.ID); !errors.Is(err, ErrConflict) {
-		t.Errorf("a grouped plug on a computer: %v, want ErrConflict", err)
+	if _, err := s.AssignMeter(ctx, "strip-1", &desk.ID); err != nil {
+		t.Errorf("a grouped plug on a computer: %v", err)
 	}
 
 	groups, _ := s.Groups(ctx)
-	if len(groups) != 1 || len(groups[0].MeterIDs) != 2 || groups[0].MeterIDs[0] != "strip-1" {
-		t.Errorf("groups = %+v", groups)
+	if len(groups) != 1 || len(groups[0].MeterIDs) != 5 {
+		t.Errorf("groups = %+v, want one group of the five", groups)
 	}
 
 	// Taking a plug out, renaming, and removing the group: its plugs stay, as ordinary plugs.

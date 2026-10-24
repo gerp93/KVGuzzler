@@ -13,7 +13,8 @@ interface Loaded {
   domain: [number, number];
 }
 
-/** A group of plugs shown as one appliance (an entertainment center on two power strips): the total, and each plug. */
+/** A logical group of meters (an entertainment center on two power strips, a desk and its computer): the total, and each meter. A member that another
+ * member already contains is listed but not added again. */
 export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
   const label = (meterId: string) => meters.find((c) => c.id === meterId)?.label ?? meterId;
@@ -23,9 +24,10 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
       const { from, to } = periodRange(period as PeriodKey, new Date());
       const detail = await api.groupDetail(id, from, to);
       const series = await Promise.all(detail.members.map((m) => api.series(m.meter_id, from, to)));
-      // The plugs are all ordinary plugs, so their power can be added into one line; each plug is drawn on its own too.
+      // The total line adds only the members that no other member contains; each member is drawn on its own too.
       const lines: Line[] = [];
-      if (series.length > 1) lines.push(lineFrom('Total', '--color-text', sumByTime(series)));
+      const counted = series.filter((s) => !detail.not_added.includes(s.meter_id));
+      if (counted.length > 1) lines.push(lineFrom('Total', '--color-text', sumByTime(counted)));
       series.forEach((s, i) => lines.push(lineFrom(label(s.meter_id), COLORS[i % COLORS.length]!, s.points)));
       return { detail, lines, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
     },
@@ -56,18 +58,22 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
             </div>
             <p class="big">{formatKwh(detail.total_kwh)}</p>
             <p class="caption">
-              {detail.members.length} plug{detail.members.length === 1 ? '' : 's'} added together
+              {detail.members.length - detail.not_added.length} meter{detail.members.length - detail.not_added.length === 1 ? '' : 's'} added together
               {detail.total_cost != null ? `, ${formatMoney(detail.total_cost, detail.cost_estimated)}` : ''}.
+              {detail.not_added.length > 0 && ` ${detail.not_added.length} more ${detail.not_added.length === 1 ? 'is' : 'are'} inside another member, so not added again.`}
             </p>
           </section>
 
           <section class="card">
-            <h2>By plug</h2>
-            {detail.members.length === 0 && <p class="note">No plugs in this group are reporting. Put plugs in it under Settings.</p>}
+            <h2>By meter</h2>
+            {detail.members.length === 0 && <p class="note">No meters in this group are reporting. Put meters in it in the Hierarchy tab.</p>}
             <ul class="bars wide">
               {detail.members.map((m) => (
                 <li key={m.meter_id}>
-                  <span class="name">{label(m.meter_id)}</span>
+                  <span class="name" title={detail.not_added.includes(m.meter_id) ? 'Inside another member, so not added to the total' : undefined}>
+                    {label(m.meter_id)}
+                    {detail.not_added.includes(m.meter_id) ? ' (inside another)' : ''}
+                  </span>
                   <span class="bar" aria-hidden="true">
                     <i style={{ width: `${top > 0 ? (m.kwh / top) * 100 : 0}%` }} />
                   </span>

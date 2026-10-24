@@ -311,9 +311,6 @@ func (s *Store) AssignMeter(ctx context.Context, meterID string, computerID *str
 	if ch.Scope != model.ScopePC && ch.Scope != model.ScopePlug {
 		return model.Meter{}, invalid("Only a smart plug can belong to a computer, not a %s meter.", ch.Scope)
 	}
-	if ch.GroupID != nil {
-		return model.Meter{}, conflict("%s is part of a group. Take it out of the group first.", ch.Label)
-	}
 	comp, err := s.Computer(ctx, *computerID)
 	if errors.Is(err, ErrNotFound) {
 		return model.Meter{}, invalid("There is no such computer.")

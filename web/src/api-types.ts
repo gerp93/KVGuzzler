@@ -391,9 +391,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Every appliance group, with its plugs.
-         * @description A group is several plugs shown as one appliance, for something that runs through more than one (an entertainment center on
-         *     two power strips). It only changes how they are shown: each plug still records its own energy.
+         * Every group, with its meters.
+         * @description A group is a logical grouping of meters shown as one, for something that runs through more than one (an entertainment center
+         *     on two power strips, a desk and its computer). It does not change where any of them is in the wiring: each meter still records
+         *     its own energy. Any meter can be in a group except the mains, and a meter is in one group at a time.
          */
         get: operations["listGroups"];
         put?: never;
@@ -657,7 +658,7 @@ export interface components {
             max_watts?: number | null;
             /** @description The computer this plug belongs to, or null. Only `pc` and `plug` meters can belong to one. */
             computer_id?: string | null;
-            /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` meter can be in a group, and not one that belongs to a computer. */
+            /** @description The group this meter is in, or null. Any meter but the mains can be in one; a group is only a grouping and does not move it in the wiring. */
             group_id?: string | null;
             /**
              * @description The circuit this one is part of, or null. A circuit that feeds a sub-panel holds the circuits clamped inside that panel, and a plug
@@ -705,8 +706,8 @@ export interface components {
              */
             computer_id?: string | null;
             /**
-             * @description Put the plug in an appliance group (its id), or null to take it out. A plug is shown in one place: it cannot be in a
-             *     group and belong to a computer (409).
+             * @description Put the meter in a group (its id), or null to take it out. Any meter but the mains can be in a group (400 for the mains); a group
+             *     is only a grouping, so it may also be a computer's plug or sit inside another meter.
              */
             group_id?: string | null;
         };
@@ -743,7 +744,7 @@ export interface components {
             meter_id: string;
             /** @description The computer the meter belongs to, so a client can group it with that computer instead of listing it alone. */
             computer_id?: string | null;
-            /** @description The appliance group the meter is part of, so a client can list the group once instead of each plug. */
+            /** @description The group the meter is in, so a client can show the group's total as one line. */
             group_id?: string | null;
             scope: components["schemas"]["Scope"];
             kwh: number;
@@ -1093,12 +1094,17 @@ export interface components {
             from: string;
             /** Format: date-time */
             to: string;
-            /** @description Each plug that is shown (not hidden), with its own energy and cost. */
+            /** @description Each member that is shown (not hidden), with its own energy and cost. */
             members: components["schemas"]["MeterSummary"][];
-            /** @description The plugs' energy added together (all are ordinary plugs, so adding them is sound). */
+            /**
+             * @description The members' energy added together, except any in `not_added`: a member that another member already contains (a plug on a
+             *     circuit that is in the same group) is already in that one's reading, so it is not added a second time.
+             */
             total_kwh: number;
             total_cost?: components["schemas"]["Money"] | null;
             cost_estimated: boolean;
+            /** @description The ids of the members left out of the total because another member already contains them. */
+            not_added: string[];
         };
         Computer: {
             id: string;

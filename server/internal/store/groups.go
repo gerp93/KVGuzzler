@@ -142,8 +142,8 @@ func (s *Store) DeleteGroup(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-// AssignMeterToGroup puts a plug in a group, or takes it out (nil). Only an ordinary plug can be in a group (not a PC's own plug, a
-// circuit or the mains), and not one that already belongs to a computer: a plug is shown in one place.
+// AssignMeterToGroup puts a meter in a group, or takes it out (nil). A group is a logical grouping, not a place in the wiring: any meter can be in
+// one (a plug, a circuit, a computer's plug) except the mains, which is the house itself, and it stays where it is wired. A meter is in one group at a time.
 func (s *Store) AssignMeterToGroup(ctx context.Context, meterID string, groupID *string) (model.Meter, error) {
 	ch, err := s.Meter(ctx, meterID)
 	if err != nil {
@@ -156,11 +156,8 @@ func (s *Store) AssignMeterToGroup(ctx context.Context, meterID string, groupID 
 		return s.Meter(ctx, meterID)
 	}
 
-	if ch.Scope != model.ScopePlug {
-		return model.Meter{}, invalid("Only an ordinary smart plug can be in a group, not a %s meter.", ch.Scope)
-	}
-	if ch.ComputerID != nil {
-		return model.Meter{}, conflict("%s belongs to a computer. Take it out of the computer first.", ch.Label)
+	if ch.Scope == model.ScopeMains {
+		return model.Meter{}, invalid("The mains is the house itself, so it cannot be in a group.")
 	}
 	if _, err := s.Group(ctx, *groupID); err != nil {
 		if errors.Is(err, ErrNotFound) {
