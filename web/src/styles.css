@@ -378,11 +378,16 @@ button.icon:disabled {
 }
 
 .hier-top-drop {
-  margin-top: 12px;
-  padding: 10px;
+  position: fixed; /* out of the page flow: a drop zone that pushed the rows down would cancel the drag it is for */
+  bottom: 16px;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 10px 16px;
   text-align: center;
-  color: var(--color-text-muted);
-  border: 1px dashed var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-text-muted);
   border-radius: var(--radius);
 }
 

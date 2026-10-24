@@ -86,6 +86,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
       onDragOver={(e) => {
         if (!dropOk) return;
         e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
@@ -106,8 +107,15 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
           draggable={true}
           title="Drag onto another meter to put this one inside it"
           onDragStart={(e) => {
-            e.dataTransfer?.setData('text/plain', meter.id);
-            setDragging(meter.id);
+            const dt = e.dataTransfer;
+            if (dt) {
+              dt.setData('text/plain', meter.id);
+              dt.effectAllowed = 'move';
+              const row = (e.currentTarget as HTMLElement).closest('li');
+              if (row) dt.setDragImage(row, 16, 16);
+            }
+            // Changing the page in the same tick as the drag starts makes the browser cancel the drag, so wait a beat.
+            setTimeout(() => setDragging(meter.id), 0);
           }}
           onDragEnd={() => setDragging(null)}
         >
@@ -283,7 +291,10 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         {dragging && (
           <div
             class="hier-top-drop"
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+            }}
             onDrop={(e) => {
               e.preventDefault();
               const id = dragging;
