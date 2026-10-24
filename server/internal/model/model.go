@@ -14,6 +14,18 @@ const (
 	ScopePC      Scope = "pc"
 )
 
+// MeterType says what a meter is in the wiring, as the user would name it: the whole house, a sub-panel's feed (it holds other circuits),
+// one breaker, or a device (a plug, the PC's wall plug). It is a description; what the math needs (which meter is the house, what is
+// subtracted from what) still comes from the scope and the tree.
+type MeterType string
+
+const (
+	TypeHouse    MeterType = "house"
+	TypeSubPanel MeterType = "sub_panel"
+	TypeCircuit  MeterType = "circuit"
+	TypeDevice   MeterType = "device"
+)
+
 // Bucket is the width of one point in a series.
 type Bucket string
 
@@ -41,6 +53,9 @@ type Meter struct {
 	Label    string   `json:"label"`
 	Enabled  bool     `json:"enabled"`
 	MaxWatts *float64 `json:"max_watts"`
+	// Type is what the meter is (see MeterType). The server fills it in: a Refoss meter's is the user's choice, the rest follow from the scope,
+	// and a circuit with circuits inside it is a sub-panel until the user says otherwise.
+	Type MeterType `json:"type"`
 	// ComputerID is the computer this plug belongs to (its wall plug if the scope is pc, a peripheral if plug), or nil.
 	ComputerID *string `json:"computer_id"`
 	// GroupID is the appliance group this plug is part of (shown as one appliance with the group's other plugs), or nil.

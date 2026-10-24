@@ -181,7 +181,7 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 	}
 	// And before a clamp's sign could be flipped and its two legs paired.
 	// And before a circuit could be part of a sub-panel's feed.
-	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT"} {
+	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT", "type TEXT"} {
 		name := col[:strings.IndexByte(col, ' ')]
 		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = ?`, name).Scan(&has); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
@@ -251,13 +251,14 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	var c model.Meter
 	var idx sql.NullInt64
 	var max sql.NullFloat64
-	var computer, group, pair, parent sql.NullString
+	var computer, group, pair, parent, typ sql.NullString
 	var scope string
 	var enabled, invert int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent); err != nil {
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent, &typ); err != nil {
 		return c, err
 	}
 	c.Invert = invert == 1
+	c.Type = model.MeterType(typ.String) // as saved; settleTypes turns it into what the meter is
 	if parent.Valid {
 		c.ParentID = &parent.String
 	}
@@ -282,7 +283,42 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	return c, nil
 }
 
-const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id`
+const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id, type`
+
+// settleTypes fills in each meter's Type: the mains is the house, plugs are devices, and a circuit is a sub-panel when circuits sit inside it
+// (or the user said so) and a circuit otherwise. The user's own choice, kept in the type column, wins for a circuit.
+func (s *Store) settleTypes(ctx context.Context, list ...*model.Meter) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT parent_id FROM meters WHERE parent_id IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	holds := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		holds[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, c := range list {
+		switch {
+		case c.Scope == model.ScopeMains:
+			c.Type = model.TypeHouse
+		case c.Scope == model.ScopePlug || c.Scope == model.ScopePC:
+			c.Type = model.TypeDevice
+		case c.Type == model.TypeSubPanel || c.Type == model.TypeCircuit:
+		case holds[c.ID]:
+			c.Type = model.TypeSubPanel
+		default:
+			c.Type = model.TypeCircuit
+		}
+	}
+	return nil
+}
 
 func (s *Store) Meters(ctx context.Context) ([]model.Meter, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+meterCols+` FROM meters ORDER BY device_id, idx IS NULL, idx, id`)
@@ -298,7 +334,18 @@ func (s *Store) Meters(ctx context.Context) ([]model.Meter, error) {
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	ptrs := make([]*model.Meter, len(out))
+	for i := range out {
+		ptrs[i] = &out[i]
+	}
+	if err := s.settleTypes(ctx, ptrs...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // UpdateMeter changes the user's label and/or enabled switch of a meter and returns it.
@@ -321,7 +368,10 @@ func (s *Store) UpdateMeter(ctx context.Context, id string, label *string, enabl
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.Meter{}, ErrNotFound
 	}
-	return c, err
+	if err != nil {
+		return c, err
+	}
+	return c, s.settleTypes(ctx, &c)
 }
 
 // AddMinute adds covered time to a meter's minute. Adding to a minute that already has rows merges them (the

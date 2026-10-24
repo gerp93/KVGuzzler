@@ -30,9 +30,9 @@ func TestAClampsSignAndScopeAreSetAndKept(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
 	ids := monitor(t, s, "refoss-a", 3)
-	yes, mains := true, model.ScopeMains
+	yes, house := true, model.TypeHouse
 
-	ch, err := s.SetMeterWiring(ctx, ids[0], WiringChange{Invert: &yes, Scope: &mains})
+	ch, err := s.SetMeterWiring(ctx, ids[0], WiringChange{Invert: &yes, Type: &house})
 	if err != nil || !ch.Invert || ch.Scope != model.ScopeMains {
 		t.Fatalf("meter = %+v, %v", ch, err)
 	}
@@ -43,9 +43,9 @@ func TestAClampsSignAndScopeAreSetAndKept(t *testing.T) {
 			t.Errorf("the sign was lost when the meter was registered again: %+v", again)
 		}
 	}
-	bad := model.Scope("plug")
-	if _, err := s.SetMeterWiring(ctx, ids[0], WiringChange{Scope: &bad}); !errors.Is(err, ErrInvalid) {
-		t.Errorf("a plug scope: %v, want invalid", err)
+	bad := model.TypeDevice
+	if _, err := s.SetMeterWiring(ctx, ids[0], WiringChange{Type: &bad}); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a device type: %v, want invalid", err)
 	}
 	if _, err := s.SetMeterWiring(ctx, "nope", WiringChange{Invert: &yes}); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown meter: %v", err)

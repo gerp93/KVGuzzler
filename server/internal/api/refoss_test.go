@@ -46,11 +46,11 @@ func TestARefossClampsSignPairAndScopeAreSetThroughTheMeterPatch(t *testing.T) {
 	if r, _ := patch("refoss-h:em3", `{"pair_with":"nope"}`); r.StatusCode != http.StatusBadRequest {
 		t.Errorf("no such leg: %d, want 400", r.StatusCode)
 	}
-	if r, body := patch("refoss-h:em3", `{"scope":"mains"}`); r.StatusCode != 200 || decode[model.Meter](t, body).Scope != model.ScopeMains {
+	if r, body := patch("refoss-h:em3", `{"type":"house"}`); r.StatusCode != 200 || decode[model.Meter](t, body).Scope != model.ScopeMains || decode[model.Meter](t, body).Type != model.TypeHouse {
 		t.Errorf("scope: %d %s", r.StatusCode, body)
 	}
-	if r, _ := patch("refoss-h:em3", `{"scope":"plug"}`); r.StatusCode != http.StatusBadRequest {
-		t.Errorf("a plug scope: %d, want 400", r.StatusCode)
+	if r, _ := patch("refoss-h:em3", `{"type":"device"}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("a device type: %d, want 400", r.StatusCode)
 	}
 	r, body = patch("refoss-h:em2", `{"pair_with":null}`)
 	if ch := decode[model.Meter](t, body); r.StatusCode != 200 || ch.PairWith != nil {

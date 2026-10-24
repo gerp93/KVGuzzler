@@ -69,6 +69,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   takes off only the top-level circuits. Any meter but the mains can have a parent, the parent is a circuit, a loop is refused (409), and a meter that becomes the
   mains or the second leg of a pair leaves the tree (its children go to the top). The parent may be on another device (a garage monitor's feed is a circuit of the
   main panel's monitor). Settings > Meters (`web/src/MetersCard.tsx`) groups inputs by device, hides unused ones, and puts the fiddly options behind "Wiring".
+  **A meter has a `type`** (`house | sub_panel | circuit | device`, `model.MeterType`): what it is, in the user's words. It describes; the math still follows `scope` and the tree.
+  A Refoss meter's type is the user's to choose (house = the mains scope; sub_panel and circuit are both the circuit scope, told apart by the saved `type` column), a plug or the
+  PC's wall plug is a device, and a circuit with circuits inside it reads as a sub-panel until the user says otherwise (`Store.settleTypes`).
 - The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
   cap is dropped and said so; a different major `api_version` is refused with 426. The C# client is `RelayFeed` in `KVGuzzler.Core/Relay`, run by the collector service beside the carbon feed: **`relay.json`** beside
   `wall-meter.json` (`{"host": "192.168.68.110"}`, or `host:port`; default port 8080; a plain host only, never a URL) says where the house server
