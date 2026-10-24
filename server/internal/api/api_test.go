@@ -80,10 +80,10 @@ func TestStatusAndVersionHeader(t *testing.T) {
 
 func TestLiveHouseIsTheMainsAlone(t *testing.T) {
 	srv, _ := newServer(t, 2)
-	var chs struct{ Channels []model.Channel }
-	get(t, srv.URL+"/api/v1/channels", &chs)
+	var chs struct{ Meters []model.Meter }
+	get(t, srv.URL+"/api/v1/meters", &chs)
 	scope := map[string]model.Scope{}
-	for _, c := range chs.Channels {
+	for _, c := range chs.Meters {
 		scope[c.ID] = c.Scope
 	}
 
@@ -91,7 +91,7 @@ func TestLiveHouseIsTheMainsAlone(t *testing.T) {
 	get(t, srv.URL+"/api/v1/live", &live)
 	var mains, circuits float64
 	for _, r := range live.Readings {
-		switch scope[r.ChannelID] {
+		switch scope[r.MeterID] {
 		case model.ScopeMains:
 			mains += r.Watts
 		case model.ScopeCircuit:
@@ -117,38 +117,38 @@ func patch(t *testing.T, url, body string) *http.Response {
 	return resp
 }
 
-func TestRenameAndSwitchOffAChannel(t *testing.T) {
+func TestRenameAndSwitchOffAMeter(t *testing.T) {
 	srv, _ := newServer(t, 2)
 	id := "sim-em16p:ch-01"
 
-	if r := patch(t, srv.URL+"/api/v1/channels/"+id, `{"label":"  Clothes dryer "}`); r.StatusCode != 200 {
+	if r := patch(t, srv.URL+"/api/v1/meters/"+id, `{"label":"  Clothes dryer "}`); r.StatusCode != 200 {
 		t.Fatalf("rename: %d", r.StatusCode)
 	}
-	if r := patch(t, srv.URL+"/api/v1/channels/"+id, `{"enabled":false}`); r.StatusCode != 200 {
+	if r := patch(t, srv.URL+"/api/v1/meters/"+id, `{"enabled":false}`); r.StatusCode != 200 {
 		t.Fatalf("disable: %d", r.StatusCode)
 	}
-	if r := patch(t, srv.URL+"/api/v1/channels/nope", `{"enabled":false}`); r.StatusCode != 404 {
-		t.Errorf("unknown channel: %d, want 404", r.StatusCode)
+	if r := patch(t, srv.URL+"/api/v1/meters/nope", `{"enabled":false}`); r.StatusCode != 404 {
+		t.Errorf("unknown meter: %d, want 404", r.StatusCode)
 	}
-	if r := patch(t, srv.URL+"/api/v1/channels/"+id, `{"label":""}`); r.StatusCode != 400 {
+	if r := patch(t, srv.URL+"/api/v1/meters/"+id, `{"label":""}`); r.StatusCode != 400 {
 		t.Errorf("empty label: %d, want 400", r.StatusCode)
 	}
-	if r := patch(t, srv.URL+"/api/v1/channels/"+id, `{"nonsense":1}`); r.StatusCode != 400 {
+	if r := patch(t, srv.URL+"/api/v1/meters/"+id, `{"nonsense":1}`); r.StatusCode != 400 {
 		t.Errorf("unknown field: %d, want 400", r.StatusCode)
 	}
 
-	var chs struct{ Channels []model.Channel }
-	get(t, srv.URL+"/api/v1/channels", &chs)
-	for _, c := range chs.Channels {
+	var chs struct{ Meters []model.Meter }
+	get(t, srv.URL+"/api/v1/meters", &chs)
+	for _, c := range chs.Meters {
 		if c.ID == id && (c.Label != "Clothes dryer" || c.Enabled) {
-			t.Errorf("channel = %+v", c)
+			t.Errorf("meter = %+v", c)
 		}
 	}
 	var live model.Live
 	get(t, srv.URL+"/api/v1/live", &live)
 	for _, r := range live.Readings {
-		if r.ChannelID == id {
-			t.Error("a switched-off channel is still in the live view")
+		if r.MeterID == id {
+			t.Error("a switched-off meter is still in the live view")
 		}
 	}
 }
@@ -163,7 +163,7 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 		t.Fatalf("summary house=%v unmetered=%v", sum.HouseKWh, sum.UnmeteredKWh)
 	}
 	var circuits float64
-	for _, c := range sum.Channels {
+	for _, c := range sum.Meters {
 		if c.Scope == model.ScopeCircuit {
 			circuits += c.KWh
 		}
@@ -174,8 +174,8 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 
 	// A circuit that is part of another (a sub-panel's circuit inside its feed) is already in the feed's figure: it is not taken off the house
 	// a second time.
-	var kids []model.ChannelSummary
-	for _, c := range sum.Channels {
+	var kids []model.MeterSummary
+	for _, c := range sum.Meters {
 		if c.Scope == model.ScopeCircuit {
 			kids = append(kids, c)
 		}
@@ -183,7 +183,7 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 	if len(kids) < 2 {
 		t.Fatalf("the simulator has %d circuits", len(kids))
 	}
-	if r, body := send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+kids[1].ChannelID, `{"parent_id":"`+kids[0].ChannelID+`"}`); r.StatusCode != 200 {
+	if r, body := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/"+kids[1].MeterID, `{"parent_id":"`+kids[0].MeterID+`"}`); r.StatusCode != 200 {
 		t.Fatalf("nesting: %d %s", r.StatusCode, body)
 	}
 	var nested model.Summary
@@ -193,13 +193,13 @@ func TestSummaryUnmeteredNeverNegativeAndSeries(t *testing.T) {
 	}
 
 	var ser model.Series
-	get(t, srv.URL+"/api/v1/series"+q+"&channel_id=sim-em16p:mains-a", &ser)
+	get(t, srv.URL+"/api/v1/series"+q+"&meter_id=sim-em16p:mains-a", &ser)
 	if ser.Bucket != model.BucketMinute || len(ser.Points) < 29 {
 		t.Errorf("series bucket %s with %d points", ser.Bucket, len(ser.Points))
 	}
 
-	if r := get(t, srv.URL+"/api/v1/series"+q+"&channel_id=nope", nil); r.StatusCode != 400 {
-		t.Errorf("unknown channel series: %d, want 400", r.StatusCode)
+	if r := get(t, srv.URL+"/api/v1/series"+q+"&meter_id=nope", nil); r.StatusCode != 400 {
+		t.Errorf("unknown meter series: %d, want 400", r.StatusCode)
 	}
 	if r := get(t, srv.URL+"/api/v1/summary?from=x&to=y", nil); r.StatusCode != 400 {
 		t.Errorf("bad period: %d, want 400", r.StatusCode)
@@ -296,9 +296,9 @@ func TestSummaryCostFollowsTheRate(t *testing.T) {
 	if before.HouseCost != nil {
 		t.Errorf("house cost %s with no rate set, want null", *before.HouseCost)
 	}
-	for _, c := range before.Channels {
+	for _, c := range before.Meters {
 		if c.Cost != nil {
-			t.Errorf("%s has a cost (%s) with no rate set; it should have none, even when it used nothing", c.ChannelID, *c.Cost)
+			t.Errorf("%s has a cost (%s) with no rate set; it should have none, even when it used nothing", c.MeterID, *c.Cost)
 		}
 	}
 
@@ -311,9 +311,9 @@ func TestSummaryCostFollowsTheRate(t *testing.T) {
 	if got, want := parseMoney(t, after.HouseCost), *after.HouseKWh*0.20; math.Abs(got-want) > 0.0001 {
 		t.Errorf("house cost %v, want kWh x 0.20 = %v", got, want)
 	}
-	for _, c := range after.Channels {
+	for _, c := range after.Meters {
 		if got, want := parseMoney(t, c.Cost), c.KWh*0.20; math.Abs(got-want) > 0.0001 {
-			t.Errorf("%s cost %v, want %v", c.ChannelID, got, want)
+			t.Errorf("%s cost %v, want %v", c.MeterID, got, want)
 		}
 	}
 }

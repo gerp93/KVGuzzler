@@ -2,28 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
   applianceList, arrangeByPanel, BASELINE, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Channel, type ChannelSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
+  type ApplianceGroup, type Meter, type MeterSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
-const ch = (id: string, scope: Channel['scope'], enabled = true): Channel => ({
+const ch = (id: string, scope: Meter['scope'], enabled = true): Meter => ({
   id, device_id: 'd', scope, label: id, enabled, index: null, max_watts: null,
 });
-const rd = (channel_id: string, watts: number): Reading => ({ channel_id, watts });
+const rd = (meter_id: string, watts: number): Reading => ({ meter_id, watts });
 
-const channels = [ch('mains-a', 'mains'), ch('dryer', 'circuit'), ch('ev', 'circuit'), ch('off', 'circuit', false), ch('pc', 'pc'), ch('plug', 'plug')];
+const meters = [ch('mains-a', 'mains'), ch('dryer', 'circuit'), ch('ev', 'circuit'), ch('off', 'circuit', false), ch('pc', 'pc'), ch('plug', 'plug')];
 const readings = [rd('mains-a', 9000), rd('dryer', 5000), rd('ev', 200), rd('off', 999), rd('pc', 300), rd('plug', 50), rd('ghost', 1)];
 
 describe('scopes are never summed across each other', () => {
-  it('circuitsByWatts leaves out mains, the PC slice, switched-off and unknown channels, and ranks by watts', () => {
-    expect(circuitsByWatts(channels, readings).map((r) => r.channel.id)).toEqual(['dryer', 'ev', 'plug']);
+  it('circuitsByWatts leaves out mains, the PC slice, switched-off and unknown meters, and ranks by watts', () => {
+    expect(circuitsByWatts(meters, readings).map((r) => r.meter.id)).toEqual(['dryer', 'ev', 'plug']);
   });
 
   it('keeps the PC slice apart', () => {
-    expect(pcSlices(channels, readings).map((r) => [r.channel.id, r.watts])).toEqual([['pc', 300]]);
+    expect(pcSlices(meters, readings).map((r) => [r.meter.id, r.watts])).toEqual([['pc', 300]]);
   });
 
   it('unmetered is the house minus circuits only, never negative, and never subtracts the PC or plugs', () => {
-    const rows = circuitsByWatts(channels, readings);
+    const rows = circuitsByWatts(meters, readings);
     expect(unmetered(9000, rows)).toBe(9000 - 5200); // the plug's 50 W is not a circuit
     expect(unmetered(100, rows)).toBe(0);
     expect(unmetered(null, rows)).toBeNull();
@@ -36,7 +36,7 @@ describe('scopes are never summed across each other', () => {
     ];
     const reads = [rd('mains-a', 12000), rd('garage', 7500), rd('ev', 7300), rd('lights', 50), rd('dryer', 4000), rd('orphan', 20), rd('switched-off', 99)];
     const rows = nestCircuits(circuitsByWatts(wired, reads));
-    expect(rows.map((r) => [r.channel.id, r.depth, !!r.remainder])).toEqual([
+    expect(rows.map((r) => [r.meter.id, r.depth, !!r.remainder])).toEqual([
       ['garage', 0, false], ['ev', 1, false], ['lights', 1, false], ['garage', 1, true], ['dryer', 0, false], ['orphan', 0, false],
     ]);
     expect(rows.find((r) => r.remainder)!.watts).toBe(7500 - 7300 - 50);
@@ -46,29 +46,29 @@ describe('scopes are never summed across each other', () => {
 
   it('arrangeByPanel puts a sub-panel feed before the circuits inside it and keeps the order otherwise', () => {
     const list = [ch('a', 'circuit'), { ...ch('c', 'circuit'), parent_id: 'b' }, ch('b', 'circuit'), { ...ch('d', 'circuit'), parent_id: 'gone' }];
-    expect(arrangeByPanel(list).map((r) => [r.channel.id, r.depth])).toEqual([['a', 0], ['b', 0], ['c', 1], ['d', 0]]);
+    expect(arrangeByPanel(list).map((r) => [r.meter.id, r.depth])).toEqual([['a', 0], ['b', 0], ['c', 1], ['d', 0]]);
   });
 
   it('splitSummary does not fold the PC into the circuits', () => {
     const s: Summary = {
       from: 'a', to: 'b', house_kwh: 10, unmetered_kwh: 4,
-      channels: [
-        { channel_id: 'mains-a', scope: 'mains', kwh: 10, monitored_hours: 1 },
-        { channel_id: 'dryer', scope: 'circuit', kwh: 5, monitored_hours: 1 },
-        { channel_id: 'ev', scope: 'circuit', kwh: 1, monitored_hours: 1 },
-        { channel_id: 'pc', scope: 'pc', kwh: 3, monitored_hours: 1 },
+      meters: [
+        { meter_id: 'mains-a', scope: 'mains', kwh: 10, monitored_hours: 1 },
+        { meter_id: 'dryer', scope: 'circuit', kwh: 5, monitored_hours: 1 },
+        { meter_id: 'ev', scope: 'circuit', kwh: 1, monitored_hours: 1 },
+        { meter_id: 'pc', scope: 'pc', kwh: 3, monitored_hours: 1 },
       ],
     };
     const split = splitSummary(s);
-    expect(split.circuits.map((c) => c.channel_id)).toEqual(['dryer', 'ev']);
-    expect(split.pc.map((c) => c.channel_id)).toEqual(['pc']);
+    expect(split.circuits.map((c) => c.meter_id)).toEqual(['dryer', 'ev']);
+    expect(split.pc.map((c) => c.meter_id)).toEqual(['pc']);
     expect(split.houseKwh).toBe(10);
   });
 });
 
 describe('sumByTime', () => {
   const s = (points: [string, number][]): Series => ({
-    channel_id: 'x', bucket: 'hour',
+    meter_id: 'x', bucket: 'hour',
     points: points.map(([t, w]) => ({ t, avg_watts: w, max_watts: w * 2, kwh: w / 1000 })),
   });
 
@@ -147,70 +147,70 @@ describe('the PC tab helpers', () => {
 describe('the Appliances list', () => {
   const summary: Summary = {
     from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-    channels: [
-      { channel_id: 'mains-a', scope: 'mains', kwh: 20, monitored_hours: 1 },
-      { channel_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
-      { channel_id: 'fridge', scope: 'plug', kwh: 2, monitored_hours: 1 },
-      { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 5, monitored_hours: 1 },
-      { channel_id: 'monitor', computer_id: 'comp-1', scope: 'plug', kwh: 1, monitored_hours: 1 },
-      { channel_id: 'strip-1', group_id: 'grp-1', scope: 'plug', kwh: 3, cost: '0.45', monitored_hours: 1 },
-      { channel_id: 'strip-2', group_id: 'grp-1', scope: 'plug', kwh: 1.5, cost: '0.23', monitored_hours: 1 },
+    meters: [
+      { meter_id: 'mains-a', scope: 'mains', kwh: 20, monitored_hours: 1 },
+      { meter_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
+      { meter_id: 'fridge', scope: 'plug', kwh: 2, monitored_hours: 1 },
+      { meter_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 5, monitored_hours: 1 },
+      { meter_id: 'monitor', computer_id: 'comp-1', scope: 'plug', kwh: 1, monitored_hours: 1 },
+      { meter_id: 'strip-1', group_id: 'grp-1', scope: 'plug', kwh: 3, cost: '0.45', monitored_hours: 1 },
+      { meter_id: 'strip-2', group_id: 'grp-1', scope: 'plug', kwh: 1.5, cost: '0.23', monitored_hours: 1 },
     ],
   };
-  const channels = ['dryer', 'fridge', 'wall', 'monitor', 'strip-1', 'strip-2'].map((id) => ch(id, 'plug'));
-  const computer = (id: string, wall?: string): Computer => ({ id, name: id, peripheral_channel_ids: [], wall_channel_id: wall ?? null });
-  const group: ApplianceGroup = { id: 'grp-1', name: 'Entertainment center', channel_ids: ['strip-1', 'strip-2'] };
+  const meters = ['dryer', 'fridge', 'wall', 'monitor', 'strip-1', 'strip-2'].map((id) => ch(id, 'plug'));
+  const computer = (id: string, wall?: string): Computer => ({ id, name: id, peripheral_meter_ids: [], wall_meter_id: wall ?? null });
+  const group: ApplianceGroup = { id: 'grp-1', name: 'Entertainment center', meter_ids: ['strip-1', 'strip-2'] };
 
   it('lists ordinary appliances without the plugs that belong to a computer or a group, and not the house', () => {
-    const list = applianceList(summary, channels, [computer('comp-1', 'wall')], [group]);
-    expect(list.appliances.map((r) => [r.kind, r.id])).toEqual([['channel', 'dryer'], ['group', 'grp-1'], ['channel', 'fridge']]);
+    const list = applianceList(summary, meters, [computer('comp-1', 'wall')], [group]);
+    expect(list.appliances.map((r) => [r.kind, r.id])).toEqual([['meter', 'dryer'], ['group', 'grp-1'], ['meter', 'fridge']]);
   });
 
   it('lists a sub-panel feed with its circuits under it and the rest of the feed as a derived line', () => {
     const s: Summary = {
       from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-      channels: [
-        { channel_id: 'garage', scope: 'circuit', kwh: 8, cost: '1.20', monitored_hours: 1 },
-        { channel_id: 'ev', scope: 'circuit', kwh: 7, cost: '1.05', monitored_hours: 1 },
-        { channel_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
+      meters: [
+        { meter_id: 'garage', scope: 'circuit', kwh: 8, cost: '1.20', monitored_hours: 1 },
+        { meter_id: 'ev', scope: 'circuit', kwh: 7, cost: '1.05', monitored_hours: 1 },
+        { meter_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
       ],
     };
     const wired = [ch('garage', 'circuit'), { ...ch('ev', 'circuit'), parent_id: 'garage' }, ch('dryer', 'circuit')];
     const rows = applianceList(s, wired, [], []).appliances;
-    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['channel', 'garage', 0], ['channel', 'ev', 1], ['rest', 'garage', 1], ['channel', 'dryer', 0]]);
+    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['meter', 'garage', 0], ['meter', 'ev', 1], ['rest', 'garage', 1], ['meter', 'dryer', 0]]);
     expect(rows[2]).toMatchObject({ kwh: 1, cost: '0.15', label: 'Everything else on garage' });
   });
 
   it('takes a computer\'s plug that is on a circuit off that circuit\'s rest, although the computer lists it itself', () => {
     const s: Summary = {
       from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-      channels: [
-        { channel_id: 'office', scope: 'circuit', kwh: 5, monitored_hours: 1 },
-        { channel_id: 'lamp', scope: 'plug', kwh: 1, monitored_hours: 1 },
-        { channel_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 3, monitored_hours: 1 },
+      meters: [
+        { meter_id: 'office', scope: 'circuit', kwh: 5, monitored_hours: 1 },
+        { meter_id: 'lamp', scope: 'plug', kwh: 1, monitored_hours: 1 },
+        { meter_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 3, monitored_hours: 1 },
       ],
     };
     const wired = [ch('office', 'circuit'), { ...ch('lamp', 'plug'), parent_id: 'office' }, { ...ch('wall', 'pc'), parent_id: 'office' }];
     const rows = applianceList(s, wired, [], []).appliances;
-    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['channel', 'office', 0], ['channel', 'lamp', 1], ['rest', 'office', 1]]);
+    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['meter', 'office', 0], ['meter', 'lamp', 1], ['rest', 'office', 1]]);
     expect(rows[2]!.kwh).toBe(1); // 5 - 1 (the lamp) - 3 (the PC at its wall)
   });
 
   it('shows a group once, as the sum of its plugs, with a cost only when every plug has one', () => {
-    const row = applianceList(summary, channels, [], [group]).appliances.find((r) => r.kind === 'group')!;
+    const row = applianceList(summary, meters, [], [group]).appliances.find((r) => r.kind === 'group')!;
     expect(row).toMatchObject({ label: 'Entertainment center', kwh: 4.5, cost: '0.68' });
 
-    const partly: Summary = { ...summary, channels: summary.channels.map((c) => (c.channel_id === 'strip-2' ? { ...c, cost: null } : c)) };
-    expect(applianceList(partly, channels, [], [group]).appliances.find((r) => r.kind === 'group')!.cost).toBeNull();
+    const partly: Summary = { ...summary, meters: summary.meters.map((c) => (c.meter_id === 'strip-2' ? { ...c, cost: null } : c)) };
+    expect(applianceList(partly, meters, [], [group]).appliances.find((r) => r.kind === 'group')!.cost).toBeNull();
   });
 
   it('leaves out a group with no plugs reporting', () => {
-    const empty: ApplianceGroup = { id: 'grp-2', name: 'Nothing', channel_ids: [] };
-    expect(applianceList(summary, channels, [], [empty]).appliances.some((r) => r.id === 'grp-2')).toBe(false);
+    const empty: ApplianceGroup = { id: 'grp-2', name: 'Nothing', meter_ids: [] };
+    expect(applianceList(summary, meters, [], [empty]).appliances.some((r) => r.id === 'grp-2')).toBe(false);
   });
 
   it('lists a computer with its wall plug figure, biggest first, and one with no wall plug last', () => {
-    const list = applianceList(summary, channels, [computer('empty'), computer('comp-1', 'wall')]);
+    const list = applianceList(summary, meters, [computer('empty'), computer('comp-1', 'wall')]);
     expect(list.computers.map((r) => [r.computer.id, r.wall?.kwh])).toEqual([['comp-1', 5], ['empty', undefined]]);
   });
 });
@@ -365,9 +365,9 @@ describe('the energy history row detail', () => {
 
 describe('what a computer counts', () => {
   const sum = (id: string, kwh: number, cost: string | null, peak: number | null) =>
-    ({ channel_id: id, scope: 'plug', kwh, cost, peak_watts: peak, monitored_hours: 1 }) as ChannelSummary;
+    ({ meter_id: id, scope: 'plug', kwh, cost, peak_watts: peak, monitored_hours: 1 }) as MeterSummary;
   const detail = {
-    wall: { ...sum('wall', 1, '0.20', 300), scope: 'pc', carbon_g: 400, carbon_estimated_kwh: 0.25 } as ChannelSummary,
+    wall: { ...sum('wall', 1, '0.20', 300), scope: 'pc', carbon_g: 400, carbon_estimated_kwh: 0.25 } as MeterSummary,
     peripherals: [{ ...sum('monitor', 0.2, '0.04', 40), carbon_g: 80, carbon_estimated_kwh: 0.1 }, sum('speakers', 0.1, null, 10)],
   };
   const label = (id: string) => id.toUpperCase();
@@ -451,8 +451,8 @@ describe('currency and the looked-up price note', () => {
 describe('the carbon footprint', () => {
   it('adds the carbon of what is counted and says how much was valued at an average', () => {
     const sum = (id: string, kwh: number, carbon_g: number | null, est: number | null) =>
-      ({ channel_id: id, scope: 'plug', kwh, cost: null, peak_watts: null, monitored_hours: 1, carbon_g, carbon_estimated_kwh: est }) as ChannelSummary;
-    const detail = { wall: { ...sum('wall', 1, 400, 0.25), scope: 'pc' } as ChannelSummary, peripherals: [sum('monitor', 0.2, 80, 0.1), sum('speakers', 0.1, null, null)] };
+      ({ meter_id: id, scope: 'plug', kwh, cost: null, peak_watts: null, monitored_hours: 1, carbon_g, carbon_estimated_kwh: est }) as MeterSummary;
+    const detail = { wall: { ...sum('wall', 1, 400, 0.25), scope: 'pc' } as MeterSummary, peripherals: [sum('monitor', 0.2, 80, 0.1), sum('speakers', 0.1, null, null)] };
     const all = countedTotals(detail, new Set(), (id) => id);
     expect([all.carbonG, all.carbonEstimatedKwh]).toEqual([480, 0.35]);
     expect(countedTotals(detail, new Set([COUNT_PC, 'monitor']), (id) => id).carbonG).toBeNull(); // the speakers have no carbon: nothing to show

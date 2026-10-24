@@ -1,17 +1,17 @@
 // Pure helpers for the dashboard. Nothing here touches the DOM or the network.
 //
-// The rule that shapes most of them: scopes are never summed across each other. The house is the `mains` channels
+// The rule that shapes most of them: scopes are never summed across each other. The house is the `mains` meters
 // alone; circuits and plugs are parts of it; the PC's wall plug (`pc`) is a slice of some circuit and is added to nothing.
 import type { components } from './api-types';
 
 type S = components['schemas'];
-export type Channel = S['Channel'];
+export type Meter = S['Meter'];
 export type Reading = S['Reading'];
 export type Live = S['Live'];
 export type Series = S['Series'];
 export type Point = S['SeriesPoint'];
 export type Summary = S['Summary'];
-export type ChannelSummary = S['ChannelSummary'];
+export type MeterSummary = S['MeterSummary'];
 export type Status = S['Status'];
 export type Computer = S['Computer'];
 export type ApplianceGroup = S['ApplianceGroup'];
@@ -118,23 +118,23 @@ export function formatMoney(m: string | null | undefined, estimated = false): st
 export const SUSPICIOUSLY_HIGH_RATE = 1;
 
 export interface Row {
-  channel: Channel;
+  meter: Meter;
   watts: number;
   /** How deep in a sub-panel this circuit sits: 0 for a circuit of the main panel (or one with no panel shown). */
   depth?: number;
-  /** A line for what a sub-panel's feed carries that none of its circuits account for. `channel` is the feed; `of` lists its circuits' ids. */
+  /** A line for what a sub-panel's feed carries that none of its circuits account for. `meter` is the feed; `of` lists its circuits' ids. */
   remainder?: { of: string[] };
 }
 
-const byId = (channels: Channel[]) => new Map(channels.map((c) => [c.id, c]));
+const byId = (meters: Meter[]) => new Map(meters.map((c) => [c.id, c]));
 
 /** Enabled circuits and plugs with their live watts, highest first. Mains and the PC slice are not in it. */
-export function circuitsByWatts(channels: Channel[], readings: Reading[]): Row[] {
-  const ch = byId(channels);
+export function circuitsByWatts(meters: Meter[], readings: Reading[]): Row[] {
+  const ch = byId(meters);
   const rows: Row[] = [];
   for (const r of readings) {
-    const c = ch.get(r.channel_id);
-    if (c && c.enabled && (c.scope === 'circuit' || c.scope === 'plug')) rows.push({ channel: c, watts: r.watts });
+    const c = ch.get(r.meter_id);
+    if (c && c.enabled && (c.scope === 'circuit' || c.scope === 'plug')) rows.push({ meter: c, watts: r.watts });
   }
   return rows.sort((a, b) => b.watts - a.watts);
 }
@@ -143,48 +143,48 @@ export function circuitsByWatts(channels: Channel[], readings: Reading[]): Row[]
  * first), then by a line for what the feed carries that none of them account for. A circuit whose feed is not among the rows (switched off, no
  * reading) stands on its own. A feed already contains its circuits, so none of this is ever added up. */
 export function nestCircuits(rows: Row[]): Row[] {
-  const present = new Map(rows.map((r) => [r.channel.id, r]));
+  const present = new Map(rows.map((r) => [r.meter.id, r]));
   const kids = new Map<string, Row[]>();
   const roots: Row[] = [];
   for (const r of rows) {
-    const p = r.channel.parent_id;
-    if (p && p !== r.channel.id && present.has(p)) kids.set(p, [...(kids.get(p) ?? []), r]);
+    const p = r.meter.parent_id;
+    if (p && p !== r.meter.id && present.has(p)) kids.set(p, [...(kids.get(p) ?? []), r]);
     else roots.push(r);
   }
   const out: Row[] = [];
   const seen = new Set<string>();
   const walk = (r: Row, depth: number) => {
-    if (seen.has(r.channel.id)) return; // a loop in the wiring cannot happen (the server refuses it), but never spin on one
-    seen.add(r.channel.id);
+    if (seen.has(r.meter.id)) return; // a loop in the wiring cannot happen (the server refuses it), but never spin on one
+    seen.add(r.meter.id);
     out.push({ ...r, depth });
-    const mine = (kids.get(r.channel.id) ?? []).sort((a, b) => b.watts - a.watts);
+    const mine = (kids.get(r.meter.id) ?? []).sort((a, b) => b.watts - a.watts);
     for (const k of mine) walk(k, depth + 1);
     if (mine.length > 0) {
       const inside = mine.reduce((t, k) => t + k.watts, 0);
-      out.push({ channel: r.channel, watts: Math.max(0, r.watts - inside), depth: depth + 1, remainder: { of: mine.map((k) => k.channel.id) } });
+      out.push({ meter: r.meter, watts: Math.max(0, r.watts - inside), depth: depth + 1, remainder: { of: mine.map((k) => k.meter.id) } });
     }
   };
   for (const r of roots.sort((a, b) => b.watts - a.watts)) walk(r, 0);
   return out;
 }
 
-/** Orders channels as the panels are wired: a circuit that feeds a sub-panel is followed by the circuits inside it. The order the channels came
- * in is kept at every level. A channel whose feed is not in the list stands at the top. */
-export function arrangeByPanel(list: Channel[]): { channel: Channel; depth: number }[] {
+/** Orders meters as the panels are wired: a circuit that feeds a sub-panel is followed by the circuits inside it. The order the meters came
+ * in is kept at every level. A meter whose feed is not in the list stands at the top. */
+export function arrangeByPanel(list: Meter[]): { meter: Meter; depth: number }[] {
   const ids = new Set(list.map((c) => c.id));
-  const kids = new Map<string, Channel[]>();
-  const top: Channel[] = [];
+  const kids = new Map<string, Meter[]>();
+  const top: Meter[] = [];
   for (const c of list) {
     const p = c.parent_id;
     if (p && p !== c.id && ids.has(p)) kids.set(p, [...(kids.get(p) ?? []), c]);
     else top.push(c);
   }
-  const out: { channel: Channel; depth: number }[] = [];
+  const out: { meter: Meter; depth: number }[] = [];
   const seen = new Set<string>();
-  const walk = (c: Channel, depth: number) => {
+  const walk = (c: Meter, depth: number) => {
     if (seen.has(c.id)) return;
     seen.add(c.id);
-    out.push({ channel: c, depth });
+    out.push({ meter: c, depth });
     for (const k of kids.get(c.id) ?? []) walk(k, depth + 1);
   };
   for (const c of top) walk(c, 0);
@@ -192,12 +192,12 @@ export function arrangeByPanel(list: Channel[]): { channel: Channel; depth: numb
 }
 
 /** The PC's own wall plugs, kept apart from everything else. */
-export function pcSlices(channels: Channel[], readings: Reading[]): Row[] {
-  const ch = byId(channels);
+export function pcSlices(meters: Meter[], readings: Reading[]): Row[] {
+  const ch = byId(meters);
   const rows: Row[] = [];
   for (const r of readings) {
-    const c = ch.get(r.channel_id);
-    if (c && c.enabled && c.scope === 'pc') rows.push({ channel: c, watts: r.watts });
+    const c = ch.get(r.meter_id);
+    if (c && c.enabled && c.scope === 'pc') rows.push({ meter: c, watts: r.watts });
   }
   return rows;
 }
@@ -206,7 +206,7 @@ export function pcSlices(channels: Channel[], readings: Reading[]): Row[] {
  * A circuit inside a sub-panel is already in its feed's figure, so only the top level is taken off. */
 export function unmetered(house: number | null | undefined, circuits: Row[]): number | null {
   if (house === null || house === undefined) return null;
-  const sum = circuits.reduce((t, r) => t + (r.channel.scope === 'circuit' && !r.remainder && (r.depth ?? 0) === 0 ? r.watts : 0), 0);
+  const sum = circuits.reduce((t, r) => t + (r.meter.scope === 'circuit' && !r.remainder && (r.depth ?? 0) === 0 ? r.watts : 0), 0);
   return Math.max(0, house - sum);
 }
 
@@ -229,8 +229,8 @@ export function sumByTime(list: Series[]): Point[] {
 }
 
 export interface Split {
-  circuits: ChannelSummary[];
-  pc: ChannelSummary[];
+  circuits: MeterSummary[];
+  pc: MeterSummary[];
   houseKwh: number | null;
   unmeteredKwh: number | null;
 }
@@ -238,8 +238,8 @@ export interface Split {
 /** Splits a summary by scope without adding any scope to another. */
 export function splitSummary(s: Summary): Split {
   return {
-    circuits: s.channels.filter((c) => c.scope === 'circuit' || c.scope === 'plug').sort((a, b) => b.kwh - a.kwh),
-    pc: s.channels.filter((c) => c.scope === 'pc'),
+    circuits: s.meters.filter((c) => c.scope === 'circuit' || c.scope === 'plug').sort((a, b) => b.kwh - a.kwh),
+    pc: s.meters.filter((c) => c.scope === 'pc'),
     houseKwh: s.house_kwh ?? null,
     unmeteredKwh: s.unmetered_kwh ?? null,
   };
@@ -297,8 +297,8 @@ export function formatDuration(seconds: number): string {
 /** One row of the Appliances list: an ordinary appliance (a circuit or a plug), or a group of plugs shown as one. */
 export interface ApplianceRow {
   /** `rest` is what a sub-panel's feed carries that none of its circuits account for: a derived line, not something to open. */
-  kind: 'channel' | 'group' | 'rest';
-  /** The channel's id, or the group's (for `rest`, the feed's). */
+  kind: 'meter' | 'group' | 'rest';
+  /** The meter's id, or the group's (for `rest`, the feed's). */
   id: string;
   label: string;
   kwh: number;
@@ -311,7 +311,7 @@ export interface ApplianceRow {
 export interface ComputerRow {
   computer: Computer;
   /** The whole PC at its wall plug, when it has one. */
-  wall?: ChannelSummary;
+  wall?: MeterSummary;
 }
 
 export interface ApplianceList {
@@ -330,14 +330,14 @@ export function sumMoney(parts: (string | null | undefined)[]): string | null {
 /** Splits the summary into what the Appliances list shows. A plug that belongs to a computer is listed under that computer and never
  * alone; a plug in a group is listed once, as the group (all ordinary plugs, so their energy is added); a computer's figure is its wall
  * plug's. No scope is added to another. */
-export function applianceList(summary: Summary, channels: Channel[], computers: Computer[], groups: ApplianceGroup[] = []): ApplianceList {
-  const label = new Map(channels.map((c) => [c.id, c.label]));
-  const byChannel = new Map(summary.channels.map((c) => [c.channel_id, c]));
+export function applianceList(summary: Summary, meters: Meter[], computers: Computer[], groups: ApplianceGroup[] = []): ApplianceList {
+  const label = new Map(meters.map((c) => [c.id, c.label]));
+  const byMeter = new Map(summary.meters.map((c) => [c.meter_id, c]));
 
-  const own: ApplianceRow[] = summary.channels
+  const own: ApplianceRow[] = summary.meters
     .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id && !c.group_id)
-    .map((c) => ({ kind: 'channel' as const, id: c.channel_id, label: label.get(c.channel_id) ?? c.channel_id, kwh: c.kwh, cost: c.cost ?? null }));
-  const parentOf = new Map(channels.map((c) => [c.id, c.parent_id ?? null]));
+    .map((c) => ({ kind: 'meter' as const, id: c.meter_id, label: label.get(c.meter_id) ?? c.meter_id, kwh: c.kwh, cost: c.cost ?? null }));
+  const parentOf = new Map(meters.map((c) => [c.id, c.parent_id ?? null]));
   const ownIds = new Set(own.map((r) => r.id));
   const kids = new Map<string, ApplianceRow[]>();
   const top: ApplianceRow[] = [];
@@ -347,7 +347,7 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
     else top.push(r);
   }
   for (const g of groups) {
-    const members = summary.channels.filter((c) => c.group_id === g.id);
+    const members = summary.meters.filter((c) => c.group_id === g.id);
     if (members.length === 0) continue;
     top.push({
       kind: 'group', id: g.id, label: g.name,
@@ -366,7 +366,7 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
     for (const k of mine) walk(k, depth + 1);
     if (mine.length > 0) {
       // Whatever is plugged into it counts, listed here or (a computer's plugs, a group's) on its own card.
-      const inside = summary.channels.filter((c) => parentOf.get(c.channel_id) === r.id);
+      const inside = summary.meters.filter((c) => parentOf.get(c.meter_id) === r.id);
       const costs = [r.cost, ...inside.map((k) => k.cost ?? null)];
       const left = costs.every((c) => c !== null) ? Math.max(0, Number(r.cost) - inside.reduce((t, k) => t + Number(k.cost), 0)).toFixed(2) : null;
       rows.push({ kind: 'rest', id: r.id, label: `Everything else on ${r.label}`, kwh: Math.max(0, r.kwh - inside.reduce((t, k) => t + k.kwh, 0)), cost: left, depth: depth + 1 });
@@ -376,7 +376,7 @@ export function applianceList(summary: Summary, channels: Channel[], computers: 
 
   const comps = computers.map((computer) => ({
     computer,
-    wall: computer.wall_channel_id ? byChannel.get(computer.wall_channel_id) : undefined,
+    wall: computer.wall_meter_id ? byMeter.get(computer.wall_meter_id) : undefined,
   }));
   comps.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
   return { appliances: rows, computers: comps };
@@ -577,7 +577,7 @@ export function historyDetail(p: PcHistoryPeriod): string {
   return parts.join(' · ');
 }
 
-/** The key of the PC itself among the things a computer's figures can count (the plugs next to it are keyed by channel id). */
+/** The key of the PC itself among the things a computer's figures can count (the plugs next to it are keyed by meter id). */
 export const COUNT_PC = 'pc';
 
 /** The things left out of a computer's figures, as saved: a comma list. A new plug counts until it is switched off. */
@@ -610,11 +610,11 @@ export interface CountedTotals {
 /** What a computer's figures add up to for the things ticked: the PC at its wall plug and the plugs next to it, each a separate device
  * measured on its own (the PC's figure never contains them). */
 export function countedTotals(
-  detail: Pick<ComputerDetail, 'wall' | 'peripherals'>, off: ReadonlySet<string>, label: (channelId: string) => string,
+  detail: Pick<ComputerDetail, 'wall' | 'peripherals'>, off: ReadonlySet<string>, label: (meterId: string) => string,
 ): CountedTotals {
-  const counted: { summary: ChannelSummary; name: string }[] = [];
+  const counted: { summary: MeterSummary; name: string }[] = [];
   if (detail.wall && !off.has(COUNT_PC)) counted.push({ summary: detail.wall, name: 'the whole PC at the wall' });
-  for (const p of detail.peripherals) if (!off.has(p.channel_id)) counted.push({ summary: p, name: label(p.channel_id) });
+  for (const p of detail.peripherals) if (!off.has(p.meter_id)) counted.push({ summary: p, name: label(p.meter_id) });
   if (counted.length === 0) return { kwh: null, cost: null, peak: null, peakIsBound: false, parts: [], carbonG: null, carbonEstimatedKwh: 0 };
 
   const peaks = counted.map((c) => c.summary.peak_watts).filter((w): w is number => w != null);

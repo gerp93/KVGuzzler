@@ -1,6 +1,6 @@
 // Package api serves the house API described in contract/openapi.yaml.
 //
-// Implemented so far: status, devices (read, add, remove), channels (read, rename, switch off), live, series, summary
+// Implemented so far: status, devices (read, add, remove), meters (read, rename, switch off), live, series, summary
 // (with cost from the saved rates) and the rates settings. The rest of the contract (carbon, the PC ingest) answers 501
 // until it is built.
 package api
@@ -67,8 +67,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/status", s.status)
 	mux.HandleFunc("GET /api/v1/devices", s.devices)
-	mux.HandleFunc("GET /api/v1/channels", s.channels)
-	mux.HandleFunc("PATCH /api/v1/channels/{channelId}", s.updateChannel)
+	mux.HandleFunc("GET /api/v1/meters", s.meters)
+	mux.HandleFunc("PATCH /api/v1/meters/{meterId}", s.updateMeter)
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
@@ -200,19 +200,19 @@ func (s *Server) removeDevice(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
-	chs, err := s.Store.Channels(r.Context())
+func (s *Server) meters(w http.ResponseWriter, r *http.Request) {
+	chs, err := s.Store.Meters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 	if chs == nil {
-		chs = []model.Channel{}
+		chs = []model.Meter{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"channels": chs})
+	writeJSON(w, http.StatusOK, map[string]any{"meters": chs})
 }
 
-func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Label      *string         `json:"label"`
 		Enabled    *bool           `json:"enabled"`
@@ -220,7 +220,7 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		GroupID    json.RawMessage `json:"group_id"`    // an appliance group's id, or null to take the plug out; absent leaves it alone
 		// How a Refoss monitor's clamp is wired: its sign, the other leg of its breaker, and whether it measures a circuit or the mains.
 		Invert   *bool           `json:"invert"`
-		PairWith json.RawMessage `json:"pair_with"` // another input's channel id, or null to unpair; absent leaves it alone
+		PairWith json.RawMessage `json:"pair_with"` // another input's meter id, or null to unpair; absent leaves it alone
 		Scope    *string         `json:"scope"`
 		// The circuit this one is part of (a sub-panel's feed), or null to take it out; absent leaves it alone.
 		ParentID json.RawMessage `json:"parent_id"`
@@ -259,14 +259,14 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 	var pairWith *string
 	if body.PairWith != nil {
 		if err := json.Unmarshal(body.PairWith, &pairWith); err != nil {
-			writeProblem(w, http.StatusBadRequest, "bad_request", "pair_with is another input's channel id or null")
+			writeProblem(w, http.StatusBadRequest, "bad_request", "pair_with is another input's meter id or null")
 			return
 		}
 	}
 	var parentID *string
 	if body.ParentID != nil {
 		if err := json.Unmarshal(body.ParentID, &parentID); err != nil {
-			writeProblem(w, http.StatusBadRequest, "bad_request", "parent_id is a circuit's channel id or null")
+			writeProblem(w, http.StatusBadRequest, "bad_request", "parent_id is a circuit's meter id or null")
 			return
 		}
 	}
@@ -276,25 +276,25 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 		scope = &sc
 	}
 
-	id := r.PathValue("channelId")
-	ch, err := s.Store.UpdateChannel(r.Context(), id, body.Label, body.Enabled)
+	id := r.PathValue("meterId")
+	ch, err := s.Store.UpdateMeter(r.Context(), id, body.Label, body.Enabled)
 	if err == nil && (body.Invert != nil || body.PairWith != nil || scope != nil) {
-		ch, err = s.Store.SetChannelWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Scope: scope})
+		ch, err = s.Store.SetMeterWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Scope: scope})
 	}
 	if err == nil && body.ParentID != nil {
-		ch, err = s.Store.SetChannelParent(r.Context(), id, parentID)
+		ch, err = s.Store.SetMeterParent(r.Context(), id, parentID)
 	}
 	if err == nil && body.ComputerID != nil {
-		ch, err = s.Store.AssignChannel(r.Context(), id, computerID)
+		ch, err = s.Store.AssignMeter(r.Context(), id, computerID)
 	}
 	if err == nil && body.GroupID != nil {
-		ch, err = s.Store.AssignChannelToGroup(r.Context(), id, groupID)
+		ch, err = s.Store.AssignMeterToGroup(r.Context(), id, groupID)
 	}
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusOK, ch)
 	case errors.Is(err, store.ErrNotFound):
-		writeProblem(w, http.StatusNotFound, "unknown_channel", "no such channel")
+		writeProblem(w, http.StatusNotFound, "unknown_meter", "no such meter")
 	case errors.Is(err, store.ErrInvalid):
 		writeProblem(w, http.StatusBadRequest, "bad_computer", err.Error())
 	case errors.Is(err, store.ErrConflict):
@@ -304,14 +304,14 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// enabledChannels returns the channels the user has not switched off, keyed by id.
-func (s *Server) enabledChannels(ctx context.Context) ([]model.Channel, map[string]model.Channel, error) {
-	chs, err := s.Store.Channels(ctx)
+// enabledMeters returns the meters the user has not switched off, keyed by id.
+func (s *Server) enabledMeters(ctx context.Context) ([]model.Meter, map[string]model.Meter, error) {
+	chs, err := s.Store.Meters(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	byID := map[string]model.Channel{}
-	var on []model.Channel
+	byID := map[string]model.Meter{}
+	var on []model.Meter
 	for _, c := range chs {
 		byID[c.ID] = c
 		if c.Enabled {
@@ -322,7 +322,7 @@ func (s *Server) enabledChannels(ctx context.Context) ([]model.Channel, map[stri
 }
 
 func (s *Server) live(w http.ResponseWriter, r *http.Request) {
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
@@ -331,7 +331,7 @@ func (s *Server) live(w http.ResponseWriter, r *http.Request) {
 	var house float64
 	haveMains := false
 	for _, rd := range s.Collector.LiveReadings() {
-		ch, ok := byID[rd.ChannelID]
+		ch, ok := byID[rd.MeterID]
 		if !ok || !ch.Enabled {
 			continue
 		}
@@ -379,14 +379,14 @@ func (s *Server) series(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
 		return
 	}
-	id := r.URL.Query().Get("channel_id")
-	_, byID, err := s.enabledChannels(r.Context())
+	id := r.URL.Query().Get("meter_id")
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 	if _, ok := byID[id]; !ok {
-		writeProblem(w, http.StatusBadRequest, "unknown_channel", "no such channel")
+		writeProblem(w, http.StatusBadRequest, "unknown_meter", "no such meter")
 		return
 	}
 	bucket := model.Bucket(r.URL.Query().Get("bucket"))
@@ -403,7 +403,7 @@ func (s *Server) series(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, model.Series{ChannelID: id, Bucket: bucket, Points: points})
+	writeJSON(w, http.StatusOK, model.Series{MeterID: id, Bucket: bucket, Points: points})
 }
 
 func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
@@ -412,7 +412,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
 		return
 	}
-	on, _, err := s.enabledChannels(r.Context())
+	on, _, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
@@ -424,7 +424,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	}
 	schedule := cfg.Schedule(s.Loc)
 
-	sum := model.Summary{From: from.UTC(), To: to.UTC(), Channels: []model.ChannelSummary{}}
+	sum := model.Summary{From: from.UTC(), To: to.UTC(), Meters: []model.MeterSummary{}}
 	// A circuit inside a sub-panel is part of that panel's feed, which is a circuit itself: only the top-level circuits are taken off the house.
 	shown := map[string]bool{}
 	for _, ch := range on {
@@ -438,13 +438,13 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	var housePeak, houseCarbon, houseCarbonEst float64
 	havePeak, haveCarbon := false, false
 	for _, ch := range on {
-		cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		cs, priced, err := s.meterSummary(r.Context(), ch, from, to, schedule)
 		if err != nil {
 			serverError(w, err)
 			return
 		}
 		sum.CostEstimated = sum.CostEstimated || (cs.Cost != nil && priced.Estimated)
-		sum.Channels = append(sum.Channels, cs)
+		sum.Meters = append(sum.Meters, cs)
 
 		// Scopes are never summed across each other: the house is the mains alone, circuits are summed on their own.
 		switch ch.Scope {
@@ -494,14 +494,14 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sum)
 }
 
-// channelSummary is one channel's energy, peak, covered time and cost over [from, to). Each stretch of the period is priced
+// meterSummary is one meter's energy, peak, covered time and cost over [from, to). Each stretch of the period is priced
 // at its own day's rate (a period can span two bills); the cost is nil when no price is known.
-func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to time.Time, schedule *rates.Schedule) (model.ChannelSummary, rates.RatedCost, error) {
+func (s *Server) meterSummary(ctx context.Context, ch model.Meter, from, to time.Time, schedule *rates.Schedule) (model.MeterSummary, rates.RatedCost, error) {
 	t, err := s.Store.Totals(ctx, ch.ID, from, to)
 	if err != nil {
-		return model.ChannelSummary{}, rates.RatedCost{}, err
+		return model.MeterSummary{}, rates.RatedCost{}, err
 	}
-	cs := model.ChannelSummary{ChannelID: ch.ID, ComputerID: ch.ComputerID, GroupID: ch.GroupID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
+	cs := model.MeterSummary{MeterID: ch.ID, ComputerID: ch.ComputerID, GroupID: ch.GroupID, Scope: ch.Scope, KWh: t.KWh, MonitoredHours: t.MonitoredHours}
 	if t.MonitoredHours > 0 {
 		peak := t.PeakWatts
 		cs.PeakWatts = &peak
@@ -515,10 +515,10 @@ func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to 
 		return tot.KWh
 	}, from, to)
 	if readErr != nil {
-		return model.ChannelSummary{}, rates.RatedCost{}, readErr
+		return model.MeterSummary{}, rates.RatedCost{}, readErr
 	}
 	if !schedule.HasRate(from, to) {
-		priced.Unpriced = true // no price known: a channel that used nothing has no cost either, not "$0.00"
+		priced.Unpriced = true // no price known: a meter that used nothing has no cost either, not "$0.00"
 	}
 	if !priced.Unpriced {
 		c := priced.Cost.String()
@@ -526,7 +526,7 @@ func (s *Server) channelSummary(ctx context.Context, ch model.Channel, from, to 
 	}
 	car, err := s.carbonOf(ctx, []string{ch.ID}, from, to)
 	if err != nil {
-		return model.ChannelSummary{}, rates.RatedCost{}, err
+		return model.MeterSummary{}, rates.RatedCost{}, err
 	}
 	if car != nil {
 		g, est := car.Kg*1000, car.EstimatedKWh
@@ -655,21 +655,21 @@ func (s *Server) groupDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 
-	detail := model.GroupDetail{Group: g, From: from.UTC(), To: to.UTC(), Members: []model.ChannelSummary{}}
+	detail := model.GroupDetail{Group: g, From: from.UTC(), To: to.UTC(), Members: []model.MeterSummary{}}
 	var cost rates.Money
 	priced := true
-	for _, id := range g.ChannelIDs {
+	for _, id := range g.MeterIDs {
 		ch, ok := byID[id]
 		if !ok || !ch.Enabled {
 			continue
 		}
-		cs, rc, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		cs, rc, err := s.meterSummary(r.Context(), ch, from, to, schedule)
 		if err != nil {
 			serverError(w, err)
 			return
@@ -785,22 +785,22 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 
-	detail := model.ComputerDetail{Computer: comp, From: from.UTC(), To: to.UTC(), Peripherals: []model.ChannelSummary{}}
+	detail := model.ComputerDetail{Computer: comp, From: from.UTC(), To: to.UTC(), Peripherals: []model.MeterSummary{}}
 	var setup float64
 	var setupCost rates.Money
 	setupPriced, haveAny := true, false
-	add := func(id string) (*model.ChannelSummary, error) {
+	add := func(id string) (*model.MeterSummary, error) {
 		ch, ok := byID[id]
 		if !ok || !ch.Enabled {
 			return nil, nil // a plug the user has hidden is neither shown nor counted
 		}
-		cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		cs, priced, err := s.meterSummary(r.Context(), ch, from, to, schedule)
 		if err != nil {
 			return nil, err
 		}
@@ -814,13 +814,13 @@ func (s *Server) computerDetail(w http.ResponseWriter, r *http.Request) {
 		detail.CostEstimated = detail.CostEstimated || (cs.Cost != nil && priced.Estimated)
 		return &cs, nil
 	}
-	if comp.WallChannelID != nil {
-		if detail.Wall, err = add(*comp.WallChannelID); err != nil {
+	if comp.WallMeterID != nil {
+		if detail.Wall, err = add(*comp.WallMeterID); err != nil {
 			serverError(w, err)
 			return
 		}
 	}
-	for _, id := range comp.PeripheralChannelIDs {
+	for _, id := range comp.PeripheralMeterIDs {
 		cs, err := add(id)
 		if err != nil {
 			serverError(w, err)
@@ -925,7 +925,7 @@ func (s *Server) computerHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
@@ -966,8 +966,8 @@ func (s *Server) computerHistory(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
-			cs, priced, err := s.channelSummary(r.Context(), ch, from, to, schedule)
+		if ch, ok := byID[derefString(comp.WallMeterID)]; ok && ch.Enabled {
+			cs, priced, err := s.meterSummary(r.Context(), ch, from, to, schedule)
 			if err != nil {
 				serverError(w, err)
 				return
@@ -1034,14 +1034,14 @@ func (s *Server) computerEstimate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 	// Only the plugs that belong to this computer, are shown, and were asked for are counted.
-	var plugs []model.Channel
-	for _, id := range comp.PeripheralChannelIDs {
+	var plugs []model.Meter
+	for _, id := range comp.PeripheralMeterIDs {
 		if ch, ok := byID[id]; ok && ch.Enabled && wanted[id] {
 			plugs = append(plugs, ch)
 		}
@@ -1057,7 +1057,7 @@ func (s *Server) computerEstimate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if includePC {
-		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+		if ch, ok := byID[derefString(comp.WallMeterID)]; ok && ch.Enabled {
 			t, err := s.Store.Totals(r.Context(), ch.ID, from, now)
 			if err != nil {
 				serverError(w, err)
@@ -1106,7 +1106,7 @@ func (s *Server) computerEstimate(w http.ResponseWriter, r *http.Request) {
 
 	if includePC {
 		if whole {
-			t, err := s.Store.Totals(r.Context(), derefString(comp.WallChannelID), from, now)
+			t, err := s.Store.Totals(r.Context(), derefString(comp.WallMeterID), from, now)
 			if err != nil {
 				serverError(w, err)
 				return

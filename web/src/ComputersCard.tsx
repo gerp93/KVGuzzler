@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { usePoll } from './hooks';
-import type { Channel, Computer } from './lib';
+import type { Meter, Computer } from './lib';
 
 /** Settings for computers: add one, name it, and tie its wall plug and its peripherals to it. */
-export function ComputersCard({ channels, onChanged }: { channels: Channel[]; onChanged: () => void }) {
+export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
-  const { data: computers, error } = usePoll<Computer[]>(api.computers, 10_000, [rev, channels]);
+  const { data: computers, error } = usePoll<Computer[]>(api.computers, 10_000, [rev, meters]);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState('');
@@ -38,7 +38,7 @@ export function ComputersCard({ channels, onChanged }: { channels: Channel[]; on
         <ComputerBlock
           key={c.id}
           computer={c}
-          channels={channels}
+          meters={meters}
           confirming={confirming === c.id}
           onConfirm={(on) => setConfirming(on ? c.id : '')}
           run={run}
@@ -73,25 +73,25 @@ export function ComputersCard({ channels, onChanged }: { channels: Channel[]; on
 }
 
 function ComputerBlock({
-  computer, channels, confirming, onConfirm, run,
+  computer, meters, confirming, onConfirm, run,
 }: {
   computer: Computer;
-  channels: Channel[];
+  meters: Meter[];
   confirming: boolean;
   onConfirm: (on: boolean) => void;
   run: (work: Promise<unknown>) => void;
 }) {
   const [name, setName] = useState(computer.name);
   // A plug can be chosen if it is free or already this computer's.
-  const mine = (c: Channel) => !c.computer_id || c.computer_id === computer.id;
-  const wallChoices = channels.filter((c) => c.scope === 'pc' && mine(c));
-  const peripheralChoices = channels.filter((c) => c.scope === 'plug' && mine(c));
+  const mine = (c: Meter) => !c.computer_id || c.computer_id === computer.id;
+  const wallChoices = meters.filter((c) => c.scope === 'pc' && mine(c));
+  const peripheralChoices = meters.filter((c) => c.scope === 'plug' && mine(c));
 
-  const setWall = (channelId: string) => {
+  const setWall = (meterId: string) => {
     // One wall plug per computer: let the old one go first, then tie the new one.
     const work = async () => {
-      if (computer.wall_channel_id) await api.updateChannel(computer.wall_channel_id, { computer_id: null });
-      if (channelId) await api.updateChannel(channelId, { computer_id: computer.id });
+      if (computer.wall_meter_id) await api.updateMeter(computer.wall_meter_id, { computer_id: null });
+      if (meterId) await api.updateMeter(meterId, { computer_id: computer.id });
     };
     run(work());
   };
@@ -127,7 +127,7 @@ function ComputerBlock({
 
       <label class="field">
         <span>Wall plug (measures the whole PC)</span>
-        <select value={computer.wall_channel_id ?? ''} onChange={(e) => setWall((e.target as HTMLSelectElement).value)}>
+        <select value={computer.wall_meter_id ?? ''} onChange={(e) => setWall((e.target as HTMLSelectElement).value)}>
           <option value="">None</option>
           {wallChoices.map((c) => (
             <option key={c.id} value={c.id}>
@@ -148,7 +148,7 @@ function ComputerBlock({
               key={c.id}
               type="button"
               aria-pressed={tied}
-              onClick={() => run(api.updateChannel(c.id, { computer_id: tied ? null : computer.id }))}
+              onClick={() => run(api.updateMeter(c.id, { computer_id: tied ? null : computer.id }))}
             >
               {c.label}
             </button>

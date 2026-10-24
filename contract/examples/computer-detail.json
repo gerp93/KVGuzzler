@@ -3,8 +3,8 @@
     "id": "comp-1a2b3c4d",
     "name": "Desktop",
     "source_id": "pc-7f3a9c1e",
-    "wall_channel_id": "shelly-192.168.1.106:plug",
-    "peripheral_channel_ids": [
+    "wall_meter_id": "shelly-192.168.1.106:plug",
+    "peripheral_meter_ids": [
       "shelly-192.168.1.67:plug"
     ],
     "last_seen": "2026-10-22T18:04:11Z"
@@ -12,7 +12,7 @@
   "from": "2026-10-22T05:00:00Z",
   "to": "2026-10-23T05:00:00Z",
   "wall": {
-    "channel_id": "shelly-192.168.1.106:plug",
+    "meter_id": "shelly-192.168.1.106:plug",
     "computer_id": "comp-1a2b3c4d",
     "scope": "pc",
     "kwh": 3.1,
@@ -23,7 +23,7 @@
   },
   "peripherals": [
     {
-      "channel_id": "shelly-192.168.1.67:plug",
+      "meter_id": "shelly-192.168.1.67:plug",
       "computer_id": "comp-1a2b3c4d",
       "scope": "plug",
       "kwh": 0.6,

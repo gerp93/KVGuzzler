@@ -85,26 +85,26 @@ func poll(t *testing.T, s *Source) map[string]float64 {
 	}
 	out := map[string]float64{}
 	for _, r := range rs {
-		out[r.ChannelID] = r.Watts
+		out[r.MeterID] = r.Watts
 	}
 	return out
 }
 
 const dev = "refoss-192.168.68.88:em"
 
-func TestAMonitorHasEighteenChannelsAndOnlyReadsStatus(t *testing.T) {
+func TestAMonitorHasEighteenMetersAndOnlyReadsStatus(t *testing.T) {
 	s := source(t, string(fixture(t, "status-em16p.json")), nil)
 	d := s.Device()
 	if d.ID != "refoss-192.168.68.88" || d.Kind != "refoss" || d.Name != "Refoss EM16P" || d.Model != "em16p" {
 		t.Errorf("device = %+v", d)
 	}
-	chs := s.Channels()
+	chs := s.Meters()
 	if len(chs) != 18 || chs[0].ID != dev+"1" || chs[0].Label != "A1" || chs[7].Label != "B2" || chs[17].Label != "C6" || chs[0].Scope != "circuit" || chs[0].MaxWatts == nil {
-		t.Errorf("channels = %+v", chs)
+		t.Errorf("meters = %+v", chs)
 	}
 	for _, ch := range chs {
 		if ch.DeviceID != d.ID || !strings.HasPrefix(ch.ID, d.ID+":") {
-			t.Errorf("channel %+v is not under its device", ch)
+			t.Errorf("meter %+v is not under its device", ch)
 		}
 	}
 }
@@ -139,7 +139,7 @@ func TestWithNoSettingsABackwardsClampReportsNothingAndSaysSo(t *testing.T) {
 	}
 }
 
-func TestFlippingTheSignReadsTheRealPowerAndAPairIsBothLegsAddedAndOneChannel(t *testing.T) {
+func TestFlippingTheSignReadsTheRealPowerAndAPairIsBothLegsAddedAndOneMeter(t *testing.T) {
 	flip := map[string]Setting{dev + "2": {Invert: true}, dev + "8": {Invert: true}}
 	s := source(t, string(fixture(t, "status-em16p.json")), flip)
 	got := poll(t, s)

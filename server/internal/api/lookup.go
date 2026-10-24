@@ -267,7 +267,7 @@ func (s *Server) RefreshRates(ctx context.Context) error {
 
 // learnProfile saves when the house uses power: the mains clamps' hourly energy over the last 60 days, else the computers' wall plugs.
 func (s *Server) learnProfile(ctx context.Context, now time.Time) error {
-	on, _, err := s.enabledChannels(ctx)
+	on, _, err := s.enabledMeters(ctx)
 	if err != nil {
 		return err
 	}

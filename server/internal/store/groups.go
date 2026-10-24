@@ -53,7 +53,7 @@ func (s *Store) Groups(ctx context.Context) ([]model.ApplianceGroup, error) {
 			rows.Close()
 			return nil, err
 		}
-		g.ChannelIDs = []string{}
+		g.MeterIDs = []string{}
 		byID[g.ID] = &g
 		order = append(order, g.ID)
 	}
@@ -62,18 +62,18 @@ func (s *Store) Groups(ctx context.Context) ([]model.ApplianceGroup, error) {
 		return nil, err
 	}
 
-	chans, err := s.db.QueryContext(ctx, `SELECT group_id, id FROM channels WHERE group_id IS NOT NULL ORDER BY id`)
+	chans, err := s.db.QueryContext(ctx, `SELECT group_id, id FROM meters WHERE group_id IS NOT NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	defer chans.Close()
 	for chans.Next() {
-		var groupID, channelID string
-		if err := chans.Scan(&groupID, &channelID); err != nil {
+		var groupID, meterID string
+		if err := chans.Scan(&groupID, &meterID); err != nil {
 			return nil, err
 		}
 		if g := byID[groupID]; g != nil {
-			g.ChannelIDs = append(g.ChannelIDs, channelID)
+			g.MeterIDs = append(g.MeterIDs, meterID)
 		}
 	}
 	if err := chans.Err(); err != nil {
@@ -129,7 +129,7 @@ func (s *Store) DeleteGroup(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE channels SET group_id = NULL WHERE group_id = ?`, id); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE meters SET group_id = NULL WHERE group_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM appliance_groups WHERE id = ?`, id)
@@ -142,34 +142,34 @@ func (s *Store) DeleteGroup(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-// AssignChannelToGroup puts a plug in a group, or takes it out (nil). Only an ordinary plug can be in a group (not a PC's own plug, a
+// AssignMeterToGroup puts a plug in a group, or takes it out (nil). Only an ordinary plug can be in a group (not a PC's own plug, a
 // circuit or the mains), and not one that already belongs to a computer: a plug is shown in one place.
-func (s *Store) AssignChannelToGroup(ctx context.Context, channelID string, groupID *string) (model.Channel, error) {
-	ch, err := s.Channel(ctx, channelID)
+func (s *Store) AssignMeterToGroup(ctx context.Context, meterID string, groupID *string) (model.Meter, error) {
+	ch, err := s.Meter(ctx, meterID)
 	if err != nil {
-		return model.Channel{}, err
+		return model.Meter{}, err
 	}
 	if groupID == nil || *groupID == "" {
-		if _, err := s.db.ExecContext(ctx, `UPDATE channels SET group_id = NULL WHERE id = ?`, channelID); err != nil {
-			return model.Channel{}, err
+		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET group_id = NULL WHERE id = ?`, meterID); err != nil {
+			return model.Meter{}, err
 		}
-		return s.Channel(ctx, channelID)
+		return s.Meter(ctx, meterID)
 	}
 
 	if ch.Scope != model.ScopePlug {
-		return model.Channel{}, invalid("Only an ordinary smart plug can be in a group, not a %s channel.", ch.Scope)
+		return model.Meter{}, invalid("Only an ordinary smart plug can be in a group, not a %s meter.", ch.Scope)
 	}
 	if ch.ComputerID != nil {
-		return model.Channel{}, conflict("%s belongs to a computer. Take it out of the computer first.", ch.Label)
+		return model.Meter{}, conflict("%s belongs to a computer. Take it out of the computer first.", ch.Label)
 	}
 	if _, err := s.Group(ctx, *groupID); err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return model.Channel{}, invalid("There is no such group.")
+			return model.Meter{}, invalid("There is no such group.")
 		}
-		return model.Channel{}, err
+		return model.Meter{}, err
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE channels SET group_id = ? WHERE id = ?`, *groupID, channelID); err != nil {
-		return model.Channel{}, err
+	if _, err := s.db.ExecContext(ctx, `UPDATE meters SET group_id = ? WHERE id = ?`, *groupID, meterID); err != nil {
+		return model.Meter{}, err
 	}
-	return s.Channel(ctx, channelID)
+	return s.Meter(ctx, meterID)
 }

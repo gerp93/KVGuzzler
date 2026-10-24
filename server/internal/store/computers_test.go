@@ -15,9 +15,9 @@ import (
 
 func str(s string) *string { return &s }
 
-func addChannel(t *testing.T, s *Store, id string, scope model.Scope) {
+func addMeter(t *testing.T, s *Store, id string, scope model.Scope) {
 	t.Helper()
-	if err := s.UpsertChannel(context.Background(), model.Channel{ID: id, DeviceID: "d-" + id, Scope: scope, Label: id}); err != nil {
+	if err := s.UpsertMeter(context.Background(), model.Meter{ID: id, DeviceID: "d-" + id, Scope: scope, Label: id}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -25,15 +25,15 @@ func addChannel(t *testing.T, s *Store, id string, scope model.Scope) {
 func TestComputersHaveOneWallPlugAndAnyNumberOfPeripherals(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
-	addChannel(t, s, "wall-1", model.ScopePC)
-	addChannel(t, s, "wall-2", model.ScopePC)
-	addChannel(t, s, "monitor", model.ScopePlug)
-	addChannel(t, s, "speakers", model.ScopePlug)
-	addChannel(t, s, "house-a", model.ScopeMains)
-	addChannel(t, s, "dryer", model.ScopeCircuit)
+	addMeter(t, s, "wall-1", model.ScopePC)
+	addMeter(t, s, "wall-2", model.ScopePC)
+	addMeter(t, s, "monitor", model.ScopePlug)
+	addMeter(t, s, "speakers", model.ScopePlug)
+	addMeter(t, s, "house-a", model.ScopeMains)
+	addMeter(t, s, "dryer", model.ScopeCircuit)
 
 	desk, err := s.CreateComputer(ctx, "  Desktop ", nil)
-	if err != nil || desk.Name != "Desktop" || !strings.HasPrefix(desk.ID, "comp-") || desk.PeripheralChannelIDs == nil {
+	if err != nil || desk.Name != "Desktop" || !strings.HasPrefix(desk.ID, "comp-") || desk.PeripheralMeterIDs == nil {
 		t.Fatalf("desk = %+v, %v", desk, err)
 	}
 	laptop, err := s.CreateComputer(ctx, "Laptop", nil)
@@ -42,29 +42,29 @@ func TestComputersHaveOneWallPlugAndAnyNumberOfPeripherals(t *testing.T) {
 	}
 
 	for _, ch := range []string{"wall-1", "monitor", "speakers"} {
-		if _, err := s.AssignChannel(ctx, ch, &desk.ID); err != nil {
+		if _, err := s.AssignMeter(ctx, ch, &desk.ID); err != nil {
 			t.Fatalf("assigning %s: %v", ch, err)
 		}
 	}
-	if _, err := s.AssignChannel(ctx, "wall-2", &desk.ID); !errors.Is(err, ErrConflict) {
+	if _, err := s.AssignMeter(ctx, "wall-2", &desk.ID); !errors.Is(err, ErrConflict) {
 		t.Errorf("a second wall plug on one computer: %v, want ErrConflict", err)
 	}
-	if _, err := s.AssignChannel(ctx, "wall-2", &laptop.ID); err != nil {
+	if _, err := s.AssignMeter(ctx, "wall-2", &laptop.ID); err != nil {
 		t.Errorf("the other computer's wall plug: %v", err)
 	}
-	if _, err := s.AssignChannel(ctx, "wall-1", &desk.ID); err != nil {
+	if _, err := s.AssignMeter(ctx, "wall-1", &desk.ID); err != nil {
 		t.Errorf("re-assigning the same wall plug to its own computer: %v", err)
 	}
 	for _, ch := range []string{"house-a", "dryer"} {
-		if _, err := s.AssignChannel(ctx, ch, &desk.ID); !errors.Is(err, ErrInvalid) {
+		if _, err := s.AssignMeter(ctx, ch, &desk.ID); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v, want ErrInvalid (only plugs can belong to a computer)", ch, err)
 		}
 	}
-	if _, err := s.AssignChannel(ctx, "monitor", str("comp-nope")); !errors.Is(err, ErrInvalid) {
+	if _, err := s.AssignMeter(ctx, "monitor", str("comp-nope")); !errors.Is(err, ErrInvalid) {
 		t.Errorf("unknown computer: %v, want ErrInvalid", err)
 	}
-	if _, err := s.AssignChannel(ctx, "nope", &desk.ID); !errors.Is(err, ErrNotFound) {
-		t.Errorf("unknown channel: %v, want ErrNotFound", err)
+	if _, err := s.AssignMeter(ctx, "nope", &desk.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown meter: %v, want ErrNotFound", err)
 	}
 
 	all, _ := s.Computers(ctx)
@@ -72,16 +72,16 @@ func TestComputersHaveOneWallPlugAndAnyNumberOfPeripherals(t *testing.T) {
 		t.Fatalf("computers = %+v, want Desktop then Laptop", all)
 	}
 	got := all[0]
-	if got.WallChannelID == nil || *got.WallChannelID != "wall-1" || len(got.PeripheralChannelIDs) != 2 || got.PeripheralChannelIDs[0] != "monitor" {
+	if got.WallMeterID == nil || *got.WallMeterID != "wall-1" || len(got.PeripheralMeterIDs) != 2 || got.PeripheralMeterIDs[0] != "monitor" {
 		t.Errorf("desktop = %+v", got)
 	}
-	ch, _ := s.Channel(ctx, "monitor")
+	ch, _ := s.Meter(ctx, "monitor")
 	if ch.ComputerID == nil || *ch.ComputerID != desk.ID {
-		t.Errorf("the channel should say which computer it belongs to: %+v", ch)
+		t.Errorf("the meter should say which computer it belongs to: %+v", ch)
 	}
 
 	// Letting a plug go, and removing a computer: its plugs stay, as ordinary plugs.
-	if _, err := s.AssignChannel(ctx, "speakers", nil); err != nil {
+	if _, err := s.AssignMeter(ctx, "speakers", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DeleteComputer(ctx, desk.ID); err != nil {
@@ -91,7 +91,7 @@ func TestComputersHaveOneWallPlugAndAnyNumberOfPeripherals(t *testing.T) {
 		t.Errorf("deleting twice: %v", err)
 	}
 	for _, id := range []string{"wall-1", "monitor", "speakers"} {
-		if c, _ := s.Channel(ctx, id); c.ComputerID != nil {
+		if c, _ := s.Meter(ctx, id); c.ComputerID != nil {
 			t.Errorf("%s still belongs to a removed computer", id)
 		}
 	}
@@ -180,8 +180,8 @@ func TestOpeningADatabaseFromBeforePlugsCouldBelongToAComputer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := old.Exec(`CREATE TABLE channels (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, idx INTEGER, scope TEXT NOT NULL, label TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, max_watts REAL);
-INSERT INTO channels(id, device_id, scope, label) VALUES ('shelly-1:plug', 'shelly-1', 'pc', 'PC');`); err != nil {
+	if _, err := old.Exec(`CREATE TABLE meters (id TEXT PRIMARY KEY, device_id TEXT NOT NULL, idx INTEGER, scope TEXT NOT NULL, label TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, max_watts REAL);
+INSERT INTO meters(id, device_id, scope, label) VALUES ('shelly-1:plug', 'shelly-1', 'pc', 'PC');`); err != nil {
 		t.Fatal(err)
 	}
 	old.Close()
@@ -191,12 +191,12 @@ INSERT INTO channels(id, device_id, scope, label) VALUES ('shelly-1:plug', 'shel
 		t.Fatal(err)
 	}
 	defer s.Close()
-	chs, err := s.Channels(context.Background())
+	chs, err := s.Meters(context.Background())
 	if err != nil || len(chs) != 1 || chs[0].ComputerID != nil {
-		t.Fatalf("channels = %+v, %v", chs, err)
+		t.Fatalf("meters = %+v, %v", chs, err)
 	}
 	comp, _ := s.CreateComputer(context.Background(), "Desktop", nil)
-	if _, err := s.AssignChannel(context.Background(), "shelly-1:plug", &comp.ID); err != nil {
+	if _, err := s.AssignMeter(context.Background(), "shelly-1:plug", &comp.ID); err != nil {
 		t.Errorf("assigning on a migrated database: %v", err)
 	}
 }
@@ -214,14 +214,14 @@ func TestAFirstPushAdoptsTheOnlyComputerThatHasNoCollectorButNeverGuessesBetween
 
 	// The user made a computer and tied its plugs: the collector for that PC adopts it, and nothing is duplicated.
 	s := open(t)
-	addChannel(t, s, "wall", model.ScopePC)
+	addMeter(t, s, "wall", model.ScopePC)
 	mine, _ := s.CreateComputer(ctx, "kgerp_PC", nil)
-	if _, err := s.AssignChannel(ctx, "wall", &mine.ID); err != nil {
+	if _, err := s.AssignMeter(ctx, "wall", &mine.ID); err != nil {
 		t.Fatal(err)
 	}
 	push(s, "pc-1", "KGERP-PC")
 	all, _ := s.Computers(ctx)
-	if len(all) != 1 || all[0].ID != mine.ID || all[0].SourceID == nil || *all[0].SourceID != "pc-1" || all[0].Name != "kgerp_PC" || all[0].WallChannelID == nil {
+	if len(all) != 1 || all[0].ID != mine.ID || all[0].SourceID == nil || *all[0].SourceID != "pc-1" || all[0].Name != "kgerp_PC" || all[0].WallMeterID == nil {
 		t.Fatalf("computers = %+v, want the user's computer, now reporting through pc-1, with its name and plug kept", all)
 	}
 

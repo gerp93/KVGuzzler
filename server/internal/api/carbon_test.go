@@ -156,10 +156,10 @@ func TestAKeyIsNeverWrittenIntoTheDatabaseFile(t *testing.T) {
 	}
 }
 
-func TestChannelsCarryTheCarbonOfTheirEnergyHourByHour(t *testing.T) {
+func TestMetersCarryTheCarbonOfTheirEnergyHourByHour(t *testing.T) {
 	srv, st, _ := carbonServer(t, okMapsAnswer)
 	ctx := t.Context()
-	if err := st.UpsertChannel(ctx, model.Channel{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
 		t.Fatal(err)
 	}
 	// 12:00, 13:00 and 14:00 each use 0.1, 0.2 and 0.1 kWh; the first two hours have an intensity of their own.
@@ -174,10 +174,10 @@ func TestChannelsCarryTheCarbonOfTheirEnergyHourByHour(t *testing.T) {
 	energy(13, 0.2)
 	energy(14, 0.1)
 	period := "?from=2026-10-22T00:00:00Z&to=2026-10-23T00:00:00Z"
-	summary := func() model.ChannelSummary {
+	summary := func() model.MeterSummary {
 		var sum model.Summary
 		get(t, srv.URL+"/api/v1/summary"+period, &sum)
-		return sum.Channels[0]
+		return sum.Meters[0]
 	}
 	if cs := summary(); cs.CarbonG != nil {
 		t.Fatalf("with no intensity ever saved there is nothing to show: %v", *cs.CarbonG)

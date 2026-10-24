@@ -139,7 +139,7 @@ type PcSource struct {
 	Programs       []PcProgramTotal `json:"programs"`
 	Gaps           []PcGap          `json:"gaps"`
 	Live           *PcLive          `json:"live"`
-	// CarbonG and CarbonEstimatedKWh are the carbon of what the PC's sensors measured over the period (the same figures a channel carries).
+	// CarbonG and CarbonEstimatedKWh are the carbon of what the PC's sensors measured over the period (the same figures a meter carries).
 	CarbonG            *float64 `json:"carbon_g"`
 	CarbonEstimatedKWh *float64 `json:"carbon_estimated_kwh"`
 	Runs               []PcRun  `json:"runs"`
@@ -151,8 +151,8 @@ type Computer struct {
 	ID                   string     `json:"id"`
 	Name                 string     `json:"name"`
 	SourceID             *string    `json:"source_id"`
-	WallChannelID        *string    `json:"wall_channel_id"`
-	PeripheralChannelIDs []string   `json:"peripheral_channel_ids"`
+	WallMeterID        *string    `json:"wall_meter_id"`
+	PeripheralMeterIDs []string   `json:"peripheral_meter_ids"`
 	LastSeen             *time.Time `json:"last_seen"`
 }
 
@@ -162,8 +162,8 @@ type ComputerDetail struct {
 	Computer      Computer         `json:"computer"`
 	From          time.Time        `json:"from"`
 	To            time.Time        `json:"to"`
-	Wall          *ChannelSummary  `json:"wall"`
-	Peripherals   []ChannelSummary `json:"peripherals"`
+	Wall          *MeterSummary  `json:"wall"`
+	Peripherals   []MeterSummary `json:"peripherals"`
 	SetupKWh      *float64         `json:"setup_kwh"`
 	SetupCost     *string          `json:"setup_cost"`
 	CostEstimated bool             `json:"cost_estimated"`

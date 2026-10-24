@@ -1,10 +1,10 @@
 {
-  "group": { "id": "grp-3c4d5e6f", "name": "Entertainment center", "channel_ids": ["plug-strip-1:plug", "plug-strip-2:plug"] },
+  "group": { "id": "grp-3c4d5e6f", "name": "Entertainment center", "meter_ids": ["plug-strip-1:plug", "plug-strip-2:plug"] },
   "from": "2026-10-22T05:00:00Z",
   "to": "2026-10-23T05:00:00Z",
   "members": [
-    { "channel_id": "plug-strip-1:plug", "group_id": "grp-3c4d5e6f", "scope": "plug", "kwh": 1.4, "cost": "0.21", "carbon_g": null, "peak_watts": 210.0, "monitored_hours": 24 },
-    { "channel_id": "plug-strip-2:plug", "group_id": "grp-3c4d5e6f", "scope": "plug", "kwh": 0.6, "cost": "0.09", "carbon_g": null, "peak_watts": 95.0, "monitored_hours": 24 }
+    { "meter_id": "plug-strip-1:plug", "group_id": "grp-3c4d5e6f", "scope": "plug", "kwh": 1.4, "cost": "0.21", "carbon_g": null, "peak_watts": 210.0, "monitored_hours": 24 },
+    { "meter_id": "plug-strip-2:plug", "group_id": "grp-3c4d5e6f", "scope": "plug", "kwh": 0.6, "cost": "0.09", "carbon_g": null, "peak_watts": 95.0, "monitored_hours": 24 }
   ],
   "total_kwh": 2.0,
   "total_cost": "0.30",

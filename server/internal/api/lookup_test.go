@@ -182,7 +182,7 @@ func TestChoosingARateSavesItAndPricesWithIt(t *testing.T) {
 	}
 
 	// A wall plug that used 1 kWh costs 12 cents at the looked-up price, not the 15 cents of the single rate.
-	if err := st.UpsertChannel(ctx, model.Channel{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 60; i++ {
@@ -193,13 +193,13 @@ func TestChoosingARateSavesItAndPricesWithIt(t *testing.T) {
 	var sum model.Summary
 	get(t, srv.URL+"/api/v1/summary?from=2026-10-22T00:00:00Z&to=2026-10-23T00:00:00Z", &sum)
 	var cost *string
-	for _, c := range sum.Channels {
-		if c.ChannelID == "wall" {
+	for _, c := range sum.Meters {
+		if c.MeterID == "wall" {
 			cost = c.Cost
 		}
 	}
 	if cost == nil || !strings.HasPrefix(*cost, "0.12") {
-		t.Errorf("cost = %v, want 0.12 (1 kWh at the looked-up price); channels %+v", cost, sum.Channels)
+		t.Errorf("cost = %v, want 0.12 (1 kWh at the looked-up price); meters %+v", cost, sum.Meters)
 	}
 
 	// Choosing the same rate again does not ask OpenEI again.
@@ -269,7 +269,7 @@ func TestATimeOfUseTariffIsWeightedByTheHoursTheHouseReallyUsesPower(t *testing.
 	send(t, http.MethodPut, srv.URL+"/api/v1/rates", `{"mode":"lookup","tariff_label":"tou-1"}`)
 
 	// The house only ever draws power at 18:00 on weekdays (a Monday and a Tuesday here): its day is all peak.
-	if err := st.UpsertChannel(ctx, model.Channel{ID: "mains-a", DeviceID: "d", Scope: model.ScopeMains, Label: "Mains A"}); err != nil {
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "mains-a", DeviceID: "d", Scope: model.ScopeMains, Label: "Mains A"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, day := range []int{19, 20} {

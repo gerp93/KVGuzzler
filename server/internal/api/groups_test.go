@@ -14,14 +14,14 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 	ctx := t.Context()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 
-	for _, ch := range []model.Channel{
+	for _, ch := range []model.Meter{
 		{ID: "strip-1", DeviceID: "d1", Scope: model.ScopePlug, Label: "TV strip"},
 		{ID: "strip-2", DeviceID: "d2", Scope: model.ScopePlug, Label: "Audio strip"},
 		{ID: "strip-3", DeviceID: "d3", Scope: model.ScopePlug, Label: "Hidden strip"},
 		{ID: "pc-wall", DeviceID: "d4", Scope: model.ScopePC, Label: "PC"},
 		{ID: "desk-plug", DeviceID: "d5", Scope: model.ScopePlug, Label: "Monitor"},
 	} {
-		if err := st.UpsertChannel(ctx, ch); err != nil {
+		if err := st.UpsertMeter(ctx, ch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -39,12 +39,12 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 		t.Fatalf("add: %d %s", resp.StatusCode, body)
 	}
 	grp := decode[model.ApplianceGroup](t, body)
-	if grp.Name != "Entertainment center" || grp.ChannelIDs == nil {
+	if grp.Name != "Entertainment center" || grp.MeterIDs == nil {
 		t.Errorf("group = %+v", grp)
 	}
 	quoted := `"` + grp.ID + `"`
-	put := func(channel, group string) int {
-		r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+channel, `{"group_id":`+group+`}`)
+	put := func(meter, group string) int {
+		r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/"+meter, `{"group_id":`+group+`}`)
 		return r.StatusCode
 	}
 
@@ -66,15 +66,15 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 	// A plug is shown in one place: a grouped plug cannot join a computer, and a computer's plug cannot join a group.
 	_, cbody := send(t, http.MethodPost, srv.URL+"/api/v1/computers", `{"name":"Desktop"}`)
 	comp := decode[model.Computer](t, cbody)
-	if r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/channels/strip-1", `{"computer_id":"`+comp.ID+`"}`); r.StatusCode != 409 {
+	if r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/strip-1", `{"computer_id":"`+comp.ID+`"}`); r.StatusCode != 409 {
 		t.Errorf("a grouped plug on a computer: %d, want 409", r.StatusCode)
 	}
-	send(t, http.MethodPatch, srv.URL+"/api/v1/channels/desk-plug", `{"computer_id":"`+comp.ID+`"}`)
+	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/desk-plug", `{"computer_id":"`+comp.ID+`"}`)
 	if code := put("desk-plug", quoted); code != 409 {
 		t.Errorf("a computer's plug in a group: %d, want 409", code)
 	}
 
-	send(t, http.MethodPatch, srv.URL+"/api/v1/channels/strip-3", `{"enabled":false}`)
+	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/strip-3", `{"enabled":false}`)
 	var d model.GroupDetail
 	get(t, base+"/"+grp.ID+"/detail"+period, &d)
 	wantKwh := (200.0 + 100) * 60 / 3.6e6
@@ -94,13 +94,13 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 	var sum model.Summary
 	get(t, srv.URL+"/api/v1/summary"+period, &sum)
 	inGroup := 0
-	for _, c := range sum.Channels {
+	for _, c := range sum.Meters {
 		if c.GroupID != nil && *c.GroupID == grp.ID {
 			inGroup++
 		}
 	}
 	if inGroup != 2 {
-		t.Errorf("%d summary channels carry the group, want the 2 shown plugs", inGroup)
+		t.Errorf("%d summary meters carry the group, want the 2 shown plugs", inGroup)
 	}
 
 	// Taking a plug out, renaming, listing, removing.
@@ -129,7 +129,7 @@ func TestGroupsCombineSeveralPlugsIntoOneApplianceAndFollowTheRules(t *testing.T
 	if list.Groups == nil || len(list.Groups) != 0 {
 		t.Errorf("groups = %v, want an empty (not null) list", list.Groups)
 	}
-	if chs, _ := st.Channel(ctx, "strip-1"); chs.GroupID != nil {
+	if chs, _ := st.Meter(ctx, "strip-1"); chs.GroupID != nil {
 		t.Error("a plug still belongs to a removed group")
 	}
 }

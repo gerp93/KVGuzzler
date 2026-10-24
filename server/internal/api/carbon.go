@@ -192,9 +192,9 @@ func (s *Server) deleteCarbon(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// carbonOf is the carbon of some channels' energy over [from, to): each hour's kWh at that hour's intensity (see carbon.Value). Nil when no
-// intensity has ever been saved. All the channels must be of one scope, as with any sum here.
-func (s *Server) carbonOf(ctx context.Context, channelIDs []string, from, to time.Time) (*carbon.Result, error) {
+// carbonOf is the carbon of some meters' energy over [from, to): each hour's kWh at that hour's intensity (see carbon.Value). Nil when no
+// intensity has ever been saved. All the meters must be of one scope, as with any sum here.
+func (s *Server) carbonOf(ctx context.Context, meterIDs []string, from, to time.Time) (*carbon.Result, error) {
 	ever, ok, err := s.Store.AverageCarbonEver(ctx)
 	if err != nil || !ok {
 		return nil, err
@@ -203,7 +203,7 @@ func (s *Server) carbonOf(ctx context.Context, channelIDs []string, from, to tim
 	if err != nil {
 		return nil, err
 	}
-	byHour, err := s.Store.HourlyKWh(ctx, channelIDs, from, to)
+	byHour, err := s.Store.HourlyKWh(ctx, meterIDs, from, to)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,7 @@ func TestMainsCoverCircuitsAndStayUnderCaps(t *testing.T) {
 	s := NewAt(func() time.Time { return now })
 	caps := map[string]float64{}
 	scope := map[string]model.Scope{}
-	for _, c := range s.Channels() {
+	for _, c := range s.Meters() {
 		caps[c.ID] = *c.MaxWatts
 		scope[c.ID] = c.Scope
 	}
@@ -28,10 +28,10 @@ func TestMainsCoverCircuitsAndStayUnderCaps(t *testing.T) {
 		}
 		var mains, circuits float64
 		for _, r := range rs {
-			if r.Watts < 0 || r.Watts > caps[r.ChannelID] {
-				t.Fatalf("%s read %.0f W at %s, cap %.0f", r.ChannelID, r.Watts, now, caps[r.ChannelID])
+			if r.Watts < 0 || r.Watts > caps[r.MeterID] {
+				t.Fatalf("%s read %.0f W at %s, cap %.0f", r.MeterID, r.Watts, now, caps[r.MeterID])
 			}
-			switch scope[r.ChannelID] {
+			switch scope[r.MeterID] {
 			case model.ScopeMains:
 				mains += r.Watts
 			case model.ScopeCircuit:
@@ -44,19 +44,19 @@ func TestMainsCoverCircuitsAndStayUnderCaps(t *testing.T) {
 	}
 }
 
-func TestEveryReadingHasAChannel(t *testing.T) {
+func TestEveryReadingHasAMeter(t *testing.T) {
 	s := NewAt(func() time.Time { return time.Date(2026, 10, 22, 18, 30, 0, 0, time.UTC) })
 	known := map[string]bool{}
-	for _, c := range s.Channels() {
+	for _, c := range s.Meters() {
 		known[c.ID] = true
 	}
 	rs, _ := s.Poll(context.Background())
 	if len(rs) != len(known) {
-		t.Errorf("%d readings for %d channels", len(rs), len(known))
+		t.Errorf("%d readings for %d meters", len(rs), len(known))
 	}
 	for _, r := range rs {
-		if !known[r.ChannelID] {
-			t.Errorf("reading for unknown channel %s", r.ChannelID)
+		if !known[r.MeterID] {
+			t.Errorf("reading for unknown meter %s", r.MeterID)
 		}
 	}
 }

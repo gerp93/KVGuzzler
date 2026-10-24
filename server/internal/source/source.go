@@ -1,4 +1,4 @@
-// Package source is what the collector polls: one device and the channels it measures.
+// Package source is what the collector polls: one device and the meters it measures.
 package source
 
 import (
@@ -16,8 +16,8 @@ type Noter interface {
 type Source interface {
 	// Device describes the device. Online and LastSeen are filled in by the collector, not here.
 	Device() model.Device
-	// Channels lists what the device measures, with the sanity cap of each (a reading above it is dropped).
-	Channels() []model.Channel
-	// Poll reads every channel once. It must never change anything on the device.
+	// Meters lists what the device measures, with the sanity cap of each (a reading above it is dropped).
+	Meters() []model.Meter
+	// Poll reads every meter once. It must never change anything on the device.
 	Poll(ctx context.Context) ([]model.Reading, error)
 }

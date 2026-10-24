@@ -1,7 +1,7 @@
-// Package collector polls every source on a timer, keeps the latest reading of each channel for the live view,
+// Package collector polls every source on a timer, keeps the latest reading of each meter for the live view,
 // and folds the readings into per-minute rows in the store.
 //
-// A reading above its channel's sanity cap is dropped, like a missing one, and said so in the notes: it is never
+// A reading above its meter's sanity cap is dropped, like a missing one, and said so in the notes: it is never
 // averaged in. Time a source was not answering is not credited: a gap in the history is a gap.
 package collector
 
@@ -65,15 +65,15 @@ func New(s *store.Store, interval time.Duration) *Collector {
 	return &Collector{store: s, interval: interval, now: time.Now, live: map[string]liveReading{}, notes: map[string]note{}}
 }
 
-// Add registers a source: its device and channels are written to the store (keeping any label the user gave them).
+// Add registers a source: its device and meters are written to the store (keeping any label the user gave them).
 func (c *Collector) Add(ctx context.Context, src source.Source) error {
 	d := src.Device()
 	if err := c.store.UpsertDevice(ctx, d); err != nil {
 		return err
 	}
 	st := &state{src: src, caps: map[string]float64{}, labels: map[string]string{}, acc: map[string]*acc{}}
-	for _, ch := range src.Channels() {
-		if err := c.store.UpsertChannel(ctx, ch); err != nil {
+	for _, ch := range src.Meters() {
+		if err := c.store.UpsertMeter(ctx, ch); err != nil {
 			return err
 		}
 		st.labels[ch.ID] = ch.Label
@@ -206,9 +206,9 @@ func (c *Collector) step(ctx context.Context, st *state, t time.Time) {
 	st.minute = minute
 
 	for _, r := range readings {
-		if cap, ok := st.caps[r.ChannelID]; ok && r.Watts > cap {
-			c.notes["cap:"+r.ChannelID] = note{
-				text:  fmt.Sprintf("Dropped an impossible reading of %.0f W on %s (cap %.0f W).", r.Watts, st.labels[r.ChannelID], cap),
+		if cap, ok := st.caps[r.MeterID]; ok && r.Watts > cap {
+			c.notes["cap:"+r.MeterID] = note{
+				text:  fmt.Sprintf("Dropped an impossible reading of %.0f W on %s (cap %.0f W).", r.Watts, st.labels[r.MeterID], cap),
 				until: t.Add(noteLifetime),
 			}
 			continue
@@ -216,11 +216,11 @@ func (c *Collector) step(ctx context.Context, st *state, t time.Time) {
 		if r.Watts < 0 {
 			continue
 		}
-		c.live[r.ChannelID] = liveReading{Reading: r, at: t}
-		a := st.acc[r.ChannelID]
+		c.live[r.MeterID] = liveReading{Reading: r, at: t}
+		a := st.acc[r.MeterID]
 		if a == nil {
 			a = &acc{}
-			st.acc[r.ChannelID] = a
+			st.acc[r.MeterID] = a
 		}
 		a.ws += r.Watts * dt
 		a.secs += dt
@@ -263,7 +263,7 @@ func (c *Collector) Devices() []model.Device {
 	return out
 }
 
-// LiveReadings is the latest reading of every channel that answered recently.
+// LiveReadings is the latest reading of every meter that answered recently.
 func (c *Collector) LiveReadings() []model.Reading {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -274,7 +274,7 @@ func (c *Collector) LiveReadings() []model.Reading {
 			out = append(out, r.Reading)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ChannelID < out[j].ChannelID })
+	sort.Slice(out, func(i, j int) bool { return out[i].MeterID < out[j].MeterID })
 	return out
 }
 

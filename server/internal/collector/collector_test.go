@@ -20,9 +20,9 @@ type fake struct {
 }
 
 func (f *fake) Device() model.Device { return model.Device{ID: "dev", Kind: "refoss", Name: "Fake"} }
-func (f *fake) Channels() []model.Channel {
+func (f *fake) Meters() []model.Meter {
 	cap := 5000.0
-	return []model.Channel{{ID: "dev/ch-01", DeviceID: "dev", Scope: model.ScopeCircuit, Label: "Dryer", Enabled: true, MaxWatts: &cap}}
+	return []model.Meter{{ID: "dev/ch-01", DeviceID: "dev", Scope: model.ScopeCircuit, Label: "Dryer", Enabled: true, MaxWatts: &cap}}
 }
 func (f *fake) Poll(context.Context) ([]model.Reading, error) { return f.readings, f.err }
 
@@ -46,7 +46,7 @@ var t0 = time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 func TestEnergyIsWattsTimesCoveredSeconds(t *testing.T) {
 	ctx := context.Background()
 	c, s, f := setup(t)
-	f.readings = []model.Reading{{ChannelID: "dev/ch-01", Watts: 3600}}
+	f.readings = []model.Reading{{MeterID: "dev/ch-01", Watts: 3600}}
 	// Polls at 12:00:00 .. 12:01:00. The first only starts the clock, so 60 s are credited.
 	for i := 0; i <= 60; i++ {
 		c.PollOnce(ctx, t0.Add(time.Duration(i)*time.Second))
@@ -66,10 +66,10 @@ func TestImpossibleReadingIsDroppedAndNoted(t *testing.T) {
 	c, s, f := setup(t)
 	c.SetClock(func() time.Time { return t0.Add(10 * time.Second) })
 
-	f.readings = []model.Reading{{ChannelID: "dev/ch-01", Watts: 100}}
+	f.readings = []model.Reading{{MeterID: "dev/ch-01", Watts: 100}}
 	c.PollOnce(ctx, t0)
 	c.PollOnce(ctx, t0.Add(time.Second))
-	f.readings = []model.Reading{{ChannelID: "dev/ch-01", Watts: 250000}} // NVML-style nonsense
+	f.readings = []model.Reading{{MeterID: "dev/ch-01", Watts: 250000}} // NVML-style nonsense
 	c.PollOnce(ctx, t0.Add(2*time.Second))
 	c.FlushAll(ctx)
 
@@ -93,7 +93,7 @@ func TestSilenceIsNotCreditedAndIsReported(t *testing.T) {
 	c, s, f := setup(t)
 	c.SetClock(func() time.Time { return t0.Add(20 * time.Second) })
 
-	f.readings = []model.Reading{{ChannelID: "dev/ch-01", Watts: 1000}}
+	f.readings = []model.Reading{{MeterID: "dev/ch-01", Watts: 1000}}
 	c.PollOnce(ctx, t0)
 	c.PollOnce(ctx, t0.Add(time.Second)) // 1 s credited
 	f.err = errors.New("connection refused")
@@ -153,7 +153,7 @@ func TestSourcesCanBeAddedAndRemovedWhileRunning(t *testing.T) {
 	go func() { c.Run(ctx); close(done) }()
 	t.Cleanup(func() { cancel(); <-done })
 
-	src := &counting{fake: fake{readings: []model.Reading{{ChannelID: "dev/ch-01", Watts: 100}}}}
+	src := &counting{fake: fake{readings: []model.Reading{{MeterID: "dev/ch-01", Watts: 100}}}}
 	if err := c.Add(context.Background(), src); err != nil {
 		t.Fatal(err)
 	}

@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { usePoll } from './hooks';
-import type { ApplianceGroup, Channel } from './lib';
+import type { ApplianceGroup, Meter } from './lib';
 
 /** Settings for appliance groups: several plugs shown as one appliance (an entertainment center on two power strips). */
-export function GroupsCard({ channels, onChanged }: { channels: Channel[]; onChanged: () => void }) {
+export function GroupsCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
-  const { data: groups, error } = usePoll<ApplianceGroup[]>(api.groups, 10_000, [rev, channels]);
+  const { data: groups, error } = usePoll<ApplianceGroup[]>(api.groups, 10_000, [rev, meters]);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState('');
@@ -35,7 +35,7 @@ export function GroupsCard({ channels, onChanged }: { channels: Channel[]; onCha
         <GroupBlock
           key={g.id}
           group={g}
-          channels={channels}
+          meters={meters}
           confirming={confirming === g.id}
           onConfirm={(on) => setConfirming(on ? g.id : '')}
           run={run}
@@ -70,17 +70,17 @@ export function GroupsCard({ channels, onChanged }: { channels: Channel[]; onCha
 }
 
 function GroupBlock({
-  group, channels, confirming, onConfirm, run,
+  group, meters, confirming, onConfirm, run,
 }: {
   group: ApplianceGroup;
-  channels: Channel[];
+  meters: Meter[];
   confirming: boolean;
   onConfirm: (on: boolean) => void;
   run: (work: Promise<unknown>) => void;
 }) {
   const [name, setName] = useState(group.name);
   // An ordinary plug can be chosen if it is free or already in this group; a computer's plug is shown with its computer.
-  const choices = channels.filter((c) => c.scope === 'plug' && !c.computer_id && (!c.group_id || c.group_id === group.id));
+  const choices = meters.filter((c) => c.scope === 'plug' && !c.computer_id && (!c.group_id || c.group_id === group.id));
 
   return (
     <div class="computer-block">
@@ -120,7 +120,7 @@ function GroupBlock({
               key={c.id}
               type="button"
               aria-pressed={inGroup}
-              onClick={() => run(api.updateChannel(c.id, { group_id: inGroup ? null : group.id }))}
+              onClick={() => run(api.updateMeter(c.id, { group_id: inGroup ? null : group.id }))}
             >
               {c.label}
             </button>

@@ -143,7 +143,7 @@ export function DevicesCard({ onChanged }: { onChanged: () => void }) {
         </label>
         <p class="caption">
           Only the EM16P has been tried. Its local login must be off in the Refoss app. Every input is added; the ones with nothing clamped on them are hidden, and
-          you rename, flip and pair the rest under Channels below.
+          you rename, flip and pair the rest under Meters below.
         </p>
         <div class="chips">
           <button type="button" onClick={addRefoss} disabled={busy || refossHost.trim() === ''}>

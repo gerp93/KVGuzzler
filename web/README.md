@@ -21,7 +21,7 @@ npm run dev           # vite on :5173, proxying /api to a server on :8080 (run t
 - **History**: the house over a period, with up to three circuits, plugs or the PC drawn on their own lines.
 - **Appliances**: a list of what used the energy, with the derived remainder and cost. Several plugs can be grouped under one name (an entertainment center) and show as one row. Click an appliance or a group for its own page; click a computer for
   the full breakdown (the whole PC at the wall, its peripherals, a chart, and what its collector reports: sensors, programs, times it was not recording).
-- **Settings**: devices, computers (tie a wall plug and peripherals to each), appliance groups, the price, rename or hide a channel (changes only this server's label) and a theme.
+- **Settings**: devices, computers (tie a wall plug and peripherals to each), appliance groups, the price, rename or hide a meter (changes only this server's label) and a theme.
 
 The address says what is open (`#/appliances/computer/<id>`), so back, reload and a copied link all land in the same place.
 

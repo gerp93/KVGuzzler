@@ -31,9 +31,9 @@ GOOS=linux GOARCH=amd64 go build -o housed ./cmd/housed
 | `internal/shelly` | Shelly plug (Gen2+) over one read-only GET (`/rpc/Switch.GetStatus?id=0`). A port of the desktop app's `ShellyPlug`, tested with the answer captured from a real Plug US Gen4. |
 | `internal/devices` | Adds, removes and restores devices: a plug is read once before it is kept, saved, and polled again after a restart. |
 | `internal/sim` | A simulated house with a dryer, range, EV charger and so on. |
-| `internal/store` | SQLite (WAL, pure Go): devices, channels, per-minute history, totals and bucketed series. |
+| `internal/store` | SQLite (WAL, pure Go): devices, meters, per-minute history, totals and bucketed series. |
 | `internal/collector` | Polls sources, drops impossible readings (and says so), never credits time a device was silent. |
-| `internal/api` | Status, devices (add, remove), channels (rename, hide, tie to a computer), computers (add, rename, remove, detail), live, series, summary, rates, the PC push. |
+| `internal/api` | Status, devices (add, remove), meters (rename, hide, tie to a computer), computers (add, rename, remove, detail), live, series, summary, rates, the PC push. |
 | `internal/rates` | Pricing: one rate or per-bill prices (bills, flat fees, estimates after the latest bill), exact decimal money. A port of the desktop app's `KVGuzzler.Core.Billing`; `rates_test.go` is `BillingTests.cs` ported case for case. |
 | `internal/pcrelay` | What the PC collector pushes (`POST /api/v1/ingest/pc`) and the checks it must pass: impossible readings dropped and said so, a different major version refused. |
 | `internal/store` (groups) | Appliance groups: several ordinary plugs shown as one appliance; a plug is in a group or tied to a computer, not both. |
@@ -72,11 +72,11 @@ fixed with "Flip sign", and the two clamps of a 240 V breaker are paired into on
 
 ## Not built yet (answers 501)
 
-A Refoss EM06P (only the EM16P has been seen), and the main-panel setup (mains channels on a monitor) is built but has not been tried.
+A Refoss EM06P (only the EM16P has been seen), and the main-panel setup (mains meters on a monitor) is built but has not been tried.
 
 ## Rules
 
 - Devices are only read. The Refoss client refuses any method that is not on its allowlist.
 - A device host is a plain host or IP, never a URL, path or port.
-- The house is the sum of the `mains` channels only; circuits and plugs are parts of it and the PC slice is added to nothing.
-- A reading above its channel's cap is dropped, not averaged, and reported in the notes.
+- The house is the sum of the `mains` meters only; circuits and plugs are parts of it and the PC slice is added to nothing.
+- A reading above its meter's cap is dropped, not averaged, and reported in the notes.

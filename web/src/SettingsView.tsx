@@ -1,19 +1,19 @@
-import { ChannelsCard } from './ChannelsCard';
+import { MetersCard } from './MetersCard';
 import { ComputersCard } from './ComputersCard';
 import { CarbonCard } from './CarbonCard';
 import { DatabaseCard } from './DatabaseCard';
 import { DevicesCard } from './DevicesCard';
 import { GroupsCard } from './GroupsCard';
 import { RatesCard } from './RatesCard';
-import { THEMES, type Channel, type Theme } from './lib';
+import { THEMES, type Meter, type Theme } from './lib';
 
 export function SettingsView({
-  channels,
+  meters,
   onChanged,
   theme,
   onTheme,
 }: {
-  channels: Channel[];
+  meters: Meter[];
   onChanged: () => void;
   theme: Theme;
   onTheme: (t: Theme) => void;
@@ -21,10 +21,10 @@ export function SettingsView({
   return (
     <>
       <DevicesCard onChanged={onChanged} />
-      <ComputersCard channels={channels} onChanged={onChanged} />
-      <GroupsCard channels={channels} onChanged={onChanged} />
+      <ComputersCard meters={meters} onChanged={onChanged} />
+      <GroupsCard meters={meters} onChanged={onChanged} />
       <RatesCard />
-      <ChannelsCard channels={channels} onChanged={onChanged} />
+      <MetersCard meters={meters} onChanged={onChanged} />
       <CarbonCard />
       <DatabaseCard />
       <section class="card">

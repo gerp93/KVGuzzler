@@ -99,7 +99,7 @@ func (m *Manager) buildDefault(kind, host, name string, scope model.Scope, hc *h
 // refossSettings reads, on each poll, how the user said a monitor's clamps are wired (which way round, which legs are one breaker).
 func (m *Manager) refossSettings(deviceID string) refoss.SettingsFunc {
 	return func(ctx context.Context) (map[string]refoss.Setting, error) {
-		chs, err := m.Store.DeviceChannels(ctx, deviceID)
+		chs, err := m.Store.DeviceMeters(ctx, deviceID)
 		if err != nil {
 			return nil, err
 		}
@@ -230,18 +230,18 @@ func (m *Manager) Add(ctx context.Context, nd NewDevice) (model.Device, error) {
 	return d, nil
 }
 
-// switchOffIdle hides the channels of a new device that had nothing on them at the first reading (the user switches on the ones they use).
+// switchOffIdle hides the meters of a new device that had nothing on them at the first reading (the user switches on the ones they use).
 func (m *Manager) switchOffIdle(ctx context.Context, src source.Source, active []string) error {
 	live := map[string]bool{}
 	for _, id := range active {
 		live[id] = true
 	}
 	off := false
-	for _, ch := range src.Channels() {
+	for _, ch := range src.Meters() {
 		if live[ch.ID] {
 			continue
 		}
-		if _, err := m.Store.UpdateChannel(ctx, ch.ID, nil, &off); err != nil {
+		if _, err := m.Store.UpdateMeter(ctx, ch.ID, nil, &off); err != nil {
 			return err
 		}
 	}
@@ -253,12 +253,12 @@ func (m *Manager) switchOffIdle(ctx context.Context, src source.Source, active [
 // when there is none or more than one to choose from. A plug that already belongs to a computer (added again after being
 // removed) is left where it was.
 func (m *Manager) tieToAComputer(ctx context.Context, src source.Source) error {
-	chs := src.Channels()
+	chs := src.Meters()
 	if len(chs) == 0 {
 		return nil
 	}
 	id := chs[0].ID
-	if have, err := m.Store.Channel(ctx, id); err == nil && have.ComputerID != nil {
+	if have, err := m.Store.Meter(ctx, id); err == nil && have.ComputerID != nil {
 		return nil
 	}
 	all, err := m.Store.Computers(ctx)
@@ -267,7 +267,7 @@ func (m *Manager) tieToAComputer(ctx context.Context, src source.Source) error {
 	}
 	var free []model.Computer
 	for _, c := range all {
-		if c.WallChannelID == nil {
+		if c.WallMeterID == nil {
 			free = append(free, c)
 		}
 	}
@@ -285,7 +285,7 @@ func (m *Manager) tieToAComputer(ctx context.Context, src source.Source) error {
 		}
 		target = c.ID
 	}
-	_, err = m.Store.AssignChannel(ctx, id, &target)
+	_, err = m.Store.AssignMeter(ctx, id, &target)
 	return err
 }
 
@@ -319,7 +319,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 		if polling[d.ID] {
 			continue
 		}
-		chs, err := m.Store.DeviceChannels(ctx, d.ID)
+		chs, err := m.Store.DeviceMeters(ctx, d.ID)
 		if err != nil {
 			return err
 		}
