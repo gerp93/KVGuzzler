@@ -2,12 +2,12 @@ import { useState } from 'preact/hooks';
 import { api } from './api';
 import { usePoll } from './hooks';
 import type { ApplianceGroup, Meter } from './lib';
+import { routePath } from './route';
 
-/** Settings for appliance groups: several plugs shown as one appliance (an entertainment center on two power strips). */
+/** The appliance groups: several plugs shown as one appliance (an entertainment center on two power strips). Adding one is the + Add button of the Hierarchy tab. */
 export function GroupsCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
   const { data: groups, error } = usePoll<ApplianceGroup[]>(api.groups, 10_000, [rev, meters]);
-  const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState('');
 
@@ -22,11 +22,11 @@ export function GroupsCard({ meters, onChanged }: { meters: Meter[]; onChanged: 
     );
 
   return (
-    <section class="card">
+    <section class="card wide">
       <h2>Appliance groups</h2>
       <p class="caption">
-        For something that runs through more than one plug, like an entertainment center on two power strips: group the plugs and
-        The Hierarchy tab lists them as one, with their energy and cost added. Each plug still records on its own.
+        For something that runs through more than one plug, like an entertainment center on two power strips: group the plugs and it is
+        shown as one, with their energy and cost added. Each plug still records on its own. Add a group with + Add.
       </p>
       {error && <p class="note">{error.message}</p>}
       {groups && groups.length === 0 && <p class="note">No groups yet.</p>}
@@ -42,24 +42,6 @@ export function GroupsCard({ meters, onChanged }: { meters: Meter[]; onChanged: 
         />
       ))}
 
-      <fieldset class="device-form">
-        <legend>Add a group</legend>
-        <label class="field">
-          <span>Name</span>
-          <input value={name} maxLength={60} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-        </label>
-        <div class="chips">
-          <button
-            type="button"
-            disabled={name.trim() === ''}
-            onClick={() => {
-              void run(api.addGroup(name.trim()).then(() => setName('')));
-            }}
-          >
-            Add group
-          </button>
-        </div>
-      </fieldset>
       {message && (
         <p class="note error" role="alert">
           {message}
@@ -110,8 +92,10 @@ function GroupBlock({
           </button>
         )}
       </div>
-      <p class="caption">Plugs in this group</p>
-      {choices.length === 0 && <p class="caption">No plugs to choose from. Add a plug under Devices first.</p>}
+      <p class="caption">
+        Plugs in this group · <a href={routePath('hierarchy', 'group', group.id)}>open its page</a>
+      </p>
+      {choices.length === 0 && <p class="caption">No plugs to choose from. Add a plug with + Add first.</p>}
       <div class="chips">
         {choices.map((c) => {
           const inGroup = c.group_id === group.id;

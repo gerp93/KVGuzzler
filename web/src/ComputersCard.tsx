@@ -3,11 +3,10 @@ import { api } from './api';
 import { usePoll } from './hooks';
 import type { Meter, Computer } from './lib';
 
-/** Settings for computers: add one, name it, and tie its wall plug and its peripherals to it. */
+/** The computers: name one, tie its wall plug and its peripherals to it, remove it. Adding one is the + Add button of the Hierarchy tab. */
 export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
   const { data: computers, error } = usePoll<Computer[]>(api.computers, 10_000, [rev, meters]);
-  const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState('');
 
@@ -25,11 +24,11 @@ export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChange
     );
 
   return (
-    <section class="card">
+    <section class="card wide">
       <h2>Computers</h2>
       <p class="caption">
         A computer is its own kind of appliance. Tie its wall plug (which measures the whole PC) and its peripherals to it, and
-        it opens as one thing in the Hierarchy tab. A PC that has the KVGuzzler collector adds itself here the first time it reports.
+        its wall plug opens it as one thing. A PC that has the KVGuzzler collector adds itself here the first time it reports; add one by hand with + Add.
       </p>
       {error && <p class="note">{error.message}</p>}
       {computers && computers.length === 0 && <p class="note">No computers yet.</p>}
@@ -45,24 +44,6 @@ export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChange
         />
       ))}
 
-      <fieldset class="device-form">
-        <legend>Add a computer</legend>
-        <label class="field">
-          <span>Name</span>
-          <input value={name} maxLength={60} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-        </label>
-        <div class="chips">
-          <button
-            type="button"
-            disabled={name.trim() === ''}
-            onClick={() => {
-              void run(api.addComputer(name.trim()).then(() => setName('')));
-            }}
-          >
-            Add computer
-          </button>
-        </div>
-      </fieldset>
       {message && (
         <p class="note error" role="alert">
           {message}
@@ -136,10 +117,10 @@ function ComputerBlock({
           ))}
         </select>
       </label>
-      {wallChoices.length === 0 && <p class="caption">Add a plug marked "my PC's plug" under Devices to choose it here.</p>}
+      {wallChoices.length === 0 && <p class="caption">Add a plug marked "my PC's plug" with + Add to choose it here.</p>}
 
       <p class="caption">Peripherals (each is a separate plug)</p>
-      {peripheralChoices.length === 0 && <p class="caption">No other plugs to tie. Add a plug under Devices first.</p>}
+      {peripheralChoices.length === 0 && <p class="caption">No other plugs to tie. Add a plug with + Add first.</p>}
       <div class="chips">
         {peripheralChoices.map((c) => {
           const tied = c.computer_id === computer.id;

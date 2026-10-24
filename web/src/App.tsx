@@ -67,7 +67,7 @@ export function App() {
         ) : active === 'help' ? (
           <HelpView />
         ) : (
-          <SettingsView meters={meters} onChanged={() => setRev((n) => n + 1)} theme={theme} onTheme={setThemeName} />
+          <SettingsView theme={theme} onTheme={setThemeName} />
         )}
         {status.data && status.data.notes.length > 0 && active !== 'live' && (
           <section class="card warn">
