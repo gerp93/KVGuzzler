@@ -221,7 +221,7 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 		// How a Refoss monitor's clamp is wired: its sign, the other leg of its breaker, and whether it measures a circuit or the mains.
 		Invert   *bool           `json:"invert"`
 		PairWith json.RawMessage `json:"pair_with"` // another input's meter id, or null to unpair; absent leaves it alone
-		Type     *string         `json:"type"` // what a Refoss meter is: house, sub_panel or circuit
+		Type     *string         `json:"type"`      // what a Refoss meter is: house, sub_panel or circuit
 		// The circuit this one is part of (a sub-panel's feed), or null to take it out; absent leaves it alone.
 		ParentID json.RawMessage `json:"parent_id"`
 	}
