@@ -171,6 +171,16 @@ main {
   white-space: nowrap;
 }
 
+.bars .name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bars .name a:hover,
+.bars .name a:focus-visible {
+  text-decoration: underline;
+}
+
 .bars .bar {
   height: 10px;
   overflow: hidden;
@@ -324,6 +334,7 @@ select {
 }
 
 button.icon,
+a.button.icon,
 button.twisty,
 button.show-btn {
   display: inline-flex;

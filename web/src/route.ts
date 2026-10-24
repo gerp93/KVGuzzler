@@ -1,10 +1,11 @@
-// A tiny hash router: the address says which tab is open and, in Appliances, which thing is open, so the browser's back
+// A tiny hash router: the address says which tab is open and, in the Hierarchy tab, which thing is open, so the browser's back
 // button, a reload and a copied link all land in the same place.
 //
 //   #/live                                  a tab
-//   #/appliances                            the list
-//   #/appliances/meter/<meter id>       one appliance
-//   #/appliances/computer/<computer id>     one computer
+//   #/hierarchy                             the tree
+//   #/hierarchy/meter/<meter id>            one meter
+//   #/hierarchy/computer/<computer id>      one computer
+//   #/hierarchy/group/<group id>            one appliance group
 import { useEffect, useState } from 'preact/hooks';
 
 export interface Route {

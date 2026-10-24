@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, arrangeByPanel, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
-  type ApplianceGroup, type Meter, type MeterSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
+  arrangeByPanel, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
 const ch = (id: string, scope: Meter['scope'], enabled = true): Meter => ({
@@ -141,77 +141,6 @@ describe('the PC tab helpers', () => {
     expect(formatDuration(4.5 * 3600)).toBe('4 h 30 min');
     expect(formatDuration(2 * 3600)).toBe('2 h');
     expect(formatDuration(-5)).toBe('0 s');
-  });
-});
-
-describe('the Appliances list', () => {
-  const summary: Summary = {
-    from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-    meters: [
-      { meter_id: 'mains-a', scope: 'mains', kwh: 20, monitored_hours: 1 },
-      { meter_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
-      { meter_id: 'fridge', scope: 'plug', kwh: 2, monitored_hours: 1 },
-      { meter_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 5, monitored_hours: 1 },
-      { meter_id: 'monitor', computer_id: 'comp-1', scope: 'plug', kwh: 1, monitored_hours: 1 },
-      { meter_id: 'strip-1', group_id: 'grp-1', scope: 'plug', kwh: 3, cost: '0.45', monitored_hours: 1 },
-      { meter_id: 'strip-2', group_id: 'grp-1', scope: 'plug', kwh: 1.5, cost: '0.23', monitored_hours: 1 },
-    ],
-  };
-  const meters = ['dryer', 'fridge', 'wall', 'monitor', 'strip-1', 'strip-2'].map((id) => ch(id, 'plug'));
-  const computer = (id: string, wall?: string): Computer => ({ id, name: id, peripheral_meter_ids: [], wall_meter_id: wall ?? null });
-  const group: ApplianceGroup = { id: 'grp-1', name: 'Entertainment center', meter_ids: ['strip-1', 'strip-2'] };
-
-  it('lists ordinary appliances without the plugs that belong to a computer or a group, and not the house', () => {
-    const list = applianceList(summary, meters, [computer('comp-1', 'wall')], [group]);
-    expect(list.appliances.map((r) => [r.kind, r.id])).toEqual([['meter', 'dryer'], ['group', 'grp-1'], ['meter', 'fridge']]);
-  });
-
-  it('lists a sub-panel feed with its circuits under it and the rest of the feed as a derived line', () => {
-    const s: Summary = {
-      from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-      meters: [
-        { meter_id: 'garage', scope: 'circuit', kwh: 8, cost: '1.20', monitored_hours: 1 },
-        { meter_id: 'ev', scope: 'circuit', kwh: 7, cost: '1.05', monitored_hours: 1 },
-        { meter_id: 'dryer', scope: 'circuit', kwh: 6, cost: '0.90', monitored_hours: 1 },
-      ],
-    };
-    const wired = [ch('garage', 'circuit'), { ...ch('ev', 'circuit'), parent_id: 'garage' }, ch('dryer', 'circuit')];
-    const rows = applianceList(s, wired, [], []).appliances;
-    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['meter', 'garage', 0], ['meter', 'ev', 1], ['rest', 'garage', 1], ['meter', 'dryer', 0]]);
-    expect(rows[2]).toMatchObject({ kwh: 1, cost: '0.15', label: 'Everything else on garage' });
-  });
-
-  it('takes a computer\'s plug that is on a circuit off that circuit\'s rest, although the computer lists it itself', () => {
-    const s: Summary = {
-      from: 'a', to: 'b', house_kwh: 20, unmetered_kwh: 5,
-      meters: [
-        { meter_id: 'office', scope: 'circuit', kwh: 5, monitored_hours: 1 },
-        { meter_id: 'lamp', scope: 'plug', kwh: 1, monitored_hours: 1 },
-        { meter_id: 'wall', computer_id: 'comp-1', scope: 'pc', kwh: 3, monitored_hours: 1 },
-      ],
-    };
-    const wired = [ch('office', 'circuit'), { ...ch('lamp', 'plug'), parent_id: 'office' }, { ...ch('wall', 'pc'), parent_id: 'office' }];
-    const rows = applianceList(s, wired, [], []).appliances;
-    expect(rows.map((r) => [r.kind, r.id, r.depth])).toEqual([['meter', 'office', 0], ['meter', 'lamp', 1], ['rest', 'office', 1]]);
-    expect(rows[2]!.kwh).toBe(1); // 5 - 1 (the lamp) - 3 (the PC at its wall)
-  });
-
-  it('shows a group once, as the sum of its plugs, with a cost only when every plug has one', () => {
-    const row = applianceList(summary, meters, [], [group]).appliances.find((r) => r.kind === 'group')!;
-    expect(row).toMatchObject({ label: 'Entertainment center', kwh: 4.5, cost: '0.68' });
-
-    const partly: Summary = { ...summary, meters: summary.meters.map((c) => (c.meter_id === 'strip-2' ? { ...c, cost: null } : c)) };
-    expect(applianceList(partly, meters, [], [group]).appliances.find((r) => r.kind === 'group')!.cost).toBeNull();
-  });
-
-  it('leaves out a group with no plugs reporting', () => {
-    const empty: ApplianceGroup = { id: 'grp-2', name: 'Nothing', meter_ids: [] };
-    expect(applianceList(summary, meters, [], [empty]).appliances.some((r) => r.id === 'grp-2')).toBe(false);
-  });
-
-  it('lists a computer with its wall plug figure, biggest first, and one with no wall plug last', () => {
-    const list = applianceList(summary, meters, [computer('empty'), computer('comp-1', 'wall')]);
-    expect(list.computers.map((r) => [r.computer.id, r.wall?.kwh])).toEqual([['comp-1', 5], ['empty', undefined]]);
   });
 });
 

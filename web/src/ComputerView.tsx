@@ -88,8 +88,8 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
   const peakIsBound = hasPlugs ? (counted?.peakIsBound ?? false) : false;
   return (
     <>
-      <a class="back" href={routePath('appliances')}>
-        ← All appliances
+      <a class="back" href={routePath('hierarchy')}>
+        ← Hierarchy
       </a>
 
       {error && (

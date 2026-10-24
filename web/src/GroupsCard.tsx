@@ -26,7 +26,7 @@ export function GroupsCard({ meters, onChanged }: { meters: Meter[]; onChanged: 
       <h2>Appliance groups</h2>
       <p class="caption">
         For something that runs through more than one plug, like an entertainment center on two power strips: group the plugs and
-        Appliances shows them as one, with their energy and cost added. Each plug still records on its own.
+        The Hierarchy tab lists them as one, with their energy and cost added. Each plug still records on its own.
       </p>
       {error && <p class="note">{error.message}</p>}
       {groups && groups.length === 0 && <p class="note">No groups yet.</p>}

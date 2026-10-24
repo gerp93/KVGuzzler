@@ -29,7 +29,7 @@ export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChange
       <h2>Computers</h2>
       <p class="caption">
         A computer is its own kind of appliance. Tie its wall plug (which measures the whole PC) and its peripherals to it, and
-        it opens as one thing in Appliances. A PC that has the KVGuzzler collector adds itself here the first time it reports.
+        it opens as one thing in the Hierarchy tab. A PC that has the KVGuzzler collector adds itself here the first time it reports.
       </p>
       {error && <p class="note">{error.message}</p>}
       {computers && computers.length === 0 && <p class="note">No computers yet.</p>}

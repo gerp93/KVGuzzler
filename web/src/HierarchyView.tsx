@@ -4,10 +4,15 @@
 // it only changes how this dashboard reads and shows them.
 import { useState } from 'preact/hooks';
 import { api } from './api';
+import { meterPath } from './Bars';
+import { ComputerView } from './ComputerView';
+import { GroupView } from './GroupView';
 import { usePoll } from './hooks';
+import { MeterPage } from './MeterPage';
+import { routePath } from './route';
 import {
   arrangeByPanel, canHold, clampName, formatWatts, indentTarget, outdentTarget, shownMeters, usualPartner,
-  type Device, type Live, type Meter,
+  type ApplianceGroup, type Device, type Live, type Meter,
 } from './lib';
 
 type Change = Parameters<typeof api.updateMeter>[1];
@@ -121,6 +126,9 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
         {tag && <span class="caption hier-tag">{tag}</span>}
         <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
         <div class="hier-actions">
+          <a class="button icon" href={meterPath(meter)} title="Open this meter's page" aria-label={`Open ${legs}`}>
+            ›
+          </a>
           <button type="button" class="icon" disabled={!out} title={parent ? `Move out of ${parent.label}` : 'Already at the top'} aria-label={`Move ${legs} out of its panel`} onClick={() => out && void run(meter.id, { parent_id: out.parent })}>
             ←
           </button>
@@ -227,9 +235,20 @@ function Hidden({ meter, deviceName, onChanged }: { meter: Meter; deviceName: st
   );
 }
 
-export function HierarchyView({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
+/** The Hierarchy tab: the tree, or (the address says which) one meter, one computer or one appliance group open on its own page. */
+export function HierarchyView({ meters, open, onChanged }: { meters: Meter[]; open: string[]; onChanged: () => void }) {
+  const [kind, id] = open;
+  const back = { href: routePath('hierarchy'), label: 'Hierarchy' };
+  if (kind === 'meter' && id) return <MeterPage id={id} meters={meters} back={back} />;
+  if (kind === 'computer' && id) return <ComputerView id={id} meters={meters} />;
+  if (kind === 'group' && id) return <GroupView id={id} meters={meters} />;
+  return <Tree meters={meters} onChanged={onChanged} />;
+}
+
+function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const { data: devices } = usePoll<Device[]>(api.devices, 30_000, [meters.length]);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
+  const { data: groups } = usePoll<ApplianceGroup[]>(api.groups, 30_000, [meters]);
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -287,6 +306,21 @@ export function HierarchyView({ meters, onChanged }: { meters: Meter[]; onChange
           </details>
         )}
       </section>
+      {groups && groups.length > 0 && (
+        <section class="card wide">
+          <h2>Appliance groups</h2>
+          <ul class="bars">
+            {groups.map((g) => (
+              <li key={g.id}>
+                <span class="name">
+                  <a href={routePath('hierarchy', 'group', g.id)}>{g.name}</a>
+                </span>
+                <span class="caption">{g.meter_ids.length} plugs shown as one</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
