@@ -39,7 +39,7 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
 
   return (
     <div ref={box} class="flow">
-      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} height={layout.height} role="img" aria-label="Where the energy went, from the whole to its parts">
+      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} height={layout.height} role="group" aria-label="Where the energy went, from the whole to its parts">
         {layout.links.map((l) => {
           const mid = (l.from.x + layout.nodeWidth + l.to.x) / 2;
           const x0 = l.from.x + layout.nodeWidth;

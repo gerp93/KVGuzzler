@@ -2,7 +2,7 @@
 // an estimator, a history list, a CSV and a chart), then each circuit. The house is the mains clamps alone: circuits and plugs are parts of
 // it and are never added to it.
 import { api } from './api';
-import { Bars } from './Bars';
+import { Bars, meterPath } from './Bars';
 import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
 import { Chart, lineFrom, type Line } from './Chart';
@@ -99,6 +99,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   // The PC's wall plug is a slice of a circuit: once it says which circuit, it is shown beneath it (and counted in what that circuit carries).
   const base = circuitsByWatts(meters, live.readings);
   const slices = pcSlices(meters, live.readings);
+  const top = base[0];
   const placed = slices.filter((r) => r.meter.parent_id && base.some((b) => b.meter.id === r.meter.parent_id));
   const circuits = nestCircuits([...base, ...placed]);
   const house = live.house_watts ?? null;
@@ -130,6 +131,12 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           </div>
           <Spark values={trail} label="The last few minutes of the house's draw" />
         </div>
+        {top && top.watts > 0 && (
+          <p class="insight">
+            Biggest circuit right now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, {formatWatts(top.watts)}
+            {house != null && house > 0 ? ` (${Math.round((top.watts / house) * 100)}% of the house)` : ''}.
+          </p>
+        )}
         <div class="stats three">
           <div class="stat">
             <span class="caption">Energy</span>

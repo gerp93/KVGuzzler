@@ -10,6 +10,8 @@
 /* The themes give a button's fill but not the text on it, and some fills are light and some dark: black or white, whichever reads. */
 body {
   --on-primary: oklch(from var(--color-primary-action) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+  /* The themes' muted text is too faint on their own surfaces (about 3.4:1); this is the text colour pulled slightly toward the surface. */
+  --muted: color-mix(in srgb, var(--color-text) 92%, var(--color-surface));
   --on-top: oklch(from var(--color-top-bar-bg) clamp(0, (0.62 - l) * 1000, 1) 0 0);
 }
 
@@ -84,7 +86,6 @@ button:hover:not(:disabled) {
   gap: 6px;
   margin-right: auto;
   font-size: 0.8rem;
-  opacity: 0.85;
 }
 
 .conn i {
@@ -144,7 +145,6 @@ button:hover:not(:disabled) {
   min-width: 0;
   font-size: 0.72rem;
   color: var(--on-top, var(--color-text));
-  opacity: 0.78;
   text-align: center;
   text-decoration: none;
 }
@@ -225,7 +225,7 @@ main {
 .note {
   margin: 8px 0 0;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .note {
@@ -286,7 +286,7 @@ main {
 
 /* What a sub-panel's feed carries beyond its own circuits: derived, so quieter than a measured row */
 .bars li.rest {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -297,7 +297,7 @@ main {
 }
 
 .cost {
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .derived {
@@ -307,7 +307,7 @@ main {
   margin: 12px 0 0;
   padding-top: 8px;
   border-top: 1px dashed var(--color-border);
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 /* Controls */
@@ -417,7 +417,7 @@ select {
 .hier-energy,
 .hier-cost {
   min-width: 4.5rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .hier-energy,
@@ -429,7 +429,7 @@ select {
   display: none;
   margin-top: 12px;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 /* Wide enough, the columns line up down the list: name, what it is, now, energy and cost over the period, then the buttons. */
@@ -503,7 +503,7 @@ button.icon:disabled {
 
 .drag {
   cursor: grab;
-  color: var(--color-text-muted);
+  color: var(--muted);
   user-select: none;
 }
 
@@ -517,7 +517,7 @@ button.icon:disabled {
   text-align: center;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px dashed var(--color-text-muted);
+  border: 1px dashed var(--muted);
   border-radius: var(--radius);
 }
 
@@ -558,7 +558,7 @@ input[type='radio'] {
   padding: 0;
   margin-bottom: 4px;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .check {
@@ -608,13 +608,8 @@ select:focus-visible {
     border-radius: var(--radius);
   }
 
-  .top nav a {
-    opacity: 0.92;
-  }
-
   .top nav a:hover {
     background: var(--color-top-bar-hover);
-    opacity: 1;
   }
 
   .top nav a[aria-current='page'] {
@@ -667,7 +662,7 @@ select:focus-visible {
 
 .field > span {
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .bill-form {
@@ -839,7 +834,7 @@ select:focus-visible {
 
 .part.rest,
 .swatch.rest {
-  background: var(--color-text-muted);
+  background: var(--muted);
 }
 
 .legend {
@@ -870,7 +865,7 @@ details {
 
 summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 a.button {
@@ -924,12 +919,12 @@ a.button {
 .flow rect.n1 { fill: var(--color-accent-blue); }
 .flow rect.n2 { fill: var(--color-accent-red); }
 .flow rect.n3 { fill: var(--color-accent-muted); }
-.flow rect.rest { fill: var(--color-text-muted); opacity: 0.55; }
+.flow rect.rest { fill: var(--muted); opacity: 0.55; }
 .flow path.n0 { stroke: var(--color-accent-green); }
 .flow path.n1 { stroke: var(--color-accent-blue); }
 .flow path.n2 { stroke: var(--color-accent-red); }
 .flow path.n3 { stroke: var(--color-accent-muted); }
-.flow path.rest { stroke: var(--color-text-muted); }
+.flow path.rest { stroke: var(--muted); }
 
 .flow text {
   fill: var(--color-text);
@@ -941,7 +936,7 @@ a.button {
 }
 
 .flow text .small {
-  fill: var(--color-text-muted);
+  fill: var(--muted);
   font-size: 11px;
 }
 
@@ -959,7 +954,7 @@ a.button {
 }
 
 .hier-row.virtual .part-name {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -1004,7 +999,7 @@ a.button {
 
 /* The column titles above a list of bars */
 .bars li.head {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -1272,7 +1267,8 @@ details.hint .caption {
 }
 
 a {
-  color: var(--color-accent-blue);
+  color: var(--color-text);
+  text-underline-offset: 3px;
 }
 
 a:focus-visible,
@@ -1339,7 +1335,6 @@ summary:focus-visible {
 
   .hier-cost {
     padding-left: 0;
-    color: var(--color-text-muted);
   }
 
   .hier-actions {
@@ -1405,7 +1400,7 @@ main > .caption {
 }
 
 .chart .u-legend .u-series:first-child {
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 /* Forms and prose read best in one column of a sensible width */
@@ -1420,8 +1415,7 @@ main:has(> .page-narrow) {
   gap: 4px;
   min-height: 2rem;
   font-size: 0.95rem;
-  text-decoration: none;
-  color: var(--color-accent-blue);
+  color: var(--color-text);
 }
 
 .back:hover {
@@ -1482,4 +1476,9 @@ main > * {
 
 .chart .u-legend .u-series th {
   padding-right: 4px;
+}
+
+.insight {
+  margin: 12px 0 0;
+  font-size: 0.95rem;
 }
