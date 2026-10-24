@@ -2,20 +2,20 @@ import { api } from './api';
 import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
-import { formatKwh, formatMoney, formatWatts, periodRange, type Channel, type ChannelSummary, type PeriodKey, type Summary } from './lib';
+import { formatKwh, formatMoney, formatWatts, periodRange, type Meter, type MeterSummary, type PeriodKey, type Summary } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
   summary: Summary;
-  mine: ChannelSummary | undefined;
+  mine: MeterSummary | undefined;
   line: Line | undefined;
   domain: [number, number];
 }
 
 /** One ordinary appliance (a circuit or a plug): how much it used, what that cost, and when. */
-export function ApplianceView({ id, channels }: { id: string; channels: Channel[] }) {
+export function ApplianceView({ id, meters }: { id: string; meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
-  const channel = channels.find((c) => c.id === id);
+  const meter = meters.find((c) => c.id === id);
 
   const { data, error } = usePoll<Loaded>(
     async () => {
@@ -23,8 +23,8 @@ export function ApplianceView({ id, channels }: { id: string; channels: Channel[
       const [summary, series] = await Promise.all([api.summary(from, to), api.series(id, from, to)]);
       return {
         summary,
-        mine: summary.channels.find((c) => c.channel_id === id),
-        line: series.points.length > 0 ? lineFrom(channel?.label ?? id, '--color-text', series.points) : undefined,
+        mine: summary.meters.find((c) => c.meter_id === id),
+        line: series.points.length > 0 ? lineFrom(meter?.label ?? id, '--color-text', series.points) : undefined,
         domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number],
       };
     },
@@ -46,11 +46,11 @@ export function ApplianceView({ id, channels }: { id: string; channels: Channel[
           <p>{error.message}</p>
         </section>
       )}
-      {!channel && <p class="note">There is no such appliance.</p>}
-      {channel && (
+      {!meter && <p class="note">There is no such appliance.</p>}
+      {meter && (
         <section class="card hero">
           <div class="row">
-            <h2>{channel.label}</h2>
+            <h2>{meter.label}</h2>
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
           </div>
           <p class="big">{formatKwh(mine?.kwh)}</p>
@@ -67,7 +67,7 @@ export function ApplianceView({ id, channels }: { id: string; channels: Channel[
           <Chart lines={[data.line]} domain={data.domain} />
         </section>
       )}
-      {data && !data.line && channel && <p class="note">Nothing recorded for this appliance in this period.</p>}
+      {data && !data.line && meter && <p class="note">Nothing recorded for this appliance in this period.</p>}
     </>
   );
 }

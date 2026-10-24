@@ -100,16 +100,16 @@ func SupportedModel(model string) bool { return strings.EqualFold(model, "em16p"
 
 const inputsOf = 18
 
-// Setting is what the user has chosen for one channel.
+// Setting is what the user has chosen for one meter.
 type Setting struct {
 	// Invert flips the sign of the clamp's reading: for a clamp put on the other way round.
 	Invert bool
-	// PairWith is the channel of the other leg of the same 240 V breaker. The channel that has it reports both legs added; the other
+	// PairWith is the meter of the other leg of the same 240 V breaker. The meter that has it reports both legs added; the other
 	// leg is then not reported on its own.
 	PairWith string
 }
 
-// SettingsFunc gives the channel settings by channel id. It is asked on every poll, so a change takes effect at once.
+// SettingsFunc gives the meter settings by meter id. It is asked on every poll, so a change takes effect at once.
 type SettingsFunc func(ctx context.Context) (map[string]Setting, error)
 
 // Source polls one monitor. It only ever reads.
@@ -144,7 +144,7 @@ func NewSourceWithBase(base, host, name, model string, settings SettingsFunc, hc
 // DeviceID is the id a monitor at host has.
 func DeviceID(host string) string { return "refoss-" + host }
 
-func (s *Source) channelID(n int) string { return fmt.Sprintf("%s:em%d", DeviceID(s.host), n) }
+func (s *Source) meterID(n int) string { return fmt.Sprintf("%s:em%d", DeviceID(s.host), n) }
 
 func (s *Source) Device() model.Device {
 	name := s.name
@@ -154,21 +154,21 @@ func (s *Source) Device() model.Device {
 	return model.Device{ID: DeviceID(s.host), Kind: "refoss", Host: s.host, Name: name, Model: s.model}
 }
 
-// Channels are every input of the monitor, named as the monitor names them. The ones nothing is clamped on are switched off when the
+// Meters are every input of the monitor, named as the monitor names them. The ones nothing is clamped on are switched off when the
 // device is added, and the user switches on the ones they use.
-func (s *Source) Channels() []model.Channel {
+func (s *Source) Meters() []model.Meter {
 	max := MaxWatts
-	out := make([]model.Channel, 0, inputsOf)
+	out := make([]model.Meter, 0, inputsOf)
 	for n := 1; n <= inputsOf; n++ {
 		idx := n
-		out = append(out, model.Channel{
-			ID: s.channelID(n), DeviceID: DeviceID(s.host), Index: &idx, Scope: model.ScopeCircuit, Label: InputLabel(n), Enabled: true, MaxWatts: &max,
+		out = append(out, model.Meter{
+			ID: s.meterID(n), DeviceID: DeviceID(s.host), Index: &idx, Scope: model.ScopeCircuit, Label: InputLabel(n), Enabled: true, MaxWatts: &max,
 		})
 	}
 	return out
 }
 
-// Poll reads every input once. A channel's power is its clamp's, with its sign flipped if the user said so, and with the other leg added
+// Poll reads every input once. A meter's power is its clamp's, with its sign flipped if the user said so, and with the other leg added
 // when it is paired. A reading that is still negative after that is dropped and said so in the notes: nothing here has solar.
 func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 	body, err := s.client.StatusRaw(ctx)
@@ -186,7 +186,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 		}
 	}
 
-	// A leg that is paired into another channel is reported there, not on its own.
+	// A leg that is paired into another meter is reported there, not on its own.
 	partner := map[string]bool{}
 	for _, st := range settings {
 		if st.PairWith != "" {
@@ -199,7 +199,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 			return 0, false
 		}
 		w := in.Power
-		if settings[s.channelID(n)].Invert {
+		if settings[s.meterID(n)].Invert {
 			w = -w
 		}
 		return w, true
@@ -208,7 +208,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 	var readings []model.Reading
 	var notes, active []string
 	for n := 1; n <= inputsOf; n++ {
-		id := s.channelID(n)
+		id := s.meterID(n)
 		// An input with a load on it, whichever way round its clamp is: a little current, or a little power either way.
 		if in, ok := inputs[n]; ok && in.Voltage >= minVolts && (math.Abs(in.Power) >= backwardsWatts || in.Current >= 0.05) {
 			active = append(active, id)
@@ -222,7 +222,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 		}
 		label := InputLabel(n)
 		if other := settings[id].PairWith; other != "" {
-			if m, ok := inputOfChannel(other); ok {
+			if m, ok := inputOfMeter(other); ok {
 				if w2, ok := watts(m); ok {
 					w += w2
 					label += "+" + InputLabel(m)
@@ -235,7 +235,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 			}
 			continue
 		}
-		readings = append(readings, model.Reading{ChannelID: id, Watts: w})
+		readings = append(readings, model.Reading{MeterID: id, Watts: w})
 	}
 	s.mu.Lock()
 	s.notes, s.active = notes, active
@@ -250,7 +250,7 @@ func (s *Source) Notes() []string {
 	return append([]string(nil), s.notes...)
 }
 
-// Active are the channels that had something clamped on them at the last poll (a load on them, whichever way round the clamp is). The
+// Active are the meters that had something clamped on them at the last poll (a load on them, whichever way round the clamp is). The
 // others are switched off when the monitor is added, so the dashboard does not list a row of zeros.
 func (s *Source) Active() []string {
 	s.mu.Lock()
@@ -258,12 +258,12 @@ func (s *Source) Active() []string {
 	return append([]string(nil), s.active...)
 }
 
-// inputOfChannel is 8 for "refoss-192.168.68.88:em8".
-func inputOfChannel(channelID string) (int, bool) {
-	i := strings.LastIndex(channelID, ":em")
+// inputOfMeter is 8 for "refoss-192.168.68.88:em8".
+func inputOfMeter(meterID string) (int, bool) {
+	i := strings.LastIndex(meterID, ":em")
 	if i < 0 {
 		return 0, false
 	}
-	n, err := strconv.Atoi(channelID[i+3:])
+	n, err := strconv.Atoi(meterID[i+3:])
 	return n, err == nil && n >= 1 && n <= inputsOf
 }

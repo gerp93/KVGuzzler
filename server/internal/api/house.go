@@ -14,7 +14,7 @@ import (
 // whole-house figures the main dashboard shows, the same kinds of figure a computer's page has (energy, cost, highest draw, carbon, an estimate,
 // a history list and a CSV).
 
-// houseFigures adds up the mains channels over [from, to). Have is false when no mains channel is shown.
+// houseFigures adds up the mains meters over [from, to). Have is false when no mains meter is shown.
 type houseFigures struct {
 	Have      bool
 	KWh       float64
@@ -26,7 +26,7 @@ type houseFigures struct {
 	CarbonEst *float64
 }
 
-func (s *Server) houseFigures(ctx context.Context, on []model.Channel, from, to time.Time, schedule *rates.Schedule) (houseFigures, error) {
+func (s *Server) houseFigures(ctx context.Context, on []model.Meter, from, to time.Time, schedule *rates.Schedule) (houseFigures, error) {
 	var h houseFigures
 	var cost rates.Money
 	priced := true
@@ -36,7 +36,7 @@ func (s *Server) houseFigures(ctx context.Context, on []model.Channel, from, to 
 		if ch.Scope != model.ScopeMains {
 			continue
 		}
-		cs, pc, err := s.channelSummary(ctx, ch, from, to, schedule)
+		cs, pc, err := s.meterSummary(ctx, ch, from, to, schedule)
 		if err != nil {
 			return h, err
 		}
@@ -84,7 +84,7 @@ func (s *Server) houseHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	on, _, err := s.enabledChannels(r.Context())
+	on, _, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
@@ -142,12 +142,12 @@ func (s *Server) houseEstimate(w http.ResponseWriter, r *http.Request) {
 	if span > 0 {
 		from = now.Add(-span)
 	}
-	on, _, err := s.enabledChannels(r.Context())
+	on, _, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	var mains []model.Channel
+	var mains []model.Meter
 	var first time.Time
 	for _, ch := range on {
 		if ch.Scope != model.ScopeMains {
@@ -202,7 +202,7 @@ func (s *Server) houseExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	on, _, err := s.enabledChannels(r.Context())
+	on, _, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return

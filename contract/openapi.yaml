@@ -19,10 +19,10 @@ info:
     - Everything about a device is read-only. This API never switches or configures a physical device.
     - Scopes are never summed across each other. `mains` is the whole house, `circuit` and `plug` are parts of it, and
       `pc` is the PC's own wall plug, which is a slice of some circuit already counted. Only readings of one scope
-      are ever added together, and `house_watts` is the sum of the `mains` channels alone.
+      are ever added together, and `house_watts` is the sum of the `mains` meters alone.
     - Money is a decimal string (`"12.34"`), never a number. Dates and times are RFC 3339 in UTC; "day" buckets and
       bill dates use the server's configured local time zone.
-    - A reading above the sanity cap for its channel is dropped, not averaged; the drop is reported in `notes`.
+    - A reading above the sanity cap for its meter is dropped, not averaged; the drop is reported in `notes`.
 servers:
   - url: http://house-box:8080
     description: The house server (host name and port are chosen at install time).
@@ -83,7 +83,7 @@ paths:
               $ref: '#/components/schemas/NewDevice'
       responses:
         '201':
-          description: Created. The server has already read the device once to learn its channels.
+          description: Created. The server has already read the device once to learn its meters.
           content:
             application/json:
               schema:
@@ -120,11 +120,11 @@ paths:
           description: Removed.
         '404':
           $ref: '#/components/responses/Problem'
-  /api/v1/channels:
+  /api/v1/meters:
     get:
       tags: [Read]
-      operationId: listChannels
-      summary: Every channel (a circuit, a mains leg, a plug, the PC) with its label.
+      operationId: listMeters
+      summary: Every meter (a circuit, a mains leg, a plug, the PC) with its label.
       responses:
         '200':
           description: OK
@@ -132,39 +132,39 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [channels]
+                required: [meters]
                 properties:
-                  channels:
+                  meters:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Channel'
-  /api/v1/channels/{channelId}:
+                      $ref: '#/components/schemas/Meter'
+  /api/v1/meters/{meterId}:
     patch:
       tags: [Settings]
-      operationId: updateChannel
-      summary: Rename a channel, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device.
+      operationId: updateMeter
+      summary: Rename a meter, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device.
       parameters:
-        - $ref: '#/components/parameters/ChannelId'
+        - $ref: '#/components/parameters/MeterId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChannelUpdate'
+              $ref: '#/components/schemas/MeterUpdate'
       responses:
         '200':
-          description: The updated channel.
+          description: The updated meter.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Channel'
+                $ref: '#/components/schemas/Meter'
         '404':
           $ref: '#/components/responses/Problem'
   /api/v1/live:
     get:
       tags: [Read]
       operationId: getLive
-      summary: The latest reading of every enabled channel.
+      summary: The latest reading of every enabled meter.
       responses:
         '200':
           description: OK
@@ -176,11 +176,11 @@ paths:
     get:
       tags: [Read]
       operationId: getSeries
-      summary: A channel's power over a period, bucketed.
+      summary: A meter's power over a period, bucketed.
       parameters:
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
-        - name: channel_id
+        - name: meter_id
           in: query
           required: true
           schema:
@@ -205,7 +205,7 @@ paths:
       tags: [Read]
       operationId: getHouseHistory
       summary: The house's energy over the rolling periods (hour, day, week, month, year, all time).
-      description: "One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains channel is shown."
+      description: "One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains meter is shown."
       responses:
         '200':
           description: OK
@@ -262,7 +262,7 @@ paths:
     get:
       tags: [Read]
       operationId: getSummary
-      summary: Energy, cost and carbon per channel for a period, plus the house total.
+      summary: Energy, cost and carbon per meter for a period, plus the house total.
       parameters:
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
@@ -413,7 +413,7 @@ paths:
       operationId: getComputerSeries
       summary: What each part of a computer drew over a period.
       description: |
-        One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a channel's series,
+        One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a meter's series,
         plus the stretches the collector was not recording so a chart can shade them. The lines are never added together. 204 when no
         collector reports for this computer or it has never reported.
       parameters:
@@ -505,7 +505,7 @@ paths:
           in: query
           required: false
           description: |
-            Comma-separated channel ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
+            Comma-separated meter ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
             the computer are ignored.
           schema:
             type: string
@@ -550,7 +550,7 @@ paths:
     post:
       tags: [Settings]
       operationId: addGroup
-      summary: Add an empty group. Put plugs in it with PATCH /channels/{id} group_id.
+      summary: Add an empty group. Put plugs in it with PATCH /meters/{id} group_id.
       requestBody:
         required: true
         content:
@@ -824,8 +824,8 @@ components:
       required: true
       schema:
         type: string
-    ChannelId:
-      name: channelId
+    MeterId:
+      name: meterId
       in: path
       required: true
       schema:
@@ -873,7 +873,7 @@ components:
     Scope:
       type: string
       description: |
-        What a channel measures. Scopes are never summed across each other.
+        What a meter measures. Scopes are never summed across each other.
         `mains` is the whole house (one per measured leg; the house is their sum), `circuit` is one breaker, `plug` is one
         appliance on a smart plug, `pc` is the PC's own wall plug and is a slice of a circuit, never added to anything.
       enum: [mains, circuit, plug, pc]
@@ -926,7 +926,7 @@ components:
           description: |
             What a plug measures (`plug` when left out): `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
             circuit already counted, so it is shown beside the others and added to nothing. Not allowed for a Refoss monitor
-            (400): its inputs are circuits until set otherwise per channel.
+            (400): its inputs are circuits until set otherwise per meter.
     Device:
       type: object
       required: [id, kind, host, online]
@@ -949,7 +949,7 @@ components:
         last_seen:
           type: [string, 'null']
           format: date-time
-    Channel:
+    Meter:
       type: object
       required: [id, device_id, scope, label, enabled]
       properties:
@@ -961,7 +961,7 @@ components:
           type: string
         index:
           type: [integer, 'null']
-          description: The channel number on the device, when it has one.
+          description: The meter number on the device, when it has one.
         scope:
           $ref: '#/components/schemas/Scope'
         label:
@@ -969,32 +969,32 @@ components:
           description: What the user calls it, for example "Dryer" or "EV charger".
         enabled:
           type: boolean
-          description: A switched-off channel is not shown or counted but its history is kept.
+          description: A switched-off meter is not shown or counted but its history is kept.
         max_watts:
           type: [number, 'null']
           description: The sanity cap; a reading above it is dropped.
         computer_id:
           type: [string, 'null']
-          description: The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one.
+          description: The computer this plug belongs to, or null. Only `pc` and `plug` meters can belong to one.
         group_id:
           type: [string, 'null']
-          description: The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer.
+          description: The appliance group this plug is part of, or null. Only an ordinary `plug` meter can be in a group, and not one that belongs to a computer.
         parent_id:
           type: [string, 'null']
           description: |
             The circuit this one is part of, or null. A circuit that feeds a sub-panel holds the circuits clamped inside that panel, and a plug
             says which circuit it is plugged into. The parent's own figure already contains its children's, so a parent and its children are never
-            added together; what the parent has that none of them account for is the remainder. Any channel but `mains` can have one (a computer's wall
+            added together; what the parent has that none of them account for is the remainder. Any meter but `mains` can have one (a computer's wall
             plug and peripherals included: the circuit they are on).
         invert:
           type: boolean
-          description: Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it.
+          description: Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss meter has it.
         pair_with:
           type: [string, 'null']
           description: |
-            The channel of the other leg of the same 240 V breaker. This channel then reports both legs added, and that one is switched off and
-            not reported on its own. Only a Refoss channel has it.
-    ChannelUpdate:
+            The meter of the other leg of the same 240 V breaker. This meter then reports both legs added, and that one is switched off and
+            not reported on its own. Only a Refoss meter has it.
+    MeterUpdate:
       type: object
       minProperties: 1
       properties:
@@ -1010,8 +1010,8 @@ components:
         pair_with:
           type: [string, 'null']
           description: |
-            Refoss only. The channel of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
-            circuit (this channel reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
+            Refoss only. The meter of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
+            circuit (this meter reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
         scope:
           type: string
           enum: [circuit, mains]
@@ -1019,13 +1019,13 @@ components:
         parent_id:
           type: [string, 'null']
           description: |
-            Put this channel inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
-            must be a `circuit` and the channel anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.
+            Put this meter inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
+            must be a `circuit` and the meter anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.
         computer_id:
           type: [string, 'null']
           description: |
             Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
-            any number of `plug` channels are its peripherals.
+            any number of `plug` meters are its peripherals.
         group_id:
           type: [string, 'null']
           description: |
@@ -1033,9 +1033,9 @@ components:
             group and belong to a computer (409).
     Reading:
       type: object
-      required: [channel_id, watts]
+      required: [meter_id, watts]
       properties:
-        channel_id:
+        meter_id:
           type: string
         watts:
           type: number
@@ -1056,7 +1056,7 @@ components:
             $ref: '#/components/schemas/Reading'
         house_watts:
           type: [number, 'null']
-          description: The sum of the `mains` readings only; null when no mains channel answered.
+          description: The sum of the `mains` readings only; null when no mains meter answered.
         notes:
           type: array
           items:
@@ -1077,9 +1077,9 @@ components:
           type: number
     Series:
       type: object
-      required: [channel_id, bucket, points]
+      required: [meter_id, bucket, points]
       properties:
-        channel_id:
+        meter_id:
           type: string
         bucket:
           $ref: '#/components/schemas/Bucket'
@@ -1087,18 +1087,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SeriesPoint'
-    ChannelSummary:
+    MeterSummary:
       type: object
-      required: [channel_id, scope, kwh]
+      required: [meter_id, scope, kwh]
       properties:
-        channel_id:
+        meter_id:
           type: string
         computer_id:
           type: [string, 'null']
-          description: The computer the channel belongs to, so a client can group it with that computer instead of listing it alone.
+          description: The computer the meter belongs to, so a client can group it with that computer instead of listing it alone.
         group_id:
           type: [string, 'null']
-          description: The appliance group the channel is part of, so a client can list the group once instead of each plug.
+          description: The appliance group the meter is part of, so a client can list the group once instead of each plug.
         scope:
           $ref: '#/components/schemas/Scope'
         kwh:
@@ -1117,10 +1117,10 @@ components:
           type: [number, 'null']
         monitored_hours:
           type: number
-          description: Hours inside the period in which this channel actually reported.
+          description: Hours inside the period in which this meter actually reported.
     Summary:
       type: object
-      required: [from, to, channels, house_kwh]
+      required: [from, to, meters, house_kwh]
       properties:
         from:
           type: string
@@ -1128,13 +1128,13 @@ components:
         to:
           type: string
           format: date-time
-        channels:
+        meters:
           type: array
           items:
-            $ref: '#/components/schemas/ChannelSummary'
+            $ref: '#/components/schemas/MeterSummary'
         house_kwh:
           type: [number, 'null']
-          description: Energy of the `mains` channels only; null when there is none.
+          description: Energy of the `mains` meters only; null when there is none.
         house_cost:
           oneOf:
             - $ref: '#/components/schemas/Money'
@@ -1142,7 +1142,7 @@ components:
         unmetered_kwh:
           type: [number, 'null']
           description: |
-            `house_kwh` minus the energy of the enabled top-level `circuit` channels (those with no `parent_id`, or whose parent is not
+            `house_kwh` minus the energy of the enabled top-level `circuit` meters (those with no `parent_id`, or whose parent is not
             shown), never below zero: what no circuit clamp accounts for. A circuit inside a sub-panel's feed is part of the feed's figure
             and is not taken off a second time. Derived, so shown as its own row and never added to anything.
         cost_estimated:
@@ -1155,10 +1155,10 @@ components:
           description: The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity.
         house_peak_watts:
           type: [number, 'null']
-          description: "The mains channels' highest draws added. An upper bound: the legs need not peak in the same second."
+          description: "The mains meters' highest draws added. An upper bound: the legs need not peak in the same second."
         house_carbon_g:
           type: [number, 'null']
-          description: The mains channels' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved.
+          description: The mains meters' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved.
         house_carbon_estimated_kwh:
           type: [number, 'null']
           description: The part of the house's energy whose carbon was worked out at an average because its own hour had no saved intensity.
@@ -1179,7 +1179,7 @@ components:
           format: date-time
         kwh:
           type: number
-          description: The `mains` channels' energy only.
+          description: The `mains` meters' energy only.
         cost:
           oneOf:
             - $ref: '#/components/schemas/Money'
@@ -1199,7 +1199,7 @@ components:
       properties:
         periods:
           type: array
-          description: Empty when no mains channel is shown.
+          description: Empty when no mains meter is shown.
           items:
             $ref: '#/components/schemas/HouseHistoryPeriod'
     RateMode:
@@ -1679,13 +1679,13 @@ components:
             $ref: '#/components/schemas/PcRun'
     ApplianceGroup:
       type: object
-      required: [id, name, channel_ids]
+      required: [id, name, meter_ids]
       properties:
         id:
           type: string
         name:
           type: string
-        channel_ids:
+        meter_ids:
           type: array
           items:
             type: string
@@ -1713,7 +1713,7 @@ components:
           type: array
           description: Each plug that is shown (not hidden), with its own energy and cost.
           items:
-            $ref: '#/components/schemas/ChannelSummary'
+            $ref: '#/components/schemas/MeterSummary'
         total_kwh:
           type: number
           description: The plugs' energy added together (all are ordinary plugs, so adding them is sound).
@@ -1725,7 +1725,7 @@ components:
           type: boolean
     Computer:
       type: object
-      required: [id, name, peripheral_channel_ids]
+      required: [id, name, peripheral_meter_ids]
       properties:
         id:
           type: string
@@ -1734,10 +1734,10 @@ components:
         source_id:
           type: [string, 'null']
           description: The PC collector that reports for this computer, or null when none does.
-        wall_channel_id:
+        wall_meter_id:
           type: [string, 'null']
           description: The plug the computer is on, measuring the whole PC at the wall (scope `pc`).
-        peripheral_channel_ids:
+        peripheral_meter_ids:
           type: array
           description: Plugs next to the computer (monitor, speakers), each a separate device.
           items:
@@ -1781,13 +1781,13 @@ components:
           format: date-time
         wall:
           oneOf:
-            - $ref: '#/components/schemas/ChannelSummary'
+            - $ref: '#/components/schemas/MeterSummary'
             - type: 'null'
           description: The whole PC at the wall, from its plug.
         peripherals:
           type: array
           items:
-            $ref: '#/components/schemas/ChannelSummary'
+            $ref: '#/components/schemas/MeterSummary'
         setup_kwh:
           type: [number, 'null']
           description: The wall figure plus the peripherals, for the whole desk. A separate figure, never part of the PC's own.
@@ -1870,7 +1870,7 @@ components:
             $ref: '#/components/schemas/PcGap'
         carbon_g:
           type: [number, 'null']
-          description: The carbon of what the PC's sensors measured over the period, like a channel's carbon_g.
+          description: The carbon of what the PC's sensors measured over the period, like a meter's carbon_g.
         carbon_estimated_kwh:
           type: [number, 'null']
         live:

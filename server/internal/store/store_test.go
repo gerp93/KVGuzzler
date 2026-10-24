@@ -26,31 +26,31 @@ func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 func TestRegisteringAgainKeepsTheUsersLabelAndSwitch(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
-	ch := model.Channel{ID: "d/ch-01", DeviceID: "d", Scope: model.ScopeCircuit, Label: "Channel 1"}
-	if err := s.UpsertChannel(ctx, ch); err != nil {
+	ch := model.Meter{ID: "d/ch-01", DeviceID: "d", Scope: model.ScopeCircuit, Label: "Meter 1"}
+	if err := s.UpsertMeter(ctx, ch); err != nil {
 		t.Fatal(err)
 	}
 	label, off := "Dryer", false
-	if _, err := s.UpdateChannel(ctx, ch.ID, &label, &off); err != nil {
+	if _, err := s.UpdateMeter(ctx, ch.ID, &label, &off); err != nil {
 		t.Fatal(err)
 	}
 
-	ch.Label = "Channel 1 (renamed by the device)"
-	if err := s.UpsertChannel(ctx, ch); err != nil {
+	ch.Label = "Meter 1 (renamed by the device)"
+	if err := s.UpsertMeter(ctx, ch); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.Channels(ctx)
+	got, err := s.Meters(ctx)
 	if err != nil || len(got) != 1 {
-		t.Fatalf("channels = %v, %v", got, err)
+		t.Fatalf("meters = %v, %v", got, err)
 	}
 	if got[0].Label != "Dryer" || got[0].Enabled {
 		t.Errorf("after re-registering: %+v, want label Dryer and disabled", got[0])
 	}
 }
 
-func TestUpdateUnknownChannel(t *testing.T) {
+func TestUpdateUnknownMeter(t *testing.T) {
 	label := "x"
-	if _, err := open(t).UpdateChannel(context.Background(), "nope", &label, nil); err != ErrNotFound {
+	if _, err := open(t).UpdateMeter(context.Background(), "nope", &label, nil); err != ErrNotFound {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
@@ -131,15 +131,15 @@ func TestMetaRoundTrip(t *testing.T) {
 	}
 }
 
-func TestRemovedDevicesAreNotListedButTheirChannelsStayAndAReAddBringsThemBack(t *testing.T) {
+func TestRemovedDevicesAreNotListedButTheirMetersStayAndAReAddBringsThemBack(t *testing.T) {
 	ctx := context.Background()
 	s := open(t)
 	d := model.Device{ID: "shelly-1", Kind: "shelly_plug", Host: "10.0.0.7", Name: "Dryer plug"}
-	ch := model.Channel{ID: "shelly-1:plug", DeviceID: "shelly-1", Scope: model.ScopePlug, Label: "Dryer plug"}
+	ch := model.Meter{ID: "shelly-1:plug", DeviceID: "shelly-1", Scope: model.ScopePlug, Label: "Dryer plug"}
 	if err := s.UpsertDevice(ctx, d); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpsertChannel(ctx, ch); err != nil {
+	if err := s.UpsertMeter(ctx, ch); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,8 +149,8 @@ func TestRemovedDevicesAreNotListedButTheirChannelsStayAndAReAddBringsThemBack(t
 	if got, _ := s.Devices(ctx); len(got) != 0 {
 		t.Errorf("devices after removal = %v", got)
 	}
-	if got, _ := s.DeviceChannels(ctx, "shelly-1"); len(got) != 1 {
-		t.Errorf("channels after removal = %v, want the history's channel kept", got)
+	if got, _ := s.DeviceMeters(ctx, "shelly-1"); len(got) != 1 {
+		t.Errorf("meters after removal = %v, want the history's meter kept", got)
 	}
 	if err := s.RemoveDevice(ctx, "shelly-1"); err != ErrNotFound {
 		t.Errorf("removing twice: %v, want ErrNotFound", err)

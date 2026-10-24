@@ -98,13 +98,13 @@ func circuitID(i int) string    { return fmt.Sprintf("%s:ch-%02d", deviceID, i+1
 func f64(v float64) *float64    { return &v }
 func idx(i int) *int            { return &i }
 
-func (s *Source) Channels() []model.Channel {
-	chs := []model.Channel{
+func (s *Source) Meters() []model.Meter {
+	chs := []model.Meter{
 		{ID: mainsID("a"), DeviceID: deviceID, Scope: model.ScopeMains, Label: "Mains A", Enabled: true, MaxWatts: f64(26000)},
 		{ID: mainsID("b"), DeviceID: deviceID, Scope: model.ScopeMains, Label: "Mains B", Enabled: true, MaxWatts: f64(26000)},
 	}
 	for i, a := range appliances {
-		chs = append(chs, model.Channel{
+		chs = append(chs, model.Meter{
 			ID: circuitID(i), DeviceID: deviceID, Index: idx(i + 1), Scope: model.ScopeCircuit,
 			Label: a.label, Enabled: true, MaxWatts: f64(a.max),
 		})
@@ -122,13 +122,13 @@ func (s *Source) Poll(_ context.Context) ([]model.Reading, error) {
 	for i, a := range appliances {
 		w := a.watts(hour, r)
 		total += w
-		readings = append(readings, model.Reading{ChannelID: circuitID(i), Watts: w, Volts: f64(a.volts), Amps: f64(w / a.volts)})
+		readings = append(readings, model.Reading{MeterID: circuitID(i), Watts: w, Volts: f64(a.volts), Amps: f64(w / a.volts)})
 	}
 	// The two legs share the load; the 240 V loads draw equally from both.
 	legA, legB := total/2*1.02, total/2*0.98
 	readings = append(readings,
-		model.Reading{ChannelID: mainsID("a"), Watts: legA, Volts: f64(121), Amps: f64(legA / 121)},
-		model.Reading{ChannelID: mainsID("b"), Watts: legB, Volts: f64(120), Amps: f64(legB / 120)},
+		model.Reading{MeterID: mainsID("a"), Watts: legA, Volts: f64(121), Amps: f64(legA / 121)},
+		model.Reading{MeterID: mainsID("b"), Watts: legB, Volts: f64(120), Amps: f64(legB / 120)},
 	)
 	return readings, nil
 }

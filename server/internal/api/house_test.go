@@ -19,12 +19,12 @@ func houseServer(t *testing.T) (*httptest.Server, *store.Store) {
 	t.Helper()
 	srv, st := computerServer(t)
 	ctx := t.Context()
-	for _, ch := range []model.Channel{
+	for _, ch := range []model.Meter{
 		{ID: "mains-a", DeviceID: "d", Scope: model.ScopeMains, Label: "Mains A"},
 		{ID: "mains-b", DeviceID: "d", Scope: model.ScopeMains, Label: "Mains B"},
 		{ID: "dryer", DeviceID: "d", Scope: model.ScopeCircuit, Label: "Dryer"},
 	} {
-		if err := st.UpsertChannel(ctx, ch); err != nil {
+		if err := st.UpsertMeter(ctx, ch); err != nil {
 			t.Fatal(err)
 		}
 	}

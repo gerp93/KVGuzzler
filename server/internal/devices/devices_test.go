@@ -98,9 +98,9 @@ func TestAddReadsTheDeviceOnceAndKeepsIt(t *testing.T) {
 	if got := c.Devices(); len(got) != 1 || got[0].ID != d.ID {
 		t.Errorf("collector devices = %+v", got)
 	}
-	chs, _ := f.st.DeviceChannels(ctx, d.ID)
+	chs, _ := f.st.DeviceMeters(ctx, d.ID)
 	if len(chs) != 1 || chs[0].Scope != model.ScopePC || chs[0].Label != "Desktop PC" {
-		t.Errorf("channels = %+v", chs)
+		t.Errorf("meters = %+v", chs)
 	}
 }
 
@@ -182,9 +182,9 @@ func TestRemoveAndRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The user renames the PC's channel; a restart must not undo that.
+	// The user renames the PC's meter; a restart must not undo that.
 	label := "My desktop"
-	if _, err := f.st.UpdateChannel(ctx, pc.ID+":plug", &label, nil); err != nil {
+	if _, err := f.st.UpdateMeter(ctx, pc.ID+":plug", &label, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,12 +207,12 @@ func TestRemoveAndRestore(t *testing.T) {
 	if len(got) != 1 || got[0].ID != pc.ID {
 		t.Fatalf("restored devices = %+v, want only the PC plug", got)
 	}
-	chs, _ := f.st.DeviceChannels(ctx, pc.ID)
+	chs, _ := f.st.DeviceMeters(ctx, pc.ID)
 	if len(chs) != 1 || chs[0].Scope != model.ScopePC || chs[0].Label != "My desktop" {
-		t.Errorf("channel after restore = %+v, want scope pc and the user's label", chs)
+		t.Errorf("meter after restore = %+v, want scope pc and the user's label", chs)
 	}
-	if old, _ := f.st.DeviceChannels(ctx, gone.ID); len(old) != 1 {
-		t.Error("a removed device's channel (its history) was lost")
+	if old, _ := f.st.DeviceMeters(ctx, gone.ID); len(old) != 1 {
+		t.Error("a removed device's meter (its history) was lost")
 	}
 
 	// Restoring again changes nothing.
@@ -263,7 +263,7 @@ func TestAPcPlugJoinsTheOneComputerWithoutAWallPlugOtherwiseGetsItsOwn(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		return c.WallChannelID
+		return c.WallMeterID
 	}
 
 	// A collector has already added a computer: the plug joins it.
@@ -293,7 +293,7 @@ func TestAPcPlugJoinsTheOneComputerWithoutAWallPlugOtherwiseGetsItsOwn(t *testin
 			laptop = &all[i]
 		}
 	}
-	if laptop == nil || laptop.WallChannelID == nil {
+	if laptop == nil || laptop.WallMeterID == nil {
 		t.Errorf("laptop = %+v", laptop)
 	}
 
@@ -325,7 +325,7 @@ func TestAPcPlugAddedAgainAfterBeingRemovedKeepsItsComputer(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, _ := f.st.Computers(ctx)
-	if len(after) != 1 || after[0].ID != before[0].ID || after[0].WallChannelID == nil {
+	if len(after) != 1 || after[0].ID != before[0].ID || after[0].WallMeterID == nil {
 		t.Errorf("computers = %+v, want the same one with its wall plug still tied", after)
 	}
 }
@@ -337,7 +337,7 @@ func refossReadings(t *testing.T, c *collector.Collector, id string) map[string]
 	c.PollOnce(context.Background(), time.Now())
 	out := map[string]float64{}
 	for _, r := range c.LiveReadings() {
-		out[r.ChannelID] = r.Watts
+		out[r.MeterID] = r.Watts
 	}
 	_ = id
 	return out
@@ -352,9 +352,9 @@ func TestAddingARefossMonitorKeepsItsInputsAndSwitchesOffTheOnesWithNothingOnThe
 	if err != nil || d.ID != "refoss-192.168.68.88" || d.Kind != "refoss" || d.Model != "em16p" || d.Name != "Garage panel" {
 		t.Fatalf("device = %+v, err %v", d, err)
 	}
-	chs, _ := f.st.DeviceChannels(ctx, d.ID)
+	chs, _ := f.st.DeviceMeters(ctx, d.ID)
 	if len(chs) != 18 {
-		t.Fatalf("%d channels, want the 18 inputs", len(chs))
+		t.Fatalf("%d meters, want the 18 inputs", len(chs))
 	}
 	on := map[string]bool{}
 	for _, ch := range chs {
@@ -426,19 +426,19 @@ func TestABackwardsClampIsSaidSoAndFixedByFlippingItsSignOrPairingTheLegs(t *tes
 
 	// Flip the sign of input 2: it reads the 3.7 kW it really draws.
 	yes := true
-	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{Invert: &yes}); err != nil {
+	if _, err := f.st.SetMeterWiring(ctx, id(2), store.WiringChange{Invert: &yes}); err != nil {
 		t.Fatal(err)
 	}
 	if got = refossReadings(t, c, ""); got[id(2)] < 3660 || got[id(2)] > 3680 {
 		t.Errorf("flipped input 2 = %v, want about 3668", got[id(2)])
 	}
 
-	// Flip input 8 too and pair the two legs: one circuit of 7.3 kW on input 2, and input 8 is no channel of its own any more.
-	if _, err := f.st.SetChannelWiring(ctx, id(8), store.WiringChange{Invert: &yes}); err != nil {
+	// Flip input 8 too and pair the two legs: one circuit of 7.3 kW on input 2, and input 8 is no meter of its own any more.
+	if _, err := f.st.SetMeterWiring(ctx, id(8), store.WiringChange{Invert: &yes}); err != nil {
 		t.Fatal(err)
 	}
 	partner := id(8)
-	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{SetPair: true, PairWith: &partner}); err != nil {
+	if _, err := f.st.SetMeterWiring(ctx, id(2), store.WiringChange{SetPair: true, PairWith: &partner}); err != nil {
 		t.Fatal(err)
 	}
 	got = refossReadings(t, c, "")
@@ -448,18 +448,18 @@ func TestABackwardsClampIsSaidSoAndFixedByFlippingItsSignOrPairingTheLegs(t *tes
 	if _, ok := got[id(8)]; ok {
 		t.Error("the second leg is still reported on its own")
 	}
-	if ch, _ := f.st.Channel(ctx, id(8)); ch.Enabled {
+	if ch, _ := f.st.Meter(ctx, id(8)); ch.Enabled {
 		t.Error("the second leg should be switched off once it is part of a circuit")
 	}
 	if n := strings.Join(c.Notes(), ""); strings.Contains(n, "Refoss reads") {
 		t.Errorf("there is nothing backwards any more but the notes say %q", n)
 	}
 
-	// Unpairing brings the leg back as a channel of its own.
-	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{SetPair: true}); err != nil {
+	// Unpairing brings the leg back as a meter of its own.
+	if _, err := f.st.SetMeterWiring(ctx, id(2), store.WiringChange{SetPair: true}); err != nil {
 		t.Fatal(err)
 	}
-	if ch, _ := f.st.Channel(ctx, id(8)); !ch.Enabled || ch.PairWith != nil {
+	if ch, _ := f.st.Meter(ctx, id(8)); !ch.Enabled || ch.PairWith != nil {
 		t.Errorf("after unpairing: %+v", ch)
 	}
 }

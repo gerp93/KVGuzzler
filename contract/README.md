@@ -16,16 +16,21 @@ Adding an optional field or an endpoint keeps the major. Removing, renaming or r
 and its clients are then updated together. A client that meets a different major must say which side needs updating
 instead of guessing.
 
+One deliberate exception: the word "channel" became "meter" everywhere (`/api/v1/meters`, `meter_id`, `Meter`, ...) without a bump to 2. The
+renamed read endpoints are used only by the dashboard embedded in the same server binary (the Electron viewer loads that dashboard and calls none
+of them), and the one outside client, the PC collector, sends `POST /api/v1/ingest/pc`, whose body never had the word. If a client outside
+this repository ever reads the API, a rename like this bumps the major again.
+
 ## Rules the contract encodes
 
 - Read-only toward devices: nothing here switches or configures a Refoss monitor or a plug.
-- A `Scope` is never summed with another. House power is the `mains` channels only; `circuit` and `plug` are parts of it;
+- A `Scope` is never summed with another. House power is the `mains` meters only; `circuit` and `plug` are parts of it;
   the PC's wall plug (`pc`) is a slice of a circuit and is never added to anything.
 - Money is a decimal string. Carbon is an estimate and carries how much of it is estimated.
 - The ingest is idempotent per (`source_id`, `minute`, `name`) so the PC can resend its outbox after a failure.
 
 ## Not settled yet
 
-The Refoss field names (per-channel watts, volts, amps, cumulative kWh) are not confirmed against a real device, so the
-Go server's Refoss client maps whatever the real `Refoss.Status.Get` returns onto these channels. If a real response shows
+The Refoss field names (per-meter watts, volts, amps, cumulative kWh) are not confirmed against a real device, so the
+Go server's Refoss client maps whatever the real `Refoss.Status.Get` returns onto these meters. If a real response shows
 the model needs another field, it is added here first.

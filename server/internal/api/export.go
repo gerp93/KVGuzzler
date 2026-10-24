@@ -143,14 +143,14 @@ func (s *Server) computerExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	schedule := cfg.Schedule(s.Loc)
-	_, byID, err := s.enabledChannels(r.Context())
+	_, byID, err := s.enabledMeters(r.Context())
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 
-	perDay := func(channelID string) (map[rates.Date]float64, error) {
-		points, err := s.Store.Series(r.Context(), channelID, from, to, model.BucketDay, s.Loc)
+	perDay := func(meterID string) (map[rates.Date]float64, error) {
+		points, err := s.Store.Series(r.Context(), meterID, from, to, model.BucketDay, s.Loc)
 		out := map[rates.Date]float64{}
 		for _, p := range points {
 			out[rates.DateOf(p.T, s.Loc)] += p.KWh
@@ -159,7 +159,7 @@ func (s *Server) computerExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var wall map[rates.Date]float64
-	if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+	if ch, ok := byID[derefString(comp.WallMeterID)]; ok && ch.Enabled {
 		if wall, err = perDay(ch.ID); err != nil {
 			serverError(w, err)
 			return
@@ -167,7 +167,7 @@ func (s *Server) computerExport(w http.ResponseWriter, r *http.Request) {
 	}
 	var labels []string
 	var meters []map[rates.Date]float64
-	for _, id := range comp.PeripheralChannelIDs {
+	for _, id := range comp.PeripheralMeterIDs {
 		ch, ok := byID[id]
 		if !ok || !ch.Enabled {
 			continue
@@ -212,10 +212,10 @@ func (s *Server) computerExport(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
-		if ch, ok := byID[derefString(comp.WallChannelID)]; ok && ch.Enabled {
+		if ch, ok := byID[derefString(comp.WallMeterID)]; ok && ch.Enabled {
 			wallID = ch.ID
 		}
-		for _, id := range comp.PeripheralChannelIDs {
+		for _, id := range comp.PeripheralMeterIDs {
 			if ch, ok := byID[id]; ok && ch.Enabled {
 				meterIDs = append(meterIDs, id)
 			}

@@ -5,7 +5,7 @@ import { HelpView } from './HelpView';
 import { HistoryView } from './HistoryView';
 import { usePoll, useStored } from './hooks';
 import { LiveView } from './LiveView';
-import { DEFAULT_THEME, isTheme, setCurrencyCode, type Channel } from './lib';
+import { DEFAULT_THEME, isTheme, setCurrencyCode, type Meter } from './lib';
 import { routePath, useRoute } from './route';
 import { SettingsView } from './SettingsView';
 
@@ -26,17 +26,17 @@ export function App() {
     document.body.className = `${theme}-theme`;
   }, [theme]);
 
-  // Bumped after a rename or a show/hide so the channel list is read again.
+  // Bumped after a rename or a show/hide so the meter list is read again.
   const [rev, setRev] = useState(0);
   const status = usePoll(api.status, 30_000, []);
-  const chan = usePoll<Channel[]>(() => api.channels(), 0, [rev]);
+  const loaded = usePoll<Meter[]>(() => api.meters(), 0, [rev]);
   // Every amount is shown in the currency of the saved price settings.
   const rateSettings = usePoll(api.rates, 60_000, [rev]);
   setCurrencyCode(rateSettings.data?.currency);
 
-  const mismatch = [status.error, chan.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
+  const mismatch = [status.error, loaded.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
   const active: TabId = TABS.find((t) => t.id === route.tab)?.id ?? 'live';
-  const channels = chan.data ?? [];
+  const meters = loaded.data ?? [];
 
   return (
     <>
@@ -55,19 +55,19 @@ export function App() {
           <section class="card warn">
             <p>{mismatch.message}</p>
           </section>
-        ) : !chan.data ? (
-          <p class="note">{chan.error ? `Waiting for the server: ${chan.error.message}` : 'Loading…'}</p>
+        ) : !loaded.data ? (
+          <p class="note">{loaded.error ? `Waiting for the server: ${loaded.error.message}` : 'Loading…'}</p>
         ) : active === 'live' ? (
-          <LiveView channels={channels} onOpenSettings={() => (window.location.hash = routePath('settings'))} />
+          <LiveView meters={meters} onOpenSettings={() => (window.location.hash = routePath('settings'))} />
         ) : active === 'history' ? (
-          <HistoryView channels={channels} />
+          <HistoryView meters={meters} />
         ) : active === 'appliances' ? (
-          <AppliancesView channels={channels} open={route.rest} />
+          <AppliancesView meters={meters} open={route.rest} />
 
         ) : active === 'help' ? (
           <HelpView />
         ) : (
-          <SettingsView channels={channels} onChanged={() => setRev((n) => n + 1)} theme={theme} onTheme={setThemeName} />
+          <SettingsView meters={meters} onChanged={() => setRev((n) => n + 1)} theme={theme} onTheme={setThemeName} />
         )}
         {status.data && status.data.notes.length > 0 && active !== 'live' && (
           <section class="card warn">

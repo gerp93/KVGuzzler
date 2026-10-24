@@ -9,7 +9,7 @@ import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
   COUNT_PC, carbonNote, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
-  type Channel, type ChannelSummary, type ComputerDetail, type PeriodKey,
+  type Meter, type MeterSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
 
@@ -31,21 +31,21 @@ function ago(iso: string | null | undefined): string {
 }
 
 /** One computer: the whole PC at its plug, the desk around it, and (when a collector reports for it) its insides. */
-export function ComputerView({ id, channels }: { id: string; channels: Channel[] }) {
+export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
-  const label = (channelId: string) => channels.find((c) => c.id === channelId)?.label ?? channelId;
+  const label = (meterId: string) => meters.find((c) => c.id === meterId)?.label ?? meterId;
 
   const { data, error } = usePoll<Loaded>(
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
       const detail = await api.computerDetail(id, from, to);
       // Each plug is drawn on its own line; the lines are never added together.
-      const plugs = [detail.wall, ...detail.peripherals].filter((p): p is ChannelSummary => !!p);
+      const plugs = [detail.wall, ...detail.peripherals].filter((p): p is MeterSummary => !!p);
       const [series, pcSeries] = await Promise.all([
-        Promise.all(plugs.map((p) => api.series(p.channel_id, from, to))),
+        Promise.all(plugs.map((p) => api.series(p.meter_id, from, to))),
         detail.computer.source_id ? api.computerSeries(id, from, to) : Promise.resolve(undefined),
       ]);
-      const lines = series.map((s, i) => lineFrom(label(s.channel_id), i === 0 && detail.wall ? '--color-text' : COLORS[i % COLORS.length]!, s.points));
+      const lines = series.map((s, i) => lineFrom(label(s.meter_id), i === 0 && detail.wall ? '--color-text' : COLORS[i % COLORS.length]!, s.points));
       const perScope = new Map<string, number>();
       const inside = (pcSeries?.lines ?? []).map((l) => {
         const index = perScope.get(l.scope) ?? 0;
@@ -56,7 +56,7 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
       return { detail, lines, inside, shades: gapShades(pcSeries?.gaps ?? []), domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
     },
     60_000,
-    [id, period, channels],
+    [id, period, meters],
   );
 
   // The look is small and changes every few seconds, so it has its own quick poll; the period data above is slow.
@@ -64,7 +64,7 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
 
   // What each plug draws right now, as the server reads it.
   const { data: plugsNow } = usePoll(() => api.live(), 5_000, []);
-  const plugWatts = (channelId: string) => plugsNow?.readings.find((r) => r.channel_id === channelId)?.watts ?? null;
+  const plugWatts = (meterId: string) => plugsNow?.readings.find((r) => r.meter_id === meterId)?.watts ?? null;
 
   // What the figures count: the PC and each plug next to it, until one is switched off (and a new plug counts until it is).
   const [offText, setOffText] = useStored(`count-off-${id}`, '');
@@ -76,12 +76,12 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
   const counted = detail ? countedTotals(detail, off, label) : undefined;
   const hasPlugs = (detail?.peripherals.length ?? 0) > 0;
   // The PC itself right now: its wall plug as the server reads it, else the PC's own look (wall as it reads it, else the sensors).
-  const pcWatts = detail?.computer.wall_channel_id != null ? plugWatts(detail.computer.wall_channel_id) : null;
+  const pcWatts = detail?.computer.wall_meter_id != null ? plugWatts(detail.computer.wall_meter_id) : null;
   const pcLook = liveNow && !isLiveStale(liveNow) ? liveSplit(liveNow).baseWatts : null;
-  const plugsList = (detail?.peripherals ?? []).map((p) => ({ key: p.channel_id, watts: plugWatts(p.channel_id) }));
+  const plugsList = (detail?.peripherals ?? []).map((p) => ({ key: p.meter_id, watts: plugWatts(p.meter_id) }));
   const nowWatts = countedWatts(pcWatts ?? pcLook, plugsList, off);
   const pcWhat = pcWatts != null ? 'the whole PC at the wall' : liveNow && liveSplit(liveNow).baseIsWall ? 'the whole PC at the wall, as it reads it' : 'the sensors added together';
-  const nowWhat = [...(off.has(COUNT_PC) ? [] : [pcWhat]), ...(detail?.peripherals ?? []).filter((p) => !off.has(p.channel_id)).map((p) => label(p.channel_id))].join(', ') || 'nothing counted';
+  const nowWhat = [...(off.has(COUNT_PC) ? [] : [pcWhat]), ...(detail?.peripherals ?? []).filter((p) => !off.has(p.meter_id)).map((p) => label(p.meter_id))].join(', ') || 'nothing counted';
   const pcPeak = detail?.wall?.peak_watts ?? detail?.pc?.total_peak_watts ?? null;
   // The sensors' peak stands in for the wall's only when there is no wall plug and nothing else counts.
   const peak = hasPlugs && counted && counted.parts.length > 0 ? counted.peak : pcPeak;
@@ -133,8 +133,8 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
                   </label>
                 )}
                 {detail.peripherals.map((p) => (
-                  <label key={p.channel_id}>
-                    <input type="checkbox" checked={!off.has(p.channel_id)} onChange={() => toggle(p.channel_id)} /> {label(p.channel_id)}
+                  <label key={p.meter_id}>
+                    <input type="checkbox" checked={!off.has(p.meter_id)} onChange={() => toggle(p.meter_id)} /> {label(p.meter_id)}
                   </label>
                 ))}
               </div>
@@ -167,8 +167,8 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
               </p>
               <ul class="bars wide">
                 {detail.peripherals.map((p) => (
-                  <li key={p.channel_id}>
-                    <span class="name">{label(p.channel_id)}</span>
+                  <li key={p.meter_id}>
+                    <span class="name">{label(p.meter_id)}</span>
                     <span class="bar" aria-hidden="true">
                       <i style={{ width: `${detail.setup_kwh! > 0 ? (p.kwh / detail.setup_kwh!) * 100 : 0}%` }} />
                     </span>
@@ -190,9 +190,9 @@ export function ComputerView({ id, channels }: { id: string; channels: Channel[]
 
           <Estimator
             load={(window) =>
-              api.computerEstimate(id, window, detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid)), !off.has(COUNT_PC))
+              api.computerEstimate(id, window, detail.peripherals.map((p) => p.meter_id).filter((cid) => !off.has(cid)), !off.has(COUNT_PC))
             }
-            deps={[id, detail.peripherals.map((p) => p.channel_id).filter((cid) => !off.has(cid)).join(','), off.has(COUNT_PC)]}
+            deps={[id, detail.peripherals.map((p) => p.meter_id).filter((cid) => !off.has(cid)).join(','), off.has(COUNT_PC)]}
             basisOf={usageBasis}
             who="the PC"
             nowWatts={nowWatts}

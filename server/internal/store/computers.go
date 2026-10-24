@@ -149,7 +149,7 @@ func (s *Store) Computers(ctx context.Context) ([]model.Computer, error) {
 		if source.Valid {
 			c.SourceID = &source.String
 		}
-		c.PeripheralChannelIDs = []string{}
+		c.PeripheralMeterIDs = []string{}
 		byID[c.ID] = &c
 		order = append(order, c.ID)
 	}
@@ -158,13 +158,13 @@ func (s *Store) Computers(ctx context.Context) ([]model.Computer, error) {
 		return nil, err
 	}
 
-	chans, err := s.db.QueryContext(ctx, `SELECT computer_id, id, scope FROM channels WHERE computer_id IS NOT NULL ORDER BY id`)
+	chans, err := s.db.QueryContext(ctx, `SELECT computer_id, id, scope FROM meters WHERE computer_id IS NOT NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	for chans.Next() {
-		var computerID, channelID, scope string
-		if err := chans.Scan(&computerID, &channelID, &scope); err != nil {
+		var computerID, meterID, scope string
+		if err := chans.Scan(&computerID, &meterID, &scope); err != nil {
 			chans.Close()
 			return nil, err
 		}
@@ -172,11 +172,11 @@ func (s *Store) Computers(ctx context.Context) ([]model.Computer, error) {
 		if c == nil {
 			continue // a plug that still points at a computer that was removed
 		}
-		id := channelID
+		id := meterID
 		if model.Scope(scope) == model.ScopePC {
-			c.WallChannelID = &id
+			c.WallMeterID = &id
 		} else {
-			c.PeripheralChannelIDs = append(c.PeripheralChannelIDs, id)
+			c.PeripheralMeterIDs = append(c.PeripheralMeterIDs, id)
 		}
 	}
 	chans.Close()
@@ -269,7 +269,7 @@ func (s *Store) DeleteComputer(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE channels SET computer_id = NULL WHERE computer_id = ?`, id); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE meters SET computer_id = NULL WHERE computer_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM computers WHERE id = ?`, id)
@@ -282,47 +282,47 @@ func (s *Store) DeleteComputer(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
-// Channel returns one channel, or ErrNotFound.
-func (s *Store) Channel(ctx context.Context, id string) (model.Channel, error) {
-	c, err := scanChannel(s.db.QueryRowContext(ctx, `SELECT `+channelCols+` FROM channels WHERE id = ?`, id))
+// Meter returns one meter, or ErrNotFound.
+func (s *Store) Meter(ctx context.Context, id string) (model.Meter, error) {
+	c, err := scanMeter(s.db.QueryRowContext(ctx, `SELECT `+meterCols+` FROM meters WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return model.Channel{}, ErrNotFound
+		return model.Meter{}, ErrNotFound
 	}
 	return c, err
 }
 
-// AssignChannel ties a plug to a computer, or lets it go (nil). Only a plug's channels can belong to a computer: a `pc`
-// channel is its wall plug (one per computer), a `plug` channel is a peripheral.
-func (s *Store) AssignChannel(ctx context.Context, channelID string, computerID *string) (model.Channel, error) {
-	ch, err := s.Channel(ctx, channelID)
+// AssignMeter ties a plug to a computer, or lets it go (nil). Only a plug's meters can belong to a computer: a `pc`
+// meter is its wall plug (one per computer), a `plug` meter is a peripheral.
+func (s *Store) AssignMeter(ctx context.Context, meterID string, computerID *string) (model.Meter, error) {
+	ch, err := s.Meter(ctx, meterID)
 	if err != nil {
-		return model.Channel{}, err
+		return model.Meter{}, err
 	}
 	if computerID == nil || *computerID == "" {
-		if _, err := s.db.ExecContext(ctx, `UPDATE channels SET computer_id = NULL WHERE id = ?`, channelID); err != nil {
-			return model.Channel{}, err
+		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET computer_id = NULL WHERE id = ?`, meterID); err != nil {
+			return model.Meter{}, err
 		}
-		return s.Channel(ctx, channelID)
+		return s.Meter(ctx, meterID)
 	}
 
 	if ch.Scope != model.ScopePC && ch.Scope != model.ScopePlug {
-		return model.Channel{}, invalid("Only a smart plug can belong to a computer, not a %s channel.", ch.Scope)
+		return model.Meter{}, invalid("Only a smart plug can belong to a computer, not a %s meter.", ch.Scope)
 	}
 	if ch.GroupID != nil {
-		return model.Channel{}, conflict("%s is part of a group. Take it out of the group first.", ch.Label)
+		return model.Meter{}, conflict("%s is part of a group. Take it out of the group first.", ch.Label)
 	}
 	comp, err := s.Computer(ctx, *computerID)
 	if errors.Is(err, ErrNotFound) {
-		return model.Channel{}, invalid("There is no such computer.")
+		return model.Meter{}, invalid("There is no such computer.")
 	}
 	if err != nil {
-		return model.Channel{}, err
+		return model.Meter{}, err
 	}
-	if ch.Scope == model.ScopePC && comp.WallChannelID != nil && *comp.WallChannelID != channelID {
-		return model.Channel{}, conflict("%s is already on a plug that measures the whole PC. A computer has one.", comp.Name)
+	if ch.Scope == model.ScopePC && comp.WallMeterID != nil && *comp.WallMeterID != meterID {
+		return model.Meter{}, conflict("%s is already on a plug that measures the whole PC. A computer has one.", comp.Name)
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE channels SET computer_id = ? WHERE id = ?`, *computerID, channelID); err != nil {
-		return model.Channel{}, err
+	if _, err := s.db.ExecContext(ctx, `UPDATE meters SET computer_id = ? WHERE id = ?`, *computerID, meterID); err != nil {
+		return model.Meter{}, err
 	}
-	return s.Channel(ctx, channelID)
+	return s.Meter(ctx, meterID)
 }

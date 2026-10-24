@@ -13,13 +13,13 @@ describe('the hash router', () => {
     expect(parseRoute('#/appliances/computer/comp-1a2b', 'live')).toEqual({ tab: 'appliances', rest: ['computer', 'comp-1a2b'] });
   });
 
-  it('round-trips ids that need escaping, such as a plug channel with a colon', () => {
-    const path = routePath('appliances', 'channel', 'shelly-192.168.1.67:plug');
-    expect(path).toBe('#/appliances/channel/shelly-192.168.1.67%3Aplug');
-    expect(parseRoute(path, 'live').rest).toEqual(['channel', 'shelly-192.168.1.67:plug']);
+  it('round-trips ids that need escaping, such as a plug meter with a colon', () => {
+    const path = routePath('appliances', 'meter', 'shelly-192.168.1.67:plug');
+    expect(path).toBe('#/appliances/meter/shelly-192.168.1.67%3Aplug');
+    expect(parseRoute(path, 'live').rest).toEqual(['meter', 'shelly-192.168.1.67:plug']);
   });
 
   it('does not fall over on a broken escape', () => {
-    expect(parseRoute('#/appliances/channel/%E0%A4%A', 'live').rest).toEqual(['channel', '%E0%A4%A']);
+    expect(parseRoute('#/appliances/meter/%E0%A4%A', 'live').rest).toEqual(['meter', '%E0%A4%A']);
   });
 });

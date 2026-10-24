@@ -276,21 +276,21 @@ select {
   flex: 1 1 10rem;
 }
 
-/* Settings > Channels: a compact row per input, the fiddly options behind a Wiring button */
-.chan-device {
+/* Settings > Meters: a compact row per input, the fiddly options behind a Wiring button */
+.meter-device {
   margin-top: 16px;
 }
 
-.chan-device h3 {
+.meter-device h3 {
   margin: 0 0 8px;
 }
 
-.chan-device h3 .caption {
+.meter-device h3 .caption {
   margin-left: 6px;
   font-weight: 400;
 }
 
-.channels {
+.meters {
   display: grid;
   gap: 10px;
   margin: 0;
@@ -298,29 +298,29 @@ select {
   list-style: none;
 }
 
-.channels .chan {
+.meters .meter-row {
   display: grid;
   gap: 8px;
   padding-left: 8px;
   border-left: 2px solid var(--color-border);
 }
 
-.chan-main {
+.meter-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.chan-main .grow {
+.meter-main .grow {
   flex: 1 1 11rem;
 }
 
-.chan-main .caption {
+.meter-main .caption {
   margin: 0;
 }
 
-.chan-wiring {
+.meter-wiring {
   display: grid;
   gap: 12px;
   padding: 10px 12px;
@@ -328,11 +328,11 @@ select {
   border-radius: var(--radius);
 }
 
-.chan-wiring .field {
+.meter-wiring .field {
   margin-top: 0;
 }
 
-.chan-wiring fieldset {
+.meter-wiring fieldset {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
@@ -341,7 +341,7 @@ select {
   border: 0;
 }
 
-.chan-wiring legend {
+.meter-wiring legend {
   padding: 0;
   margin-bottom: 4px;
   font-size: 0.85rem;

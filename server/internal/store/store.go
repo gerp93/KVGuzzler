@@ -1,6 +1,6 @@
 // Package store keeps the server's history in SQLite (WAL mode, pure Go driver, so the server cross-compiles).
 //
-// History is per-minute rows per channel: the average and highest watts and how many seconds of the minute were
+// History is per-minute rows per meter: the average and highest watts and how many seconds of the minute were
 // actually covered. Energy is average watts x covered seconds, so a minute only partly covered counts only what was seen.
 package store
 
@@ -55,7 +55,75 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// renameChannelsToMeters moves a database made when a meter was still called a channel: the table `channels` becomes `meters` and the
+// column `minutes.channel_id` becomes `meter_id`. It runs before anything else, so the CREATE TABLE IF NOT EXISTS below never makes an empty
+// `meters` beside the old table, and it does nothing on a database that has been moved already (or was made after the rename).
+func renameChannelsToMeters(db *sql.DB) error {
+	count := func(q string, args ...any) (int, error) {
+		var n int
+		err := db.QueryRow(q, args...).Scan(&n)
+		return n, err
+	}
+	hasTable := func(name string) (bool, error) {
+		n, err := count(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name)
+		return n > 0, err
+	}
+	oldTable, err := hasTable("channels")
+	if err != nil {
+		return err
+	}
+	oldColumn := false
+	if minutes, err := hasTable("minutes"); err != nil {
+		return err
+	} else if minutes {
+		n, err := count(`SELECT COUNT(*) FROM pragma_table_info('minutes') WHERE name = 'channel_id'`)
+		if err != nil {
+			return err
+		}
+		oldColumn = n > 0
+	}
+	if !oldTable && !oldColumn {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if oldTable {
+		var meters int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meters'`).Scan(&meters); err != nil {
+			return err
+		}
+		if meters > 0 {
+			// Both exist: only an empty `meters` (made by mistake) may be thrown away; never guess between two with rows in them.
+			var rows int
+			if err := tx.QueryRow(`SELECT COUNT(*) FROM meters`).Scan(&rows); err != nil {
+				return err
+			}
+			if rows > 0 {
+				return errors.New("both a channels table and a meters table have rows")
+			}
+			if _, err := tx.Exec(`DROP TABLE meters`); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(`ALTER TABLE channels RENAME TO meters`); err != nil {
+			return err
+		}
+	}
+	if oldColumn {
+		if _, err := tx.Exec(`ALTER TABLE minutes RENAME COLUMN channel_id TO meter_id`); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func migrate(db *sql.DB) error {
+	if err := renameChannelsToMeters(db); err != nil {
+		return fmt.Errorf("store: migrate: channels to meters: %w", err)
+	}
 	_, err := db.Exec(`
 CREATE TABLE IF NOT EXISTS devices (
   id    TEXT PRIMARY KEY,
@@ -65,7 +133,7 @@ CREATE TABLE IF NOT EXISTS devices (
   model TEXT NOT NULL DEFAULT '',
   removed INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS channels (
+CREATE TABLE IF NOT EXISTS meters (
   id        TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
   idx       INTEGER,
@@ -77,12 +145,12 @@ CREATE TABLE IF NOT EXISTS channels (
   group_id TEXT
 );
 CREATE TABLE IF NOT EXISTS minutes (
-  channel_id TEXT NOT NULL,
+  meter_id TEXT NOT NULL,
   minute     INTEGER NOT NULL,
   avg_w      REAL NOT NULL,
   max_w      REAL NOT NULL,
   seconds    REAL NOT NULL,
-  PRIMARY KEY (channel_id, minute)
+  PRIMARY KEY (meter_id, minute)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -103,11 +171,11 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 		}
 	}
 	// Databases made before plugs could belong to a computer have no such column.
-	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = 'computer_id'`).Scan(&has); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = 'computer_id'`).Scan(&has); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
 	if has == 0 {
-		if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN computer_id TEXT`); err != nil {
+		if _, err := db.Exec(`ALTER TABLE meters ADD COLUMN computer_id TEXT`); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
@@ -115,21 +183,21 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 	// And before a circuit could be part of a sub-panel's feed.
 	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT"} {
 		name := col[:strings.IndexByte(col, ' ')]
-		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = ?`, name).Scan(&has); err != nil {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = ?`, name).Scan(&has); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 		if has == 0 {
-			if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN ` + col); err != nil {
+			if _, err := db.Exec(`ALTER TABLE meters ADD COLUMN ` + col); err != nil {
 				return fmt.Errorf("store: migrate: %w", err)
 			}
 		}
 	}
 	// And before plugs could be grouped.
-	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name = 'group_id'`).Scan(&has); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = 'group_id'`).Scan(&has); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
 	if has == 0 {
-		if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN group_id TEXT`); err != nil {
+		if _, err := db.Exec(`ALTER TABLE meters ADD COLUMN group_id TEXT`); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
@@ -145,8 +213,8 @@ ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, host = excluded.host, name =
 	return err
 }
 
-// UpsertChannel records a channel. The label and the enabled switch are the user's and survive re-registering.
-func (s *Store) UpsertChannel(ctx context.Context, c model.Channel) error {
+// UpsertMeter records a meter. The label and the enabled switch are the user's and survive re-registering.
+func (s *Store) UpsertMeter(ctx context.Context, c model.Meter) error {
 	var idx any
 	if c.Index != nil {
 		idx = *c.Index
@@ -156,7 +224,7 @@ func (s *Store) UpsertChannel(ctx context.Context, c model.Channel) error {
 		max = *c.MaxWatts
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO channels(id, device_id, idx, scope, label, enabled, max_watts) VALUES (?, ?, ?, ?, ?, 1, ?)
+INSERT INTO meters(id, device_id, idx, scope, label, enabled, max_watts) VALUES (?, ?, ?, ?, ?, 1, ?)
 ON CONFLICT(id) DO UPDATE SET device_id = excluded.device_id, idx = excluded.idx, scope = excluded.scope, max_watts = excluded.max_watts`,
 		c.ID, c.DeviceID, idx, string(c.Scope), c.Label, max)
 	return err
@@ -179,8 +247,8 @@ func (s *Store) Devices(ctx context.Context) ([]model.Device, error) {
 	return out, rows.Err()
 }
 
-func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
-	var c model.Channel
+func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
+	var c model.Meter
 	var idx sql.NullInt64
 	var max sql.NullFloat64
 	var computer, group, pair, parent sql.NullString
@@ -214,17 +282,17 @@ func scanChannel(sc interface{ Scan(...any) error }) (model.Channel, error) {
 	return c, nil
 }
 
-const channelCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id`
+const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id`
 
-func (s *Store) Channels(ctx context.Context) ([]model.Channel, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels ORDER BY device_id, idx IS NULL, idx, id`)
+func (s *Store) Meters(ctx context.Context) ([]model.Meter, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+meterCols+` FROM meters ORDER BY device_id, idx IS NULL, idx, id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []model.Channel
+	var out []model.Meter
 	for rows.Next() {
-		c, err := scanChannel(rows)
+		c, err := scanMeter(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -233,11 +301,11 @@ func (s *Store) Channels(ctx context.Context) ([]model.Channel, error) {
 	return out, rows.Err()
 }
 
-// UpdateChannel changes the user's label and/or enabled switch of a channel and returns it.
-func (s *Store) UpdateChannel(ctx context.Context, id string, label *string, enabled *bool) (model.Channel, error) {
+// UpdateMeter changes the user's label and/or enabled switch of a meter and returns it.
+func (s *Store) UpdateMeter(ctx context.Context, id string, label *string, enabled *bool) (model.Meter, error) {
 	if label != nil {
-		if _, err := s.db.ExecContext(ctx, `UPDATE channels SET label = ? WHERE id = ?`, *label, id); err != nil {
-			return model.Channel{}, err
+		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET label = ? WHERE id = ?`, *label, id); err != nil {
+			return model.Meter{}, err
 		}
 	}
 	if enabled != nil {
@@ -245,30 +313,30 @@ func (s *Store) UpdateChannel(ctx context.Context, id string, label *string, ena
 		if *enabled {
 			v = 1
 		}
-		if _, err := s.db.ExecContext(ctx, `UPDATE channels SET enabled = ? WHERE id = ?`, v, id); err != nil {
-			return model.Channel{}, err
+		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET enabled = ? WHERE id = ?`, v, id); err != nil {
+			return model.Meter{}, err
 		}
 	}
-	c, err := scanChannel(s.db.QueryRowContext(ctx, `SELECT `+channelCols+` FROM channels WHERE id = ?`, id))
+	c, err := scanMeter(s.db.QueryRowContext(ctx, `SELECT `+meterCols+` FROM meters WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return model.Channel{}, ErrNotFound
+		return model.Meter{}, ErrNotFound
 	}
 	return c, err
 }
 
-// AddMinute adds covered time to a channel's minute. Adding to a minute that already has rows merges them (the
+// AddMinute adds covered time to a meter's minute. Adding to a minute that already has rows merges them (the
 // averages are weighted by seconds), so a restart in the middle of a minute loses nothing.
-func (s *Store) AddMinute(ctx context.Context, channelID string, minute time.Time, avgW, maxW, seconds float64) error {
+func (s *Store) AddMinute(ctx context.Context, meterID string, minute time.Time, avgW, maxW, seconds float64) error {
 	if seconds <= 0 {
 		return nil
 	}
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO minutes(channel_id, minute, avg_w, max_w, seconds) VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(channel_id, minute) DO UPDATE SET
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(meter_id, minute) DO UPDATE SET
   avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / (seconds + excluded.seconds),
   max_w   = max(max_w, excluded.max_w),
   seconds = seconds + excluded.seconds`,
-		channelID, minute.Unix(), avgW, maxW, seconds)
+		meterID, minute.Unix(), avgW, maxW, seconds)
 	return err
 }
 
@@ -278,10 +346,10 @@ type Totals struct {
 	MonitoredHours float64
 }
 
-// FirstMinute is the first minute a channel has any energy recorded, or false when it has none.
-func (s *Store) FirstMinute(ctx context.Context, channelID string) (time.Time, bool, error) {
+// FirstMinute is the first minute a meter has any energy recorded, or false when it has none.
+func (s *Store) FirstMinute(ctx context.Context, meterID string) (time.Time, bool, error) {
 	var first sql.NullInt64
-	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM minutes WHERE channel_id = ?`, channelID).Scan(&first); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM minutes WHERE meter_id = ?`, meterID).Scan(&first); err != nil {
 		return time.Time{}, false, err
 	}
 	if !first.Valid {
@@ -290,13 +358,13 @@ func (s *Store) FirstMinute(ctx context.Context, channelID string) (time.Time, b
 	return time.Unix(first.Int64, 0).UTC(), true, nil
 }
 
-// Totals is a channel's energy, highest reading and covered time in [from, to).
-func (s *Store) Totals(ctx context.Context, channelID string, from, to time.Time) (Totals, error) {
+// Totals is a meter's energy, highest reading and covered time in [from, to).
+func (s *Store) Totals(ctx context.Context, meterID string, from, to time.Time) (Totals, error) {
 	var ws, peak, secs float64
 	err := s.db.QueryRowContext(ctx, `
 SELECT COALESCE(SUM(avg_w * seconds), 0), COALESCE(MAX(max_w), 0), COALESCE(SUM(seconds), 0)
-FROM minutes WHERE channel_id = ? AND minute >= ? AND minute < ?`,
-		channelID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs)
+FROM minutes WHERE meter_id = ? AND minute >= ? AND minute < ?`,
+		meterID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs)
 	if err != nil {
 		return Totals{}, err
 	}
@@ -305,15 +373,15 @@ FROM minutes WHERE channel_id = ? AND minute >= ? AND minute < ?`,
 
 type agg struct{ ws, max, secs float64 }
 
-// Series is a channel's power over [from, to), bucketed. A "day" is a day of loc.
-func (s *Store) Series(ctx context.Context, channelID string, from, to time.Time, bucket model.Bucket, loc *time.Location) ([]model.Point, error) {
+// Series is a meter's power over [from, to), bucketed. A "day" is a day of loc.
+func (s *Store) Series(ctx context.Context, meterID string, from, to time.Time, bucket model.Bucket, loc *time.Location) ([]model.Point, error) {
 	q := `SELECT minute, avg_w * seconds, max_w, seconds FROM minutes
-WHERE channel_id = ? AND minute >= ? AND minute < ? ORDER BY minute`
+WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`
 	if bucket != model.BucketMinute {
 		q = `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds), MAX(max_w), SUM(seconds) FROM minutes
-WHERE channel_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
+WHERE meter_id = ? AND minute >= ? AND minute < ? GROUP BY 1 ORDER BY 1`
 	}
-	rows, err := s.db.QueryContext(ctx, q, channelID, from.Unix(), to.Unix())
+	rows, err := s.db.QueryContext(ctx, q, meterID, from.Unix(), to.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +457,7 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	return err
 }
 
-// RemoveDevice marks a device as no longer polled. Its channels and history stay.
+// RemoveDevice marks a device as no longer polled. Its meters and history stay.
 func (s *Store) RemoveDevice(ctx context.Context, id string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE devices SET removed = 1 WHERE id = ? AND removed = 0`, id)
 	if err != nil {
@@ -401,16 +469,16 @@ func (s *Store) RemoveDevice(ctx context.Context, id string) error {
 	return nil
 }
 
-// DeviceChannels returns the channels of one device.
-func (s *Store) DeviceChannels(ctx context.Context, deviceID string) ([]model.Channel, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+channelCols+` FROM channels WHERE device_id = ? ORDER BY idx IS NULL, idx, id`, deviceID)
+// DeviceMeters returns the meters of one device.
+func (s *Store) DeviceMeters(ctx context.Context, deviceID string) ([]model.Meter, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+meterCols+` FROM meters WHERE device_id = ? ORDER BY idx IS NULL, idx, id`, deviceID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []model.Channel
+	var out []model.Meter
 	for rows.Next() {
-		c, err := scanChannel(rows)
+		c, err := scanMeter(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -419,20 +487,20 @@ func (s *Store) DeviceChannels(ctx context.Context, deviceID string) ([]model.Ch
 	return out, rows.Err()
 }
 
-// HourlyKWh is the energy the given channels together used in each hour of [from, to), by the unix second the hour starts. Only the
-// channels of one scope should be given (never the house and its circuits together: that would count the same power twice).
-func (s *Store) HourlyKWh(ctx context.Context, channelIDs []string, from, to time.Time) (map[int64]float64, error) {
+// HourlyKWh is the energy the given meters together used in each hour of [from, to), by the unix second the hour starts. Only the
+// meters of one scope should be given (never the house and its circuits together: that would count the same power twice).
+func (s *Store) HourlyKWh(ctx context.Context, meterIDs []string, from, to time.Time) (map[int64]float64, error) {
 	out := map[int64]float64{}
-	if len(channelIDs) == 0 {
+	if len(meterIDs) == 0 {
 		return out, nil
 	}
-	marks := strings.TrimSuffix(strings.Repeat("?,", len(channelIDs)), ",")
-	args := make([]any, 0, len(channelIDs)+2)
-	for _, id := range channelIDs {
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(meterIDs)), ",")
+	args := make([]any, 0, len(meterIDs)+2)
+	for _, id := range meterIDs {
 		args = append(args, id)
 	}
 	args = append(args, from.Unix(), to.Unix())
-	rows, err := s.db.QueryContext(ctx, `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds) FROM minutes WHERE channel_id IN (`+marks+`) AND minute >= ? AND minute < ? GROUP BY 1`, args...)
+	rows, err := s.db.QueryContext(ctx, `SELECT (minute / 3600) * 3600, SUM(avg_w * seconds) FROM minutes WHERE meter_id IN (`+marks+`) AND minute >= ? AND minute < ? GROUP BY 1`, args...)
 	if err != nil {
 		return nil, err
 	}

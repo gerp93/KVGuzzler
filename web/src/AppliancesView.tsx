@@ -6,7 +6,7 @@ import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import {
   applianceList, formatKwh, formatMoney, periodRange,
-  type ApplianceGroup, type Channel, type Computer, type PeriodKey, type Summary,
+  type ApplianceGroup, type Meter, type Computer, type PeriodKey, type Summary,
 } from './lib';
 import { routePath } from './route';
 
@@ -17,15 +17,15 @@ interface Loaded {
 }
 
 /** The Appliances tab: a list, and one thing open at a time (an ordinary appliance, or a computer with its full breakdown). */
-export function AppliancesView({ channels, open }: { channels: Channel[]; open: string[] }) {
+export function AppliancesView({ meters, open }: { meters: Meter[]; open: string[] }) {
   const [kind, id] = open;
-  if (kind === 'computer' && id) return <ComputerView id={id} channels={channels} />;
-  if (kind === 'channel' && id) return <ApplianceView id={id} channels={channels} />;
-  if (kind === 'group' && id) return <GroupView id={id} channels={channels} />;
-  return <AppliancesList channels={channels} />;
+  if (kind === 'computer' && id) return <ComputerView id={id} meters={meters} />;
+  if (kind === 'meter' && id) return <ApplianceView id={id} meters={meters} />;
+  if (kind === 'group' && id) return <GroupView id={id} meters={meters} />;
+  return <AppliancesList meters={meters} />;
 }
 
-function AppliancesList({ channels }: { channels: Channel[] }) {
+function AppliancesList({ meters }: { meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
   const { data, error } = usePoll<Loaded>(
     async () => {
@@ -34,10 +34,10 @@ function AppliancesList({ channels }: { channels: Channel[] }) {
       return { summary, computers, groups };
     },
     60_000,
-    [period, channels],
+    [period, meters],
   );
 
-  const list = data ? applianceList(data.summary, channels, data.computers, data.groups) : undefined;
+  const list = data ? applianceList(data.summary, meters, data.computers, data.groups) : undefined;
   const estimated = data?.summary.cost_estimated;
   const top = Math.max(0, ...(list?.appliances.map((a) => a.kwh) ?? []), data?.summary.unmetered_kwh ?? 0);
   const topComputer = Math.max(0, ...(list?.computers.map((c) => c.wall?.kwh ?? 0) ?? []));

@@ -2,15 +2,15 @@ import { api } from './api';
 import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
-import { periodRange, sumByTime, type Channel, type PeriodKey } from './lib';
+import { periodRange, sumByTime, type Meter, type PeriodKey } from './lib';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red'];
 
-export function HistoryView({ channels }: { channels: Channel[] }) {
+export function HistoryView({ meters }: { meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
-  const [picked, setPicked] = useStored('chart-channels', '');
-  const mains = channels.filter((c) => c.enabled && c.scope === 'mains');
-  const others = channels.filter((c) => c.enabled && c.scope !== 'mains');
+  const [picked, setPicked] = useStored('chart-meters', '');
+  const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
+  const others = meters.filter((c) => c.enabled && c.scope !== 'mains');
   const ids = picked.split(',').filter(Boolean);
   const chosen = others.filter((c) => ids.includes(c.id)).slice(0, 3);
 
@@ -24,11 +24,11 @@ export function HistoryView({ channels }: { channels: Channel[] }) {
       const out: Line[] = [];
       // The house line is the mains legs added together; every other line is drawn on its own, never added to it.
       if (house.length > 0) out.push(lineFrom('House', '--color-text', sumByTime(house)));
-      rest.forEach((s, i) => out.push(lineFrom(chosen[i]?.label ?? s.channel_id, COLORS[i % COLORS.length]!, s.points)));
+      rest.forEach((s, i) => out.push(lineFrom(chosen[i]?.label ?? s.meter_id, COLORS[i % COLORS.length]!, s.points)));
       return { lines: out, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] };
     },
     60_000,
-    [period, picked, channels],
+    [period, picked, meters],
   );
 
   const toggle = (id: string) => {

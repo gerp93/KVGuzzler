@@ -60,15 +60,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/channels": {
+    "/api/v1/meters": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Every channel (a circuit, a mains leg, a plug, the PC) with its label. */
-        get: operations["listChannels"];
+        /** Every meter (a circuit, a mains leg, a plug, the PC) with its label. */
+        get: operations["listMeters"];
         put?: never;
         post?: never;
         delete?: never;
@@ -77,7 +77,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/channels/{channelId}": {
+    "/api/v1/meters/{meterId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -90,8 +90,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rename a channel, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device. */
-        patch: operations["updateChannel"];
+        /** Rename a meter, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device. */
+        patch: operations["updateMeter"];
         trace?: never;
     };
     "/api/v1/live": {
@@ -101,7 +101,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The latest reading of every enabled channel. */
+        /** The latest reading of every enabled meter. */
         get: operations["getLive"];
         put?: never;
         post?: never;
@@ -118,7 +118,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A channel's power over a period, bucketed. */
+        /** A meter's power over a period, bucketed. */
         get: operations["getSeries"];
         put?: never;
         post?: never;
@@ -137,7 +137,7 @@ export interface paths {
         };
         /**
          * The house's energy over the rolling periods (hour, day, week, month, year, all time).
-         * @description One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains channel is shown.
+         * @description One row per period ending now: the mains' energy, its cost, highest draw and carbon. Empty when no mains meter is shown.
          */
         get: operations["getHouseHistory"];
         put?: never;
@@ -197,7 +197,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Energy, cost and carbon per channel for a period, plus the house total. */
+        /** Energy, cost and carbon per meter for a period, plus the house total. */
         get: operations["getSummary"];
         put?: never;
         post?: never;
@@ -299,7 +299,7 @@ export interface paths {
         };
         /**
          * What each part of a computer drew over a period.
-         * @description One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a channel's series,
+         * @description One line per sensor, one for the PC's own reading of its wall plug and one per meter it reads, bucketed like a meter's series,
          *     plus the stretches the collector was not recording so a chart can shade them. The lines are never added together. 204 when no
          *     collector reports for this computer or it has never reported.
          */
@@ -392,7 +392,7 @@ export interface paths {
          */
         get: operations["listGroups"];
         put?: never;
-        /** Add an empty group. Put plugs in it with PATCH /channels/{id} group_id. */
+        /** Add an empty group. Put plugs in it with PATCH /meters/{id} group_id. */
         post: operations["addGroup"];
         delete?: never;
         options?: never;
@@ -571,7 +571,7 @@ export interface components {
         /** @description An exact decimal amount in the configured currency. */
         Money: string;
         /**
-         * @description What a channel measures. Scopes are never summed across each other.
+         * @description What a meter measures. Scopes are never summed across each other.
          *     `mains` is the whole house (one per measured leg; the house is their sum), `circuit` is one breaker, `plug` is one
          *     appliance on a smart plug, `pc` is the PC's own wall plug and is a slice of a circuit, never added to anything.
          * @enum {string}
@@ -604,7 +604,7 @@ export interface components {
             /**
              * @description What a plug measures (`plug` when left out): `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
              *     circuit already counted, so it is shown beside the others and added to nothing. Not allowed for a Refoss monitor
-             *     (400): its inputs are circuits until set otherwise per channel.
+             *     (400): its inputs are circuits until set otherwise per meter.
              * @enum {string}
              */
             scope?: "plug" | "pc";
@@ -622,46 +622,46 @@ export interface components {
             /** Format: date-time */
             last_seen?: string | null;
         };
-        Channel: {
+        Meter: {
             /** @description Stable, and never contains a slash (it is used as a URL path segment), for example `refoss-em16p-1:ch-07`. */
             id: string;
             device_id: string;
-            /** @description The channel number on the device, when it has one. */
+            /** @description The meter number on the device, when it has one. */
             index?: number | null;
             scope: components["schemas"]["Scope"];
             /** @description What the user calls it, for example "Dryer" or "EV charger". */
             label: string;
-            /** @description A switched-off channel is not shown or counted but its history is kept. */
+            /** @description A switched-off meter is not shown or counted but its history is kept. */
             enabled: boolean;
             /** @description The sanity cap; a reading above it is dropped. */
             max_watts?: number | null;
-            /** @description The computer this plug belongs to, or null. Only `pc` and `plug` channels can belong to one. */
+            /** @description The computer this plug belongs to, or null. Only `pc` and `plug` meters can belong to one. */
             computer_id?: string | null;
-            /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer. */
+            /** @description The appliance group this plug is part of, or null. Only an ordinary `plug` meter can be in a group, and not one that belongs to a computer. */
             group_id?: string | null;
             /**
              * @description The circuit this one is part of, or null. A circuit that feeds a sub-panel holds the circuits clamped inside that panel, and a plug
              *     says which circuit it is plugged into. The parent's own figure already contains its children's, so a parent and its children are never
-             *     added together; what the parent has that none of them account for is the remainder. Any channel but `mains` can have one (a computer's wall
+             *     added together; what the parent has that none of them account for is the remainder. Any meter but `mains` can have one (a computer's wall
              *     plug and peripherals included: the circuit they are on).
              */
             parent_id?: string | null;
-            /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it. */
+            /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss meter has it. */
             invert?: boolean;
             /**
-             * @description The channel of the other leg of the same 240 V breaker. This channel then reports both legs added, and that one is switched off and
-             *     not reported on its own. Only a Refoss channel has it.
+             * @description The meter of the other leg of the same 240 V breaker. This meter then reports both legs added, and that one is switched off and
+             *     not reported on its own. Only a Refoss meter has it.
              */
             pair_with?: string | null;
         };
-        ChannelUpdate: {
+        MeterUpdate: {
             label?: string;
             enabled?: boolean;
             /** @description Refoss only. Flip the sign of the clamp's reading (a load reads positive when the clamp is the right way round). */
             invert?: boolean;
             /**
-             * @description Refoss only. The channel of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
-             *     circuit (this channel reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
+             * @description Refoss only. The meter of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
+             *     circuit (this meter reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
              */
             pair_with?: string | null;
             /**
@@ -670,13 +670,13 @@ export interface components {
              */
             scope?: "circuit" | "mains";
             /**
-             * @description Put this channel inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
-             *     must be a `circuit` and the channel anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.
+             * @description Put this meter inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
+             *     must be a `circuit` and the meter anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.
              */
             parent_id?: string | null;
             /**
              * @description Tie the plug to a computer (its id), or null to let it go. A computer has at most one `pc` plug (its wall plug);
-             *     any number of `plug` channels are its peripherals.
+             *     any number of `plug` meters are its peripherals.
              */
             computer_id?: string | null;
             /**
@@ -686,7 +686,7 @@ export interface components {
             group_id?: string | null;
         };
         Reading: {
-            channel_id: string;
+            meter_id: string;
             watts: number;
             volts?: number | null;
             amps?: number | null;
@@ -695,7 +695,7 @@ export interface components {
             /** Format: date-time */
             time: string;
             readings: components["schemas"]["Reading"][];
-            /** @description The sum of the `mains` readings only; null when no mains channel answered. */
+            /** @description The sum of the `mains` readings only; null when no mains meter answered. */
             house_watts: number | null;
             notes: string[];
         };
@@ -710,15 +710,15 @@ export interface components {
             kwh: number;
         };
         Series: {
-            channel_id: string;
+            meter_id: string;
             bucket: components["schemas"]["Bucket"];
             points: components["schemas"]["SeriesPoint"][];
         };
-        ChannelSummary: {
-            channel_id: string;
-            /** @description The computer the channel belongs to, so a client can group it with that computer instead of listing it alone. */
+        MeterSummary: {
+            meter_id: string;
+            /** @description The computer the meter belongs to, so a client can group it with that computer instead of listing it alone. */
             computer_id?: string | null;
-            /** @description The appliance group the channel is part of, so a client can list the group once instead of each plug. */
+            /** @description The appliance group the meter is part of, so a client can list the group once instead of each plug. */
             group_id?: string | null;
             scope: components["schemas"]["Scope"];
             kwh: number;
@@ -728,7 +728,7 @@ export interface components {
             /** @description The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity. */
             carbon_estimated_kwh?: number | null;
             peak_watts?: number | null;
-            /** @description Hours inside the period in which this channel actually reported. */
+            /** @description Hours inside the period in which this meter actually reported. */
             monitored_hours?: number;
         };
         Summary: {
@@ -736,12 +736,12 @@ export interface components {
             from: string;
             /** Format: date-time */
             to: string;
-            channels: components["schemas"]["ChannelSummary"][];
-            /** @description Energy of the `mains` channels only; null when there is none. */
+            meters: components["schemas"]["MeterSummary"][];
+            /** @description Energy of the `mains` meters only; null when there is none. */
             house_kwh: number | null;
             house_cost?: components["schemas"]["Money"] | null;
             /**
-             * @description `house_kwh` minus the energy of the enabled top-level `circuit` channels (those with no `parent_id`, or whose parent is not
+             * @description `house_kwh` minus the energy of the enabled top-level `circuit` meters (those with no `parent_id`, or whose parent is not
              *     shown), never below zero: what no circuit clamp accounts for. A circuit inside a sub-panel's feed is part of the feed's figure
              *     and is not taken off a second time. Derived, so shown as its own row and never added to anything.
              */
@@ -753,9 +753,9 @@ export interface components {
             cost_estimated?: boolean;
             /** @description The share (0 to 1) of the carbon figure that rests on an estimated, not measured, grid intensity. */
             carbon_estimated_share?: number | null;
-            /** @description The mains channels' highest draws added. An upper bound: the legs need not peak in the same second. */
+            /** @description The mains meters' highest draws added. An upper bound: the legs need not peak in the same second. */
             house_peak_watts?: number | null;
-            /** @description The mains channels' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved. */
+            /** @description The mains meters' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved. */
             house_carbon_g?: number | null;
             /** @description The part of the house's energy whose carbon was worked out at an average because its own hour had no saved intensity. */
             house_carbon_estimated_kwh?: number | null;
@@ -768,7 +768,7 @@ export interface components {
             from: string;
             /** Format: date-time */
             to: string;
-            /** @description The `mains` channels' energy only. */
+            /** @description The `mains` meters' energy only. */
             kwh: number;
             cost?: components["schemas"]["Money"] | null;
             cost_estimated: boolean;
@@ -778,7 +778,7 @@ export interface components {
             carbon_estimated_kwh?: number | null;
         };
         HouseHistory: {
-            /** @description Empty when no mains channel is shown. */
+            /** @description Empty when no mains meter is shown. */
             periods: components["schemas"]["HouseHistoryPeriod"][];
         };
         /** @enum {string} */
@@ -1057,7 +1057,7 @@ export interface components {
         ApplianceGroup: {
             id: string;
             name: string;
-            channel_ids: string[];
+            meter_ids: string[];
         };
         NewGroup: {
             name: string;
@@ -1069,7 +1069,7 @@ export interface components {
             /** Format: date-time */
             to: string;
             /** @description Each plug that is shown (not hidden), with its own energy and cost. */
-            members: components["schemas"]["ChannelSummary"][];
+            members: components["schemas"]["MeterSummary"][];
             /** @description The plugs' energy added together (all are ordinary plugs, so adding them is sound). */
             total_kwh: number;
             total_cost?: components["schemas"]["Money"] | null;
@@ -1081,9 +1081,9 @@ export interface components {
             /** @description The PC collector that reports for this computer, or null when none does. */
             source_id?: string | null;
             /** @description The plug the computer is on, measuring the whole PC at the wall (scope `pc`). */
-            wall_channel_id?: string | null;
+            wall_meter_id?: string | null;
             /** @description Plugs next to the computer (monitor, speakers), each a separate device. */
-            peripheral_channel_ids: string[];
+            peripheral_meter_ids: string[];
             /**
              * Format: date-time
              * @description When its collector last sent anything.
@@ -1106,8 +1106,8 @@ export interface components {
             /** Format: date-time */
             to: string;
             /** @description The whole PC at the wall, from its plug. */
-            wall?: components["schemas"]["ChannelSummary"] | null;
-            peripherals: components["schemas"]["ChannelSummary"][];
+            wall?: components["schemas"]["MeterSummary"] | null;
+            peripherals: components["schemas"]["MeterSummary"][];
             /** @description The wall figure plus the peripherals, for the whole desk. A separate figure, never part of the PC's own. */
             setup_kwh?: number | null;
             setup_cost?: components["schemas"]["Money"] | null;
@@ -1150,7 +1150,7 @@ export interface components {
             programs: components["schemas"]["PcProgramTotal"][];
             /** @description Stretches the PC was not sampling (asleep, off, lost power), clipped to the period. */
             gaps: components["schemas"]["PcGap"][];
-            /** @description The carbon of what the PC's sensors measured over the period, like a channel's carbon_g. */
+            /** @description The carbon of what the PC's sensors measured over the period, like a meter's carbon_g. */
             carbon_g?: number | null;
             carbon_estimated_kwh?: number | null;
             /** @description The PC's latest readings, or null when it has not sent any. */
@@ -1181,7 +1181,7 @@ export interface components {
         DeviceId: string;
         GroupId: string;
         ComputerId: string;
-        ChannelId: string;
+        MeterId: string;
         /** @description Start of the period (inclusive), RFC 3339. */
         From: string;
         /** @description End of the period (exclusive), RFC 3339. */
@@ -1252,7 +1252,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Created. The server has already read the device once to learn its channels. */
+            /** @description Created. The server has already read the device once to learn its meters. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1312,7 +1312,7 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
-    listChannels: {
+    listMeters: {
         parameters: {
             query?: never;
             header?: never;
@@ -1328,34 +1328,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        channels: components["schemas"]["Channel"][];
+                        meters: components["schemas"]["Meter"][];
                     };
                 };
             };
         };
     };
-    updateChannel: {
+    updateMeter: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                channelId: components["parameters"]["ChannelId"];
+                meterId: components["parameters"]["MeterId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChannelUpdate"];
+                "application/json": components["schemas"]["MeterUpdate"];
             };
         };
         responses: {
-            /** @description The updated channel. */
+            /** @description The updated meter. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Channel"];
+                    "application/json": components["schemas"]["Meter"];
                 };
             };
             404: components["responses"]["Problem"];
@@ -1388,7 +1388,7 @@ export interface operations {
                 from: components["parameters"]["From"];
                 /** @description End of the period (exclusive), RFC 3339. */
                 to: components["parameters"]["To"];
-                channel_id: string;
+                meter_id: string;
                 /** @description Defaults to the coarsest bucket that keeps the period under about 400 points. */
                 bucket?: components["schemas"]["Bucket"];
             };
@@ -1775,7 +1775,7 @@ export interface operations {
                 /** @description How far back to average. Default 7d. */
                 window?: "24h" | "7d" | "30d" | "all";
                 /**
-                 * @description Comma-separated channel ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
+                 * @description Comma-separated meter ids of the plugs next to the computer (monitor, speakers) to add to the usage. Ids that do not belong to
                  *     the computer are ignored.
                  */
                 peripherals?: string;

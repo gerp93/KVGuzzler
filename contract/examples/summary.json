@@ -1,9 +1,9 @@
 {
   "from": "2026-10-01T05:00:00Z",
   "to": "2026-11-01T05:00:00Z",
-  "channels": [
+  "meters": [
     {
-      "channel_id": "refoss-em16p-1:mains-a",
+      "meter_id": "refoss-em16p-1:mains-a",
       "scope": "mains",
       "kwh": 412.8,
       "cost": "61.92",
@@ -12,7 +12,7 @@
       "monitored_hours": 744
     },
     {
-      "channel_id": "refoss-em16p-1:mains-b",
+      "meter_id": "refoss-em16p-1:mains-b",
       "scope": "mains",
       "kwh": 288.1,
       "cost": "43.22",
@@ -21,7 +21,7 @@
       "monitored_hours": 744
     },
     {
-      "channel_id": "refoss-em16p-1:ch-07",
+      "meter_id": "refoss-em16p-1:ch-07",
       "scope": "circuit",
       "kwh": 96.4,
       "cost": "14.46",
@@ -30,7 +30,7 @@
       "monitored_hours": 744
     },
     {
-      "channel_id": "pc-wall",
+      "meter_id": "pc-wall",
       "scope": "pc",
       "kwh": 134.0,
       "cost": "20.10",

@@ -133,7 +133,7 @@ func TestOnlyAPlainHostIsAccepted(t *testing.T) {
 	}
 }
 
-func TestSourceIsOneChannelOfTheRightScope(t *testing.T) {
+func TestSourceIsOneMeterOfTheRightScope(t *testing.T) {
 	var hits atomic.Int32
 	c := serve(t, func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); _, _ = w.Write([]byte(answer)) })
 
@@ -141,12 +141,12 @@ func TestSourceIsOneChannelOfTheRightScope(t *testing.T) {
 	if d := src.Device(); d.ID != "shelly-192.168.1.50" || d.Kind != "shelly_plug" || d.Host != "192.168.1.50" {
 		t.Errorf("device = %+v", d)
 	}
-	chs := src.Channels()
+	chs := src.Meters()
 	if len(chs) != 1 || chs[0].Scope != model.ScopePC || chs[0].Label != "Desktop PC" || strings.Contains(chs[0].ID, "/") || *chs[0].MaxWatts != MaxWatts {
-		t.Errorf("channels = %+v", chs)
+		t.Errorf("meters = %+v", chs)
 	}
 	rs, err := src.Poll(context.Background())
-	if err != nil || len(rs) != 1 || rs[0].ChannelID != chs[0].ID || rs[0].Watts != 52.1 {
+	if err != nil || len(rs) != 1 || rs[0].MeterID != chs[0].ID || rs[0].Watts != 52.1 {
 		t.Fatalf("readings = %+v, %v", rs, err)
 	}
 	if hits.Load() != 1 {
@@ -164,7 +164,7 @@ func TestDeviceIDIsSafeForAUrlSegment(t *testing.T) {
 
 func TestNameDefaultsToTheHost(t *testing.T) {
 	c := serve(t, func(w http.ResponseWriter, _ *http.Request) {})
-	if got := newSource(c, "10.0.0.7", "", model.ScopePlug).Channels()[0].Label; got != "10.0.0.7" {
+	if got := newSource(c, "10.0.0.7", "", model.ScopePlug).Meters()[0].Label; got != "10.0.0.7" {
 		t.Errorf("label = %q", got)
 	}
 }

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, Channel, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -39,10 +39,10 @@ const q = (params: Record<string, string | undefined>) => {
 
 export const api = {
   status: () => request<Status>('api/v1/status'),
-  channels: () => request<{ channels: Channel[] }>('api/v1/channels').then((r) => r.channels),
+  meters: () => request<{ meters: Meter[] }>('api/v1/meters').then((r) => r.meters),
   live: () => request<Live>('api/v1/live'),
-  series: (channelId: string, from: string, to: string, bucket?: string) =>
-    request<Series>(`api/v1/series?${q({ channel_id: channelId, from, to, bucket })}`),
+  series: (meterId: string, from: string, to: string, bucket?: string) =>
+    request<Series>(`api/v1/series?${q({ meter_id: meterId, from, to, bucket })}`),
   summary: (from: string, to: string) => request<Summary>(`api/v1/summary?${q({ from, to })}`),
   devices: () => request<{ devices: Device[] }>('api/v1/devices').then((r) => r.devices),
   addDevice: (nd: NewDevice) =>
@@ -73,7 +73,7 @@ export const api = {
     request<ComputerDetail>(`api/v1/computers/${encodeURIComponent(id)}/detail?${q({ from, to })}`),
   /** The PC's latest look, small enough to ask for every few seconds; undefined when there is none yet. */
   computerLive: (id: string) => request<PcLive | undefined>(`api/v1/computers/${encodeURIComponent(id)}/live`),
-  /** Today's price and what the computer really used per day over a window; `plugs` are the channel ids of the plugs to add. */
+  /** Today's price and what the computer really used per day over a window; `plugs` are the meter ids of the plugs to add. */
   computerEstimate: (id: string, window: string, plugs: string[], includePc: boolean) =>
     request<ComputerEstimate>(
       `api/v1/computers/${encodeURIComponent(id)}/estimate?${q({ window, peripherals: plugs.join(',') || undefined, include_pc: includePc ? undefined : 'false' })}`,
@@ -122,8 +122,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateChannel: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains'; parent_id?: string | null }) =>
-    request<Channel>(`api/v1/channels/${encodeURIComponent(id)}`, {
+  updateMeter: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains'; parent_id?: string | null }) =>
+    request<Meter>(`api/v1/meters/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

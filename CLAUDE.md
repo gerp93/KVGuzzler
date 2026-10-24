@@ -29,9 +29,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 
 - Devices are only **read**. The Refoss client has a method allowlist (no `*.Set`); a device host is a plain host/IP, never a URL,
   path or port (`internal/hostcheck`). Refoss local auth is turned off on the devices (a 401 is reported, not worked around).
-- Scopes (`mains | circuit | plug | pc`) are never summed across each other: the house is the `mains` channels alone, circuits
+- Scopes (`mains | circuit | plug | pc`) are never summed across each other: the house is the `mains` meters alone, circuits
   and plugs are parts of it, and the PC's wall plug is a slice of a circuit and is added to nothing.
-- A reading above its channel's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
+- A reading above its meter's cap is dropped, not averaged, and said so in the notes. Time a device did not answer is not credited.
 - Pricing in the server (`server/internal/rates`) is a **port** of `KVGuzzler.Core.Billing` (bills, flat fees, `RateSchedule`); its tests are
   `BillingTests.cs` ported case for case. A change to a pricing rule goes in both places, with the test in both. Money is exact (`big.Rat`),
   never a float; bill dates are local calendar days. "One rate", "my bills" and the **OpenEI lookup** exist there (the carbon footprint is ported too, below). The lookup is a port of `OpenEiClient`/`Tariff`/`UsageProfile`
@@ -44,7 +44,7 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   the server because a free key did not give the data wanted**, and a setup saved for it is ignored), saved per hour in `carbon_intensity` by a feed run from `housed` (every 30 min, retry after 5 min or an hour when told to slow down, follows the saved setup).
   `PUT /carbon` takes a reading first and **only keeps a setup that got one**; the key is write-only, never returned, never in an error text, and a key left out keeps the saved one.
   **Secrets (the EIA and OpenEI keys) live in `secrets.json` beside the database, mode 0600, not in the database** (`Store.Secret`/`SetSecret`): the database is copied by the nightly
-  snapshots and shared read-only, and a key should not travel with the history. A key an earlier version left in the meta table is moved there the first time it is read. Each channel and the PC's sensors carry `carbon_g` (each hour's kWh at that hour's
+  snapshots and shared read-only, and a key should not travel with the history. A key an earlier version left in the meta table is moved there the first time it is read. Each meter and the PC's sensors carry `carbon_g` (each hour's kWh at that hour's
   intensity, the average of the hours that have one for hours that do not, and `carbon_estimated_kwh` says how much); it is the grid's average, never "what one more kWh would
   cause", always shown as ≈. The daily CSV gets `pc_co2_kg`/`peripherals_co2_kg` once any intensity was saved. **Not checked against the real services.**
 - Plugs: `server/internal/shelly` is a port of `ShellyPlug` (one read-only GET; a plug often has the PC or a fridge on it, so nothing may
@@ -59,16 +59,16 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   computer of its own. Only plugs can belong to a computer. A computer's plugs are listed under it, never alone, and none of it is added to the
   house or circuit figures; "setup" (wall plus peripherals) is a separate labelled figure. Open one in Appliances for the Guzzler-style breakdown.
 - **Appliance groups** (`/api/v1/groups`): several ordinary plugs shown as one appliance (an entertainment center on two power strips). Only
-  `plug`-scope channels can be in a group, and not one that belongs to a computer (a plug is shown in one place; 409 either way). It changes
+  `plug`-scope meters can be in a group, and not one that belongs to a computer (a plug is shown in one place; 409 either way). It changes
   only the display: each plug still records its own energy, and the group's figure is the sum of its plugs' (one scope, so the sum is sound;
   the cost is shown only when every plug has one). A hidden plug is neither shown nor counted.
-- **Panels nest** (`parent_id` on a channel, `store/parent.go`): a `circuit` that feeds a sub-panel holds the circuits clamped inside it, and a plug, a computer's
+- **Panels nest** (`parent_id` on a meter, `store/parent.go`): a `circuit` that feeds a sub-panel holds the circuits clamped inside it, and a plug, a computer's
   wall plug (`pc`) or a peripheral says which circuit it is on. A circuit with no parent is on the main panel, under the house; there can be several top-level
   entries and nothing needs a main monitor to exist. The parent's own reading already contains its children's, so they
   are **never added to it**: what is left is shown as "Everything else" (parent minus children, in the dashboard, per parent), and the house's `unmetered_kwh`
-  takes off only the top-level circuits. Any channel but the mains can have a parent, the parent is a circuit, a loop is refused (409), and a channel that becomes the
+  takes off only the top-level circuits. Any meter but the mains can have a parent, the parent is a circuit, a loop is refused (409), and a meter that becomes the
   mains or the second leg of a pair leaves the tree (its children go to the top). The parent may be on another device (a garage monitor's feed is a circuit of the
-  main panel's monitor). Settings > Channels (`web/src/ChannelsCard.tsx`) groups inputs by device, hides unused ones, and puts the fiddly options behind "Wiring".
+  main panel's monitor). Settings > Meters (`web/src/MetersCard.tsx`) groups inputs by device, hides unused ones, and puts the fiddly options behind "Wiring".
 - The PC collector pushes to `POST /api/v1/ingest/pc` (idempotent per source, minute and name, so the backlog can be resent). A reading above its
   cap is dropped and said so; a different major `api_version` is refused with 426. The C# client is `RelayFeed` in `KVGuzzler.Core/Relay`, run by the collector service beside the carbon feed: **`relay.json`** beside
   `wall-meter.json` (`{"host": "192.168.68.110"}`, or `host:port`; default port 8080; a plain host only, never a URL) says where the house server
@@ -93,15 +93,19 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **The main dashboard (Live) has the same kinds of figure as a computer's page**, for the house (the mains alone): period picker, energy, cost, right now, max draw
   (`house_peak_watts`, an upper bound: the legs' peaks added), the carbon line, the rate note, each circuit's energy/cost/share of the house, `GET /estimate`,
   `GET /history` and `GET /export.csv` (the house and each circuit per day) and a house chart. None of it adds a circuit or plug to the house.
-- Channel ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
-  changes only for a breaking change, and the server and its clients move together.
+- Meter ids never contain a slash (they are URL path segments). Money is a decimal string. The contract's integer `api_version`
+  changes only for a breaking change, and the server and its clients move together. The one rename that did not bump it: "channel" became "meter"
+  everywhere (API paths, `meter_id`, the `meters` table; `store.renameChannelsToMeters` moves an older database on open), because only the embedded
+  dashboard reads those endpoints and the PC collector's ingest body never had the word (see `contract/README.md`).
+- **"Meter" is the one word** for anything measured, in the tree and in the UI: a circuit, a sub-panel's feed, the whole house, a plug, the PC's wall plug.
+  A Refoss clamp socket is an "input" in prose, a Refoss monitor is a device. Do not bring "channel" back.
 - **Refoss monitors** (`internal/refoss`, only the **EM16P** has been seen: `testdata/status-em16p.json` is a real answer, with the network details taken out; a repository
   fixture must never hold the Wi-Fi name, MAC or address). `Refoss.Status.Get` answers one object per input, `em:1` to `em:18`, with signed `power`: A1-A6 (`em:1-6`), B1-B6 (`em:7-12`)
   and C1-C6 (`em:13-18`), named for the phase whose voltage they use. A US split-phase panel reads about 118 V on A and B and nothing on C. A **240 V breaker has a clamp on each of
-  its two legs, one on an A input and one on a B input, and is one circuit: the two added** (`pair_with` on the channel; the other leg is switched off and not reported on its own).
+  its two legs, one on an A input and one on a B input, and is one circuit: the two added** (`pair_with` on the meter; the other leg is switched off and not reported on its own).
   A clamp on backwards reads negative on a load: `invert` (Flip sign) fixes it in software; a reading still negative after that is dropped and **said so by name** in the notes (the
-  `source.Noter` interface), never counted as zero. Every input is a channel when the monitor is added, and the ones with nothing on them at that moment are switched off (they come
-  back in Settings). All are circuits until set to `mains` per channel (a monitor on the main panel). A clamp's sign and pairing are the user's: **never change them for the user**.
+  `source.Noter` interface), never counted as zero. Every input is a meter when the monitor is added, and the ones with nothing on them at that moment are switched off (they come
+  back in Settings). All are circuits until set to `mains` per meter (a monitor on the main panel). A clamp's sign and pairing are the user's: **never change them for the user**.
   The monitor is only ever read (`Refoss.DeviceInfo.Get`, `Refoss.Status.Get`); the energy is integrated by the collector from the instantaneous power, as for a plug.
   **Not checked on an EM06P or on the main panel** (only a garage sub-panel's three circuits).
 

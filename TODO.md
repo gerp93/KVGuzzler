@@ -119,7 +119,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
 - **Whole-house energy monitor** (Refoss clamp monitors, always-on server; plan agreed, first parts built): `contract/` is the
   OpenAPI between the parts and `server/` (Go, see its README) is the house server. Built: the contract with checked examples, a
   read-only Refoss client (`DeviceInfo` parsed), a simulated house, SQLite history, a collector that drops impossible readings, and
-  the API for status, devices, channels, live, series and summary, and the `web/` dashboard (Live, History, Appliances, Settings; themed,
+  the API for status, devices, meters, live, series and summary, and the `web/` dashboard (Live, History, Appliances, Settings; themed,
   phone-width checked, embedded in the server binary). **Verified only against the simulator and fake HTTP servers**;
   nothing has been tried on a real Refoss monitor. Still to do, in order: real Refoss readings (call `Refoss.Status.Get` on a real
   device first and write the mapping from its answer; confirm auth is off), OpenEI/carbon in Go (port with the C# test
@@ -161,7 +161,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     made up), VisualAssault theming for its two pages, and trying it off Windows. `npm run dist` was run once here: the packaged app starts and
     opens its setup page, and the one-click per-user installer (`shell/release/House Power Setup 0.1.0.exe`, about 107 MB, **unsigned**, so
     SmartScreen will warn) was built, but not installed or run.
-  - The Refoss EM16P is mapped and running on the garage sub-panel (see CLAUDE.md); still to try: a second monitor on the main panel (mains channels, the house figure), an EM06P, and the clamps A1/B1 that read the EV charger too.
+  - The Refoss EM16P is mapped and running on the garage sub-panel (see CLAUDE.md); still to try: a second monitor on the main panel (mains meters, the house figure), an EM06P, and the clamps A1/B1 that read the EV charger too.
   - Other plug brands (the entertainment center's are not Shelly): a source per brand behind the same `Source` interface (Tasmota, and Matter plugs through Home Assistant).
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /

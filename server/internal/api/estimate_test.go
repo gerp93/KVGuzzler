@@ -94,13 +94,13 @@ func TestTheEstimateCountsTheWallPlugAndOnlyThePlugsAskedFor(t *testing.T) {
 	srv, st := computerServer(t) // the clock is 2026-10-22 19:00 UTC
 	ctx := t.Context()
 	start := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	for _, ch := range []model.Channel{
+	for _, ch := range []model.Meter{
 		{ID: "wall", DeviceID: "d-wall", Scope: model.ScopePC, Label: "PC"},
 		{ID: "monitor", DeviceID: "d-mon", Scope: model.ScopePlug, Label: "Monitor"},
 		{ID: "speakers", DeviceID: "d-spk", Scope: model.ScopePlug, Label: "Speakers"},
 		{ID: "kettle", DeviceID: "d-ket", Scope: model.ScopePlug, Label: "Kettle"},
 	} {
-		if err := st.UpsertChannel(ctx, ch); err != nil {
+		if err := st.UpsertMeter(ctx, ch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -115,7 +115,7 @@ func TestTheEstimateCountsTheWallPlugAndOnlyThePlugsAskedFor(t *testing.T) {
 	_, body := send(t, http.MethodPost, srv.URL+"/api/v1/computers", `{"name":"Desktop"}`)
 	comp := decode[model.Computer](t, body)
 	for _, ch := range []string{"wall", "monitor", "speakers"} { // the kettle is not part of this computer
-		send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+ch, `{"computer_id":"`+comp.ID+`"}`)
+		send(t, http.MethodPatch, srv.URL+"/api/v1/meters/"+ch, `{"computer_id":"`+comp.ID+`"}`)
 	}
 	base := srv.URL + "/api/v1/computers/" + comp.ID + "/estimate"
 	usage := func(query string) *model.AverageUse {

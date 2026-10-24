@@ -79,7 +79,7 @@ func TestAPcPushAddsAComputerAndShowsItsInsidesAndResendingReplacesIt(t *testing
 		t.Fatalf("computers = %+v, want the one the first push added (and not another per push)", list.Computers)
 	}
 	comp := list.Computers[0]
-	if comp.Name != "Desktop" || comp.SourceID == nil || *comp.SourceID != "pc-7f3a9c1e" || comp.LastSeen == nil || comp.WallChannelID != nil {
+	if comp.Name != "Desktop" || comp.SourceID == nil || *comp.SourceID != "pc-7f3a9c1e" || comp.LastSeen == nil || comp.WallMeterID != nil {
 		t.Errorf("computer = %+v", comp)
 	}
 
@@ -164,7 +164,7 @@ func TestComputersCanBeAddedRenamedLinkedAndRemoved(t *testing.T) {
 		t.Fatalf("add: %d %s", resp.StatusCode, body)
 	}
 	laptop := decode[model.Computer](t, body)
-	if laptop.Name != "Laptop" || laptop.PeripheralChannelIDs == nil {
+	if laptop.Name != "Laptop" || laptop.PeripheralMeterIDs == nil {
 		t.Errorf("laptop = %+v", laptop)
 	}
 
@@ -200,14 +200,14 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 	ctx := t.Context()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 
-	for _, ch := range []model.Channel{
+	for _, ch := range []model.Meter{
 		{ID: "wall", DeviceID: "d-wall", Scope: model.ScopePC, Label: "PC"},
 		{ID: "wall2", DeviceID: "d-wall2", Scope: model.ScopePC, Label: "Second PC plug"},
 		{ID: "monitor", DeviceID: "d-mon", Scope: model.ScopePlug, Label: "Monitor"},
 		{ID: "speakers", DeviceID: "d-spk", Scope: model.ScopePlug, Label: "Speakers"},
 		{ID: "dryer", DeviceID: "d-dry", Scope: model.ScopeCircuit, Label: "Dryer"},
 	} {
-		if err := st.UpsertChannel(ctx, ch); err != nil {
+		if err := st.UpsertMeter(ctx, ch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -222,8 +222,8 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 	}
 	_, body := send(t, http.MethodPost, srv.URL+"/api/v1/computers", `{"name":"Desktop"}`)
 	comp := decode[model.Computer](t, body)
-	assign := func(channel, computer string) int {
-		r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+channel, `{"computer_id":`+computer+`}`)
+	assign := func(meter, computer string) int {
+		r, _ := send(t, http.MethodPatch, srv.URL+"/api/v1/meters/"+meter, `{"computer_id":`+computer+`}`)
 		return r.StatusCode
 	}
 	id := `"` + comp.ID + `"`
@@ -249,7 +249,7 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 	var d model.ComputerDetail
 	get(t, srv.URL+"/api/v1/computers/"+comp.ID+"/detail"+period, &d)
 	pcKwh := 300.0 * 60 / 3.6e6
-	if d.Wall == nil || d.Wall.ChannelID != "wall" || math.Abs(d.Wall.KWh-pcKwh) > 1e-12 || d.Wall.Cost == nil {
+	if d.Wall == nil || d.Wall.MeterID != "wall" || math.Abs(d.Wall.KWh-pcKwh) > 1e-12 || d.Wall.Cost == nil {
 		t.Fatalf("wall = %+v", d.Wall)
 	}
 	if len(d.Peripherals) != 2 {
@@ -273,17 +273,17 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 	var sum model.Summary
 	get(t, srv.URL+"/api/v1/summary"+period, &sum)
 	tied := 0
-	for _, c := range sum.Channels {
+	for _, c := range sum.Meters {
 		if c.ComputerID != nil && *c.ComputerID == comp.ID {
 			tied++
 		}
 	}
 	if tied != 3 {
-		t.Errorf("%d channels in the summary carry the computer, want 3", tied)
+		t.Errorf("%d meters in the summary carry the computer, want 3", tied)
 	}
 
 	// A plug the user hides is neither shown nor counted; letting a plug go takes it out of the computer.
-	send(t, http.MethodPatch, srv.URL+"/api/v1/channels/speakers", `{"enabled":false}`)
+	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/speakers", `{"enabled":false}`)
 	assign("monitor", `null`)
 	get(t, srv.URL+"/api/v1/computers/"+comp.ID+"/detail"+period, &d)
 	if len(d.Peripherals) != 0 || d.SetupKWh == nil || math.Abs(*d.SetupKWh-pcKwh) > 1e-12 {
@@ -291,7 +291,7 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 	}
 	var list struct{ Computers []model.Computer }
 	get(t, srv.URL+"/api/v1/computers", &list)
-	if len(list.Computers[0].PeripheralChannelIDs) != 1 || list.Computers[0].PeripheralChannelIDs[0] != "speakers" {
+	if len(list.Computers[0].PeripheralMeterIDs) != 1 || list.Computers[0].PeripheralMeterIDs[0] != "speakers" {
 		t.Errorf("the hidden plug is still tied to the computer: %+v", list.Computers[0])
 	}
 }
@@ -299,7 +299,7 @@ func TestPlugsTieToAComputerAndTheDetailAddsUpTheSetupSeparately(t *testing.T) {
 func TestSetupHasNoCostWhenNothingIsPriced(t *testing.T) {
 	srv, st := computerServer(t)
 	ctx := t.Context()
-	if err := st.UpsertChannel(ctx, model.Channel{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "wall", DeviceID: "d", Scope: model.ScopePC, Label: "PC"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.AddMinute(ctx, "wall", time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC), 300, 300, 60); err != nil {
@@ -307,7 +307,7 @@ func TestSetupHasNoCostWhenNothingIsPriced(t *testing.T) {
 	}
 	_, body := send(t, http.MethodPost, srv.URL+"/api/v1/computers", `{"name":"Desktop"}`)
 	comp := decode[model.Computer](t, body)
-	send(t, http.MethodPatch, srv.URL+"/api/v1/channels/wall", `{"computer_id":"`+comp.ID+`"}`)
+	send(t, http.MethodPatch, srv.URL+"/api/v1/meters/wall", `{"computer_id":"`+comp.ID+`"}`)
 
 	var d model.ComputerDetail
 	get(t, srv.URL+"/api/v1/computers/"+comp.ID+"/detail"+period, &d)

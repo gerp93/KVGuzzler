@@ -3,7 +3,7 @@ package model
 
 import "time"
 
-// Scope is what a channel measures. Scopes are never summed across each other: the house is the mains channels
+// Scope is what a meter measures. Scopes are never summed across each other: the house is the mains meters
 // alone, a circuit or plug is a part of it, and the PC's wall plug is a slice of some circuit, added to nothing.
 type Scope string
 
@@ -33,7 +33,7 @@ type Device struct {
 	LastSeen *time.Time `json:"last_seen"`
 }
 
-type Channel struct {
+type Meter struct {
 	ID       string   `json:"id"`
 	DeviceID string   `json:"device_id"`
 	Index    *int     `json:"index"`
@@ -45,10 +45,10 @@ type Channel struct {
 	ComputerID *string `json:"computer_id"`
 	// GroupID is the appliance group this plug is part of (shown as one appliance with the group's other plugs), or nil.
 	GroupID *string `json:"group_id"`
-	// Invert flips the sign of a clamp's reading (a Refoss clamp put on backwards). Only Refoss channels have it.
+	// Invert flips the sign of a clamp's reading (a Refoss clamp put on backwards). Only Refoss meters have it.
 	Invert bool `json:"invert"`
-	// PairWith is the channel of the other leg of the same 240 V breaker: this channel then reports both legs added, and that one is
-	// not reported on its own. Only Refoss channels have it.
+	// PairWith is the meter of the other leg of the same 240 V breaker: this meter then reports both legs added, and that one is
+	// not reported on its own. Only Refoss meters have it.
 	PairWith *string `json:"pair_with"`
 	// ParentID is the circuit this one is part of: a circuit that feeds a sub-panel holds the circuits of that panel. Its own figure already
 	// contains theirs, so a parent and its children are never added together. Only a circuit has one.
@@ -56,10 +56,10 @@ type Channel struct {
 }
 
 type Reading struct {
-	ChannelID string   `json:"channel_id"`
-	Watts     float64  `json:"watts"`
-	Volts     *float64 `json:"volts"`
-	Amps      *float64 `json:"amps"`
+	MeterID string   `json:"meter_id"`
+	Watts   float64  `json:"watts"`
+	Volts   *float64 `json:"volts"`
+	Amps    *float64 `json:"amps"`
 }
 
 type Live struct {
@@ -77,13 +77,13 @@ type Point struct {
 }
 
 type Series struct {
-	ChannelID string  `json:"channel_id"`
-	Bucket    Bucket  `json:"bucket"`
-	Points    []Point `json:"points"`
+	MeterID string  `json:"meter_id"`
+	Bucket  Bucket  `json:"bucket"`
+	Points  []Point `json:"points"`
 }
 
-type ChannelSummary struct {
-	ChannelID  string   `json:"channel_id"`
+type MeterSummary struct {
+	MeterID    string   `json:"meter_id"`
 	ComputerID *string  `json:"computer_id"`
 	GroupID    *string  `json:"group_id"`
 	Scope      Scope    `json:"scope"`
@@ -97,16 +97,16 @@ type ChannelSummary struct {
 }
 
 type Summary struct {
-	From          time.Time        `json:"from"`
-	To            time.Time        `json:"to"`
-	Channels      []ChannelSummary `json:"channels"`
-	HouseKWh      *float64         `json:"house_kwh"`
-	HouseCost     *string          `json:"house_cost"`
-	CostEstimated bool             `json:"cost_estimated"`
-	UnmeteredKWh  *float64         `json:"unmetered_kwh"`
+	From          time.Time      `json:"from"`
+	To            time.Time      `json:"to"`
+	Meters        []MeterSummary `json:"meters"`
+	HouseKWh      *float64       `json:"house_kwh"`
+	HouseCost     *string        `json:"house_cost"`
+	CostEstimated bool           `json:"cost_estimated"`
+	UnmeteredKWh  *float64       `json:"unmetered_kwh"`
 	// HousePeakWatts is the mains' highest draws added: an upper bound, as the two legs need not peak in the same second.
 	HousePeakWatts *float64 `json:"house_peak_watts"`
-	// HouseCarbonG and HouseCarbonEstimatedKWh are the mains' carbon figures added (see ChannelSummary).
+	// HouseCarbonG and HouseCarbonEstimatedKWh are the mains' carbon figures added (see MeterSummary).
 	HouseCarbonG            *float64 `json:"house_carbon_g"`
 	HouseCarbonEstimatedKWh *float64 `json:"house_carbon_estimated_kwh"`
 }

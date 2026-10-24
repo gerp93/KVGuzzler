@@ -147,11 +147,11 @@ func isTimeout(err error) bool {
 	return errors.As(err, &t) && t.Timeout()
 }
 
-// Source is a plug as the collector's source: one channel, the plug itself.
+// Source is a plug as the collector's source: one meter, the plug itself.
 type Source struct {
-	device  model.Device
-	channel model.Channel
-	client  *Client
+	device model.Device
+	meter  model.Meter
+	client *Client
 }
 
 var idUnsafe = regexp.MustCompile(`[^a-z0-9.-]+`)
@@ -162,7 +162,7 @@ func DeviceID(host string) string {
 }
 
 // NewSource makes a source for the plug at host. scope is model.ScopePlug for an appliance, or model.ScopePC for the PC's
-// own wall plug (a slice of a circuit, never added to anything). name labels the channel; empty means the host.
+// own wall plug (a slice of a circuit, never added to anything). name labels the meter; empty means the host.
 func NewSource(host, name string, scope model.Scope, hc *http.Client) (*Source, error) {
 	c, err := New(host, hc)
 	if err != nil {
@@ -178,21 +178,21 @@ func newSource(c *Client, host, name string, scope model.Scope) *Source {
 	id := DeviceID(host)
 	max := MaxWatts
 	return &Source{
-		device:  model.Device{ID: id, Kind: "shelly_plug", Host: host, Name: name, Model: "shelly"},
-		channel: model.Channel{ID: id + ":plug", DeviceID: id, Scope: scope, Label: name, Enabled: true, MaxWatts: &max},
-		client:  c,
+		device: model.Device{ID: id, Kind: "shelly_plug", Host: host, Name: name, Model: "shelly"},
+		meter:  model.Meter{ID: id + ":plug", DeviceID: id, Scope: scope, Label: name, Enabled: true, MaxWatts: &max},
+		client: c,
 	}
 }
 
-func (s *Source) Device() model.Device      { return s.device }
-func (s *Source) Channels() []model.Channel { return []model.Channel{s.channel} }
+func (s *Source) Device() model.Device  { return s.device }
+func (s *Source) Meters() []model.Meter { return []model.Meter{s.meter} }
 
 func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 	st, err := s.client.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return []model.Reading{{ChannelID: s.channel.ID, Watts: st.Watts, Volts: st.Volts, Amps: st.Amps}}, nil
+	return []model.Reading{{MeterID: s.meter.ID, Watts: st.Watts, Volts: st.Volts, Amps: st.Amps}}, nil
 }
 
 // NewSourceWithBase is NewSource for an address that is not a plain host (a test server with a port). Production code uses

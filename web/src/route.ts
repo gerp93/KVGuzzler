@@ -3,7 +3,7 @@
 //
 //   #/live                                  a tab
 //   #/appliances                            the list
-//   #/appliances/channel/<channel id>       one appliance
+//   #/appliances/meter/<meter id>       one appliance
 //   #/appliances/computer/<computer id>     one computer
 import { useEffect, useState } from 'preact/hooks';
 
