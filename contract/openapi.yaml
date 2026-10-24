@@ -142,7 +142,7 @@ paths:
     patch:
       tags: [Settings]
       operationId: updateChannel
-      summary: Rename a channel or switch it off. Changes only the server's own label, never the device.
+      summary: Rename a channel, switch it off, or (Refoss) flip its sign or pair its legs. Changes only the server's own settings, never the device.
       parameters:
         - $ref: '#/components/parameters/ChannelId'
       requestBody:
@@ -923,11 +923,10 @@ components:
         scope:
           type: string
           enum: [plug, pc]
-          default: plug
           description: |
-            What a plug measures: `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
-            circuit already counted, so it is shown beside the others and added to nothing. Ignored for a Refoss monitor,
-            whose channels say what they are.
+            What a plug measures (`plug` when left out): `plug` is one appliance, `pc` is the PC's own wall plug. The PC's figure is a slice of a
+            circuit already counted, so it is shown beside the others and added to nothing. Not allowed for a Refoss monitor
+            (400): its inputs are circuits until set otherwise per channel.
     Device:
       type: object
       required: [id, kind, host, online]
@@ -980,6 +979,14 @@ components:
         group_id:
           type: [string, 'null']
           description: The appliance group this plug is part of, or null. Only an ordinary `plug` channel can be in a group, and not one that belongs to a computer.
+        invert:
+          type: boolean
+          description: Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss channel has it.
+        pair_with:
+          type: [string, 'null']
+          description: |
+            The channel of the other leg of the same 240 V breaker. This channel then reports both legs added, and that one is switched off and
+            not reported on its own. Only a Refoss channel has it.
     ChannelUpdate:
       type: object
       minProperties: 1
@@ -990,6 +997,18 @@ components:
           maxLength: 60
         enabled:
           type: boolean
+        invert:
+          type: boolean
+          description: Refoss only. Flip the sign of the clamp's reading (a load reads positive when the clamp is the right way round).
+        pair_with:
+          type: [string, 'null']
+          description: |
+            Refoss only. The channel of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
+            circuit (this channel reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
+        scope:
+          type: string
+          enum: [circuit, mains]
+          description: Refoss only. A monitor on the main panel measures the mains; one on a sub-panel measures circuits.
         computer_id:
           type: [string, 'null']
           description: |

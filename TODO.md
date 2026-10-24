@@ -161,7 +161,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     made up), VisualAssault theming for its two pages, and trying it off Windows. `npm run dist` was run once here: the packaged app starts and
     opens its setup page, and the one-click per-user installer (`shell/release/House Power Setup 0.1.0.exe`, about 107 MB, **unsigned**, so
     SmartScreen will warn) was built, but not installed or run.
-  - Carbon footprint and the OpenEI tariff lookup in Go; the Refoss mapping (run `refoss-probe` first).
+  - The Refoss EM16P is mapped and running on the garage sub-panel (see CLAUDE.md); still to try: a second monitor on the main panel (mains channels, the house figure), an EM06P, and the clamps A1/B1 that read the EV charger too.
   - Other plug brands (the entertainment center's are not Shelly): a source per brand behind the same `Source` interface (Tasmota, and Matter plugs through Home Assistant).
 - **Logo and icons**: real artwork in `assets/logo.png` (do not fabricate one), then
   `python scripts/generate-icons.py`, set `Window.Icon`, `<ApplicationIcon>` and uncomment `icon_ico` /

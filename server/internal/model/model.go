@@ -45,6 +45,11 @@ type Channel struct {
 	ComputerID *string `json:"computer_id"`
 	// GroupID is the appliance group this plug is part of (shown as one appliance with the group's other plugs), or nil.
 	GroupID *string `json:"group_id"`
+	// Invert flips the sign of a clamp's reading (a Refoss clamp put on backwards). Only Refoss channels have it.
+	Invert bool `json:"invert"`
+	// PairWith is the channel of the other leg of the same 240 V breaker: this channel then reports both legs added, and that one is
+	// not reported on its own. Only Refoss channels have it.
+	PairWith *string `json:"pair_with"`
 }
 
 type Reading struct {

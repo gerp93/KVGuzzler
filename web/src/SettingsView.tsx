@@ -8,10 +8,16 @@ import { GroupsCard } from './GroupsCard';
 import { RatesCard } from './RatesCard';
 import { THEMES, type Channel, type Theme } from './lib';
 
-function ChannelRow({ channel, onChanged }: { channel: Channel; onChanged: () => void }) {
+const isRefoss = (c: Channel) => c.device_id.startsWith('refoss-');
+
+function ChannelRow({ channel, all, onChanged }: { channel: Channel; all: Channel[]; onChanged: () => void }) {
   const [label, setLabel] = useState(channel.label);
   const [error, setError] = useState('');
-  const save = (body: { label?: string; enabled?: boolean }) =>
+  // The other legs this one could be paired with: inputs of the same monitor that are not already part of a pair.
+  const taken = new Set(all.flatMap((c) => (c.pair_with ? [c.pair_with] : [])));
+  const options = all.filter((c) => c.device_id === channel.device_id && c.id !== channel.id && !c.pair_with && (!taken.has(c.id) || c.id === channel.pair_with));
+  const partnerOf = all.find((c) => c.pair_with === channel.id);
+  const save = (body: { label?: string; enabled?: boolean; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains' }) =>
     api.updateChannel(channel.id, body).then(
       () => {
         setError('');
@@ -40,6 +46,33 @@ function ChannelRow({ channel, onChanged }: { channel: Channel; onChanged: () =>
         />
         Show
       </label>
+      {isRefoss(channel) && !partnerOf && (
+        <>
+          <label class="check">
+            <input type="checkbox" checked={channel.invert === true} onChange={(e) => void save({ invert: (e.target as HTMLInputElement).checked })} />
+            Flip sign
+          </label>
+          <label class="check">
+            <span class="visually-hidden">Other leg of the breaker for {channel.label}</span>
+            <select value={channel.pair_with ?? ''} onChange={(e) => void save({ pair_with: (e.target as HTMLSelectElement).value || null })}>
+              <option value="">One wire</option>
+              {options.map((c) => (
+                <option key={c.id} value={c.id}>
+                  plus {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="check">
+            <span class="visually-hidden">What {channel.label} measures</span>
+            <select value={channel.scope} onChange={(e) => void save({ scope: (e.target as HTMLSelectElement).value as 'circuit' | 'mains' })}>
+              <option value="circuit">circuit</option>
+              <option value="mains">the mains</option>
+            </select>
+          </label>
+        </>
+      )}
+      {partnerOf && <span class="caption">second leg of {partnerOf.label}</span>}
       {error && <span class="note">{error}</span>}
     </li>
   );
@@ -65,11 +98,13 @@ export function SettingsView({
       <section class="card">
         <h2>Channels</h2>
         <p class="caption">
-          Rename a channel or hide it. This only changes how this dashboard shows it; nothing is sent to the monitor.
+          Rename a channel or hide it. This only changes how this dashboard shows it; nothing is sent to the monitor. On a Refoss monitor a load should read
+          positive: if a channel reads backwards, switch on "Flip sign" for it (or turn the clamp round). A 240 V breaker has a clamp on each of its two legs
+          (one on an A input, one on a B input): choose "plus" the other one so the two show as one circuit.
         </p>
         <ul class="settings">
           {channels.map((c) => (
-            <ChannelRow key={c.id} channel={c} onChanged={onChanged} />
+            <ChannelRow key={c.id} channel={c} all={channels} onChanged={onChanged} />
           ))}
         </ul>
       </section>

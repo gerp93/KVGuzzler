@@ -1,0 +1,70 @@
+package api
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/gerp93/KVGuzzler/server/internal/model"
+)
+
+func TestARefossClampsSignPairAndScopeAreSetThroughTheChannelPatch(t *testing.T) {
+	srv, st := computerServer(t)
+	ctx := t.Context()
+	if err := st.UpsertDevice(ctx, model.Device{ID: "refoss-h", Kind: "refoss", Host: "h", Name: "Garage", Model: "em16p"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, id := range []string{"refoss-h:em2", "refoss-h:em8", "refoss-h:em3"} {
+		idx := i
+		if err := st.UpsertChannel(ctx, model.Channel{ID: id, DeviceID: "refoss-h", Index: &idx, Scope: model.ScopeCircuit, Label: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	patch := func(id, body string) (*http.Response, string) {
+		return send(t, http.MethodPatch, srv.URL+"/api/v1/channels/"+id, body)
+	}
+
+	r, body := patch("refoss-h:em2", `{"invert":true}`)
+	if ch := decode[model.Channel](t, body); r.StatusCode != 200 || !ch.Invert {
+		t.Fatalf("invert: %d %s", r.StatusCode, body)
+	}
+	r, body = patch("refoss-h:em2", `{"pair_with":"refoss-h:em8"}`)
+	ch := decode[model.Channel](t, body)
+	if r.StatusCode != 200 || ch.PairWith == nil || *ch.PairWith != "refoss-h:em8" || !ch.Invert {
+		t.Fatalf("pair: %d %s", r.StatusCode, body)
+	}
+	var chs struct{ Channels []model.Channel }
+	get(t, srv.URL+"/api/v1/channels", &chs)
+	for _, c := range chs.Channels {
+		if c.ID == "refoss-h:em8" && c.Enabled {
+			t.Error("the second leg should be switched off")
+		}
+	}
+	if r, _ := patch("refoss-h:em3", `{"pair_with":"refoss-h:em8"}`); r.StatusCode != http.StatusConflict {
+		t.Errorf("a leg already used: %d, want 409", r.StatusCode)
+	}
+	if r, _ := patch("refoss-h:em3", `{"pair_with":"nope"}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("no such leg: %d, want 400", r.StatusCode)
+	}
+	if r, body := patch("refoss-h:em3", `{"scope":"mains"}`); r.StatusCode != 200 || decode[model.Channel](t, body).Scope != model.ScopeMains {
+		t.Errorf("scope: %d %s", r.StatusCode, body)
+	}
+	if r, _ := patch("refoss-h:em3", `{"scope":"plug"}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("a plug scope: %d, want 400", r.StatusCode)
+	}
+	r, body = patch("refoss-h:em2", `{"pair_with":null}`)
+	if ch := decode[model.Channel](t, body); r.StatusCode != 200 || ch.PairWith != nil {
+		t.Errorf("unpair: %d %s", r.StatusCode, body)
+	}
+
+	// A plug is not a monitor: it has no clamp to flip.
+	if err := st.UpsertDevice(ctx, model.Device{ID: "shelly-x", Kind: "shelly_plug", Host: "x", Model: "plug"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertChannel(ctx, model.Channel{ID: "shelly-x:plug", DeviceID: "shelly-x", Scope: model.ScopePlug, Label: "Plug"}); err != nil {
+		t.Fatal(err)
+	}
+	if r, body := patch("shelly-x:plug", `{"invert":true}`); r.StatusCode != http.StatusBadRequest || !strings.Contains(body, "Refoss") {
+		t.Errorf("a plug: %d %s", r.StatusCode, body)
+	}
+}

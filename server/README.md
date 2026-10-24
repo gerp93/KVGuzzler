@@ -65,14 +65,14 @@ old binary back if it does not. The database is never touched. Rollback restores
 go run ./cmd/refoss-probe 192.168.1.50
 ```
 
-Prints the monitor's device info and the raw `Refoss.Status.Get` answer (two read-only calls). Save that answer as a fixture; the
-server's Refoss mapping is written from it. Until then adding a Refoss monitor answers 501.
+Prints the monitor's device info and the raw `Refoss.Status.Get` answer (two read-only calls). The mapping was written from a real EM16P's
+answer (`internal/refoss/testdata/status-em16p.json`, with the Wi-Fi name, MAC and address taken out: never commit those). Add a monitor in
+the dashboard's Settings (only the EM16P is supported); its inputs are named A1-A6, B1-B6, C1-C6 as on the unit, a clamp on backwards is
+fixed with "Flip sign", and the two clamps of a 240 V breaker are paired into one circuit.
 
 ## Not built yet (answers 501)
 
-Carbon. Adding a Refoss monitor (only Shelly plugs can be added). The PC collector's client (the server side of the push is built). Pricing from a looked-up utility tariff (OpenEI) is not ported either: saving that mode is refused. **Real Refoss readings are not wired in**: the shape of
-`Refoss.Status.Get` (per-channel watts, volts, amps, kWh) has not been seen on a real device, so `StatusRaw` returns the body
-untouched and nothing guesses its fields. The first real device call decides the mapping.
+A Refoss EM06P (only the EM16P has been seen), and the main-panel setup (mains channels on a monitor) is built but has not been tried.
 
 ## Rules
 

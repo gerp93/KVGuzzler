@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,6 +112,11 @@ func (c *Collector) Remove(id string) bool {
 			delete(c.live, chID)
 		}
 		delete(c.notes, "device:"+id)
+		for k := range c.notes {
+			if strings.HasPrefix(k, "src:"+id+":") {
+				delete(c.notes, k)
+			}
+		}
 		return true
 	}
 	return false
@@ -170,6 +176,17 @@ func (c *Collector) step(ctx context.Context, st *state, t time.Time) {
 	}
 	st.online, st.lastSeen = true, t
 	delete(c.notes, key)
+	if n, ok := st.src.(source.Noter); ok {
+		// What the source says now replaces what it said before, so a fixed problem stops being reported at once.
+		for k := range c.notes {
+			if strings.HasPrefix(k, "src:"+dev.ID+":") {
+				delete(c.notes, k)
+			}
+		}
+		for i, text := range n.Notes() {
+			c.notes[fmt.Sprintf("src:%s:%d", dev.ID, i)] = note{text: text, until: t.Add(noteLifetime)}
+		}
+	}
 
 	// Credit the time since the previous answer, but never more than two polling intervals of it.
 	var dt float64

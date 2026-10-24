@@ -5,13 +5,16 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
+	"github.com/gerp93/KVGuzzler/server/internal/hostcheck"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/refoss"
 	"github.com/gerp93/KVGuzzler/server/internal/shelly"
 	"github.com/gerp93/KVGuzzler/server/internal/source"
 	"github.com/gerp93/KVGuzzler/server/internal/store"
@@ -35,10 +38,18 @@ func newFixture(t *testing.T) *fixture {
 	}
 	t.Cleanup(func() { st.Close() })
 
+	refossStatus, err := os.ReadFile("../refoss/testdata/status-em16p.json") // what a real EM16P answered
+	if err != nil {
+		t.Fatal(err)
+	}
 	status := http.StatusOK
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if status != http.StatusOK {
 			w.WriteHeader(status)
+			return
+		}
+		if r.URL.Path == "/rpc/Refoss.Status.Get" {
+			_, _ = w.Write(refossStatus)
 			return
 		}
 		_, _ = w.Write([]byte(plugAnswer))
@@ -58,7 +69,18 @@ func newFixture(t *testing.T) *fixture {
 // manager returns a manager over a fresh collector, as after a restart.
 func (f *fixture) manager() (*Manager, *collector.Collector) {
 	c := collector.New(f.st, time.Hour) // never ticks by itself: nothing here runs the collector
-	return &Manager{Store: f.st, Collector: c, build: f.build, ProbeTimeout: time.Second}, c
+	m := &Manager{Store: f.st, Collector: c, ProbeTimeout: time.Second}
+	m.detect = func(context.Context, string, *http.Client) (string, error) { return "em16p", nil }
+	m.build = func(kind, host, name string, scope model.Scope, hc *http.Client) (source.Source, error) {
+		if kind == "refoss" {
+			if err := hostcheck.Validate(host); err != nil { // as the real builder would: the simulated house is saved as a Refoss with no address
+				return nil, fail(ErrInvalid, "bad address")
+			}
+			return refoss.NewSourceWithBase(f.srv.URL, host, name, "em16p", m.refossSettings(refoss.DeviceID(host)), f.srv.Client()), nil
+		}
+		return f.build(kind, host, name, scope, hc)
+	}
+	return m, c
 }
 
 func TestAddReadsTheDeviceOnceAndKeepsIt(t *testing.T) {
@@ -98,7 +120,7 @@ func TestAddRefusesWhatItShould(t *testing.T) {
 		{"bad scope", NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Scope: "mains"}, ErrInvalid},
 		{"name too long", NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: strings.Repeat("x", 61)}, ErrInvalid},
 		{"unknown kind", NewDevice{Kind: "toaster", Host: "192.168.1.50"}, ErrInvalid},
-		{"refoss is not mapped yet", NewDevice{Kind: "refoss", Host: "192.168.1.51"}, ErrUnsupported},
+		{"a monitor has no scope to choose", NewDevice{Kind: "refoss", Host: "192.168.1.51", Scope: "pc"}, ErrInvalid},
 	}
 	for _, tc := range cases {
 		if _, err := m.Add(ctx, tc.nd); !errors.Is(err, tc.want) {
@@ -305,5 +327,155 @@ func TestAPcPlugAddedAgainAfterBeingRemovedKeepsItsComputer(t *testing.T) {
 	after, _ := f.st.Computers(ctx)
 	if len(after) != 1 || after[0].ID != before[0].ID || after[0].WallChannelID == nil {
 		t.Errorf("computers = %+v, want the same one with its wall plug still tied", after)
+	}
+}
+
+// ---- a Refoss energy monitor (the answers are what a real EM16P gave: A2 and B2, the EV charger, are clamped on backwards)
+
+func refossReadings(t *testing.T, c *collector.Collector, id string) map[string]float64 {
+	t.Helper()
+	c.PollOnce(context.Background(), time.Now())
+	out := map[string]float64{}
+	for _, r := range c.LiveReadings() {
+		out[r.ChannelID] = r.Watts
+	}
+	_ = id
+	return out
+}
+
+func TestAddingARefossMonitorKeepsItsInputsAndSwitchesOffTheOnesWithNothingOnThem(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+
+	d, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88", Name: "Garage panel"})
+	if err != nil || d.ID != "refoss-192.168.68.88" || d.Kind != "refoss" || d.Model != "em16p" || d.Name != "Garage panel" {
+		t.Fatalf("device = %+v, err %v", d, err)
+	}
+	chs, _ := f.st.DeviceChannels(ctx, d.ID)
+	if len(chs) != 18 {
+		t.Fatalf("%d channels, want the 18 inputs", len(chs))
+	}
+	on := map[string]bool{}
+	for _, ch := range chs {
+		if ch.Enabled {
+			on[ch.Label] = true
+		}
+		if ch.Scope != model.ScopeCircuit {
+			t.Errorf("%s is a %s, want circuit", ch.Label, ch.Scope)
+		}
+	}
+	// A1, A2, A3 and B1, B2, B3 have something on them (A2 and B2 backwards); the rest nothing, and C has no voltage at all.
+	want := map[string]bool{"A1": true, "A2": true, "A3": true, "B1": true, "B2": true, "B3": true}
+	if len(on) != len(want) {
+		t.Errorf("switched on: %v, want %v", on, want)
+	}
+	for l := range want {
+		if !on[l] {
+			t.Errorf("%s should be on", l)
+		}
+	}
+
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88"}); !errors.Is(err, ErrExists) {
+		t.Errorf("adding it again: %v, want ErrExists", err)
+	}
+	_ = c
+}
+
+func TestARefossMonitorOfAModelThatWasNeverSeenOrThatDoesNotAnswerIsRefused(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+
+	m.detect = func(context.Context, string, *http.Client) (string, error) { return "em06p", nil }
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88"}); !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "EM06P") {
+		t.Errorf("an EM06P: %v, want unsupported saying so", err)
+	}
+	m.detect = func(context.Context, string, *http.Client) (string, error) {
+		return "", errors.New("connection refused")
+	}
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88"}); !errors.Is(err, ErrUnreachable) {
+		t.Errorf("no answer: %v, want unreachable", err)
+	}
+	if len(c.Devices()) != 0 {
+		t.Errorf("a refused monitor was started: %+v", c.Devices())
+	}
+}
+
+func TestABackwardsClampIsSaidSoAndFixedByFlippingItsSignOrPairingTheLegs(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88"}); err != nil {
+		t.Fatal(err)
+	}
+	id := func(n int) string { return "refoss-192.168.68.88:em" + string(rune('0'+n)) }
+
+	// As the clamps are: the EV charger's two legs (inputs 2 and 8) read negative, so they report nothing and the collector says why.
+	got := refossReadings(t, c, "")
+	if got[id(1)] < 3700 || got[id(3)] < 18 || got[id(3)] > 19 {
+		t.Errorf("readings = %v", got)
+	}
+	if _, ok := got[id(2)]; ok {
+		t.Errorf("a backwards clamp reported %v W", got[id(2)])
+	}
+	notes := strings.Join(c.Notes(), " | ")
+	if !strings.Contains(notes, "A2+B2") && !strings.Contains(notes, "A2 on the Refoss reads -3668") {
+		t.Errorf("notes = %q, want a clamp reading backwards said plainly", notes)
+	}
+
+	// Flip the sign of input 2: it reads the 3.7 kW it really draws.
+	yes := true
+	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{Invert: &yes}); err != nil {
+		t.Fatal(err)
+	}
+	if got = refossReadings(t, c, ""); got[id(2)] < 3660 || got[id(2)] > 3680 {
+		t.Errorf("flipped input 2 = %v, want about 3668", got[id(2)])
+	}
+
+	// Flip input 8 too and pair the two legs: one circuit of 7.3 kW on input 2, and input 8 is no channel of its own any more.
+	if _, err := f.st.SetChannelWiring(ctx, id(8), store.WiringChange{Invert: &yes}); err != nil {
+		t.Fatal(err)
+	}
+	partner := id(8)
+	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{SetPair: true, PairWith: &partner}); err != nil {
+		t.Fatal(err)
+	}
+	got = refossReadings(t, c, "")
+	if w := got[id(2)]; w < 7320 || w > 7350 {
+		t.Errorf("the paired EV circuit = %v, want about 7334 (3668 + 3666)", w)
+	}
+	if _, ok := got[id(8)]; ok {
+		t.Error("the second leg is still reported on its own")
+	}
+	if ch, _ := f.st.Channel(ctx, id(8)); ch.Enabled {
+		t.Error("the second leg should be switched off once it is part of a circuit")
+	}
+	if n := strings.Join(c.Notes(), ""); strings.Contains(n, "Refoss reads") {
+		t.Errorf("there is nothing backwards any more but the notes say %q", n)
+	}
+
+	// Unpairing brings the leg back as a channel of its own.
+	if _, err := f.st.SetChannelWiring(ctx, id(2), store.WiringChange{SetPair: true}); err != nil {
+		t.Fatal(err)
+	}
+	if ch, _ := f.st.Channel(ctx, id(8)); !ch.Enabled || ch.PairWith != nil {
+		t.Errorf("after unpairing: %+v", ch)
+	}
+}
+
+func TestARestartKeepsARefossMonitorAndItsModel(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, _ := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88"}); err != nil {
+		t.Fatal(err)
+	}
+	m2, c2 := f.manager() // as after a restart: nothing remembered but what is saved
+	if err := m2.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds := c2.Devices(); len(ds) != 1 || ds[0].ID != "refoss-192.168.68.88" || ds[0].Model != "em16p" {
+		t.Errorf("restored = %+v", ds)
 	}
 }

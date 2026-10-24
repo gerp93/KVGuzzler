@@ -7,6 +7,12 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 )
 
+// Noter is a source that can also say, in words, what needs attention (a clamp put on backwards, say). The collector shows these beside
+// its own notes.
+type Noter interface {
+	Notes() []string
+}
+
 type Source interface {
 	// Device describes the device. Online and LastSeen are filled in by the collector, not here.
 	Device() model.Device
