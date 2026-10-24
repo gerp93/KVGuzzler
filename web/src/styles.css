@@ -7,6 +7,12 @@
   --bar-h: 3.75rem; /* the phone's bottom tab bar */
 }
 
+/* The themes give a button's fill but not the text on it, and some fills are light and some dark: black or white, whichever reads. */
+body {
+  --on-primary: oklch(from var(--color-primary-action) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+  --on-top: oklch(from var(--color-top-bar-bg) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: 4rem;
@@ -62,6 +68,7 @@ button:hover:not(:disabled) {
   gap: 4px var(--gap);
   min-height: 3rem;
   padding: 8px 16px;
+  color: var(--on-top, var(--color-text));
   background: var(--color-top-bar-bg);
 }
 
@@ -77,7 +84,7 @@ button:hover:not(:disabled) {
   gap: 6px;
   margin-right: auto;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  opacity: 0.85;
 }
 
 .conn i {
@@ -136,13 +143,14 @@ button:hover:not(:disabled) {
   gap: 2px;
   min-width: 0;
   font-size: 0.72rem;
-  color: var(--color-text-muted);
+  color: var(--on-top, var(--color-text));
+  opacity: 0.78;
   text-align: center;
   text-decoration: none;
 }
 
 .top nav a[aria-current='page'] {
-  color: var(--color-text);
+  opacity: 1;
   font-weight: 600;
 }
 
@@ -150,6 +158,7 @@ button:hover:not(:disabled) {
   padding: 3px 14px;
   box-sizing: content-box;
   margin: -3px 0;
+  color: var(--on-primary, var(--color-text));
   background: var(--color-primary-action);
   border-radius: 999px;
 }
@@ -322,7 +331,7 @@ main {
 .seg button[aria-pressed='true'],
 .chips button[aria-pressed='true'] {
   background: var(--color-primary-action);
-  color: var(--color-primary-action-text, var(--color-text));
+  color: var(--on-primary, var(--color-text));
 }
 
 .chips {
@@ -596,17 +605,21 @@ select:focus-visible {
     gap: 8px;
     padding: 8px 12px;
     font-size: 1rem;
-    color: inherit;
     border-radius: var(--radius);
+  }
+
+  .top nav a {
+    opacity: 0.92;
   }
 
   .top nav a:hover {
     background: var(--color-top-bar-hover);
+    opacity: 1;
   }
 
   .top nav a[aria-current='page'] {
     background: var(--color-primary-action);
-    color: var(--color-primary-action-text, var(--color-text));
+    color: var(--on-primary, var(--color-text));
   }
 
   .top nav a[aria-current='page'] .ico {
