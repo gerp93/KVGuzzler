@@ -380,6 +380,12 @@ func (m *Manager) Update(ctx context.Context, id string, u UpdateDevice) (model.
 		}
 		return model.Device{}, err
 	}
+	// A device that is just one meter (a plug) has one name: the device's. The meter follows it, so there is only one place to rename it.
+	if name != d.Name && len(meters) == 1 {
+		if _, err := m.Store.UpdateMeter(ctx, meters[0].ID, &name, nil); err != nil {
+			log.Printf("could not rename the meter of %s: %v", id, err)
+		}
+	}
 	out := src.Device()
 	out.Online = true
 	return out, nil

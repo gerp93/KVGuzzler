@@ -870,3 +870,9 @@ a.button {
 .device-edit .field {
   margin-top: 0;
 }
+
+/* A plug's name in the tree: plain text, as it is renamed under Devices */
+.hier-main .meter-name {
+  padding: 8px;
+  font-weight: 600;
+}
