@@ -89,7 +89,7 @@ function DeviceRow({ device, onChanged }: { device: Device; onChanged: () => voi
       {editing && (
         <div class="device-edit">
           <label class="field">
-            <span>Name</span>
+            <span>Name (a plug's meter is named the same)</span>
             <input value={name} maxLength={60} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
           </label>
           <label class="field">

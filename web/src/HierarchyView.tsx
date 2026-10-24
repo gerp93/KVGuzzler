@@ -43,6 +43,8 @@ interface Shared {
   figures: Map<string, MeterSummary>;
   estimated: boolean;
   deviceName: (id: string) => string;
+  /** A device that is one meter (a plug) is named under Devices, and its meter has that name: the tree does not rename it a second time. */
+  isOnlyMeterOfDevice: (id: string) => boolean;
   /** The name of a computer, by id: a plug that is its wall plug or one of its peripherals says so on its row. */
   computerName: (id: string) => string;
   watts: Map<string, number>;
@@ -52,7 +54,7 @@ interface Shared {
 }
 
 function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; shared: Shared }) {
-  const { all, figures, estimated, deviceName, computerName, watts, dragging, setDragging, onChanged } = shared;
+  const { all, figures, estimated, deviceName, isOnlyMeterOfDevice, computerName, watts, dragging, setDragging, onChanged } = shared;
   const depth = rows[at]!.depth;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
@@ -138,16 +140,22 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
         >
           ⠿
         </span>
-        <label class="grow">
-          <span class="visually-hidden">Name for {legs}</span>
-          <input
-            value={label}
-            maxLength={60}
-            onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
-            onBlur={() => label !== meter.label && void run(meter.id, { label })}
-            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-          />
-        </label>
+        {isOnlyMeterOfDevice(meter.device_id) ? (
+          <span class="grow meter-name" title="Rename it under Devices: a plug has one name">
+            {meter.label}
+          </span>
+        ) : (
+          <label class="grow">
+            <span class="visually-hidden">Name for {legs}</span>
+            <input
+              value={label}
+              maxLength={60}
+              onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
+              onBlur={() => label !== meter.label && void run(meter.id, { label })}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            />
+          </label>
+        )}
         <span class="caption hier-tag" title={tag}>
           {tag}
         </span>
@@ -332,13 +340,16 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
 
   const names = new Map((devices ?? []).map((d) => [d.id, d.name || d.host]));
   const deviceName = (id: string) => names.get(id) ?? '';
+  const perDevice = new Map<string, number>();
+  for (const m of meters) perDevice.set(m.device_id, (perDevice.get(m.device_id) ?? 0) + 1);
+  const isOnlyMeterOfDevice = (id: string) => perDevice.get(id) === 1;
   const computerNames = new Map((computers ?? []).map((c) => [c.id, c.name]));
   const computerName = (id: string) => computerNames.get(id) ?? '';
   const watts = new Map((live?.readings ?? []).map((r) => [r.meter_id, r.watts]));
   const rows = arrangeByPanel(shownMeters(meters));
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, computerName, watts, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, dragging, setDragging, onChanged };
 
   return (
     <>

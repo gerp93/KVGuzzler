@@ -614,3 +614,30 @@ func TestAMonitorThatMovesKeepsItsInputsAndTheirWiring(t *testing.T) {
 		t.Errorf("A2 = %v: its flipped sign should still apply under the old id (readings %v)", w, got)
 	}
 }
+
+func TestRenamingAPlugRenamesItsMeterToo(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, _ := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: "Desk"}); err != nil {
+		t.Fatal(err)
+	}
+	name := "Standing desk"
+	if _, err := m.Update(ctx, "shelly-192.168.1.50", UpdateDevice{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	if mt, err := f.st.Meter(ctx, "shelly-192.168.1.50:plug"); err != nil || mt.Label != name {
+		t.Errorf("the plug's meter is %q (%v), want it to follow the device's name", mt.Label, err)
+	}
+	// A monitor has many meters, each named on its own: renaming the device leaves them alone.
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88", Name: "Garage panel"}); err != nil {
+		t.Fatal(err)
+	}
+	rename := "Garage"
+	if _, err := m.Update(ctx, "refoss-192.168.68.88", UpdateDevice{Name: &rename}); err != nil {
+		t.Fatal(err)
+	}
+	if mt, _ := f.st.Meter(ctx, "refoss-192.168.68.88:em2"); mt.Label != "A2" {
+		t.Errorf("an input's name is %q, want it left alone", mt.Label)
+	}
+}
