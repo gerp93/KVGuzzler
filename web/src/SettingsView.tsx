@@ -17,6 +17,8 @@ function ChannelRow({ channel, all, onChanged }: { channel: Channel; all: Channe
   const taken = new Set(all.flatMap((c) => (c.pair_with ? [c.pair_with] : [])));
   const options = all.filter((c) => c.device_id === channel.device_id && c.id !== channel.id && !c.pair_with && (!taken.has(c.id) || c.id === channel.pair_with));
   const partnerOf = all.find((c) => c.pair_with === channel.id);
+  // The other leg of this circuit, when paired: its clamp has a sign of its own (one leg can be on the right way round and the other not).
+  const secondLeg = channel.pair_with ? all.find((c) => c.id === channel.pair_with) : undefined;
   const save = (body: { label?: string; enabled?: boolean; invert?: boolean; pair_with?: string | null; scope?: 'circuit' | 'mains' }) =>
     api.updateChannel(channel.id, body).then(
       () => {
@@ -50,8 +52,18 @@ function ChannelRow({ channel, all, onChanged }: { channel: Channel; all: Channe
         <>
           <label class="check">
             <input type="checkbox" checked={channel.invert === true} onChange={(e) => void save({ invert: (e.target as HTMLInputElement).checked })} />
-            Flip sign
+            {secondLeg ? `Flip ${channel.label}` : 'Flip sign'}
           </label>
+          {secondLeg && (
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={secondLeg.invert === true}
+                onChange={(e) => void api.updateChannel(secondLeg.id, { invert: (e.target as HTMLInputElement).checked }).then(onChanged, (err: Error) => setError(err.message))}
+              />
+              Flip the second leg
+            </label>
+          )}
           <label class="check">
             <span class="visually-hidden">Other leg of the breaker for {channel.label}</span>
             <select value={channel.pair_with ?? ''} onChange={(e) => void save({ pair_with: (e.target as HTMLSelectElement).value || null })}>
