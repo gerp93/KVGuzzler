@@ -5,7 +5,11 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { meterPath } from './Bars';
+import { AddPanel } from './AddPanel';
+import { ComputersCard } from './ComputersCard';
+import { DevicesCard } from './DevicesCard';
 import { FlowChart } from './FlowChart';
+import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
@@ -14,7 +18,7 @@ import { MeterPage } from './MeterPage';
 import { routePath } from './route';
 import {
   arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, usualPartner,
-  type ApplianceGroup, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
+  type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
 type Change = Parameters<typeof api.updateMeter>[1];
@@ -276,8 +280,8 @@ export function HierarchyView({ meters, open, onChanged }: { meters: Meter[]; op
 function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const { data: devices } = usePoll<Device[]>(api.devices, 30_000, [meters.length]);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
-  const { data: groups } = usePoll<ApplianceGroup[]>(api.groups, 30_000, [meters]);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   // The same period as the Live page (they share the saved choice); only the energy and cost columns follow it.
   const [period, setPeriod] = useStored('period', '24h');
@@ -313,7 +317,21 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         </p>
       </section>
       <section class="card wide">
-        <h2>Hierarchy</h2>
+        <div class="row">
+          <h2>Hierarchy</h2>
+          <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+            ＋ Add
+          </button>
+        </div>
+        {adding && (
+          <AddPanel
+            onAdded={() => {
+              setAdding(false);
+              onChanged();
+            }}
+            onCancel={() => setAdding(false)}
+          />
+        )}
         <p class="caption">
           Every meter, laid out as the house is wired. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
@@ -367,21 +385,9 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           </details>
         )}
       </section>
-      {groups && groups.length > 0 && (
-        <section class="card wide">
-          <h2>Appliance groups</h2>
-          <ul class="bars">
-            {groups.map((g) => (
-              <li key={g.id}>
-                <span class="name">
-                  <a href={routePath('hierarchy', 'group', g.id)}>{g.name}</a>
-                </span>
-                <span class="caption">{g.meter_ids.length} plugs shown as one</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <DevicesCard meters={meters} onChanged={onChanged} />
+      <ComputersCard meters={meters} onChanged={onChanged} />
+      <GroupsCard meters={meters} onChanged={onChanged} />
     </>
   );
 }
