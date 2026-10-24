@@ -3,9 +3,11 @@
 // it and are never added to it.
 import { api } from './api';
 import { Bars } from './Bars';
+import { ComputerView } from './ComputerView';
 import { Chart, lineFrom, type Line } from './Chart';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
+import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { RateNote } from './RateNote';
@@ -20,7 +22,37 @@ interface Period {
   domain: [number, number];
 }
 
+/** The live page: the whole house, or (when some meters are marked as favorites) one click to any of them instead: the computer, the EV
+ * charger, a sub-panel. A favorite opens the same page it has in the Hierarchy tab. */
 export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: () => void }) {
+  const [focus, setFocus] = useStored('live-focus', '');
+  const favorites = meters.filter((m) => m.favorite && m.enabled);
+  const chosen = favorites.find((m) => m.id === focus);
+  if (favorites.length === 0) return <House meters={meters} onOpenSettings={onOpenSettings} />;
+  return (
+    <>
+      <div class="chips" role="group" aria-label="What to show">
+        <button type="button" aria-pressed={!chosen} onClick={() => setFocus('')}>
+          House
+        </button>
+        {favorites.map((m) => (
+          <button key={m.id} type="button" aria-pressed={chosen?.id === m.id} onClick={() => setFocus(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {!chosen ? (
+        <House meters={meters} onOpenSettings={onOpenSettings} />
+      ) : chosen.scope === 'pc' && chosen.computer_id ? (
+        <ComputerView id={chosen.computer_id} meters={meters} embedded />
+      ) : (
+        <MeterPage id={chosen.id} meters={meters} />
+      )}
+    </>
+  );
+}
+
+function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: () => void }) {
   const [period, setPeriod] = useStored('period', '24h');
   const { data: live, error } = usePoll<Live>(api.live, 2000, []);
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');

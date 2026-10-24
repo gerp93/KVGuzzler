@@ -993,6 +993,9 @@ components:
             says which circuit it is plugged into. The parent's own figure already contains its children's, so a parent and its children are never
             added together; what the parent has that none of them account for is the remainder. Any meter but `mains` can have one (a computer's wall
             plug and peripherals included: the circuit they are on).
+        favorite:
+          type: boolean
+          description: The user marked it as one they want one click away; the live page offers it as a choice. Kept on the server so every device shows the same ones.
         invert:
           type: boolean
           description: Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss meter has it.
@@ -1019,6 +1022,9 @@ components:
           description: |
             Refoss only. The meter of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
             circuit (this meter reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
+        favorite:
+          type: boolean
+          description: Mark the meter as a favorite (or not). Any meter can be one.
         type:
           type: string
           enum: [house, sub_panel, circuit]

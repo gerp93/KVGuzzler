@@ -224,12 +224,14 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 		Type     *string         `json:"type"`      // what a Refoss meter is: house, sub_panel or circuit
 		// The circuit this one is part of (a sub-panel's feed), or null to take it out; absent leaves it alone.
 		ParentID json.RawMessage `json:"parent_id"`
+		// A favorite is offered on the live page as a one-click choice.
+		Favorite *bool `json:"favorite"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
-		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type and/or parent_id")
+		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil && body.Favorite == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type, parent_id and/or favorite")
 		return
 	}
 	if body.Label != nil {
@@ -283,6 +285,9 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && body.ParentID != nil {
 		ch, err = s.Store.SetMeterParent(r.Context(), id, parentID)
+	}
+	if err == nil && body.Favorite != nil {
+		ch, err = s.Store.SetMeterFavorite(r.Context(), id, *body.Favorite)
 	}
 	if err == nil && body.ComputerID != nil {
 		ch, err = s.Store.AssignMeter(r.Context(), id, computerID)

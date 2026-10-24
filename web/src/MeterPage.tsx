@@ -18,7 +18,7 @@ interface Loaded {
 // The chart's lines: the meter in the text colour, the meters inside it each in a colour of their own.
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
 
-export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; back: { href: string; label: string } }) {
+export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; back?: { href: string; label: string } }) {
   const [period, setPeriod] = useStored('period', '24h');
   const meter = meters.find((m) => m.id === id);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
@@ -58,9 +58,11 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
 
   return (
     <>
-      <a class="back" href={back.href}>
-        ← {back.label}
-      </a>
+      {back && (
+        <a class="back" href={back.href}>
+          ← {back.label}
+        </a>
+      )}
       {error && (
         <section class="card warn">
           <p>{error.message}</p>

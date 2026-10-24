@@ -653,6 +653,8 @@ export interface components {
              *     plug and peripherals included: the circuit they are on).
              */
             parent_id?: string | null;
+            /** @description The user marked it as one they want one click away; the live page offers it as a choice. Kept on the server so every device shows the same ones. */
+            favorite?: boolean;
             /** @description Flip the sign of the reading, for a Refoss clamp put on backwards. Only a Refoss meter has it. */
             invert?: boolean;
             /**
@@ -671,6 +673,8 @@ export interface components {
              *     circuit (this meter reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
              */
             pair_with?: string | null;
+            /** @description Mark the meter as a favorite (or not). Any meter can be one. */
+            favorite?: boolean;
             /**
              * @description Refoss only. What the meter is: a monitor on the main panel measures the `house`; one on a sub-panel measures `circuit`s, and a
              *     circuit that feeds a sub-panel is a `sub_panel`.

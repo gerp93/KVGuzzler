@@ -126,6 +126,16 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
         {tag && <span class="caption hier-tag">{tag}</span>}
         <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
         <div class="hier-actions">
+          <button
+            type="button"
+            class="icon star"
+            aria-pressed={meter.favorite === true}
+            title={meter.favorite ? 'Remove from the favorites on Live' : 'Add to the favorites on Live'}
+            aria-label={`${meter.favorite ? 'Unfavorite' : 'Favorite'} ${legs}`}
+            onClick={() => void run(meter.id, { favorite: !meter.favorite })}
+          >
+            {meter.favorite ? '★' : '☆'}
+          </button>
           <a class="button icon" href={meterPath(meter)} title="Open this meter's page" aria-label={`Open ${legs}`}>
             ›
           </a>

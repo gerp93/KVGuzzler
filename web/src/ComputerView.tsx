@@ -31,7 +31,8 @@ function ago(iso: string | null | undefined): string {
 }
 
 /** One computer: the whole PC at its plug, the desk around it, and (when a collector reports for it) its insides. */
-export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
+/** `embedded` leaves out the way back, for when the page is shown inside another (a favorite on the live page). */
+export function ComputerView({ id, meters, embedded = false }: { id: string; meters: Meter[]; embedded?: boolean }) {
   const [period, setPeriod] = useStored('period', '24h');
   const label = (meterId: string) => meters.find((c) => c.id === meterId)?.label ?? meterId;
 
@@ -88,9 +89,11 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
   const peakIsBound = hasPlugs ? (counted?.peakIsBound ?? false) : false;
   return (
     <>
-      <a class="back" href={routePath('hierarchy')}>
-        ← Hierarchy
-      </a>
+      {!embedded && (
+        <a class="back" href={routePath('hierarchy')}>
+          ← Hierarchy
+        </a>
+      )}
 
       {error && (
         <section class="card warn">
