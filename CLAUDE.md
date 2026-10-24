@@ -54,6 +54,10 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **Deployment settings are never committed.** The box's address, the port and the server settings (`HOUSED_TZ`...) live in
   `~/.config/kvguzzler/deploy.env` on the PC and `/etc/housed/housed.env` on the box; the repo has only `scripts/deploy.env.example` with
   placeholders. Deploy with `scripts/deploy-server.sh` (see `server/README.md`); it restores the old binary if the new one does not answer.
+- **Runs** (`server/internal/runs`, `GET /api/v1/meters/{id}/runs`, `web/src/RunsCard.tsx`): the times a meter was working, found from the stored minutes only. The working level is a quarter of the way from the meter's
+  10th to its 95th percentile (never below 10 W), learned from at least the last 30 days so an hour is judged like a month, or `min_watts`; a meter whose spread is under 15 W has no level and no runs (`threshold_watts` null,
+  the card hides). A dip of up to 5 minutes does not end a run, under 3 minutes is not a run. A run is listed in the period it **starts** in and is followed 12 h past the period's end; its cost is its energy at the price of the
+  day it started (null without a price, never zero), the totals count all runs even past the 500 listed. Runs are a view of one meter's own reading: never added to anything.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

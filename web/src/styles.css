@@ -882,3 +882,68 @@ a.button {
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
+
+/* A meter's runs: each time it was working, newest first */
+.runs-summary {
+  margin: 0 0 8px;
+}
+
+.runs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runs li {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5rem) 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.runs .bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.runs .bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-green);
+}
+
+@media (max-width: 480px) {
+  .runs li {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'when cost' 'bar len';
+    gap: 2px 8px;
+  }
+  .runs .when {
+    grid-area: when;
+  }
+  .runs .cost {
+    grid-area: cost;
+  }
+  .runs .bar {
+    grid-area: bar;
+  }
+  .runs .len {
+    grid-area: len;
+  }
+}
+
+button.link {
+  margin-top: 8px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent-blue);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}

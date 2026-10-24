@@ -70,6 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/devices", s.devices)
 	mux.HandleFunc("GET /api/v1/meters", s.meters)
 	mux.HandleFunc("PATCH /api/v1/meters/{meterId}", s.updateMeter)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs", s.meterRuns)
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)

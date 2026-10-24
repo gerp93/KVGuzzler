@@ -8,10 +8,13 @@ import { FlowChart } from './FlowChart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { RateNote } from './RateNote';
+import { RunsCard } from './RunsCard';
+import { showRuns, type MeterRuns } from './runs';
 import { carbonNote, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
 
 interface Loaded {
   summary: Summary;
+  runs: MeterRuns | undefined;
   lines: Line[];
   domain: [number, number];
 }
@@ -28,13 +31,19 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
   const { data, error } = usePoll<Loaded>(
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
-      const [summary, own, ...inside] = await Promise.all([api.summary(from, to), api.series(id, from, to), ...direct.map((d) => api.series(d.id, from, to))]);
+      // The runs are a nicety: if they cannot be read the rest of the page still shows.
+      const [summary, own, runs, ...inside] = await Promise.all([
+        api.summary(from, to),
+        api.series(id, from, to),
+        api.meterRuns(id, from, to).catch(() => undefined),
+        ...direct.map((d) => api.series(d.id, from, to)),
+      ]);
       const lines: Line[] = [];
       if (own.points.length > 0) lines.push(lineFrom(meter?.label ?? id, '--color-text', own.points));
       inside.forEach((s, i) => {
         if (s.points.length > 0) lines.push(lineFrom(direct[i]!.label, COLORS[i % COLORS.length]!, s.points));
       });
-      return { summary, lines, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
+      return { summary, runs, lines, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number] };
     },
     60_000,
     [id, period, direct.map((d) => d.id).join(',')],
@@ -114,6 +123,8 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
           <FlowChart meters={meters} summary={data.summary} root={id} />
         </section>
       )}
+
+      {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} />}
 
       {data && data.lines.length > 0 && (
         <section class="card">

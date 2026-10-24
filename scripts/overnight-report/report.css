@@ -47,3 +47,6 @@ footer { color: var(--muted); border-top: 1px solid var(--line); padding: 22px 0
   .entry .num { display: none; }
   .shots { grid-template-columns: 1fr; }
 }
+
+.entry .checked, .entry .unverified { margin: .5rem 0; font-size: .92rem; }
+.entry .unverified { border-left: 3px solid #d9a441; padding-left: .7rem; }

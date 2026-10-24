@@ -198,6 +198,38 @@ paths:
                 $ref: '#/components/schemas/Meter'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/runs:
+    get:
+      tags: [Read]
+      operationId: getMeterRuns
+      summary: The times a meter was working over a period (a car charging, a dryer drying).
+      description: |
+        Found from the recorded minutes alone: a run is a stretch where the meter drew clearly more than it does at rest. A short dip inside a
+        run does not end it and a blip of a minute or two is not a run. The level that counts as working is learned from the meter's last 30 days
+        (so an hour is judged by the same level as a month) unless `min_watts` is given. A meter that barely changes has no such level
+        (`threshold_watts` is null) and no runs. A run is listed in the period it starts in; the newest 500 are listed and `totals` counts all.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: min_watts
+          in: query
+          required: false
+          description: Count a minute as working from this many watts up, instead of the learned level.
+          schema:
+            type: number
+            exclusiveMinimum: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterRuns'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/live:
     get:
       tags: [Read]
@@ -1155,6 +1187,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SeriesPoint'
+    MeterRun:
+      type: object
+      required: [start, end, minutes, kwh, avg_watts, peak_watts, cost]
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+          description: The end of the last working minute.
+        minutes:
+          type: integer
+          description: From the first to the last working minute, the short dips inside it included.
+        kwh:
+          type: number
+          description: Every recorded minute from the first working one to the last, the dips inside it included.
+        avg_watts:
+          type: number
+        peak_watts:
+          type: number
+        cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: The run's energy at the price of the local day it started; null when no price is known.
+    MeterRunTotals:
+      type: object
+      required: [count, kwh, cost, minutes, longest_minutes, peak_watts]
+      description: Over every run that starts in the period, also those past the listed 500.
+      properties:
+        count:
+          type: integer
+        kwh:
+          type: number
+        cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Null unless every run has a price.
+        minutes:
+          type: integer
+          description: The runs' minutes added.
+        longest_minutes:
+          type: integer
+        peak_watts:
+          type: number
+    MeterRuns:
+      type: object
+      required: [meter_id, threshold_watts, meter_kwh, runs, totals, truncated, cost_estimated, from, to]
+      properties:
+        meter_id:
+          type: string
+        threshold_watts:
+          type: [number, 'null']
+          description: The level above which a minute counts as working; null for a meter that barely changes.
+        meter_kwh:
+          type: number
+          description: Everything the meter used over the period, so the runs' share of it can be said.
+        runs:
+          type: array
+          description: Newest first, at most 500.
+          items:
+            $ref: '#/components/schemas/MeterRun'
+        totals:
+          $ref: '#/components/schemas/MeterRunTotals'
+        truncated:
+          type: boolean
+        cost_estimated:
+          type: boolean
+          description: True when any run was priced at an estimated price (a day after the latest bill).
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
     MeterSummary:
       type: object
       required: [meter_id, scope, kwh]

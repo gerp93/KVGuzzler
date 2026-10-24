@@ -54,16 +54,21 @@ def main():
         meta_bits = []
         if e.get('commit'):
             meta_bits.append(f'commit <code>{html.escape(e["commit"])}</code>')
-        if e.get('tests'):
-            meta_bits.append(html.escape(e['tests']))
         if e.get('files'):
-            meta_bits.append(html.escape(e['files']))
+            fl = e['files'] if isinstance(e['files'], list) else [e['files']]
+            meta_bits.append('files ' + ', '.join(f'<code>{html.escape(x)}</code>' for x in fl))
+        checks = ''
+        if e.get('tests'):
+            checks += f'<p class="checked"><strong>How it was checked.</strong> {e["tests"]}</p>'
+        if e.get('notes'):
+            checks += f'<p class="unverified"><strong>Not verified / limits.</strong> {e["notes"]}</p>'
         kind = e.get('kind', 'feature')
         body.append(
             f'<section id="{e["id"]}" class="entry {kind}"><div class="num">{n:02d}</div><div class="main">'
             f'<h2>{html.escape(e["title"])} <span class="tag">{html.escape(kind)}</span></h2>'
             f'<p class="lead">{e["summary"]}</p>'
             f'{"<ul>" + det + "</ul>" if det else ""}'
+            f'{checks}'
             f'{"<div class=shots>" + imgs + "</div>" if imgs else ""}'
             f'{"<p class=meta>" + " &middot; ".join(meta_bits) + "</p>" if meta_bits else ""}'
             f'</div></section>'

@@ -23,6 +23,39 @@
    ],
    "commit": "a99f39f",
    "tests": "go test ./... passes"
+  },
+  {
+   "id": "runs",
+   "title": "Runs: every time the car charged or the dryer ran",
+   "kind": "feature",
+   "summary": "A meter's page now has a <strong>Runs</strong> card: each stretch the meter was really working (a charging session, a dryer load, an oven preheat), with how long it lasted, how much energy it took and what it cost. For the EV charger it reads like a charging log: <em>7 runs, about 21 kWh and $3.36 each, 3 h on average</em>.",
+   "details": [
+    "<strong>Why it matters:</strong> a bill is a monthly lump; a run is something you can act on. \"A charge costs $3.36 and I do it five nights a week\" is a number you can compare with the public charger or with moving the charge to the cheap hours.",
+    "<strong>How a run is found</strong> (no new device reading, only the minutes already stored): the level that counts as working is a quarter of the way from the meter's resting power (its 10th percentile) to its working power (its 95th), learned from the last 30 days so that looking at one hour is judged by the same level as a month. A dip of up to five minutes does not end a run (a heating element clicking off), and a stretch shorter than three minutes is not a run. A meter whose busiest and quietest minutes differ by less than 15 W (a router) has no level and no card.",
+    "<strong>API:</strong> <code>GET /api/v1/meters/{id}/runs?from&to</code> with an optional <code>min_watts</code>. It gives the level, the runs newest first (at most 500), each with start, end, minutes, kWh, average and peak watts and a cost, plus totals over all runs and the meter's own energy so the card can say what share of the meter the runs hold. A run is listed in the period it <em>starts</em> in and is followed up to 12 hours past the end so it is whole. The cost is the run's energy at the price of the day it started (the same schedule code every other figure uses; no price saved gives no cost, never a zero).",
+    "<strong>Phone:</strong> on a narrow screen each run becomes two lines (when and cost on the first, the bar and length on the second).",
+    "<strong>Note for the demo:</strong> the simulator plans each day on its own, so a charge that would cross midnight is cut at midnight into two runs (\"Fri 12:00 AM\" is the tail of Thursday night's charge). A real car would not do this; it is a simulator artefact."
+   ],
+   "images": [
+    {
+     "path": "img/runs-mcp-Claude_Browser-blob-1792844213056-42xkx9.jpg",
+     "caption": "The EV charger over seven days: seven charging sessions beside the power chart that shows the same seven plateaus."
+    },
+    {
+     "path": "img/runs-mcp-Claude_Browser-blob-1792844271840-pnxjmd.jpg",
+     "caption": "The same card at phone width (375 px)."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: five API tests (charges listed newest first with exact kWh, cost at the day's price, a steady fridge has no runs, a run belongs to the period it starts in and is whole, bad asks are refused), plus the earlier detection tests. Web: runs.test.ts. Contract example <code>meter-runs.json</code> validates against the schema.",
+   "files": [
+    "server/internal/api/runs.go",
+    "server/internal/store/minutes.go",
+    "web/src/RunsCard.tsx",
+    "web/src/runs.ts",
+    "contract/openapi.yaml"
+   ],
+   "notes": "Not verified: on your real house (only the simulator's charger was looked at), and with a car that tapers its charge in many small steps (the 5-minute dip rule may split such a charge). A compressor that cycles (a fridge) also gets a Runs card, with many short runs: that is true to what it does but not very useful; the card could be hidden for runs shorter than ten minutes on average."
   }
  ]
 }

@@ -99,6 +99,29 @@ export interface paths {
         patch: operations["updateMeter"];
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The times a meter was working over a period (a car charging, a dryer drying).
+         * @description Found from the recorded minutes alone: a run is a stretch where the meter drew clearly more than it does at rest. A short dip inside a
+         *     run does not end it and a blip of a minute or two is not a run. The level that counts as working is learned from the meter's last 30 days
+         *     (so an hour is judged by the same level as a month) unless `min_watts` is given. A meter that barely changes has no such level
+         *     (`threshold_watts` is null) and no runs. A run is listed in the period it starts in; the newest 500 are listed and `totals` counts all.
+         */
+        get: operations["getMeterRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/live": {
         parameters: {
             query?: never;
@@ -739,6 +762,51 @@ export interface components {
             meter_id: string;
             bucket: components["schemas"]["Bucket"];
             points: components["schemas"]["SeriesPoint"][];
+        };
+        MeterRun: {
+            /** Format: date-time */
+            start: string;
+            /**
+             * Format: date-time
+             * @description The end of the last working minute.
+             */
+            end: string;
+            /** @description From the first to the last working minute, the short dips inside it included. */
+            minutes: number;
+            /** @description Every recorded minute from the first working one to the last, the dips inside it included. */
+            kwh: number;
+            avg_watts: number;
+            peak_watts: number;
+            /** @description The run's energy at the price of the local day it started; null when no price is known. */
+            cost: components["schemas"]["Money"] | null;
+        };
+        /** @description Over every run that starts in the period, also those past the listed 500. */
+        MeterRunTotals: {
+            count: number;
+            kwh: number;
+            /** @description Null unless every run has a price. */
+            cost: components["schemas"]["Money"] | null;
+            /** @description The runs' minutes added. */
+            minutes: number;
+            longest_minutes: number;
+            peak_watts: number;
+        };
+        MeterRuns: {
+            meter_id: string;
+            /** @description The level above which a minute counts as working; null for a meter that barely changes. */
+            threshold_watts: number | null;
+            /** @description Everything the meter used over the period, so the runs' share of it can be said. */
+            meter_kwh: number;
+            /** @description Newest first, at most 500. */
+            runs: components["schemas"]["MeterRun"][];
+            totals: components["schemas"]["MeterRunTotals"];
+            truncated: boolean;
+            /** @description True when any run was priced at an estimated price (a day after the latest bill). */
+            cost_estimated: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
         };
         MeterSummary: {
             meter_id: string;
@@ -1435,6 +1503,37 @@ export interface operations {
                     "application/json": components["schemas"]["Meter"];
                 };
             };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMeterRuns: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+                /** @description Count a minute as working from this many watts up, instead of the learned level. */
+                min_watts?: number;
+            };
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeterRuns"];
+                };
+            };
+            400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
         };
     };

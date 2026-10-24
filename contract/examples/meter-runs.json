@@ -1,0 +1,37 @@
+{
+  "meter_id": "refoss-em16p-1:ch-12",
+  "threshold_watts": 1840.5,
+  "meter_kwh": 212.6,
+  "runs": [
+    {
+      "start": "2026-10-23T23:10:00Z",
+      "end": "2026-10-24T03:40:00Z",
+      "minutes": 270,
+      "kwh": 32.4,
+      "avg_watts": 7200,
+      "peak_watts": 7410,
+      "cost": "4.92"
+    },
+    {
+      "start": "2026-10-21T23:30:00Z",
+      "end": "2026-10-22T02:15:00Z",
+      "minutes": 165,
+      "kwh": 19.8,
+      "avg_watts": 7200,
+      "peak_watts": 7390,
+      "cost": "3.00"
+    }
+  ],
+  "totals": {
+    "count": 2,
+    "kwh": 52.2,
+    "cost": "7.92",
+    "minutes": 435,
+    "longest_minutes": 270,
+    "peak_watts": 7410
+  },
+  "truncated": false,
+  "cost_estimated": false,
+  "from": "2026-10-17T05:00:00Z",
+  "to": "2026-10-24T05:00:00Z"
+}
