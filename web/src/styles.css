@@ -772,3 +772,58 @@ a.button {
     padding: 6px 6px;
   }
 }
+
+/* The flow chart: bands as wide as the energy through them, drawn in the theme's colours */
+.flow {
+  width: 100%;
+  overflow: hidden;
+}
+
+.flow svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.flow .node,
+.flow .link {
+  opacity: 0.9;
+}
+
+.flow .link {
+  fill: none;
+  opacity: 0.28;
+}
+
+.flow rect.n0 { fill: var(--color-accent-green); }
+.flow rect.n1 { fill: var(--color-accent-blue); }
+.flow rect.n2 { fill: var(--color-accent-red); }
+.flow rect.n3 { fill: var(--color-accent-muted); }
+.flow rect.rest { fill: var(--color-text-muted); opacity: 0.55; }
+.flow path.n0 { stroke: var(--color-accent-green); }
+.flow path.n1 { stroke: var(--color-accent-blue); }
+.flow path.n2 { stroke: var(--color-accent-red); }
+.flow path.n3 { stroke: var(--color-accent-muted); }
+.flow path.rest { stroke: var(--color-text-muted); }
+
+.flow text {
+  fill: var(--color-text);
+  font-size: 12px;
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.flow text .small {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.flow a text {
+  cursor: pointer;
+}
+
+.flow a:hover text {
+  text-decoration: underline;
+}

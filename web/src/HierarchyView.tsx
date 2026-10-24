@@ -5,6 +5,7 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { meterPath } from './Bars';
+import { FlowChart } from './FlowChart';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
@@ -231,7 +232,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
             <label class="field">
               <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
               <select value={meter.parent_id ?? ''} onChange={(e) => void run(meter.id, { parent_id: (e.target as HTMLSelectElement).value || null })}>
-                <option value="">{inPanel ? 'The main panel' : 'Not said'}</option>
+                <option value="">{inPanel ? 'The main panel' : 'Parent not metered'}</option>
                 {holders.map((c) => (
                   <option key={c.id} value={c.id}>
                     {inPanel ? `The sub-panel fed by ${c.label}` : c.label}
@@ -302,9 +303,17 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
     <>
       <section class="card wide">
         <div class="row">
-          <h2>Hierarchy</h2>
+          <h2>Where the energy goes</h2>
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
+        {summary ? <FlowChart meters={meters} summary={summary} /> : <p class="note">Loading…</p>}
+        <p class="caption">
+          Each band is as wide as the energy that went through it over the period. A meter's band already counts what is inside it, so the parts of a band
+          never add to more than the band itself: what is left over is "Everything else". The Energy and Cost columns below follow the same period.
+        </p>
+      </section>
+      <section class="card wide">
+        <h2>Hierarchy</h2>
         <p class="caption">
           Every meter, laid out as the house is wired. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.

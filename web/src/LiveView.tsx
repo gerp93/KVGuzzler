@@ -4,6 +4,7 @@
 import { api } from './api';
 import { Bars } from './Bars';
 import { ComputerView } from './ComputerView';
+import { FlowChart } from './FlowChart';
 import { Chart, lineFrom, type Line } from './Chart';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
@@ -163,6 +164,14 @@ function House({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: ()
           <p class="caption">Over the period, {formatKwh(summary.unmetered_kwh)} of the house's energy went through no circuit clamp.</p>
         )}
       </section>
+
+      {summary && circuits.length > 0 && (
+        <section class="card">
+          <h2>Where it goes</h2>
+          <FlowChart meters={meters} summary={summary} />
+          <p class="caption">Over the period picked above: each band is as wide as the energy through it.</p>
+        </section>
+      )}
 
       {pc.length > 0 && (
         <section class="card">

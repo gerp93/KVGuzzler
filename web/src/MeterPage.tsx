@@ -4,6 +4,7 @@
 import { api } from './api';
 import { Bars } from './Bars';
 import { Chart, lineFrom, type Line } from './Chart';
+import { FlowChart } from './FlowChart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { RateNote } from './RateNote';
@@ -104,6 +105,13 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
           <h2>Inside it</h2>
           <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} />
           <p class="caption">Shares are of this meter. "Everything else" is its own reading less the meters listed, so nothing is added twice.</p>
+        </section>
+      )}
+
+      {meter && data && (meters.some((m) => m.parent_id === id && m.enabled)) && (
+        <section class="card">
+          <h2>Where it goes</h2>
+          <FlowChart meters={meters} summary={data.summary} root={id} />
         </section>
       )}
 
