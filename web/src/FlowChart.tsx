@@ -28,7 +28,7 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
   const tree = flowTree(meters, summary, root, virtual);
   if (!tree || tree.kwh <= 0) return <p class="note">Nothing recorded in this period to draw.</p>;
   const narrow = width < 520;
-  const layout = layoutFlow(tree, width, narrow ? 120 : 190);
+  const layout = layoutFlow(tree, width, narrow ? 132 : 230);
   const byId = new Map(meters.map((m) => [m.id, m]));
   const shade = (n: LNode) => (n.node.rest ? 'rest' : (SHADES[Math.min(n.depth, SHADES.length - 1)] ?? 'n3'));
   const href = (n: LNode) => {
@@ -71,7 +71,8 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
                 </>
               ) : (
                 <>
-                  {label} <tspan class="small">{formatKwh(n.node.kwh)}</tspan>
+                  {label}
+                  {!narrow && <tspan class="small"> {formatKwh(n.node.kwh)}</tspan>}
                 </>
               )}
             </text>

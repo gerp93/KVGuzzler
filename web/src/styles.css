@@ -1026,8 +1026,8 @@ a.button {
   }
 }
 
-/* A phone: a meter is two lines, name and watts, then the bar, then the period's figures. */
-@media (max-width: 639px) {
+/* A card too narrow for four columns (a phone, or half a desktop page): a meter is two lines, name and watts, then the bar, then the period's figures. */
+@container (max-width: 40rem) {
   .bars li,
   .bars.wide li,
   .bars a.rowlink,
@@ -1271,6 +1271,7 @@ summary:focus-visible {
 
 .card {
   min-width: 0;
+  container-type: inline-size;
 }
 
 /* Hierarchy on a phone: name and watts on the first line, then what it is, then its energy and cost, then the buttons. */
@@ -1345,4 +1346,51 @@ summary:focus-visible {
   .hier-main .drag {
     display: none;
   }
+}
+
+/* Cards are as tall as what is in them: a short card beside a long one stays short instead of stretching into an empty box. */
+main {
+  align-items: start;
+}
+
+main > .caption {
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  main > .caption {
+    grid-column: 1 / -1;
+  }
+
+}
+
+@container (min-width: 40.01rem) {
+  .bars li,
+  .bars a.rowlink {
+    grid-template-columns: minmax(0, 12rem) 1fr auto;
+  }
+
+  .bars.wide li,
+  .bars.wide a.rowlink {
+    grid-template-columns: minmax(0, 12rem) 1fr auto auto;
+  }
+}
+
+/* A name with a line of detail under it (a program, its CPU and GPU energy) wraps instead of being cut off */
+.bars .name:has(.caption) {
+  white-space: normal;
+}
+
+/* The chart's key: left, small, with what the pointer is on */
+.chart .u-legend {
+  margin-top: 4px;
+  text-align: left;
+}
+
+.chart .u-legend .u-series {
+  padding: 2px 8px 2px 0;
+}
+
+.chart .u-legend .u-series:first-child {
+  color: var(--color-text-muted);
 }
