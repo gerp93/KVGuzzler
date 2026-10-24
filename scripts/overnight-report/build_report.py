@@ -16,7 +16,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 NOTES = os.path.join(HERE, 'notes.json')
 OUT = os.path.join(HERE, 'overnight-report.html')
-REPO = r'C:\Users\kgerp\source\repos\_worktrees\KVGuzzler-overnight'
+REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 
 
 def git(*args):
@@ -27,6 +27,7 @@ def git(*args):
 
 
 def img_tag(path, caption):
+    path = path if os.path.isabs(path) else os.path.join(HERE, path)
     try:
         raw = open(path, 'rb').read()
     except OSError:
