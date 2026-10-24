@@ -122,7 +122,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateMeter: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; type?: 'house' | 'sub_panel' | 'circuit'; parent_id?: string | null }) =>
+  updateMeter: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; favorite?: boolean; type?: 'house' | 'sub_panel' | 'circuit'; parent_id?: string | null }) =>
     request<Meter>(`api/v1/meters/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

@@ -72,6 +72,18 @@ func TestARefossClampsSignPairAndScopeAreSetThroughTheMeterPatch(t *testing.T) {
 		t.Errorf("out of the panel: %d %s", r.StatusCode, body)
 	}
 
+	// Any meter can be a favorite, and the mark is kept on the server.
+	if r, body := patch("refoss-h:em2", `{"favorite":true}`); r.StatusCode != 200 || !decode[model.Meter](t, body).Favorite {
+		t.Errorf("favorite: %d %s", r.StatusCode, body)
+	}
+	var listed struct{ Meters []model.Meter }
+	get(t, srv.URL+"/api/v1/meters", &listed)
+	for _, m := range listed.Meters {
+		if m.ID == "refoss-h:em2" && !m.Favorite {
+			t.Error("the favorite mark was not kept")
+		}
+	}
+
 	// A plug is not a monitor: it has no clamp to flip.
 	if err := st.UpsertDevice(ctx, model.Device{ID: "shelly-x", Kind: "shelly_plug", Host: "x", Model: "plug"}); err != nil {
 		t.Fatal(err)

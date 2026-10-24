@@ -68,6 +68,8 @@ type Meter struct {
 	// ParentID is the circuit this one is part of: a circuit that feeds a sub-panel holds the circuits of that panel. Its own figure already
 	// contains theirs, so a parent and its children are never added together. Only a circuit has one.
 	ParentID *string `json:"parent_id"`
+	// Favorite marks a meter the user wants one click away: it appears as a choice on the live page. Kept here so every device sees the same ones.
+	Favorite bool `json:"favorite"`
 }
 
 type Reading struct {

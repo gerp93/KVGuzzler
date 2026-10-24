@@ -168,3 +168,25 @@ func TestAMetersTypeFollowsItsScopeAndWhatIsInsideItUntilTheUserSaysOtherwise(t 
 		t.Errorf("made a sub-panel again: %+v %v", m, err)
 	}
 }
+
+func TestAFavoriteIsSavedOnTheMeterAndCanBeTakenOff(t *testing.T) {
+	st := panelFixture(t)
+	ctx := t.Context()
+	if m, err := st.SetMeterFavorite(ctx, "ev", true); err != nil || !m.Favorite {
+		t.Fatalf("marked: %+v %v", m, err)
+	}
+	all, _ := st.Meters(ctx)
+	got := map[string]bool{}
+	for _, m := range all {
+		got[m.ID] = m.Favorite
+	}
+	if !got["ev"] || got["feed"] {
+		t.Errorf("favorites = %v", got)
+	}
+	if m, err := st.SetMeterFavorite(ctx, "ev", false); err != nil || m.Favorite {
+		t.Errorf("taken off: %+v %v", m, err)
+	}
+	if _, err := st.SetMeterFavorite(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such meter: %v", err)
+	}
+}
