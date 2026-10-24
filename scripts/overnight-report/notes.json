@@ -112,6 +112,45 @@
    "commit": "",
    "tests": "Go: store tests (a minute written in halves keeps the larger current, a meter that never reported one has none rather than 0 A, series carry each bucket's highest, pairing keeps the larger leg and adds the power, breaker sizes are validated, a database from before the column opens), a Refoss source test (own volts and amps; a pair is the larger leg's amps and the legs' volts added), API tests (summary and series carry the amps and agree with watts over volts, breaker set, forgotten and refused when 0, negative, over 1000 or not a number). Web: amps.test.ts. Contract examples validate.",
    "notes": "Not verified against a real Refoss: the demo's volts and amps come from the simulator, and a real EM16P's current is read as the monitor reports it (never negative). The 80% rule is judged on the highest minute, not on how long a load really ran: a short spike above 80% also warns. A run's own average current is not yet shown (idea for later). The house card has no amps: the legs are not added. Breaker size is offered for circuits only (not the mains or a plug)."
+  },
+  {
+   "id": "proposed",
+   "title": "Not built yet: the to-do and proposed list",
+   "kind": "finding",
+   "summary": "You woke up and asked me to stop and list what was left, so this is the list to review. Three of your backlog items were not started; one was designed and then taken out rather than left half done; the rest are my own ideas, in the order I would do them.",
+   "details": [
+    "<strong>From your backlog, not built:</strong>",
+    "<strong>Data checks panel</strong> (Hierarchy tab): things that look wrong, each with a plain-language fix. Designed, not shipped. The rules I had settled on: a meter inside another that used more than its parent (a problem if it still happens in the last hour, a warning if only earlier in the week, which is what happens when clamps are paired late); the main circuits adding up to more than the house; a device that stopped answering (its meters are covered by it, not listed separately); a meter that has never recorded or stopped reporting while its device answers; a clamp reading backwards (from the server's own note); gaps of more than an hour or 5% in a week; no price saved. Pure rules in their own package so each is a test on made-up facts, the API gathers the facts. The draft is kept in the shared notes folder (<code>data-checks-draft-checks.go.txt</code>), not in the branch.",
+    "<strong>Month projection and comparison:</strong> month-to-date kWh and cost with \"at this pace: $X for the month\" on the Live page, and a \"vs the period before\" change (up or down percent) on the tiles of the Live page and a meter page. Needs a month-to-date and a previous-period query that reuse the same price schedule.",
+    "<strong>Heat map:</strong> hour of day by weekday of average power for the house and any meter, a compact SVG on the meter page and the Live page.",
+    "<strong>My own ideas, in the order I would do them:</strong>",
+    "<strong>Cheaper charging hours:</strong> for a meter with runs (the EV), what the same runs would have cost at the cheapest hours of a time-of-use tariff. Directly useful to an EV owner and the data is already there (runs plus the looked-up tariff).",
+    "<strong>Average current of a run</strong> and the 80% rule judged on a run's length (three hours or more) rather than on the highest minute, so a short spike no longer warns.",
+    "<strong>Anomaly view:</strong> days far above that meter's usual (same weekday), with the cause (which circuit changed).",
+    "<strong>Unmetered always-on:</strong> the house floor against the floors of what is metered. In the demo it is 460 W against 40 W for the biggest meter. Floors are not additive, so it needs a careful wording, not a subtraction.",
+    "<strong>CSV export</strong> of the tree and of runs; a <strong>cost-per-day sparkline</strong> on each tree row; a <strong>weekly summary text</strong> (what you used, what it cost, what changed, the biggest run); an <strong>\"explain this number\" popover</strong>; a printable layout.",
+    "<strong>Runs polish:</strong> hide the Runs card for a meter whose average run is under about ten minutes (a fridge compressor); handle a charge that crosses midnight in the simulator.",
+    "<strong>Keyboard and screen-reader pass</strong> of the Hierarchy tab and the flow chart; performance with many meters (each page asks the server once per meter today)."
+   ],
+   "images": [],
+   "commit": "",
+   "tests": "",
+   "notes": "Nothing on this list is in the branch."
+  },
+  {
+   "id": "coordination",
+   "title": "Another session is redesigning the same screens (PR #75)",
+   "kind": "finding",
+   "summary": "A cloud session (\"Responsive UI optimization\") has an open pull request, <a href=\"https://github.com/gerp93/KVGuzzler/pull/75\">#75</a>, with a big pass over the dashboard's look: 29 files, about 1,180 lines added. It edits the same screens this branch adds cards to, so the order they land in matters.",
+   "details": [
+    "<strong>What it changes:</strong> a phone tab bar, a Live page with a trend line, meter lists that restack by card width, the Hierarchy rows on a phone, a period picker with short labels, ultra-wide layouts and a large block of new CSS. It touches <code>LiveView.tsx</code>, <code>MeterPage.tsx</code>, <code>HierarchyView.tsx</code> and <code>styles.css</code>, as this branch does.",
+    "<strong>Coordination:</strong> I sent it a message listing my files; it cannot reply to me (cloud sessions cannot message back), but its notes file <code>web/UX_NOTES.md</code> in the PR names this branch and says whoever lands second merges main. A trial merge of the two (nothing written) comes out <strong>clean, with no conflicts</strong>, because this branch keeps all its styles in a separate <code>features.css</code> and edits the shared files only a few lines at a time.",
+    "<strong>What to expect:</strong> the cards here (Runs, Always on, Current) use the existing <code>.bars</code> and <code>.stats</code> classes, not the new shared pieces in PR #75 (<code>Hint</code>, <code>Skeleton</code>, container-query rows). After both land they will work but may need a visual pass, mainly the phone and ultra-wide layouts. I did not look at them together."
+   ],
+   "images": [],
+   "commit": "",
+   "tests": "",
+   "notes": "Not verified: both branches running together. I did not merge either into the other."
   }
  ]
 }

@@ -12,3 +12,10 @@ To try it: `bash scripts/demo.sh` (made-up house, its own temporary database, po
 - **Always on**: the power the house or a meter never goes below, its yearly cost and share (`GET /api/v1/baseload`, `GET /api/v1/meters/{id}/baseload`).
 - **Amps and breakers**: volts and amps live, the highest amps per minute stored, a breaker size per circuit with a share and an 80% warning.
 - **Runs**: each time a meter was working (an EV charge, a dryer load) on the meter page, `GET /api/v1/meters/{id}/runs`.
+
+## Not built (to review)
+
+- Data checks panel (designed, taken out rather than left half done), month projection and comparison, heat map.
+- Ideas: cheaper charging hours for runs, average current of a run, anomaly view, unmetered always-on, CSV exports, cost sparkline per row,
+  weekly summary text, "explain this number", printable layout, keyboard and screen-reader pass, performance with many meters.
+- PR #75 (another session's dashboard redesign) edits the same screens; a trial merge with this branch is clean. See the report.
