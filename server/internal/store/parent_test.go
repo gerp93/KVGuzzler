@@ -97,8 +97,8 @@ func TestAMeterThatStopsBeingACircuitLeavesTheTreeAndItsChildrenGoToTheTop(t *te
 			t.Fatal(err)
 		}
 	}
-	mains := model.ScopeMains
-	if _, err := st.SetMeterWiring(ctx, "feed", WiringChange{Scope: &mains}); err != nil {
+	house := model.TypeHouse
+	if _, err := st.SetMeterWiring(ctx, "feed", WiringChange{Type: &house}); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"ev", "rest"} {
@@ -121,5 +121,50 @@ func TestAMeterThatStopsBeingACircuitLeavesTheTreeAndItsChildrenGoToTheTop(t *te
 	}
 	if _, err := st.SetMeterParent(ctx, "rest", &leg); !errors.Is(err, ErrConflict) {
 		t.Errorf("under a second leg: %v, want a conflict", err)
+	}
+}
+
+func TestAMetersTypeFollowsItsScopeAndWhatIsInsideItUntilTheUserSaysOtherwise(t *testing.T) {
+	st := panelFixture(t)
+	ctx := t.Context()
+	typeOf := func(id string) model.MeterType {
+		t.Helper()
+		m, err := st.Meter(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Type
+	}
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "fridge", DeviceID: "refoss-h", Scope: model.ScopePlug, Label: "fridge"}); err != nil {
+		t.Fatal(err)
+	}
+	if typeOf("mains") != model.TypeHouse || typeOf("fridge") != model.TypeDevice || typeOf("feed") != model.TypeCircuit {
+		t.Errorf("house %s, plug %s, feed with nothing inside %s", typeOf("mains"), typeOf("fridge"), typeOf("feed"))
+	}
+	feed := "feed"
+	if _, err := st.SetMeterParent(ctx, "ev", &feed); err != nil {
+		t.Fatal(err)
+	}
+	if typeOf("feed") != model.TypeSubPanel {
+		t.Errorf("a circuit with a circuit inside it is %s, want sub_panel", typeOf("feed"))
+	}
+	// The user's own choice wins, and the same list read together agrees.
+	circuit := model.TypeCircuit
+	if _, err := st.SetMeterWiring(ctx, "feed", WiringChange{Type: &circuit}); err != nil {
+		t.Fatal(err)
+	}
+	all, _ := st.Meters(ctx)
+	for _, m := range all {
+		if m.ID == "feed" && m.Type != model.TypeCircuit {
+			t.Errorf("a saved circuit is %s", m.Type)
+		}
+	}
+	asHouse := model.TypeHouse
+	if m, err := st.SetMeterWiring(ctx, "rest", WiringChange{Type: &asHouse}); err != nil || m.Scope != model.ScopeMains || m.Type != model.TypeHouse {
+		t.Errorf("made the house: %+v %v", m, err)
+	}
+	panel := model.TypeSubPanel
+	if m, err := st.SetMeterWiring(ctx, "rest", WiringChange{Type: &panel}); err != nil || m.Scope != model.ScopeCircuit || m.Type != model.TypeSubPanel {
+		t.Errorf("made a sub-panel again: %+v %v", m, err)
 	}
 }

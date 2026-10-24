@@ -221,15 +221,15 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 		// How a Refoss monitor's clamp is wired: its sign, the other leg of its breaker, and whether it measures a circuit or the mains.
 		Invert   *bool           `json:"invert"`
 		PairWith json.RawMessage `json:"pair_with"` // another input's meter id, or null to unpair; absent leaves it alone
-		Scope    *string         `json:"scope"`
+		Type     *string         `json:"type"` // what a Refoss meter is: house, sub_panel or circuit
 		// The circuit this one is part of (a sub-panel's feed), or null to take it out; absent leaves it alone.
 		ParentID json.RawMessage `json:"parent_id"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
-		body.Invert == nil && body.PairWith == nil && body.Scope == nil && body.ParentID == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, scope and/or parent_id")
+		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type and/or parent_id")
 		return
 	}
 	if body.Label != nil {
@@ -270,16 +270,16 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var scope *model.Scope
-	if body.Scope != nil {
-		sc := model.Scope(*body.Scope)
-		scope = &sc
+	var mtype *model.MeterType
+	if body.Type != nil {
+		t := model.MeterType(*body.Type)
+		mtype = &t
 	}
 
 	id := r.PathValue("meterId")
 	ch, err := s.Store.UpdateMeter(r.Context(), id, body.Label, body.Enabled)
-	if err == nil && (body.Invert != nil || body.PairWith != nil || scope != nil) {
-		ch, err = s.Store.SetMeterWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Scope: scope})
+	if err == nil && (body.Invert != nil || body.PairWith != nil || mtype != nil) {
+		ch, err = s.Store.SetMeterWiring(r.Context(), id, store.WiringChange{Invert: body.Invert, SetPair: body.PairWith != nil, PairWith: pairWith, Type: mtype})
 	}
 	if err == nil && body.ParentID != nil {
 		ch, err = s.Store.SetMeterParent(r.Context(), id, parentID)

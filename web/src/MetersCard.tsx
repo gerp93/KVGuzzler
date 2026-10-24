@@ -59,7 +59,7 @@ function MeterRow({ meter, all, depth, onChanged }: { meter: Meter; all: Meter[]
   // Anything but the mains can say which circuit it is on: a plug, the PC's wall plug, a sub-panel's circuit.
   const placeable = meter.scope !== 'mains';
   const hasWiring = refoss || placeable;
-  const summary = [legs !== label ? legs : '', meter.scope === 'mains' ? 'the whole house' : '', feed && !feed.enabled ? `inside ${feed.label} (hidden)` : '']
+  const summary = [legs !== label ? legs : '', meter.type === 'house' ? 'the whole house' : meter.type === 'sub_panel' ? 'sub-panel' : '', feed && !feed.enabled ? `inside ${feed.label} (hidden)` : '']
     .filter(Boolean)
     .join(' · ');
 
@@ -115,10 +115,11 @@ function MeterRow({ meter, all, depth, onChanged }: { meter: Meter; all: Meter[]
                 </select>
               </label>
               <label class="field">
-                <span>What this measures</span>
-                <select value={meter.scope} onChange={(e) => void run(meter.id, { scope: (e.target as HTMLSelectElement).value as 'circuit' | 'mains' })}>
-                  <option value="circuit">One circuit</option>
-                  <option value="mains">The whole house (a monitor on the main panel)</option>
+                <span>Type</span>
+                <select value={meter.type} onChange={(e) => void run(meter.id, { type: (e.target as HTMLSelectElement).value as 'house' | 'sub_panel' | 'circuit' })}>
+                  <option value="house">Whole house (a monitor on the main panel)</option>
+                  <option value="sub_panel">Sub-panel (feeds other circuits)</option>
+                  <option value="circuit">Circuit (one breaker)</option>
                 </select>
               </label>
             </>

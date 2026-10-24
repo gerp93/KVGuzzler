@@ -951,7 +951,7 @@ components:
           format: date-time
     Meter:
       type: object
-      required: [id, device_id, scope, label, enabled]
+      required: [id, device_id, scope, label, enabled, type]
       properties:
         id:
           type: string
@@ -964,6 +964,13 @@ components:
           description: The meter number on the device, when it has one.
         scope:
           $ref: '#/components/schemas/Scope'
+        type:
+          type: string
+          enum: [house, sub_panel, circuit, device]
+          description: |
+            What the meter is, as the user would name it: the whole `house`, a `sub_panel`'s feed (it holds other circuits), one `circuit`
+            (breaker), or a `device` (a plug, the PC's wall plug). Filled in by the server: a Refoss meter's is the user's choice, the rest follow
+            from the scope, and a circuit with circuits inside it is a sub-panel until told otherwise. It describes; the math still follows `scope`.
         label:
           type: string
           description: What the user calls it, for example "Dryer" or "EV charger".
@@ -1012,10 +1019,12 @@ components:
           description: |
             Refoss only. The meter of the other leg of the same 240 V breaker (on the same monitor), or null to unpair. The two are then one
             circuit (this meter reports both legs added); the other leg is switched off. 409 when either is already part of a pair.
-        scope:
+        type:
           type: string
-          enum: [circuit, mains]
-          description: Refoss only. A monitor on the main panel measures the mains; one on a sub-panel measures circuits.
+          enum: [house, sub_panel, circuit]
+          description: |
+            Refoss only. What the meter is: a monitor on the main panel measures the `house`; one on a sub-panel measures `circuit`s, and a
+            circuit that feeds a sub-panel is a `sub_panel`.
         parent_id:
           type: [string, 'null']
           description: |

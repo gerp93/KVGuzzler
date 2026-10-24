@@ -6,7 +6,7 @@ import {
 } from './lib';
 
 const ch = (id: string, scope: Meter['scope'], enabled = true): Meter => ({
-  id, device_id: 'd', scope, label: id, enabled, index: null, max_watts: null,
+  id, device_id: 'd', scope, type: scope === 'mains' ? 'house' : scope === 'circuit' ? 'circuit' : 'device', label: id, enabled, index: null, max_watts: null,
 });
 const rd = (meter_id: string, watts: number): Reading => ({ meter_id, watts });
 

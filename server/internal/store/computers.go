@@ -288,7 +288,10 @@ func (s *Store) Meter(ctx context.Context, id string) (model.Meter, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.Meter{}, ErrNotFound
 	}
-	return c, err
+	if err != nil {
+		return c, err
+	}
+	return c, s.settleTypes(ctx, &c)
 }
 
 // AssignMeter ties a plug to a computer, or lets it go (nil). Only a plug's meters can belong to a computer: a `pc`

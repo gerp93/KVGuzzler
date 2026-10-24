@@ -629,6 +629,13 @@ export interface components {
             /** @description The meter number on the device, when it has one. */
             index?: number | null;
             scope: components["schemas"]["Scope"];
+            /**
+             * @description What the meter is, as the user would name it: the whole `house`, a `sub_panel`'s feed (it holds other circuits), one `circuit`
+             *     (breaker), or a `device` (a plug, the PC's wall plug). Filled in by the server: a Refoss meter's is the user's choice, the rest follow
+             *     from the scope, and a circuit with circuits inside it is a sub-panel until told otherwise. It describes; the math still follows `scope`.
+             * @enum {string}
+             */
+            type: "house" | "sub_panel" | "circuit" | "device";
             /** @description What the user calls it, for example "Dryer" or "EV charger". */
             label: string;
             /** @description A switched-off meter is not shown or counted but its history is kept. */
@@ -665,10 +672,11 @@ export interface components {
              */
             pair_with?: string | null;
             /**
-             * @description Refoss only. A monitor on the main panel measures the mains; one on a sub-panel measures circuits.
+             * @description Refoss only. What the meter is: a monitor on the main panel measures the `house`; one on a sub-panel measures `circuit`s, and a
+             *     circuit that feeds a sub-panel is a `sub_panel`.
              * @enum {string}
              */
-            scope?: "circuit" | "mains";
+            type?: "house" | "sub_panel" | "circuit";
             /**
              * @description Put this meter inside a circuit (the feed of a sub-panel, or the circuit a plug is plugged into), or null to take it out. The parent
              *     must be a `circuit` and the meter anything but `mains`; neither may be the second leg of a pair. 409 when it would make a loop.

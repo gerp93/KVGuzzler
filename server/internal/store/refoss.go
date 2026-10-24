@@ -27,11 +27,11 @@ type WiringChange struct {
 	// SetPair says PairWith is meant: a nil PairWith then unpairs.
 	SetPair  bool
 	PairWith *string
-	// Scope is circuit or mains: a monitor on the main panel measures the mains, one on a sub-panel measures circuits.
-	Scope *model.Scope
+	// Type is what the meter is: the house (a monitor on the main panel measures the mains), a sub-panel's feed, or one circuit.
+	Type *model.MeterType
 }
 
-// SetMeterWiring changes the sign, the pairing and the scope of a Refoss meter and returns it.
+// SetMeterWiring changes the sign, the pairing and the type of a Refoss meter and returns it.
 func (s *Store) SetMeterWiring(ctx context.Context, id string, ch WiringChange) (model.Meter, error) {
 	c, err := s.Meter(ctx, id)
 	if err != nil {
@@ -42,17 +42,23 @@ func (s *Store) SetMeterWiring(ctx context.Context, id string, ch WiringChange) 
 		return model.Meter{}, err
 	}
 	if !isRefoss {
-		return model.Meter{}, invalid("Only a Refoss monitor's meters can have their clamp flipped, paired or given a scope.")
+		return model.Meter{}, invalid("Only a Refoss monitor's meters can have their clamp flipped, paired or given a type.")
 	}
 
-	if ch.Scope != nil {
-		if *ch.Scope != model.ScopeCircuit && *ch.Scope != model.ScopeMains {
-			return model.Meter{}, invalid("A Refoss meter is a circuit or the mains.")
+	if ch.Type != nil {
+		// The house is the mains; a sub-panel's feed and a circuit are both circuits, told apart by the saved type.
+		scope, saved := model.ScopeCircuit, any(string(*ch.Type))
+		switch *ch.Type {
+		case model.TypeHouse:
+			scope, saved = model.ScopeMains, nil
+		case model.TypeSubPanel, model.TypeCircuit:
+		default:
+			return model.Meter{}, invalid("A Refoss meter is the house, a sub-panel or a circuit.")
 		}
-		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET scope = ? WHERE id = ?`, string(*ch.Scope), id); err != nil {
+		if _, err := s.db.ExecContext(ctx, `UPDATE meters SET scope = ?, type = ? WHERE id = ?`, string(scope), saved, id); err != nil {
 			return model.Meter{}, err
 		}
-		if *ch.Scope == model.ScopeMains {
+		if scope == model.ScopeMains {
 			if err := s.forgetPlace(ctx, id); err != nil {
 				return model.Meter{}, err
 			}
