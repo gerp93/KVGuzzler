@@ -19,10 +19,9 @@ npm run dev           # vite on :5173, proxying /api to a server on :8080 (run t
 - **Live**: the house (the two mains clamps added), circuits ranked by watts, "everything else" (house minus circuits, derived),
   and the PC as an "also measured" slice that is never added to anything.
 - **History**: the house over a period, with up to three circuits, plugs or the PC drawn on their own lines.
-- **Appliances**: a list of what used the energy, with the derived remainder and cost. Several plugs can be grouped under one name (an entertainment center) and show as one row. Click an appliance or a group for its own page; click a computer for
-  the full breakdown (the whole PC at the wall, its peripherals, a chart, and what its collector reports: sensors, programs, times it was not recording).
-- **Settings**: devices, computers (tie a wall plug and peripherals to each), appliance groups, the price, rename or hide a meter (changes only this server's label) and a theme.
+- **Hierarchy**: every meter as one tree across all monitors (a sub-panel holds its circuits, a circuit holds its plugs; several top-level entries are fine), with its live reading. An arrow on a row opens its wiring (clamp direction, 120/240 V and the other clamp, type, which panel); meters move with the arrows, by dragging onto the meter they are inside, or from a list; the eye hides one. The open link on a row (›) opens that meter's page: energy, cost, right now, highest draw, carbon, what is inside it (with "Everything else") and a chart. A computer's wall plug opens the computer with its full breakdown (the whole PC at the wall, its peripherals, a chart, and what its collector reports: sensors, programs, times it was not recording). Appliance groups are listed under the tree.
+- **Settings**: devices, computers (tie a wall plug and peripherals to each), appliance groups, the price, and a theme. Meters are laid out and renamed in the Hierarchy tab.
 
-The address says what is open (`#/appliances/computer/<id>`), so back, reload and a copied link all land in the same place.
+The address says what is open (`#/hierarchy/computer/<id>`), so back, reload and a copied link all land in the same place.
 
 The dashboard checks the server's `X-KVG-Api-Version` and refuses to show data from a different major version of the contract.

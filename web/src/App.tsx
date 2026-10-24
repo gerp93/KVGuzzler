@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
-import { AppliancesView } from './AppliancesView';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
 import { HistoryView } from './HistoryView';
@@ -14,7 +13,6 @@ const TABS = [
   { id: 'live', label: 'Live' },
   { id: 'history', label: 'History' },
   { id: 'hierarchy', label: 'Hierarchy' },
-  { id: 'appliances', label: 'Appliances' },
   { id: 'settings', label: 'Settings' },
   { id: 'help', label: 'Help' },
 ] as const;
@@ -37,7 +35,8 @@ export function App() {
   setCurrencyCode(rateSettings.data?.currency);
 
   const mismatch = [status.error, loaded.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
-  const active: TabId = TABS.find((t) => t.id === route.tab)?.id ?? 'live';
+  // The old Appliances tab became the hierarchy: its links open the same things there.
+  const active: TabId = TABS.find((t) => t.id === (route.tab === 'appliances' ? 'hierarchy' : route.tab))?.id ?? 'live';
   const meters = loaded.data ?? [];
 
   return (
@@ -64,9 +63,7 @@ export function App() {
         ) : active === 'history' ? (
           <HistoryView meters={meters} />
         ) : active === 'hierarchy' ? (
-          <HierarchyView meters={meters} onChanged={() => setRev((n) => n + 1)} />
-        ) : active === 'appliances' ? (
-          <AppliancesView meters={meters} open={route.rest} />
+          <HierarchyView meters={meters} open={route.rest} onChanged={() => setRev((n) => n + 1)} />
         ) : active === 'help' ? (
           <HelpView />
         ) : (

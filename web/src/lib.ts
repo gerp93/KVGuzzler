@@ -357,92 +357,10 @@ export function formatDuration(seconds: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-/** One row of the Appliances list: an ordinary appliance (a circuit or a plug), or a group of plugs shown as one. */
-export interface ApplianceRow {
-  /** `rest` is what a sub-panel's feed carries that none of its circuits account for: a derived line, not something to open. */
-  kind: 'meter' | 'group' | 'rest';
-  /** The meter's id, or the group's (for `rest`, the feed's). */
-  id: string;
-  label: string;
-  kwh: number;
-  /** The cost as a money string; null when any part of it has no price. */
-  cost: string | null;
-  /** How deep in a sub-panel the row sits; 0 or absent at the top. */
-  depth?: number;
-}
-
-export interface ComputerRow {
-  computer: Computer;
-  /** The whole PC at its wall plug, when it has one. */
-  wall?: MeterSummary;
-}
-
-export interface ApplianceList {
-  /** Circuits, plugs and groups that belong to no computer, biggest first. */
-  appliances: ApplianceRow[];
-  /** Computers, with the figure of the plug they are on. */
-  computers: ComputerRow[];
-}
-
 /** Adds money strings for display. Null if any is missing (a partly priced total would mislead). */
 export function sumMoney(parts: (string | null | undefined)[]): string | null {
   if (parts.length === 0 || parts.some((p) => p === null || p === undefined)) return null;
   return parts.reduce((t, p) => t + Number(p), 0).toFixed(2);
-}
-
-/** Splits the summary into what the Appliances list shows. A plug that belongs to a computer is listed under that computer and never
- * alone; a plug in a group is listed once, as the group (all ordinary plugs, so their energy is added); a computer's figure is its wall
- * plug's. No scope is added to another. */
-export function applianceList(summary: Summary, meters: Meter[], computers: Computer[], groups: ApplianceGroup[] = []): ApplianceList {
-  const label = new Map(meters.map((c) => [c.id, c.label]));
-  const byMeter = new Map(summary.meters.map((c) => [c.meter_id, c]));
-
-  const own: ApplianceRow[] = summary.meters
-    .filter((c) => (c.scope === 'circuit' || c.scope === 'plug') && !c.computer_id && !c.group_id)
-    .map((c) => ({ kind: 'meter' as const, id: c.meter_id, label: label.get(c.meter_id) ?? c.meter_id, kwh: c.kwh, cost: c.cost ?? null }));
-  const parentOf = new Map(meters.map((c) => [c.id, c.parent_id ?? null]));
-  const ownIds = new Set(own.map((r) => r.id));
-  const kids = new Map<string, ApplianceRow[]>();
-  const top: ApplianceRow[] = [];
-  for (const r of own) {
-    const p = parentOf.get(r.id);
-    if (p && p !== r.id && ownIds.has(p)) kids.set(p, [...(kids.get(p) ?? []), r]);
-    else top.push(r);
-  }
-  for (const g of groups) {
-    const members = summary.meters.filter((c) => c.group_id === g.id);
-    if (members.length === 0) continue;
-    top.push({
-      kind: 'group', id: g.id, label: g.name,
-      kwh: members.reduce((t, m) => t + m.kwh, 0),
-      cost: sumMoney(members.map((m) => m.cost)),
-    });
-  }
-  // A sub-panel's feed is followed by its circuits and by what it carries that none of them account for. The feed already contains them.
-  const rows: ApplianceRow[] = [];
-  const seen = new Set<string>();
-  const walk = (r: ApplianceRow, depth: number) => {
-    if (seen.has(r.id)) return;
-    seen.add(r.id);
-    rows.push({ ...r, depth });
-    const mine = (kids.get(r.id) ?? []).sort((a, b) => b.kwh - a.kwh);
-    for (const k of mine) walk(k, depth + 1);
-    if (mine.length > 0) {
-      // Whatever is plugged into it counts, listed here or (a computer's plugs, a group's) on its own card.
-      const inside = summary.meters.filter((c) => parentOf.get(c.meter_id) === r.id);
-      const costs = [r.cost, ...inside.map((k) => k.cost ?? null)];
-      const left = costs.every((c) => c !== null) ? Math.max(0, Number(r.cost) - inside.reduce((t, k) => t + Number(k.cost), 0)).toFixed(2) : null;
-      rows.push({ kind: 'rest', id: r.id, label: `Everything else on ${r.label}`, kwh: Math.max(0, r.kwh - inside.reduce((t, k) => t + k.kwh, 0)), cost: left, depth: depth + 1 });
-    }
-  };
-  for (const r of top.sort((a, b) => b.kwh - a.kwh)) walk(r, 0);
-
-  const comps = computers.map((computer) => ({
-    computer,
-    wall: computer.wall_meter_id ? byMeter.get(computer.wall_meter_id) : undefined,
-  }));
-  comps.sort((a, b) => (b.wall?.kwh ?? -1) - (a.wall?.kwh ?? -1));
-  return { appliances: rows, computers: comps };
 }
 
 /** A PC look older than this is shown as "not answering" rather than as live. */

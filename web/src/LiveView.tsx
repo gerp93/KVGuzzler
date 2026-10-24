@@ -2,6 +2,7 @@
 // an estimator, a history list, a CSV and a chart), then each circuit. The house is the mains clamps alone: circuits and plugs are parts of
 // it and are never added to it.
 import { api } from './api';
+import { Bars } from './Bars';
 import { Chart, lineFrom, type Line } from './Chart';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
@@ -9,51 +10,14 @@ import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { RateNote } from './RateNote';
 import {
-  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseShare, houseUsageBasis, nestCircuits, periodRange, pcSlices, sumByTime, unmetered,
-  type Meter, type Live, type PeriodKey, type Row, type Summary,
+  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, pcSlices, sumByTime, unmetered,
+  type Meter, type Live, type PeriodKey, type Summary,
 } from './lib';
 
 interface Period {
   summary: Summary;
   line: Line | undefined;
   domain: [number, number];
-}
-
-function Bars({ rows, of, summary }: { rows: Row[]; of: number; summary?: Summary }) {
-  const houseKwh = summary?.house_kwh ?? null;
-  return (
-    <ul class="bars wide">
-      {rows.map((r) => {
-        const find = (id: string) => summary?.meters.find((c) => c.meter_id === id);
-        // A sub-panel's feed already holds its circuits: what it carries beyond them is the feed's figure less theirs.
-        let mine = find(r.meter.id);
-        if (mine && r.remainder) {
-          const inside = r.remainder.of.map(find);
-          const costs = [mine.cost, ...inside.map((c) => c?.cost)];
-          mine = {
-            ...mine,
-            kwh: Math.max(0, mine.kwh - inside.reduce((t, c) => t + (c?.kwh ?? 0), 0)),
-            cost: costs.every((c) => c != null) ? Math.max(0, Number(mine.cost) - inside.reduce((t, c) => t + Number(c?.cost), 0)).toFixed(2) : null,
-          };
-        }
-        const share = mine ? houseShare(mine.kwh, houseKwh) : null;
-        return (
-          <li key={r.remainder ? `rest-${r.meter.id}` : r.meter.id} class={r.remainder ? 'rest' : undefined} style={r.depth ? { paddingLeft: `${r.depth * 1.25}rem` } : undefined}>
-            <span class="name" title={r.remainder ? `Everything else on ${r.meter.label}` : r.meter.label}>
-              {r.remainder ? 'Everything else' : r.meter.label}
-            </span>
-            <span class="bar" aria-hidden="true">
-              <i style={{ width: `${of > 0 ? Math.min(100, (r.watts / of) * 100) : 0}%` }} />
-            </span>
-            <span class="num">{formatWatts(r.watts)}</span>
-            <span class="num cost">
-              {mine ? `${formatKwh(mine.kwh)}${mine.cost != null ? ` · ${formatMoney(mine.cost, summary?.cost_estimated)}` : ''}${share != null ? ` · ${share}%` : ''}` : ''}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
 }
 
 export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSettings: () => void }) {
@@ -156,7 +120,7 @@ export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSe
 
       <section class="card">
         <h2>Circuits</h2>
-        {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} />}
+        {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
         {rest !== null && (
           <p class="derived">
             <span>Everything else (no clamp on it)</span>
@@ -171,7 +135,7 @@ export function LiveView({ meters, onOpenSettings }: { meters: Meter[]; onOpenSe
       {pc.length > 0 && (
         <section class="card">
           <h2>Also measured</h2>
-          <Bars rows={pc} of={scale} summary={summary} />
+          <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
           <p class="caption">
             The PC is plugged into one of the circuits above, so this is part of it, never added to the house or circuit
             figures.

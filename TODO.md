@@ -119,11 +119,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
 - **Whole-house energy monitor** (Refoss clamp monitors, always-on server; plan agreed, first parts built): `contract/` is the
   OpenAPI between the parts and `server/` (Go, see its README) is the house server. Built: the contract with checked examples, a
   read-only Refoss client (`DeviceInfo` parsed), a simulated house, SQLite history, a collector that drops impossible readings, and
-  the API for status, devices, meters, live, series and summary, and the `web/` dashboard (Live, History, Appliances, Settings; themed,
+  the API for status, devices, meters, live, series and summary, and the `web/` dashboard (Live, History, Hierarchy, Settings; themed,
   phone-width checked, embedded in the server binary). **Verified only against the simulator and fake HTTP servers**;
   nothing has been tried on a real Refoss monitor. Still to do, in order: real Refoss readings (call `Refoss.Status.Get` on a real
   device first and write the mapping from its answer; confirm auth is off), OpenEI/carbon in Go (port with the C# test
-  cases; **rates and bills are done** (`server/internal/rates`, the Settings price editor, cost in the Appliances view), still to port: the
+  cases; **rates and bills are done** (`server/internal/rates`, the Settings price editor, cost on each meter's page), still to port: the
   OpenEI lookup and the carbon footprint; **Shelly plugs can be added in Settings** (read-only, restored after a restart, the PC's plug as a
   `pc` slice) but only tried against a stand-in plug, and `cmd/refoss-probe` is ready for the first real Refoss call), the PC relay (C# collector pushes per-minute summaries to `POST /api/v1/ingest/pc`
   with an outbox), the Electron viewer that loads the dashboard from the server, then retiring the Avalonia window (only once the
@@ -136,14 +136,14 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
     **throwaway local server**, which accepted everything (sensors, the CPU breakdown, the wall meter, programs including the system baseline, and
     gaps with their reasons). It has **not** pushed to the real box: the installed collector service is still the version before the relay, so it
     needs the update first. Then put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` and look for "House server: Sent N
-    minute(s)" in its log and the PC's sensors and programs on its page under Appliances (the box's one computer adopts the first collector).
+    minute(s)" in its log and the PC's sensors and programs on its page under the Hierarchy tab (the box's one computer adopts the first collector).
     No window setting for it yet (the window is frozen).
   - **Appliance groups** are built (an entertainment center on two plugs shown as one; Settings > Appliance groups). Only Shelly plugs can be
     added so far, so a group of other brands waits for their sources (below).
   - **The C# relay client** is built (`RelayFeed`, `relay.json`; see CLAUDE.md) and tested against a fake server and the contract's field
     names, **not yet run against the real box**. To try it: put `{"host": "<the box's address>"}` in `%ProgramData%\KVGuzzler\relay.json` (or the
     `-dev` folder for a development run) while the collector is running, and look for "House server: Sent N minute(s)" in its log and the
-    PC under Appliances. No window setting for it yet (the window is frozen).
+    PC under the Hierarchy tab. No window setting for it yet (the window is frozen).
   - **Parity with the window, in progress** (the window stays until the dashboard does everything it does). Done: per-minute sensors, the wall
     breakdown and programs (relay), gaps with reasons, and now the **live look** (Right now with each part's share of the PC and "everything else",
     live per-program watts with the idle level, notes, Max draw, Recent runs; the per-component chart with shaded gaps). Programs now carry a cost (estimated; at the period's average price, runs at the price on the day they ended), the split bar and legend, and "how this is worked out". The energy history list (hour to all time, gaps by reason), the daily CSV export (formula-safe labels) and the year and all-time periods are done. The cost estimator (constant load, right now, my usage over a window; today's price and the real average per day come from the server) and the Count ticks (PC and each plug, in the figures, max draw and the estimator) are done. Still to do, in order:

@@ -60,7 +60,7 @@ export function HelpView() {
           </p>
         </details>
         <details>
-          <summary>Appliances and the house</summary>
+          <summary>The hierarchy and the house</summary>
           <p class="note">
             The house figure is the mains clamps. Circuits and plugs are parts of it, and the PC's plug is a slice of one of the circuits. None
             of them is added to another, so the house minus the circuits is what no clamp accounts for.

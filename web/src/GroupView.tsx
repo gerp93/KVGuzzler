@@ -37,8 +37,8 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
   const top = Math.max(0, ...(detail?.members.map((m) => m.kwh) ?? []));
   return (
     <>
-      <a class="back" href={routePath('appliances')}>
-        ← All appliances
+      <a class="back" href={routePath('hierarchy')}>
+        ← Hierarchy
       </a>
       {error && (
         <section class="card warn">
