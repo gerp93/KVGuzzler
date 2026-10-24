@@ -33,7 +33,7 @@ const detail = (extra: Partial<ComputerDetail> = {}, live = true): ComputerDetai
 describe('the parts of a computer under its wall plug', () => {
   it('are its sensors biggest first (not the parts inside a sensor, not the wall reading), then what they do not account for', () => {
     const parts = pcParts(detail(), 250);
-    expect(parts.map((p) => [p.label, p.kwh])).toEqual([['GPU', 4], ['CPU package', 3], ['Memory', 0.5], ['Not metered', 2.5]]);
+    expect(parts.map((p) => [p.label, p.kwh])).toEqual([['GPU', 4], ['CPU package', 3], ['Memory', 0.5], ['Other (not metered)', 2.5]]);
     expect(parts.at(-1)).toMatchObject({ remainder: true, kwh: 2.5, cost: '0.38' }); // 10 less 7.5 at the wall's 0.15 a kWh
   });
 

@@ -46,12 +46,12 @@ export function PcLiveCard({ live }: { live: PcLive }) {
               <Row key={r.name} name={r.name} watts={r.watts} base={split.baseWatts} />
             ))}
             {split.otherWatts != null && split.otherWatts > 0 && (
-              <Row name="Everything else" watts={split.otherWatts} base={split.baseWatts} />
+              <Row name="Other (not metered)" watts={split.otherWatts} base={split.baseWatts} />
             )}
           </ul>
         )}
         {split.otherWatts != null && split.otherWatts > 0 && (
-          <p class="caption">Everything else is the wall minus the sensors: fans, drives, motherboard and power-supply loss.</p>
+          <p class="caption">Other (not metered) is the wall minus the sensors: fans, drives, motherboard and power-supply loss.</p>
         )}
 
         {split.inside.length > 0 && (

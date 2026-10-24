@@ -342,7 +342,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         {summary ? <FlowChart meters={meters} summary={summary} /> : <p class="note">Loading…</p>}
         <p class="caption">
           Each band is as wide as the energy that went through it over the period. A meter's band already counts what is inside it, so the parts of a band
-          never add to more than the band itself: what is left over is "Everything else". The Energy and Cost columns below follow the same period.
+          never add to more than the band itself: what is left over is "Other (not metered)". The Energy and Cost columns below follow the same period.
         </p>
       </section>
       <section class="card wide">
@@ -405,18 +405,6 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
                     {parts.map((p) => (
                       <PartRow key={`${meter.id}:${p.key}`} part={p} depth={depth + 1} href={page} />
                     ))}
-                    {parts.length > 0 && (
-                      <li class="hier-row virtual" style={{ marginLeft: `${(depth + 1) * 1.25}rem` }}>
-                        <div class="hier-main">
-                          <span />
-                          <span />
-                          <span class="grow part-name">
-                            <a href={page}>Programs</a>
-                          </span>
-                          <span class="caption hier-tag">estimates, on the computer's page</span>
-                        </div>
-                      </li>
-                    )}
                   </Fragment>
                 );
               })}
