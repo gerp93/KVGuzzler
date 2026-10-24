@@ -7,6 +7,13 @@ export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; 
   const find = (id: string): MeterSummary | undefined => summary?.meters.find((c) => c.meter_id === id);
   return (
     <ul class="bars wide">
+      {/* Two different things sit side by side: what it draws right now, and what it used over the period picked. */}
+      <li class="head" aria-hidden="true">
+        <span />
+        <span />
+        <span class="num">Now</span>
+        <span class="num">Over the period</span>
+      </li>
       {rows.map((r) => {
         // A parent already holds what is inside it: what it carries beyond them is its figure less theirs.
         let mine = find(r.meter.id);

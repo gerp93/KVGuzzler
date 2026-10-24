@@ -124,6 +124,11 @@ func (s *Store) setPair(ctx context.Context, c model.Meter, with *string) error 
 	if mine > 0 {
 		return conflict("%s is already the second leg of another circuit, so it cannot have a partner of its own.", c.Label)
 	}
+	// What each clamp recorded on its own, before they were one circuit, is that circuit's history: it is added together, or the circuit would
+	// read only one leg for as far back as they were apart.
+	if err := s.mergeLegHistory(ctx, c.ID, other.ID); err != nil {
+		return err
+	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE meters SET pair_with = ? WHERE id = ?`, other.ID, c.ID); err != nil {
 		return err
 	}
@@ -131,4 +136,29 @@ func (s *Store) setPair(ctx context.Context, c model.Meter, with *string) error 
 		return err
 	}
 	return s.forgetPlace(ctx, other.ID) // the second leg is no longer a circuit of its own
+}
+
+// mergeLegHistory adds what the second leg recorded into the circuit's minutes, and removes it from the leg: the two clamps are one circuit, so
+// their history is too. Energy is added exactly (power times covered seconds, minute by minute); a minute only one of them recorded is copied; the
+// highest reading of a minute is the two added, an upper bound as everywhere else for two legs. The leg's own rows are removed so that pairing
+// again later cannot add them a second time.
+func (s *Store) mergeLegHistory(ctx context.Context, ownerID, legID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds)
+SELECT ?, minute, avg_w, max_w, seconds FROM minutes WHERE meter_id = ?
+ON CONFLICT(meter_id, minute) DO UPDATE SET
+  avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / max(seconds, excluded.seconds),
+  max_w   = max_w + excluded.max_w,
+  seconds = max(seconds, excluded.seconds)`, ownerID, legID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM minutes WHERE meter_id = ?`, legID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
