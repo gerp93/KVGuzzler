@@ -323,9 +323,49 @@ select {
   margin: 0;
 }
 
-.hier-watts {
+.hier-watts,
+.hier-energy,
+.hier-cost {
   min-width: 4.5rem;
   color: var(--color-text-muted);
+}
+
+.hier-energy,
+.hier-cost {
+  color: var(--color-text);
+}
+
+.hier-head {
+  display: none;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Wide enough, the columns line up down the list: name, what it is, now, energy and cost over the period, then the buttons. */
+@media (min-width: 900px) {
+  .hier-row > .hier-main {
+    display: grid;
+    grid-template-columns: 2rem 1rem minmax(8rem, 1fr) minmax(0, 13rem) 4.5rem 5.5rem 4.5rem 12.5rem;
+    gap: 8px;
+  }
+
+  .hier-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem 4.5rem 12.5rem;
+    gap: 8px;
+    padding-right: 0;
+  }
+
+  .hier-head .hier-tag {
+    display: block;
+  }
+
+  .hier-row .hier-tag {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .hier-actions {
@@ -723,5 +763,12 @@ a.button {
     flex: 1 1 auto;
     padding: 8px 6px;
     font-size: 0.9rem;
+  }
+}
+
+/* Six period buttons have to fit a phone's width without pushing the card wider than the page */
+@media (max-width: 480px) {
+  .seg button {
+    padding: 6px 6px;
   }
 }

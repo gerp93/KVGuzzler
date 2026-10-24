@@ -7,12 +7,13 @@ import { api } from './api';
 import { meterPath } from './Bars';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
-import { usePoll } from './hooks';
+import { usePoll, useStored } from './hooks';
+import { PeriodPicker } from './Periods';
 import { MeterPage } from './MeterPage';
 import { routePath } from './route';
 import {
-  arrangeByPanel, canHold, clampName, formatWatts, indentTarget, outdentTarget, shownMeters, usualPartner,
-  type ApplianceGroup, type Device, type Live, type Meter,
+  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, usualPartner,
+  type ApplianceGroup, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
 type Change = Parameters<typeof api.updateMeter>[1];
@@ -31,6 +32,9 @@ function EyeIcon({ off }: { off?: boolean }) {
 
 interface Shared {
   all: Meter[];
+  /** What each meter used and cost over the period picked at the top, by meter id. */
+  figures: Map<string, MeterSummary>;
+  estimated: boolean;
   deviceName: (id: string) => string;
   watts: Map<string, number>;
   dragging: string | null;
@@ -39,7 +43,7 @@ interface Shared {
 }
 
 function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; shared: Shared }) {
-  const { all, deviceName, watts, dragging, setDragging, onChanged } = shared;
+  const { all, figures, estimated, deviceName, watts, dragging, setDragging, onChanged } = shared;
   const depth = rows[at]!.depth;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
@@ -75,6 +79,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
   const placeable = meter.scope !== 'mains';
 
   const watt = watts.get(meter.id);
+  const used = figures.get(meter.id);
   const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
   const dragged = dragging ? all.find((c) => c.id === dragging) : undefined;
   const dropOk = !!dragged && dragged.id !== meter.id && canHold(meter, dragged, all);
@@ -131,8 +136,12 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
         </label>
-        {tag && <span class="caption hier-tag">{tag}</span>}
+        <span class="caption hier-tag" title={tag}>
+          {tag}
+        </span>
         <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
+        <span class="num hier-energy">{used ? formatKwh(used.kwh) : ''}</span>
+        <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
         <div class="hier-actions">
           <button
             type="button"
@@ -269,6 +278,17 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const { data: groups } = usePoll<ApplianceGroup[]>(api.groups, 30_000, [meters]);
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // The same period as the Live page (they share the saved choice); only the energy and cost columns follow it.
+  const [period, setPeriod] = useStored('period', '24h');
+  const { data: summary } = usePoll<Summary>(
+    () => {
+      const { from, to } = periodRange(period as PeriodKey, new Date());
+      return api.summary(from, to);
+    },
+    60_000,
+    [period, meters.length],
+  );
+  const figures = new Map((summary?.meters ?? []).map((m) => [m.meter_id, m]));
 
   const names = new Map((devices ?? []).map((d) => [d.id, d.name || d.host]));
   const deviceName = (id: string) => names.get(id) ?? '';
@@ -276,12 +296,15 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const rows = arrangeByPanel(shownMeters(meters));
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, deviceName, watts, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, watts, dragging, setDragging, onChanged };
 
   return (
     <>
       <section class="card wide">
-        <h2>Hierarchy</h2>
+        <div class="row">
+          <h2>Hierarchy</h2>
+          <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+        </div>
         <p class="caption">
           Every meter, laid out as the house is wired. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
@@ -308,11 +331,19 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         {rows.length === 0 ? (
           <p class="note">No meters are shown. Add a device in Settings, or show one below.</p>
         ) : (
-          <ul class="hier">
-            {rows.map(({ meter }, at) => (
-              <Row key={meter.id} meter={meter} rows={rows} at={at} shared={shared} />
-            ))}
-          </ul>
+          <>
+            <div class="hier-head" aria-hidden="true">
+              <span class="hier-tag" />
+              <span class="num">Now</span>
+              <span class="num">Energy</span>
+              <span class="num">Cost</span>
+            </div>
+            <ul class="hier">
+              {rows.map(({ meter }, at) => (
+                <Row key={meter.id} meter={meter} rows={rows} at={at} shared={shared} />
+              ))}
+            </ul>
+          </>
         )}
         {hidden.length > 0 && (
           <details>
