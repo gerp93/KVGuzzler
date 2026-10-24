@@ -117,10 +117,13 @@ button.link {
   border-radius: 10px;
 }
 
-.badge.high {
-  color: var(--color-accent-muted);
+/* Readable on every theme: the text colour on a tint of the warning colour */
+.badge {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent-red) 30%, transparent);
+  border-color: var(--color-accent-red);
 }
 
 .badge.over {
-  color: var(--color-accent-red);
+  background: color-mix(in srgb, var(--color-accent-red) 65%, transparent);
 }

@@ -10,4 +10,5 @@ To try it: `bash scripts/demo.sh` (made-up house, its own temporary database, po
 
 - **Demo house**: garage sub-panel, desk PC, three weeks of history (`-sim-days`).
 - **Always on**: the power the house or a meter never goes below, its yearly cost and share (`GET /api/v1/baseload`, `GET /api/v1/meters/{id}/baseload`).
+- **Amps and breakers**: volts and amps live, the highest amps per minute stored, a breaker size per circuit with a share and an 80% warning.
 - **Runs**: each time a meter was working (an EV charge, a dryer load) on the meter page, `GET /api/v1/meters/{id}/runs`.

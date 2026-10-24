@@ -163,13 +163,13 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
           </label>
         )}
         <span class="caption hier-tag" title={tag}>
+          {nearBreaker !== null && (
+            <span class={`badge ${nearBreaker > 100 ? 'over' : 'high'}`} title={`Drawing ${nearBreaker}% of its ${meter.breaker_amps} A breaker right now`}>
+              {nearBreaker}% of breaker
+            </span>
+          )}{' '}
           {tag}
         </span>
-        {nearBreaker !== null && (
-          <span class={`badge ${nearBreaker > 100 ? 'over' : 'high'}`} title={`Drawing ${nearBreaker}% of its ${meter.breaker_amps} A breaker right now`}>
-            {nearBreaker}% of breaker
-          </span>
-        )}
         <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
         <span class="num hier-energy">{used ? formatKwh(used.kwh) : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>

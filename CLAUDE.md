@@ -61,6 +61,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **Always on** (`server/internal/baseload`, `GET /api/v1/baseload` for the house, `GET /api/v1/meters/{id}/baseload`, `web/src/BaseLoadCard.tsx`): the 5th percentile of a meter's minute averages over the period (not the lowest minute),
   with the average of the same minutes for its share, and a year of it priced at today's price (null without a price); under 60 minutes of data answers 204. The house is the mains legs added minute by minute, leaving out
   a minute where a leg is missing. `parts` (house only) are the floors of the meters that hold no other meter: **each is its own floor, never added to each other or to the house's**.
+- **Amps and breakers** (`minutes.max_a`, `meters.breaker_amps`, `web/src/amps.ts`, `Breaker.tsx`): the highest current of each minute is kept next to the highest power (nullable: a meter that reports none has none, never 0 A) and shown
+  as `max_amps` / `peak_amps`. **A 240 V pair carries the same current in both legs: its amps are the larger leg's, never the two added** (live in the Refoss source, in the stored minutes and when pairing merges old history),
+  and its volts are the two legs added. A breaker size (1 to 1000 A, circuits only in the UI) is only used to say what share of it a current is: below 80% is fine, 80% to 100% is above what a steady load should draw, above is over.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

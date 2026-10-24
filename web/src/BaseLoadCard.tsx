@@ -6,6 +6,9 @@ import { usePoll } from './hooks';
 import { formatMoney, formatWatts, periodRange, type PeriodKey } from './lib';
 import { routePath } from './route';
 
+/** Under this a meter's floor is noise. */
+const MIN_METER_WATTS = 1;
+
 export function BaseLoadCard({ meterId, period }: { meterId?: string; period: PeriodKey }) {
   const { data } = usePoll(
     async () => {
@@ -16,6 +19,8 @@ export function BaseLoadCard({ meterId, period }: { meterId?: string; period: Pe
     [meterId ?? '', period],
   );
   if (!data) return null;
+  // A meter that rests at nothing (a water heater, a charger with the car away) has no always-on power to speak of: no card, not a row of zeros.
+  if (meterId && data.watts < MIN_METER_WATTS) return null;
   return (
     <section class="card">
       <h2>Always on</h2>

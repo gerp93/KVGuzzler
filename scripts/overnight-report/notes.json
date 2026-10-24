@@ -82,6 +82,36 @@
    "commit": "",
    "tests": "Go: <code>baseload</code> package tests (what it rests at, one glitched minute does not set it, under an hour says nothing, negative and broken readings are not power, a meter that uses nothing has no share) and API tests (a meter's floor, its yearly cost at the saved price with no cost when no price is saved, the house floor never one leg short, the breakdown lists only meters that hold nothing, 204/404/400 cases). Web: <code>baseload.test.ts</code>. Contract example validates.",
    "notes": "Finding in the demo: the house floor (460 W) is much larger than any meter's own floor (the biggest is 40 W), because the simulator has about 300 W of unmetered base load. On a real house that gap (the floor of the house minus the floors of what is metered) would say how much always-on power no clamp sees; I did not turn it into a number, because floors of different meters are not additive. A cycling appliance (the fridge) rests at its off level between cycles, so its floor reads as 4 W rather than its average; the card says so. Not verified on your real house."
+  },
+  {
+   "id": "amps",
+   "title": "Amps and breakers: how close is each circuit to tripping",
+   "kind": "feature",
+   "summary": "The Refoss monitor's current and voltage used to be read and thrown away. Now each meter shows its <strong>live volts and amps</strong>, the <strong>highest amps of every minute</strong> is stored next to the highest watts, and you can say how big each breaker is: the dashboard then shows <strong>what share of the breaker</strong> the circuit used and warns above <strong>80%</strong>.",
+   "details": [
+    "<strong>Why it matters:</strong> a circuit that runs near its breaker's size for hours (an EV charger, a water heater, a space heater) is the one that trips, or that an electrician would want to hear about. The 80% line is the continuous-load rule: a load that runs for three hours or more should stay at or below 80% of the breaker.",
+    "<strong>Storage:</strong> a new nullable <code>max_a</code> column on the per-minute rows (an additive migration; older databases open unchanged and their old minutes simply have no current) and a nullable <code>breaker_amps</code> on meters. The contract gets <code>max_amps</code> on series points, <code>peak_amps</code> on meter summaries and <code>breaker_amps</code> on meters and the meter update.",
+    "<strong>240 V pairs:</strong> one breaker carries the <em>same</em> current in both legs, so a pair's amps are the <strong>larger leg</strong>, never the sum, and its voltage is the two legs added (about 237 V). This holds live (the Refoss source), in the stored minutes and when two clamps are paired late and their earlier history is merged (power is added, amps are not). Each of these is a test.",
+    "<strong>Where you see it:</strong> a <em>Current</em> card on each meter's page (right now with volts, highest in the period, and the share of the breaker with a bar marked at 80% and a warning sentence); a <em>Breaker size</em> list in the Hierarchy tab's wiring panel (the usual sizes 15 to 200 A; \"Not set\" forgets it) with the live reading beside it; and a small badge on a Hierarchy row, \"90% of breaker\", whenever a circuit is above 80% right now.",
+    "<strong>Demo:</strong> the seed script sets breaker sizes; the water heater's is deliberately too small (20 A for a 4.4 kW element), so the demo shows a warning: it reached 97% of its 20 A breaker."
+   ],
+   "images": [
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845009802-mgbeej.jpg",
+     "caption": "The water heater's page over seven days: the highest current was 19.3 A on a 20 A breaker (97%), with the 80% line marked and the warning."
+    },
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845044289-5dprtt.jpg",
+     "caption": "The Breaker size list in a row's wiring panel, with the live reading beside it."
+    },
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845127384-0nge4t.png",
+     "caption": "A row warns while its circuit is above 80% of its breaker (HVAC, with its breaker set to 15 A for the picture)."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: store tests (a minute written in halves keeps the larger current, a meter that never reported one has none rather than 0 A, series carry each bucket's highest, pairing keeps the larger leg and adds the power, breaker sizes are validated, a database from before the column opens), a Refoss source test (own volts and amps; a pair is the larger leg's amps and the legs' volts added), API tests (summary and series carry the amps and agree with watts over volts, breaker set, forgotten and refused when 0, negative, over 1000 or not a number). Web: amps.test.ts. Contract examples validate.",
+   "notes": "Not verified against a real Refoss: the demo's volts and amps come from the simulator, and a real EM16P's current is read as the monitor reports it (never negative). The 80% rule is judged on the highest minute, not on how long a load really ran: a short spike above 80% also warns. A run's own average current is not yet shown (idea for later). The house card has no amps: the legs are not added. Breaker size is offered for circuits only (not the mains or a plug)."
   }
  ]
 }
