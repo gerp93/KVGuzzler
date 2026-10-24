@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import uPlot from 'uplot';
+import { uiScale } from './uiscale';
 import 'uplot/dist/uPlot.min.css';
 
 export interface Line {
@@ -53,7 +54,20 @@ export function effectiveDomain(domain: [number, number], lines: Pick<Line, 'x'>
 }
 
 /** `domain` is the period shown, in seconds since the epoch, so a chart with few points still spans the period. */
-export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
+/** A chart's height: taller on a big monitor, where the page around it is much wider and more spacious. */
+function defaultHeight(): number {
+  if (typeof window === 'undefined' || !window.matchMedia) return 260;
+  if (window.matchMedia('(min-width: 3000px)').matches) return Math.round(Math.min(760, Math.max(400, window.innerHeight * 0.34)));
+  return window.matchMedia('(min-width: 1800px)').matches ? 340 : 260;
+}
+
+/** The chart that is the whole point of a page (History): on a big monitor it takes the height that is left under the header and above the key. */
+export function tallChartHeight(): number {
+  if (typeof window === 'undefined' || !window.matchMedia || !window.matchMedia('(min-width: 1800px)').matches) return defaultHeight();
+  return Math.max(defaultHeight(), Math.min(900, window.innerHeight - 380));
+}
+
+export function Chart({ lines, domain, shades = [], height = defaultHeight() }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,6 +77,7 @@ export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Lin
     const grid = css('--color-border');
     const shade = css('--color-accent-muted');
     const span = effectiveDomain(domain, lines);
+    const axisFont = `${Math.round(12 * uiScale())}px system-ui, sans-serif`;
     const plot = new uPlot(
       {
         width: el.clientWidth || 600,
@@ -74,13 +89,14 @@ export function Chart({ lines, domain, shades = [], height = 260 }: { lines: Lin
           y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.05 : 1] },
         },
         axes: [
-          { stroke: text, grid: { stroke: grid, width: 0.5 }, ticks: { stroke: grid } },
+          { stroke: text, font: axisFont, grid: { stroke: grid, width: 0.5 }, ticks: { stroke: grid } },
           {
             stroke: text,
+            font: axisFont,
             grid: { stroke: grid, width: 0.5 },
             ticks: { stroke: grid },
             values: (_u, v) => v.map((w) => (w >= 1000 ? `${w / 1000} kW` : `${w} W`)),
-            size: el.clientWidth < 420 ? 52 : 64,
+            size: Math.round((el.clientWidth < 420 ? 52 : 64) * uiScale()),
           },
         ],
         series: [

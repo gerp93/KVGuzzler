@@ -354,6 +354,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
 
   return (
     <>
+      <div class="tree-layout">
+        <div class="tree-rail">
       <section class="card wide">
         <div class="row">
           <h2>Where the energy goes</h2>
@@ -365,6 +367,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           never add to more than the band itself: what is left over is "Other (not metered)". The Energy and Cost columns below follow the same period.
         </Hint>
       </section>
+        </div>
+        <div class="tree-stack">
       <section class="card wide">
         <div class="row">
           <h2>Hierarchy</h2>
@@ -447,6 +451,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
       <DevicesCard meters={meters} onChanged={onChanged} />
       <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
       <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
+        </div>
+      </div>
     </>
   );
 }

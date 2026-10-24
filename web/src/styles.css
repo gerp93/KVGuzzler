@@ -26,7 +26,7 @@ html {
 
 body {
   margin: 0;
-  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font: 1rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: var(--color-text);
   background: var(--color-bg);
@@ -641,6 +641,7 @@ select:focus-visible {
 
   main > .hero,
   main > .wide,
+  .tree-layout .wide,
   main > .chips,
   main > .warn,
   main > .note {
@@ -928,7 +929,7 @@ a.button {
 
 .flow text {
   fill: var(--color-text);
-  font-size: 12px;
+  font-size: calc(12px * var(--s, 1));
   paint-order: stroke;
   stroke: var(--color-surface);
   stroke-width: 3px;
@@ -937,7 +938,7 @@ a.button {
 
 .flow text .small {
   fill: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--s, 1));
 }
 
 .flow a text {
@@ -1035,7 +1036,7 @@ a.button {
 }
 
 /* A card too narrow for four columns (a phone, or half a desktop page): a meter is two lines, name and watts, then the bar, then the period's figures. */
-@container (max-width: 40rem) {
+@container (max-width: 34rem) {
   .bars li,
   .bars.wide li,
   .bars a.rowlink,
@@ -1372,7 +1373,7 @@ main > .caption {
 
 }
 
-@container (min-width: 40.01rem) {
+@container (min-width: 34.01rem) {
   .bars li,
   .bars a.rowlink {
     grid-template-columns: minmax(0, 12rem) 1fr auto;
@@ -1481,4 +1482,191 @@ main > * {
 .insight {
   margin: 12px 0 0;
   font-size: 0.95rem;
+}
+
+/* A button that follows a field has room above it */
+.field ~ button {
+  margin-top: 12px;
+}
+
+/* ---- Ultra-wide monitors (a 34-49" curved panel is 3440 to 5120 px across) ----
+   Under 1800 px nothing here applies. Above it the page stops being a column and becomes a wall of cards on a grid of 6, 8 or 12
+   tracks, the text grows with the screen, and each page arranges its own cards (the house as a band of figures and chart over its
+   lists, the hierarchy as the flow chart beside the tree, Settings as columns). */
+:root {
+  --s: 1; /* the text scale, for what is drawn in pixels */
+}
+
+.tree-layout,
+.tree-rail,
+.tree-stack {
+  display: contents;
+}
+
+@media (min-width: 1800px) {
+  html {
+    font-size: 112.5%;
+  }
+
+  :root {
+    --s: 1.125;
+    --cols: 6;
+    --card: 2;
+    --hero: 2;
+    --chart: 4;
+    --wide: 4;
+    --flow: 2;
+  }
+
+  .top {
+    padding-inline: 40px;
+  }
+
+  main {
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-flow: row dense;
+    gap: 16px;
+    max-width: none;
+    padding: 20px 40px 48px;
+  }
+
+  /* The house wall: a row of tiles is as tall as its tallest. */
+  main.page-live {
+    align-items: stretch;
+  }
+
+  .top .conn {
+    margin-right: 0;
+  }
+
+  .top nav {
+    margin-left: 32px;
+  }
+
+  main > .card,
+  main > .hero,
+  main > .wide {
+    grid-column: span var(--card);
+  }
+
+  main > .hero {
+    grid-column: span var(--hero);
+  }
+
+  main > .chart-card {
+    grid-column: span var(--chart);
+  }
+
+  main > .wide:not(.chart-card):not(.aside-card) {
+    grid-column: span var(--wide);
+  }
+
+  main > .aside-card {
+    grid-column: span var(--hero);
+  }
+
+  main > .flow-card {
+    grid-column: span var(--flow);
+  }
+
+  main > .warn:not(.tile),
+  main > .chips,
+  main > .note,
+  main > .back,
+  main > .caption,
+  main > .banner {
+    grid-column: 1 / -1;
+  }
+
+  /* The hierarchy: the flow chart stays in view beside the tree */
+  .tree-layout {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 68rem);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .tree-rail {
+    display: block;
+    position: sticky;
+    top: 4.5rem;
+  }
+
+  .tree-stack {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* Settings and Help: forms and prose in columns of a readable width, centred */
+  main.page-settings,
+  main.page-help {
+    justify-content: center;
+  }
+
+  main.page-settings {
+    grid-template-columns: repeat(3, minmax(0, 34rem));
+  }
+
+  main.page-help {
+    grid-template-columns: repeat(2, minmax(0, 40rem));
+  }
+
+  main.page-settings > *,
+  main.page-help > * {
+    grid-column: auto;
+  }
+
+  main.page-settings > .page-narrow,
+  main.page-help > .page-narrow {
+    grid-column: 1 / -1;
+  }
+
+  .stats {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 2800px) {
+  :root {
+    --s: 1.25;
+    --cols: 8;
+    --chart: 6;
+    --wide: 6;
+    --flow: 3;
+  }
+
+  html {
+    font-size: 125%;
+  }
+}
+
+@media (min-width: 3800px) {
+  :root {
+    --cols: 12;
+    --hero: 3;
+    --chart: 9;
+    --wide: 8;
+    --flow: 6;
+  }
+
+  .tree-layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  }
+
+  /* The tree takes the first column of the stack and the devices, computers and groups sit beside it */
+  .tree-stack {
+    grid-template-columns: minmax(0, 68rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tree-stack > :first-child {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .tree-stack > :not(:first-child) {
+    grid-column: 2;
+  }
 }

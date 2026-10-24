@@ -2,6 +2,7 @@
 // keeps a setup that got one. The key is kept in a private file on the server and sent to EIA only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
+import { Hint } from './Hint';
 import type { CarbonConfig } from './lib';
 
 export function CarbonCard() {
@@ -49,11 +50,12 @@ export function CarbonCard() {
   return (
     <section class="card">
       <h2>Carbon footprint</h2>
-      <p class="caption">
-        An estimate of the CO₂ the grid emitted to make the electricity used: each hour's energy times that hour's grid intensity, worked out from the US
-        Energy Information Administration's hourly generation by fuel for your balancing authority (US only). It is the grid's average, not what one more kWh
-        would cause. It needs a free EIA API key (eia.gov/opendata); the server keeps it in a private file and sends it to EIA only.
-      </p>
+      <p class="caption">An estimate of the CO₂ the grid emitted to make the electricity you used (US only).</p>
+      <Hint>
+        Each hour's energy times that hour's grid intensity, worked out from the US Energy Information Administration's hourly generation by fuel for your
+        balancing authority. It is the grid's average, not what one more kWh would cause. It needs a free EIA API key (eia.gov/opendata); the server keeps it
+        in a private file and sends it to EIA only.
+      </Hint>
       <label class="field">
         <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>
         <input value={place} placeholder="MISO" onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />

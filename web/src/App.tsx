@@ -69,7 +69,7 @@ export function App() {
           Can't reach the house server{status.error ? ` (${status.error.message})` : ''}. What is shown may be out of date; trying again every few seconds.
         </p>
       )}
-      <main>
+      <main class={`page page-${active}${route.rest[0] ? ` page-${active}-${route.rest[0]}` : ''}`}>
         {mismatch ? (
           <section class="card warn">
             <p>{mismatch.message}</p>

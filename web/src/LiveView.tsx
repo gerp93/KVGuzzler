@@ -174,7 +174,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       )}
 
       {figures?.line && (
-        <section class="card wide">
+        <section class="card wide chart-card">
           <h2>Power over time</h2>
           <Chart lines={[figures.line]} domain={figures.domain} />
           <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
@@ -196,7 +196,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       </section>
 
       {summary && circuits.length > 0 && (
-        <section class="card">
+        <section class="card flow-card">
           <h2>Where it goes</h2>
           <FlowChart meters={meters} summary={summary} />
           <p class="caption">Over the period picked above: each band is as wide as the energy through it.</p>

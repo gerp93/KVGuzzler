@@ -105,7 +105,7 @@ const LINE = 7; // half a text line, for spacing labels
 
 /** Lays the tree out in `width` pixels: one column per level, bands sized by energy with one scale for the whole chart, labels to the right of
  * each band (the last column keeps `labelWidth` free for them). */
-export function layoutFlow(tree: FlowNode, width: number, labelWidth = 190): Layout {
+export function layoutFlow(tree: FlowNode, width: number, labelWidth = 190, scale = 1): Layout {
   const values = new Map<string, number>();
   const valueOf = (n: FlowNode): number => {
     const v = Math.max(n.kwh, n.children.reduce((t, c) => t + valueOf(c), 0));
@@ -127,7 +127,7 @@ export function layoutFlow(tree: FlowNode, width: number, labelWidth = 190): Lay
   const cols = columns.length;
   const step = cols > 1 ? Math.max(40, (width - 2 * PAD - NODE_W - labelWidth) / (cols - 1)) : 0;
   const tallest = Math.max(...columns.map((c) => c.length));
-  const height = Math.min(600, Math.max(240, 2 * PAD + tallest * 34));
+  const height = Math.min(600 * scale, Math.max(240 * scale, 2 * PAD + tallest * 34 * scale));
   const inner = height - 2 * PAD;
 
   // One scale for the whole chart, the tightest column deciding, so a wide band means the same energy everywhere.
