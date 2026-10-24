@@ -346,8 +346,17 @@ func TestBillPricesAreUsedAndEstimatesAreFlagged(t *testing.T) {
 }
 
 type fakeDevices struct {
-	addErr, removeErr error
-	got               devices.NewDevice
+	addErr, removeErr, updateErr error
+	got                          devices.NewDevice
+	gotUpdate                    devices.UpdateDevice
+}
+
+func (f *fakeDevices) Update(_ context.Context, id string, u devices.UpdateDevice) (model.Device, error) {
+	f.gotUpdate = u
+	if f.updateErr != nil {
+		return model.Device{}, f.updateErr
+	}
+	return model.Device{ID: id, Kind: "shelly_plug", Online: true}, nil
 }
 
 func (f *fakeDevices) Add(_ context.Context, nd devices.NewDevice) (model.Device, error) {
@@ -395,6 +404,35 @@ func serverWithDevices(t *testing.T, fd *fakeDevices) *httptest.Server {
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+func TestChangingADevicesNameOrAddressAnswersEachFailureWithItsStatus(t *testing.T) {
+	cases := []struct {
+		err  error
+		want int
+	}{
+		{nil, http.StatusOK},
+		{fmt.Errorf("%w: a path", devices.ErrInvalid), http.StatusBadRequest},
+		{fmt.Errorf("%w: twice", devices.ErrExists), http.StatusConflict},
+		{fmt.Errorf("%w: silent", devices.ErrUnreachable), http.StatusBadGateway},
+		{fmt.Errorf("%w: x", devices.ErrNotFound), http.StatusNotFound},
+	}
+	for _, c := range cases {
+		fd := &fakeDevices{updateErr: c.err}
+		srv := serverWithDevices(t, fd)
+		if r := patch(t, srv.URL+"/api/v1/devices/shelly-x", `{"host":"10.0.0.9","name":"Desk"}`); r.StatusCode != c.want {
+			t.Errorf("update with %v: %d, want %d", c.err, r.StatusCode, c.want)
+		}
+		if c.err == nil && (fd.gotUpdate.Host == nil || *fd.gotUpdate.Host != "10.0.0.9" || fd.gotUpdate.Name == nil || *fd.gotUpdate.Name != "Desk") {
+			t.Errorf("manager was given %+v", fd.gotUpdate)
+		}
+	}
+	srv := serverWithDevices(t, &fakeDevices{})
+	for _, body := range []string{`{}`, `{"hots":"x"}`, `nope`} {
+		if r := patch(t, srv.URL+"/api/v1/devices/shelly-x", body); r.StatusCode != 400 {
+			t.Errorf("%s: %d, want 400", body, r.StatusCode)
+		}
+	}
 }
 
 func TestAddAndRemoveDeviceAnswerEachFailureWithItsStatus(t *testing.T) {

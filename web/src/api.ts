@@ -51,6 +51,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(nd),
     }),
+  updateDevice: (id: string, body: { name?: string; host?: string }) =>
+    request<Device>(`api/v1/devices/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   removeDevice: (id: string) => request<void>(`api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   groups: () => request<{ groups: ApplianceGroup[] }>('api/v1/groups').then((r) => r.groups),
   groupDetail: (id: string, from: string, to: string) =>

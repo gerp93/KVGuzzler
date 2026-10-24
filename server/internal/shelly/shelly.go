@@ -184,6 +184,14 @@ func newSource(c *Client, host, name string, scope model.Scope) *Source {
 	}
 }
 
+// SetIdentity gives the source the device id it was first saved under. A plug's id is made from its address when it is added; if the plug
+// later moves to another address it keeps that id, so its meter and its history stay what they were.
+func (s *Source) SetIdentity(id string) {
+	s.device.ID = id
+	s.meter.ID = id + ":plug"
+	s.meter.DeviceID = id
+}
+
 func (s *Source) Device() model.Device  { return s.device }
 func (s *Source) Meters() []model.Meter { return []model.Meter{s.meter} }
 

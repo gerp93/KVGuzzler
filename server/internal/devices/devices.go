@@ -52,6 +52,13 @@ type NewDevice struct {
 	Scope string `json:"scope"`
 }
 
+// UpdateDevice is what can be changed about a device that is already polled: its name, and its address (a plug that got a new one from the router).
+// Its id and its meters keep the names they were first saved under, so nothing recorded is lost.
+type UpdateDevice struct {
+	Name *string `json:"name"`
+	Host *string `json:"host"`
+}
+
 const maxName = 60
 
 type Manager struct {
@@ -289,6 +296,95 @@ func (m *Manager) tieToAComputer(ctx context.Context, src source.Source) error {
 	return err
 }
 
+// buildAs builds a source for a device that already has an id, whatever address it is at now.
+func (m *Manager) buildAs(id, kind, host, name string, scope model.Scope) (source.Source, error) {
+	src, err := m.builder()(kind, host, name, scope, m.HTTP)
+	if err != nil {
+		return nil, err
+	}
+	switch s := src.(type) {
+	case *refoss.Source:
+		s.SetIdentity(id, m.refossSettings(id))
+	case *shelly.Source:
+		s.SetIdentity(id)
+	}
+	return src, nil
+}
+
+// Update changes a polled device's name and/or address. A new address is read once first: if nothing answers there like the device did, nothing
+// changes and the old address keeps being polled. The device keeps its id, so its meters, their settings and their history stay what they were.
+func (m *Manager) Update(ctx context.Context, id string, u UpdateDevice) (model.Device, error) {
+	saved, err := m.Store.Devices(ctx)
+	if err != nil {
+		return model.Device{}, err
+	}
+	var d model.Device
+	found := false
+	for _, x := range saved {
+		if x.ID == id {
+			d, found = x, true
+		}
+	}
+	if !found {
+		return model.Device{}, fail(ErrNotFound, "No such device: %s.", id)
+	}
+	name, host := d.Name, d.Host
+	if u.Name != nil {
+		name = strings.TrimSpace(*u.Name)
+		if name == "" || utf8.RuneCountInString(name) > maxName {
+			return model.Device{}, fail(ErrInvalid, "A name is 1 to %d characters.", maxName)
+		}
+	}
+	if u.Host != nil {
+		host = strings.TrimSpace(*u.Host)
+		if err := hostcheck.Validate(host); err != nil {
+			return model.Device{}, fail(ErrInvalid, "The address must be a plain host name or IP address, not a URL, path or port.")
+		}
+	}
+	if name == d.Name && host == d.Host {
+		d.Online = true
+		return d, nil
+	}
+	for _, o := range m.Collector.Devices() {
+		if o.ID != id && o.Host == host {
+			return model.Device{}, fail(ErrExists, "%s is already being polled.", host)
+		}
+	}
+	meters, err := m.Store.DeviceMeters(ctx, id)
+	if err != nil {
+		return model.Device{}, err
+	}
+	scope := model.ScopePlug
+	if len(meters) > 0 {
+		scope = meters[0].Scope
+	}
+	if d.Kind == "refoss" {
+		m.setModel(host, d.Model)
+	}
+	src, err := m.buildAs(id, d.Kind, host, name, scope)
+	if err != nil {
+		return model.Device{}, err
+	}
+	if host != d.Host {
+		probeCtx, cancel := context.WithTimeout(ctx, m.probeTimeout())
+		defer cancel()
+		if _, err := src.Poll(probeCtx); err != nil {
+			return model.Device{}, fail(ErrUnreachable, "Nothing at %s answered like this device: %s", host, sentence(err))
+		}
+	}
+	m.Collector.Remove(id)
+	if err := m.Collector.Add(ctx, src); err != nil {
+		// Put the old one back: a failed change must not stop a device being read.
+		if old, e2 := m.buildAs(id, d.Kind, d.Host, d.Name, scope); e2 == nil {
+			_ = m.Collector.Add(ctx, old)
+		}
+		return model.Device{}, err
+	}
+	out := src.Device()
+	out.Online = true
+	return out, nil
+}
+
 // Remove stops polling a device. What it recorded stays in the history.
 func (m *Manager) Remove(ctx context.Context, id string) error {
 	found := m.Collector.Remove(id)
@@ -330,7 +426,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 		if d.Kind == "refoss" {
 			m.setModel(d.Host, d.Model)
 		}
-		src, err := m.builder()(d.Kind, d.Host, d.Name, scope, m.HTTP)
+		src, err := m.buildAs(d.ID, d.Kind, d.Host, d.Name, scope)
 		if err != nil {
 			log.Printf("not polling saved device %s: %v", d.ID, err)
 			continue

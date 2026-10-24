@@ -20,7 +20,7 @@ import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import {
   arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, usualPartner,
-  type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
+  type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
 type Change = Parameters<typeof api.updateMeter>[1];
@@ -43,6 +43,8 @@ interface Shared {
   figures: Map<string, MeterSummary>;
   estimated: boolean;
   deviceName: (id: string) => string;
+  /** The name of a computer, by id: a plug that is its wall plug or one of its peripherals says so on its row. */
+  computerName: (id: string) => string;
   watts: Map<string, number>;
   dragging: string | null;
   setDragging: (id: string | null) => void;
@@ -50,7 +52,7 @@ interface Shared {
 }
 
 function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; shared: Shared }) {
-  const { all, figures, estimated, deviceName, watts, dragging, setDragging, onChanged } = shared;
+  const { all, figures, estimated, deviceName, computerName, watts, dragging, setDragging, onChanged } = shared;
   const depth = rows[at]!.depth;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
@@ -87,7 +89,10 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
 
   const watt = watts.get(meter.id);
   const used = figures.get(meter.id);
-  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
+  // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
+  const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
+  const owner = meter.type === 'computer' ? ofComputer : meter.scope === 'plug' && ofComputer ? `peripheral of ${ofComputer}` : '';
+  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', owner, refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
   const dragged = dragging ? all.find((c) => c.id === dragging) : undefined;
   const dropOk = !!dragged && dragged.id !== meter.id && canHold(meter, dragged, all);
 
@@ -306,6 +311,7 @@ export function HierarchyView({ meters, open, onChanged }: { meters: Meter[]; op
 
 function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const { data: devices } = usePoll<Device[]>(api.devices, 30_000, [meters.length]);
+  const { data: computers } = usePoll<Computer[]>(api.computers, 30_000, [meters.length]);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
   const [dragging, setDragging] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -326,11 +332,13 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
 
   const names = new Map((devices ?? []).map((d) => [d.id, d.name || d.host]));
   const deviceName = (id: string) => names.get(id) ?? '';
+  const computerNames = new Map((computers ?? []).map((c) => [c.id, c.name]));
+  const computerName = (id: string) => computerNames.get(id) ?? '';
   const watts = new Map((live?.readings ?? []).map((r) => [r.meter_id, r.watts]));
   const rows = arrangeByPanel(shownMeters(meters));
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, watts, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, computerName, watts, dragging, setDragging, onChanged };
 
   return (
     <>

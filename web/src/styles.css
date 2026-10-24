@@ -841,3 +841,32 @@ a.button {
 .hier-row.virtual .part-name a {
   color: inherit;
 }
+
+/* Devices: a row each, the name and address behind an Edit button */
+.settings.devices .device-row {
+  display: grid;
+  gap: 8px;
+}
+
+.device-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-main .grow {
+  flex: 1 1 14rem;
+}
+
+.device-edit {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.device-edit .field {
+  margin-top: 0;
+}

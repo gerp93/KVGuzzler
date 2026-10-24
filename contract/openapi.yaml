@@ -109,6 +109,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
   /api/v1/devices/{deviceId}:
+    patch:
+      tags: [Settings]
+      operationId: updateDevice
+      summary: Change a device's name or address (a plug that got a new one from the router).
+      description: |
+        A new address is read once first: if nothing answers there like the device did, nothing changes and the old address keeps being
+        polled (502). The device keeps its id and its meters keep theirs, so their settings and their history stay what they were.
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceUpdate'
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          description: Another device is already polled at that address.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '502':
+          description: Nothing at the new address answered like this device.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
     delete:
       tags: [Settings]
       operationId: removeDevice
@@ -906,6 +944,18 @@ components:
           description: Plain-language things that need attention (a device stopped answering, a reading dropped).
           items:
             type: string
+    DeviceUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        host:
+          type: string
+          description: The new address, a plain host name or IP address only.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: The device's name. (A meter's own name is changed on the meter.)
     NewDevice:
       type: object
       required: [kind, host]

@@ -479,3 +479,138 @@ func TestARestartKeepsARefossMonitorAndItsModel(t *testing.T) {
 		t.Errorf("restored = %+v", ds)
 	}
 }
+
+// ---- changing a device's address or name
+
+func TestAPlugThatMovesToANewAddressKeepsItsIdItsMeterAndItsHistory(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50", Name: "Desk"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.AddMinute(ctx, "shelly-192.168.1.50:plug", time.Now().Truncate(time.Minute), 52, 60, 60); err != nil {
+		t.Fatal(err)
+	}
+
+	host, name := "192.168.1.99", "Desk lamp"
+	d, err := m.Update(ctx, "shelly-192.168.1.50", UpdateDevice{Host: &host, Name: &name})
+	if err != nil || d.ID != "shelly-192.168.1.50" || d.Host != host || d.Name != name {
+		t.Fatalf("device = %+v, err %v", d, err)
+	}
+	saved, _ := f.st.Devices(ctx)
+	if len(saved) != 1 || saved[0].ID != "shelly-192.168.1.50" || saved[0].Host != host || saved[0].Name != name {
+		t.Errorf("saved = %+v", saved)
+	}
+	meters, _ := f.st.DeviceMeters(ctx, "shelly-192.168.1.50")
+	if len(meters) != 1 || meters[0].ID != "shelly-192.168.1.50:plug" {
+		t.Errorf("meters = %+v: the id must not follow the address", meters)
+	}
+	if ds := c.Devices(); len(ds) != 1 || ds[0].ID != "shelly-192.168.1.50" || ds[0].Host != host {
+		t.Errorf("polled = %+v", ds)
+	}
+	c.PollOnce(ctx, time.Now())
+	got := false
+	for _, r := range c.LiveReadings() {
+		got = got || r.MeterID == "shelly-192.168.1.50:plug"
+	}
+	if !got {
+		t.Error("the plug at its new address is not read under its old meter id")
+	}
+	if tot, _ := f.st.Totals(ctx, "shelly-192.168.1.50:plug", time.Now().Add(-time.Hour), time.Now().Add(time.Hour)); tot.KWh <= 0 {
+		t.Error("the history was lost")
+	}
+
+	// A restart brings it back at the new address, under the same id.
+	m2, c2 := f.manager()
+	if err := m2.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds := c2.Devices(); len(ds) != 1 || ds[0].ID != "shelly-192.168.1.50" || ds[0].Host != host {
+		t.Errorf("restored = %+v", ds)
+	}
+}
+
+func TestAnAddressNothingAnswersAtIsRefusedAndTheOldOneKeepsBeingRead(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: "192.168.1.50"}); err != nil {
+		t.Fatal(err)
+	}
+	*f.code = http.StatusInternalServerError
+	host := "192.168.1.77"
+	if _, err := m.Update(ctx, "shelly-192.168.1.50", UpdateDevice{Host: &host}); !errors.Is(err, ErrUnreachable) {
+		t.Fatalf("update: %v, want unreachable", err)
+	}
+	*f.code = http.StatusOK
+	if ds := c.Devices(); len(ds) != 1 || ds[0].Host != "192.168.1.50" {
+		t.Errorf("polled = %+v: the old address should still be read", ds)
+	}
+	saved, _ := f.st.Devices(ctx)
+	if len(saved) != 1 || saved[0].Host != "192.168.1.50" {
+		t.Errorf("saved = %+v", saved)
+	}
+}
+
+func TestChangingADeviceChecksTheAddressTheNameAndWhatIsAlreadyPolled(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, _ := f.manager()
+	for _, h := range []string{"192.168.1.50", "192.168.1.51"} {
+		if _, err := m.Add(ctx, NewDevice{Kind: "shelly_plug", Host: h}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bad, taken, empty, long := "http://x/y", "192.168.1.51", " ", strings.Repeat("x", 61)
+	for _, c := range []struct {
+		u    UpdateDevice
+		want error
+	}{
+		{UpdateDevice{Host: &bad}, ErrInvalid},
+		{UpdateDevice{Host: &taken}, ErrExists},
+		{UpdateDevice{Name: &empty}, ErrInvalid},
+		{UpdateDevice{Name: &long}, ErrInvalid},
+	} {
+		if _, err := m.Update(ctx, "shelly-192.168.1.50", c.u); !errors.Is(err, c.want) {
+			t.Errorf("%+v: %v, want %v", c.u, err, c.want)
+		}
+	}
+	if _, err := m.Update(ctx, "shelly-nope", UpdateDevice{Name: &taken}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown device: %v", err)
+	}
+	// Changing only the name does not read the device again and does not move it.
+	name := "Lamp"
+	d, err := m.Update(ctx, "shelly-192.168.1.50", UpdateDevice{Name: &name})
+	if err != nil || d.Host != "192.168.1.50" || d.Name != "Lamp" {
+		t.Errorf("rename: %+v %v", d, err)
+	}
+}
+
+func TestAMonitorThatMovesKeepsItsInputsAndTheirWiring(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	m, c := f.manager()
+	if _, err := m.Add(ctx, NewDevice{Kind: "refoss", Host: "192.168.68.88", Name: "Garage panel"}); err != nil {
+		t.Fatal(err)
+	}
+	yes := true
+	if _, err := f.st.SetMeterWiring(ctx, "refoss-192.168.68.88:em2", store.WiringChange{Invert: &yes}); err != nil {
+		t.Fatal(err)
+	}
+	host := "192.168.68.89"
+	if _, err := m.Update(ctx, "refoss-192.168.68.88", UpdateDevice{Host: &host}); err != nil {
+		t.Fatal(err)
+	}
+	if ds := c.Devices(); len(ds) != 1 || ds[0].ID != "refoss-192.168.68.88" || ds[0].Host != host || ds[0].Model != "em16p" {
+		t.Fatalf("polled = %+v", ds)
+	}
+	c.PollOnce(ctx, time.Now())
+	got := map[string]float64{}
+	for _, r := range c.LiveReadings() {
+		got[r.MeterID] = r.Watts
+	}
+	if w := got["refoss-192.168.68.88:em2"]; w < 3660 || w > 3680 {
+		t.Errorf("A2 = %v: its flipped sign should still apply under the old id (readings %v)", w, got)
+	}
+}
