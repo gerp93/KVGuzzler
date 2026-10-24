@@ -2,8 +2,9 @@
 // the width it has, so the text stays the size of the page's text on a phone as well. Each meter's name opens its page.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { meterPath } from './Bars';
-import { flowTree, layoutFlow, type LNode } from './flow';
+import { flowTree, layoutFlow, type LNode, type VirtualParts } from './flow';
 import { formatKwh, formatMoney, type Meter, type Summary } from './lib';
+import { pcParts, usePcDetails } from './pcparts';
 
 const SHADES = ['n0', 'n1', 'n2', 'n3'];
 
@@ -19,12 +20,17 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
     return () => watch.disconnect();
   }, []);
 
-  const tree = flowTree(meters, summary, root);
+  // A computer's CPU, GPU and memory are drawn as parts of its wall plug (they are its collector's, not meters of their own).
+  const details = usePcDetails(meters, summary.from, summary.to);
+  const virtual: VirtualParts = new Map(
+    [...details].map(([wall, d]) => [wall, pcParts(d, null).filter((p) => !p.remainder).map((p) => ({ label: p.label, kwh: p.kwh, cost: p.cost }))]),
+  );
+  const tree = flowTree(meters, summary, root, virtual);
   if (!tree || tree.kwh <= 0) return <p class="note">Nothing recorded in this period to draw.</p>;
   const narrow = width < 520;
   const layout = layoutFlow(tree, width, narrow ? 120 : 190);
   const byId = new Map(meters.map((m) => [m.id, m]));
-  const shade = (n: LNode) => (n.node.meterId === null && n.depth > 0 ? 'rest' : (SHADES[Math.min(n.depth, SHADES.length - 1)] ?? 'n3'));
+  const shade = (n: LNode) => (n.node.rest ? 'rest' : (SHADES[Math.min(n.depth, SHADES.length - 1)] ?? 'n3'));
   const href = (n: LNode) => {
     const m = n.node.meterId ? byId.get(n.node.meterId) : undefined;
     return m ? meterPath(m) : undefined;

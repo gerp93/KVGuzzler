@@ -141,6 +141,31 @@ func TestAMetersTypeFollowsItsScopeAndWhatIsInsideItUntilTheUserSaysOtherwise(t 
 	if typeOf("mains") != model.TypeHouse || typeOf("fridge") != model.TypeDevice || typeOf("feed") != model.TypeCircuit {
 		t.Errorf("house %s, plug %s, feed with nothing inside %s", typeOf("mains"), typeOf("fridge"), typeOf("feed"))
 	}
+	// A PC's wall plug is a computer once it belongs to one, and only a device before that.
+	if err := st.UpsertMeter(ctx, model.Meter{ID: "pcwall2", DeviceID: "refoss-h", Scope: model.ScopePC, Label: "PC"}); err != nil {
+		t.Fatal(err)
+	}
+	if typeOf("pcwall2") != model.TypeDevice {
+		t.Errorf("a PC's plug with no computer is %s, want device", typeOf("pcwall2"))
+	}
+	comp, err := st.CreateComputer(ctx, "Desk PC", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AssignMeter(ctx, "pcwall2", &comp.ID); err != nil {
+		t.Fatal(err)
+	}
+	if typeOf("pcwall2") != model.TypeComputer {
+		t.Errorf("a computer's wall plug is %s, want computer", typeOf("pcwall2"))
+	}
+	// A plug on a circuit does not make it a sub-panel: only circuits inside it do.
+	rest := "rest"
+	if _, err := st.SetMeterParent(ctx, "fridge", &rest); err != nil {
+		t.Fatal(err)
+	}
+	if typeOf("rest") != model.TypeCircuit {
+		t.Errorf("a circuit with a plug on it is %s, want circuit", typeOf("rest"))
+	}
 	feed := "feed"
 	if _, err := st.SetMeterParent(ctx, "ev", &feed); err != nil {
 		t.Fatal(err)

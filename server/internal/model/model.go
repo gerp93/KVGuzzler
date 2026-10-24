@@ -15,7 +15,7 @@ const (
 )
 
 // MeterType says what a meter is in the wiring, as the user would name it: the whole house, a sub-panel's feed (it holds other circuits),
-// one breaker, or a device (a plug, the PC's wall plug). It is a description; what the math needs (which meter is the house, what is
+// one breaker, a device (a plug), or a computer (the wall plug of a computer: its own page, and what its collector reports as parts of it). It is a description; what the math needs (which meter is the house, what is
 // subtracted from what) still comes from the scope and the tree.
 type MeterType string
 
@@ -24,6 +24,7 @@ const (
 	TypeSubPanel MeterType = "sub_panel"
 	TypeCircuit  MeterType = "circuit"
 	TypeDevice   MeterType = "device"
+	TypeComputer MeterType = "computer"
 )
 
 // Bucket is the width of one point in a series.
