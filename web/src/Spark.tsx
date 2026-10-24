@@ -20,7 +20,8 @@ export function Spark({ values, label }: { values: number[]; label: string }) {
   if (values.length < 3) return null;
   const lo = Math.min(...values);
   const hi = Math.max(...values);
-  const span = hi - lo || 1;
+  // A steady load stays a steady line: the vertical range is never smaller than a tenth of the figure (or 10 W).
+  const span = Math.max(hi - lo, Math.abs(hi) * 0.1, 10);
   const W = 100;
   const H = 32;
   const pts = values.map((v, i) => [(i / (values.length - 1)) * W, H - 3 - ((v - lo) / span) * (H - 6)] as const);
