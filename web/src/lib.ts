@@ -191,6 +191,69 @@ export function arrangeByPanel(list: Meter[]): { meter: Meter; depth: number }[]
   return out;
 }
 
+/** The name a Refoss input has on the monitor itself (A1 to C6), or null for anything else. */
+export function inputName(m: Meter): string | null {
+  const n = m.index;
+  if (!m.device_id.startsWith('refoss-') || n == null || n < 1 || n > 18) return null;
+  return `${'ABC'[Math.floor((n - 1) / 6)]}${((n - 1) % 6) + 1}`;
+}
+
+/** What to call a meter's clamp: its input on the monitor, else its own name. */
+export const clampName = (m: Meter): string => inputName(m) ?? m.label;
+
+/** The meters a hierarchy row can show: not hidden, and not the second clamp of a breaker (that is part of the first one's row). */
+export function shownMeters(all: Meter[]): Meter[] {
+  const second = new Set(all.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
+  return all.filter((m) => m.enabled && !second.has(m.id));
+}
+
+/** The input that is usually the other half of this one's 240 V breaker on an EM16P: the same number on the other phase (A1 with B1). */
+export function usualPartner(m: Meter, candidates: Meter[]): Meter | undefined {
+  const n = m.index;
+  if (!m.device_id.startsWith('refoss-') || n == null || n < 1 || n > 12) return undefined;
+  const other = n <= 6 ? n + 6 : n - 6;
+  return candidates.find((c) => c.device_id === m.device_id && c.index === other);
+}
+
+/** The ids of a meter and everything inside it, however deep. */
+export function withDescendants(id: string, all: Meter[]): Set<string> {
+  const inside = new Set<string>([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of all) {
+      if (c.parent_id && inside.has(c.parent_id) && !inside.has(c.id)) {
+        inside.add(c.id);
+        grew = true;
+      }
+    }
+  }
+  return inside;
+}
+
+/** Whether `parent` can hold `child`: a shown circuit that is not the child itself or inside it. */
+export function canHold(parent: Meter, child: Meter, all: Meter[]): boolean {
+  return parent.scope === 'circuit' && parent.enabled && child.scope !== 'mains' && !withDescendants(child.id, all).has(parent.id);
+}
+
+/** Where the "move into the meter above" arrow goes: the row just above at the same level, when it can hold this one. */
+export function indentTarget(rows: { meter: Meter; depth: number }[], at: number, all: Meter[]): Meter | undefined {
+  const me = rows[at];
+  if (!me) return undefined;
+  for (let i = at - 1; i >= 0; i--) {
+    const r = rows[i]!;
+    if (r.depth < me.depth) return undefined;
+    if (r.depth === me.depth) return canHold(r.meter, me.meter, all) ? r.meter : undefined;
+  }
+  return undefined;
+}
+
+/** Where the "move out one level" arrow goes: the parent's own parent, or null for the top. Undefined when it is already at the top. */
+export function outdentTarget(m: Meter, all: Meter[]): { parent: string | null } | undefined {
+  if (!m.parent_id) return undefined;
+  const up = all.find((c) => c.id === m.parent_id);
+  return { parent: up?.parent_id ?? null };
+}
+
 /** The PC's own wall plugs, kept apart from everything else. */
 export function pcSlices(meters: Meter[], readings: Reading[]): Row[] {
   const ch = byId(meters);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  applianceList, arrangeByPanel, BASELINE, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  applianceList, arrangeByPanel, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type ApplianceGroup, type Meter, type MeterSummary, type Computer, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -511,5 +511,49 @@ describe('the list of rates found', () => {
     expect(sharedUtility([t('A', 'x'), t('A', 'y')])).toBe('A');
     expect(sharedUtility([t('A', 'x'), t('B', 'y')])).toBeNull();
     expect(sharedUtility([])).toBeNull();
+  });
+});
+
+describe('the moves in the hierarchy tab', () => {
+  const rf = (id: string, index: number, extra: Partial<Meter> = {}): Meter => ({ ...ch(id, 'circuit'), device_id: 'refoss-h', index, ...extra });
+  const a1 = rf('a1', 1, { pair_with: 'b1' });
+  const b1 = rf('b1', 7, { enabled: false });
+  const a2 = rf('a2', 2, { parent_id: 'a1' });
+  const a3 = rf('a3', 3, { parent_id: 'a1' });
+  const a4 = rf('a4', 4);
+  const plug = { ...ch('plug', 'plug'), parent_id: 'a4' };
+  const all = [a1, b1, a2, a3, a4, plug];
+
+  it('names a Refoss input as the monitor does, and shows a breaker once', () => {
+    expect([inputName(a1), inputName(b1), inputName(plug), clampName(a2), clampName(plug)]).toEqual(['A1', 'B1', null, 'A2', 'plug']);
+    expect(shownMeters(all).map((m) => m.id)).toEqual(['a1', 'a2', 'a3', 'a4', 'plug']);
+  });
+
+  it('suggests the same number on the other phase for a 240 V breaker', () => {
+    expect(usualPartner(rf('x', 4), all)?.id).toBe(undefined);
+    expect(usualPartner(a1, all)?.id).toBe('b1');
+    expect(usualPartner(rf('x', 9), [rf('p', 3)])?.id).toBe('p');
+    expect(usualPartner(rf('x', 14), all)).toBeUndefined();
+  });
+
+  it('only a shown circuit that is not inside the meter can hold it', () => {
+    expect(canHold(a4, a2, all)).toBe(true);
+    expect(canHold(a2, a1, all)).toBe(false); // a1 holds a2: a loop
+    expect(canHold(a1, a1, all)).toBe(false);
+    expect(canHold(plug, a2, all)).toBe(false); // a plug holds nothing
+    expect(canHold(b1, a2, all)).toBe(false); // hidden
+    expect(canHold(a4, ch('mains', 'mains'), all)).toBe(false);
+  });
+
+  it('the arrows: into the row above at the same level, out to the grandparent', () => {
+    const rows = arrangeByPanel(shownMeters(all));
+    expect(rows.map((r) => [r.meter.id, r.depth])).toEqual([['a1', 0], ['a2', 1], ['a3', 1], ['a4', 0], ['plug', 1]]);
+    expect(indentTarget(rows, 0, all)).toBeUndefined(); // first row
+    expect(indentTarget(rows, 1, all)).toBeUndefined(); // directly under its parent
+    expect(indentTarget(rows, 2, all)?.id).toBe('a2'); // a3 goes into a2
+    expect(indentTarget(rows, 3, all)?.id).toBe('a1'); // a4 goes into a1, skipping a1's circuits
+    expect(outdentTarget(a2, all)).toEqual({ parent: null });
+    expect(outdentTarget(a4, all)).toBeUndefined();
+    expect(outdentTarget({ ...a3, parent_id: 'a2' }, [...all, { ...a2, parent_id: 'a1' }])).toEqual({ parent: 'a1' });
   });
 });

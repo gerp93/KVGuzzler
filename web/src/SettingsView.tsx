@@ -1,4 +1,3 @@
-import { MetersCard } from './MetersCard';
 import { ComputersCard } from './ComputersCard';
 import { CarbonCard } from './CarbonCard';
 import { DatabaseCard } from './DatabaseCard';
@@ -24,7 +23,6 @@ export function SettingsView({
       <ComputersCard meters={meters} onChanged={onChanged} />
       <GroupsCard meters={meters} onChanged={onChanged} />
       <RatesCard />
-      <MetersCard meters={meters} onChanged={onChanged} />
       <CarbonCard />
       <DatabaseCard />
       <section class="card">
