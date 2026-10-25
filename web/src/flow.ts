@@ -2,6 +2,7 @@
 // parts to the right, each band as wide as the energy that went through it. The same rule as everywhere else holds: a parent's own reading
 // already contains its children, so what is left over is its own band ("Other (not metered)"); nothing is added twice.
 import { formatKwh, formatMoney, shownMeters, sumMoney, type Meter, type Summary } from './lib';
+import { topLevelMeters } from './measured';
 
 export interface FlowNode {
   id: string;
@@ -64,8 +65,8 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     const m = byId.get(rootId);
     return m && figures.has(m.id) ? build(m, new Set()) : undefined;
   }
-  const top = shown
-    .filter((m) => (m.scope === 'circuit' || m.scope === 'plug' || m.scope === 'pc') && (!m.parent_id || !byId.has(m.parent_id)) && figures.has(m.id))
+  const top = topLevelMeters(meters)
+    .filter((m) => figures.has(m.id))
     .map((m) => build(m, new Set()))
     .filter(used)
     .sort((a, b) => b.kwh - a.kwh);

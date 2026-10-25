@@ -2,8 +2,9 @@ import { api } from './api';
 import { Skeleton } from './Skeleton';
 import { Chart, lineFrom, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
+import { Kpi, KpiRow } from './Kpi';
 import { PeriodPicker } from './Periods';
-import { formatKwh, formatMoney, periodRange, sumByTime, type Meter, type GroupDetail, type PeriodKey } from './lib';
+import { formatKwh, formatMoney, periodRange, periodWords, sumByTime, type Meter, type GroupDetail, type PeriodKey } from './lib';
 import { routePath } from './route';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
@@ -52,18 +53,26 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
 
       {detail && (
         <>
-          <section class="card hero">
-            <div class="row">
-              <h2>{detail.group.name}</h2>
-              <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          <header class="page-head">
+            <div>
+              <h2 class="page-title">{detail.group.name}</h2>
+              <p class="page-sub">
+                {detail.members.length - detail.not_added.length} meter{detail.members.length - detail.not_added.length === 1 ? '' : 's'} added together
+              </p>
             </div>
-            <p class="big">{formatKwh(detail.total_kwh)}</p>
-            <p class="caption">
-              {detail.members.length - detail.not_added.length} meter{detail.members.length - detail.not_added.length === 1 ? '' : 's'} added together
-              {detail.total_cost != null ? `, ${formatMoney(detail.total_cost, detail.cost_estimated)}` : ''}.
-              {detail.not_added.length > 0 && ` ${detail.not_added.length} more ${detail.not_added.length === 1 ? 'is' : 'are'} inside another member, so not added again.`}
-            </p>
-          </section>
+            <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          </header>
+          <KpiRow>
+            <Kpi tone="energy" label="Energy" value={formatKwh(detail.total_kwh)} hint={periodWords(period as PeriodKey)} />
+            <Kpi tone="cost" label="Cost" value={detail.total_cost != null ? formatMoney(detail.total_cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
+          </KpiRow>
+          {detail.not_added.length > 0 && (
+            <div class="kpi-notes">
+              <p class="caption">
+                {detail.not_added.length} more {detail.not_added.length === 1 ? 'is' : 'are'} inside another member, so not added again.
+              </p>
+            </div>
+          )}
 
           <section class="card">
             <h2>By meter</h2>

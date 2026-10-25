@@ -300,6 +300,39 @@
    "commit": "",
    "tests": "Layout is CSS and wrapper elements, so it is checked by measuring in the browser (card positions and sizes at 2000, 3440 and 5120 px, and at 1280 and 375 px for overflow), not by unit tests; the web typecheck, tests and build pass.",
    "notes": "I could only look at the ultra-wide pages as small screenshots (the pane is far narrower than the emulated screen), so text legibility at those sizes is judged from the measurements and the font scaling already in place, not seen at full size. A short card in the first column of a meter's page can leave a gap at the bottom of that column (the columns are balanced by height, not exact). Settings and Help keep their centred, readable columns."
+  },
+  {
+   "id": "live-redesign",
+   "title": "The live page redesigned: figure tiles, panels, and real numbers without a whole-house clamp",
+   "kind": "fix",
+   "summary": "The four figures at the top of the page (right now, energy, cost, highest draw) showed dashes on a setup with no whole-house clamp, and the page was a pile of equal boxes. Now they show real numbers, each in a tile of its own, and the rest of the page is a few panels with a clear order.",
+   "details": [
+    "<strong>Why the dashes:</strong> the \"house\" figures only exist when a whole-house clamp reports. Without one the page now adds up <em>everything measured at the top of the tree</em> (circuits on no panel, and plugs and computers that name no circuit) and calls it <strong>Everything measured</strong>, with a line saying it is not the whole house. The same sum feeds the power chart and the flow chart's root. Nothing inside a meter is added to it (a sub-panel's circuits are already in the panel's reading).",
+    "<strong>Figure tiles:</strong> four tiles, each with a small label and icon, the figure large with its unit quiet beside it, and a line under it saying what period it covers. \"Right now\" is the lead tile and carries the trend line. The same tiles head a meter's page, a computer's page and a group's page, in place of the old hero card.",
+    "<strong>Panels instead of nine boxes:</strong> a page head (the name, the biggest circuit right now, the period), the tiles, then <em>power over time</em>, <em>circuits</em>, <em>where it goes</em>, one <em>insights</em> panel (always on, unusual days and the things measured beside the circuits, divided by lines) and one <em>tools</em> panel (cost estimator and energy history side by side). On a very wide screen the panels sit two to a row.",
+    "One surface style, one spacing scale, text in the theme's text colours with colour only on the small marks (a tile's edge and icon), and everything drawn from the theme's properties so every theme works (checked in the blue theme and the neon one). The favorites switcher is one segmented control, and scrolls sideways on a phone instead of wrapping into a blob."
+   ],
+   "images": [
+    {
+     "path": "img/live-redesign-mcp-Claude_Browser-blob-1792898139301-9s1pj7.jpg",
+     "caption": "The live page in the neon theme at 1600 px: the tiles, then the chart."
+    },
+    {
+     "path": "img/live-redesign-mcp-Claude_Browser-blob-1792897876317-khbi9y.jpg",
+     "caption": "With no whole-house clamp: the same page says \"Everything measured\" and shows real figures (the demo with its two mains clamps hidden)."
+    },
+    {
+     "path": "img/live-redesign-mcp-Claude_Browser-blob-1792898155376-tzw6w6.jpg",
+     "caption": "At 3440 px (neon): tiles across the top, chart beside the circuits, panels two to a row."
+    },
+    {
+     "path": "img/live-redesign-mcp-Claude_Browser-blob-1792898123273-iwb2hg.jpg",
+     "caption": "On a phone, the circuits panel: one list, each meter on three lines."
+    }
+   ],
+   "commit": "",
+   "tests": "Web: the sum of everything measured (adds the top-level meters only, never what is inside a panel; no cost unless every meter has one; nothing at all when nothing is measured), what counts as top-level, the big figure split into number and unit, the period in words. Layout checked in the browser at 375, 1280, 1600, 2000 and 3440 px (no horizontal overflow on the phone).",
+   "notes": "Seen at full size at phone, 1280 and 1600 px; at 2000 px and above only as small screenshots, with positions and sizes measured. The blue and the neon themes were looked at; the other twelve use the same properties but were not each viewed. Without a whole-house clamp the energy, cost and tiles add the top-level meters, so a plug that is really on a metered circuit but never had its circuit chosen is counted beside that circuit until it is chosen."
   }
  ]
 }

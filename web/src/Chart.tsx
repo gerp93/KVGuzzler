@@ -67,6 +67,12 @@ export function tallChartHeight(): number {
   return Math.max(defaultHeight(), Math.min(900, window.innerHeight - 380));
 }
 
+/** The height of the chart on the live page: the usual one on a small screen, taller on a wide one so it keeps up with the list beside it. */
+export function wideChartHeight(): number {
+  if (typeof window === 'undefined' || !window.matchMedia || !window.matchMedia('(min-width: 1800px)').matches) return defaultHeight();
+  return Math.max(defaultHeight(), Math.min(520, Math.round(window.innerHeight * 0.36)));
+}
+
 export function Chart({ lines, domain, shades = [], height = defaultHeight() }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
 

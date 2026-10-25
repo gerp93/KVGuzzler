@@ -62,6 +62,24 @@ export function periodRange(key: PeriodKey, now: Date): { from: string; to: stri
   return { from: new Date(end - ms).toISOString(), to: new Date(end).toISOString() };
 }
 
+/** The period in words, for a line under a figure: "the last 7 days". */
+export function periodWords(key: PeriodKey): string {
+  switch (key) {
+    case '1h':
+      return 'the last hour';
+    case '24h':
+      return 'the last 24 hours';
+    case '7d':
+      return 'the last 7 days';
+    case '30d':
+      return 'the last 30 days';
+    case '1y':
+      return 'the last year';
+    default:
+      return 'all recorded time';
+  }
+}
+
 export function formatWatts(w: number | null | undefined): string {
   if (w === null || w === undefined) return '—';
   return Math.abs(w) >= 1000 ? `${(w / 1000).toFixed(2)} kW` : `${Math.round(w)} W`;
