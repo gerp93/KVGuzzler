@@ -158,13 +158,15 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
             <p class="big small">{peak != null ? `≤ ${formatWatts(peak)}` : '—'}</p>
           </div>
         </div>
-        <p class="caption">
-          {house === null
-            ? 'No whole-house clamp is reporting yet.'
-            : 'The mains clamps added together. The highest draw is an upper bound: the two legs need not peak in the same second.'}
-        </p>
-        {carbon && <p class="caption">{carbon}</p>}
-        <RateNote kwh={kwh} cost={cost} />
+        <div class="hero-notes">
+          <p class="caption">
+            {house === null
+              ? 'No whole-house clamp is reporting yet.'
+              : 'The mains clamps added together. The highest draw is an upper bound: the two legs need not peak in the same second.'}
+          </p>
+          {carbon && <p class="caption">{carbon}</p>}
+          <RateNote kwh={kwh} cost={cost} />
+        </div>
       </section>
 
       {live.notes.length > 0 && (
@@ -175,63 +177,71 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         </section>
       )}
 
-      {figures?.line && (
-        <section class="card wide chart-card">
-          <h2>Power over time</h2>
-          <Chart lines={[figures.line]} domain={figures.domain} />
-          <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
-        </section>
-      )}
-
-      <section class="card">
-        <h2>Circuits</h2>
-        {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
-        {rest !== null && (
-          <p class="derived">
-            <span>Other (not metered)</span>
-            <span class="num">{formatWatts(rest)}</span>
-          </p>
+      {/* On a small screen the bands are only a way of keeping the order (they have no box of their own); on a very wide one each is a row:
+          what the house drew over time beside what draws it, where the energy goes beside what never stops, then the smaller tools side by side. */}
+      <div class="band band-main">
+        {figures?.line && (
+          <section class="card wide chart-card">
+            <h2>Power over time</h2>
+            <Chart lines={[figures.line]} domain={figures.domain} />
+            <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
+          </section>
         )}
-        {summary?.unmetered_kwh != null && (
-          <p class="caption">Over the period, {formatKwh(summary.unmetered_kwh)} of the house's energy went through no circuit clamp.</p>
+
+        <section class="card circuits-card">
+          <h2>Circuits</h2>
+          {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
+          {rest !== null && (
+            <p class="derived">
+              <span>Other (not metered)</span>
+              <span class="num">{formatWatts(rest)}</span>
+            </p>
+          )}
+          {summary?.unmetered_kwh != null && (
+            <p class="caption">Over the period, {formatKwh(summary.unmetered_kwh)} of the house's energy went through no circuit clamp.</p>
+          )}
+        </section>
+      </div>
+
+      <div class="band band-flow">
+        {summary && circuits.length > 0 && (
+          <section class="card flow-card">
+            <h2>Where it goes</h2>
+            <FlowChart meters={meters} summary={summary} />
+            <p class="caption">Over the period picked above: each band is as wide as the energy through it.</p>
+          </section>
         )}
-      </section>
 
-      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
+        {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
+      </div>
 
-      {mains.length > 0 && <AnomalyCard />}
+      <div class="band band-tiles">
+        {mains.length > 0 && <AnomalyCard />}
 
-      {summary && circuits.length > 0 && (
-        <section class="card flow-card">
-          <h2>Where it goes</h2>
-          <FlowChart meters={meters} summary={summary} />
-          <p class="caption">Over the period picked above: each band is as wide as the energy through it.</p>
-        </section>
-      )}
+        {pc.length > 0 && (
+          <section class="card">
+            <h2>Also measured</h2>
+            <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
+            <p class="caption">
+              The PC is plugged into one of the circuits above, so this is part of it, never added to the house or circuit
+              figures.
+            </p>
+          </section>
+        )}
 
-      {pc.length > 0 && (
-        <section class="card">
-          <h2>Also measured</h2>
-          <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
-          <p class="caption">
-            The PC is plugged into one of the circuits above, so this is part of it, never added to the house or circuit
-            figures.
-          </p>
-        </section>
-      )}
+        {mains.length > 0 && (
+          <Estimator
+            load={api.houseEstimate}
+            deps={[]}
+            basisOf={houseUsageBasis}
+            who="the house"
+            nowWatts={house}
+            nowWhat="the mains clamps"
+          />
+        )}
 
-      {mains.length > 0 && (
-        <Estimator
-          load={api.houseEstimate}
-          deps={[]}
-          basisOf={houseUsageBasis}
-          who="the house"
-          nowWatts={house}
-          nowWhat="the mains clamps"
-        />
-      )}
-
-      {mains.length > 0 && <HouseHistoryCard period={period as PeriodKey} />}
+        {mains.length > 0 && <HouseHistoryCard period={period as PeriodKey} />}
+      </div>
     </>
   );
 }

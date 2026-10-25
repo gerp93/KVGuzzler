@@ -70,6 +70,10 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **Unusual days** (`server/internal/anomaly`, `GET /api/v1/anomalies`, `web/src/AnomalyCard.tsx`): a complete local day is unusual when it is far above the median of the same kind of day (weekday or weekend) over the 4 weeks before it,
   by three measures at once (1.5x the usual, 3.5 typical swings, and at least 1 kWh for the house / 0.3 kWh for a meter more); under 4 earlier days of the kind says nothing, today is never judged. A meter whose day is explained by
   something that holds it being unusual the same day is **named as a cause, not listed again**, and causes are already in the figure, never added to it.
+- **Ultra-wide layouts** (`styles.css`, from 1800 px; each page has its own, measured in the browser, not left to one grid): Live is a hero strip, then bands (`.band-main`: chart | circuits, `.band-flow`: where it goes | always on, `.band-tiles`: the
+  small tools as one auto-fit row), each band's cards as tall as the tallest; a meter, computer or group page is a hero strip over 2/3/4 CSS columns (`column-span: all` on the hero, `break-inside: avoid` on cards) so there is never a card in
+  a box of empty space; Hierarchy is the flow chart and `.tree-extra` (devices, computers, groups) beside the tree; History is the chart and a full-height compare column. Below 1800 px the bands are `display: contents`, so the DOM order
+  (chart first on a meter page) is the small-screen order. A new card goes in the band or column it belongs to, never loose in `main`.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a
