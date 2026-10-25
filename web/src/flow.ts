@@ -28,8 +28,12 @@ function moneyLeft(whole: string | null | undefined, parts: (string | null)[]): 
 }
 
 /** The tree to draw over a period. With a `rootId`, that meter and everything inside it. Without one, the house: the whole-house clamps as the
- * whole, the top-level circuits as its parts and what no circuit accounts for as the remainder; with no whole-house clamp at all, the
- * top-level circuits added up stand in for it. Undefined when there is nothing recorded to draw. */
+ * whole, the top-level circuits as its parts and what no circuit accounts for as the remainder; with no whole-house clamp at all, everything measured at the
+ * top level added up stands in for it ("Everything measured": it is not claimed to be every circuit in the house).
+ *
+ * A plug or a computer's wall plug that says no circuit it is on ("parent not metered") is plugged into a circuit nothing clamps. It is a part of the
+ * house beside the metered circuits, not inside any of them, so it is drawn at the top level too and what it takes comes off what no circuit
+ * accounts for (never added a second time). Undefined when there is nothing recorded to draw. */
 export function flowTree(meters: Meter[], summary: Summary, rootId?: string, virtual?: VirtualParts): FlowNode | undefined {
   const shown = shownMeters(meters);
   const byId = new Map(shown.map((m) => [m.id, m]));
@@ -56,7 +60,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     return m && figures.has(m.id) ? build(m, new Set()) : undefined;
   }
   const top = shown
-    .filter((m) => m.scope === 'circuit' && (!m.parent_id || !byId.has(m.parent_id)) && figures.has(m.id))
+    .filter((m) => (m.scope === 'circuit' || m.scope === 'plug' || m.scope === 'pc') && (!m.parent_id || !byId.has(m.parent_id)) && figures.has(m.id))
     .map((m) => build(m, new Set()))
     .sort((a, b) => b.kwh - a.kwh);
   if (top.length === 0) return undefined;
@@ -66,7 +70,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     const children = left > 0 ? [...top, rest('house', 'Other (not metered)', left, moneyLeft(summary.house_cost, top.map((c) => c.cost)))] : top;
     return { id: 'house', label: 'House', kwh: summary.house_kwh, cost: summary.house_cost ?? null, meterId: null, children };
   }
-  return { id: 'all', label: 'All circuits', kwh: inside, cost: sumMoney(top.map((c) => c.cost)), meterId: null, children: top };
+  return { id: 'all', label: 'Everything measured', kwh: inside, cost: sumMoney(top.map((c) => c.cost)), meterId: null, children: top };
 }
 
 export interface LNode {

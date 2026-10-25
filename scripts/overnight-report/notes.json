@@ -221,6 +221,26 @@
    "commit": "",
    "tests": "Go: the rule (a spike is found with its extra, a steady weekly pattern is not unusual, a noisy meter's ordinary swings are not, small extras and too little history say nothing, today and days with no data are never judged, the biggest extra first) and the API on 40 made-up days (the house day lists the charger as its cause and the garage panel is not listed again, the fridge is listed alone, a meter's page gets its own, days validated). Web: wording helpers. Contract example validates.",
    "notes": "Not verified on your real house, which has only recently had its clamps and little history: with fewer than four earlier days of a kind nothing is said, so for the first weeks the card will say there is nothing unusual. The demo's history is made up and only three weeks long. Holidays and trips (a week of low use, then back to normal) are not recognised as such: the first normal day after a long absence can look high if the absence filled most of the four weeks."
+  },
+  {
+   "id": "flow-unmetered-plugs",
+   "title": "The flow chart now shows a PC or plug that is on a circuit nothing clamps",
+   "kind": "fix",
+   "summary": "A plug or a computer's wall plug that names no circuit it is on (\"parent not metered\") is plugged into a circuit nothing measures. It used to be left out of the house chart. It is now a part of the house <strong>beside</strong> the metered circuits, and with no whole-house clamp the chart's root is called <strong>Everything measured</strong>, not \"All circuits\".",
+   "details": [
+    "<strong>Why:</strong> on the real setup only the garage sub-panel is clamped. The PC and its monitor are on a different, unmetered part of the house, so they are not inside the garage panel and not inside any circuit in the tree. The chart drew only circuits, so they never appeared, and its root said \"All circuits\" although it covered only what is clamped.",
+    "<strong>No double counting:</strong> they are drawn at the top level, not inside any circuit. With a whole-house clamp their energy comes off \"Other (not metered)\" (the house is the circuits plus these plus what is left), and the left-over band never goes below zero. Once a plug names the circuit it is on, it goes inside that circuit as before.",
+    "The PC keeps its CPU, GPU and memory bands from its collector."
+   ],
+   "images": [
+    {
+     "path": "img/flow-unmetered-plugs-mcp-Claude_Browser-blob-1792889921590-o6sbi8.jpg",
+     "caption": "The demo with the PC and monitor on no circuit and no whole-house clamp: Desk PC (with its CPU, GPU and memory) and Monitor stand beside the circuits under Everything measured."
+    }
+   ],
+   "commit": "",
+   "tests": "Web: the house tree with a PC and a plug on no circuit (beside the circuits, the remainder is house minus all of them and the parts add up to the house), without a whole-house clamp (root is Everything measured and includes them), once placed under a circuit (inside it, not at the top), and a plug with no figures is left out.",
+   "notes": "In the demo the PC was detached from the Office circuit just for this picture, so Office's own reading still contains it and it is counted in both places; on a real setup where the PC is on no metered circuit that does not happen. If a plug really is on a metered circuit but its circuit was never chosen, it is counted beside the circuit and the remainder is understated until the circuit is chosen."
   }
  ]
 }

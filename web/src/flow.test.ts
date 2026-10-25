@@ -28,7 +28,7 @@ describe('the flow chart tree', () => {
   it('without a whole-house clamp the top-level circuits added up stand in for it', () => {
     const noHouse = { ...summary, house_kwh: null, house_cost: null, meters: summary.meters.filter((x) => x.meter_id !== 'mains') };
     const tree = flowTree(meters.filter((x) => x.id !== 'mains'), noHouse)!;
-    expect(tree).toMatchObject({ id: 'all', kwh: 17, cost: '2.55' });
+    expect(tree).toMatchObject({ id: 'all', label: 'Everything measured', kwh: 17, cost: '2.55' });
     expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer']);
   });
 
@@ -99,5 +99,35 @@ describe('the flow chart layout', () => {
         if (i > 0) expect(n.labelY - col[i - 1]!.labelY).toBeGreaterThanOrEqual(7);
       });
     }
+  });
+});
+
+describe('a plug or a computer on a circuit nothing clamps', () => {
+  // The PC and its monitor say no circuit they are on: they belong to the house beside the circuits, not inside the garage panel.
+  const loose = [...meters, m('wall', 'pc', { type: 'computer', computer_id: 'c1' }), m('monitor', 'plug')];
+  const sum: Summary = { ...summary, meters: [...summary.meters, f('wall', 'pc', 2, '0.30'), f('monitor', 'plug', 0.5, '0.08')] };
+
+  it('is drawn beside the circuits, and what it takes comes off what no circuit accounts for', () => {
+    const tree = flowTree(loose, sum)!;
+    expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['wall', 2], ['monitor', 0.5], ['rest-house', 0.5]]);
+    // 20 kWh house less 10 + 7 + 2 + 0.5: nothing is counted twice.
+    expect(tree.children.reduce((t, c) => t + c.kwh, 0)).toBeCloseTo(20, 9);
+    expect(tree.children.find((c) => c.id === 'rest-house')!.cost).toBe('0.07');
+  });
+
+  it('stands in the all-circuits whole when there is no whole-house clamp, which is the sum of everything at the top', () => {
+    const noHouse = { ...sum, house_kwh: null, house_cost: null, meters: sum.meters.filter((x) => x.meter_id !== 'mains') };
+    const tree = flowTree(loose.filter((x) => x.id !== 'mains'), noHouse)!;
+    expect(tree).toMatchObject({ id: 'all', kwh: 19.5 });
+    expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer', 'wall', 'monitor']);
+  });
+
+  it('is not drawn at the top once it says which circuit it is on, and a plug with no figures is left out', () => {
+    const placed = loose.map((x) => (x.id === 'wall' ? { ...x, parent_id: 'dryer' } : x));
+    const tree = flowTree(placed, sum)!;
+    expect(tree.children.map((c) => c.id)).not.toContain('wall');
+    expect(tree.children.find((c) => c.id === 'dryer')!.children.map((c) => c.id)).toContain('wall');
+    const quiet = { ...sum, meters: sum.meters.filter((x) => x.meter_id !== 'monitor') };
+    expect(flowTree(loose, quiet)!.children.map((c) => c.id)).not.toContain('monitor');
   });
 });
