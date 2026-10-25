@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flowTree, layoutFlow, type FlowNode } from './flow';
+import { figureText, flowTree, labelRoom, layoutFlow, type FlowNode } from './flow';
 import type { Meter, Summary } from './lib';
 
 const m = (id: string, scope: Meter['scope'], extra: Partial<Meter> = {}): Meter => ({
@@ -129,5 +129,46 @@ describe('a plug or a computer on a circuit nothing clamps', () => {
     expect(tree.children.find((c) => c.id === 'dryer')!.children.map((c) => c.id)).toContain('wall');
     const quiet = { ...sum, meters: sum.meters.filter((x) => x.meter_id !== 'monitor') };
     expect(flowTree(loose, quiet)!.children.map((c) => c.id)).not.toContain('monitor');
+  });
+});
+
+describe('what each band says', () => {
+  const node = (label: string, kwh: number, cost: string | null, children: FlowNode[] = []): FlowNode => ({ id: label, label, kwh, cost, meterId: label, children });
+
+  it('gives every band its cost beside its energy, however short the band is, and the cost alone on a narrow screen', () => {
+    expect(figureText(node('EV charger', 42.2, '6.58'), false)).toBe('42.2 kWh · $6.58');
+    expect(figureText(node('Dryer', 35.3, '5.57'), true)).toBe('35.3 kWh · ≈ $5.57');
+    expect(figureText(node('Dryer', 35.3, '5.57'), false, false)).toBe('$5.57');
+  });
+
+  it('says only the energy when no price is known, never a made-up zero', () => {
+    expect(figureText(node('Dryer', 35.3, null), false)).toBe('35.3 kWh');
+  });
+
+  it('leaves room for the longest label of the last column, within limits', () => {
+    const tree = node('House', 20, '3.00', [node('Garage', 10, '1.50', [node('South Garage Subpanel', 2.75, '0.43'), node('EV', 8, '1.20')])]);
+    const room = labelRoom(tree, false, 1, 230, 380);
+    expect(room).toBeGreaterThan(230);
+    expect(room).toBeLessThanOrEqual(380);
+    expect(labelRoom(node('A', 1, null), false, 1, 230, 380)).toBe(230); // short labels keep the least
+    expect(labelRoom(node('A very long name '.repeat(8), 1, '1.00'), false, 1, 230, 380)).toBe(380);
+  });
+});
+
+describe('a meter that used nothing', () => {
+  const zero = [...meters, m('welder', 'circuit', { parent_id: 'garage' }), m('spare', 'circuit')];
+  const sum: Summary = { ...summary, meters: [...summary.meters, f('welder', 'circuit', 0, '0.00'), f('spare', 'circuit', 0, '0.00')] };
+
+  it('has no band, inside a panel or at the top, though it is measured', () => {
+    const tree = flowTree(zero, sum)!;
+    expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer', 'rest-house']);
+    expect(tree.children[0]!.children.map((c) => c.id)).toEqual(['ev', 'lights', 'rest-garage']);
+  });
+
+  it('still has one on its own page only if it used something, and its parts of nothing are left out', () => {
+    expect(flowTree(zero, sum, 'welder')!.kwh).toBe(0);
+    const virtual = new Map([['dryer', [{ label: 'Idle part', kwh: 0, cost: '0.00' }, { label: 'Real part', kwh: 1, cost: '0.15' }]]]);
+    const dryer = flowTree(zero, sum, 'dryer', virtual)!;
+    expect(dryer.children.map((c) => c.label)).toEqual(['fridge', 'Real part', 'Other (not metered)']);
   });
 });
