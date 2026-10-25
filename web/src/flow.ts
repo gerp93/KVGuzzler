@@ -1,7 +1,7 @@
 // The energy flow chart's data and layout, with no drawing in it. A flow chart is a tree laid out left to right: the whole on the left, its
 // parts to the right, each band as wide as the energy that went through it. The same rule as everywhere else holds: a parent's own reading
 // already contains its children, so what is left over is its own band ("Other (not metered)"); nothing is added twice.
-import { shownMeters, sumMoney, type Meter, type Summary } from './lib';
+import { formatKwh, formatMoney, shownMeters, sumMoney, type Meter, type Summary } from './lib';
 
 export interface FlowNode {
   id: string;
@@ -18,6 +18,9 @@ export interface FlowNode {
 
 /** Parts a meter has that are not meters of their own (a computer's CPU, GPU and memory), by the meter's id. */
 export type VirtualParts = Map<string, { label: string; kwh: number; cost: string | null }[]>;
+
+/** A band is drawn only for something that used energy over the period (or holds something that did): a meter that used nothing is not a band. */
+const used = (n: FlowNode): boolean => n.kwh > 0 || n.children.length > 0;
 
 const rest = (id: string, label: string, kwh: number, cost: string | null): FlowNode => ({ id: `rest-${id}`, label, kwh, cost, meterId: null, rest: true, children: [] });
 
@@ -46,7 +49,9 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     const children = [
       ...shown.filter((k) => k.parent_id === m.id && !here.has(k.id) && figures.has(k.id)).map((k) => build(k, here)),
       ...parts,
-    ].sort((a, b) => b.kwh - a.kwh);
+    ]
+      .filter(used)
+      .sort((a, b) => b.kwh - a.kwh);
     const own = f?.kwh ?? 0;
     if (children.length > 0) {
       const left = own - children.reduce((t, c) => t + c.kwh, 0);
@@ -62,6 +67,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
   const top = shown
     .filter((m) => (m.scope === 'circuit' || m.scope === 'plug' || m.scope === 'pc') && (!m.parent_id || !byId.has(m.parent_id)) && figures.has(m.id))
     .map((m) => build(m, new Set()))
+    .filter(used)
     .sort((a, b) => b.kwh - a.kwh);
   if (top.length === 0) return undefined;
   const inside = top.reduce((t, c) => t + c.kwh, 0);
@@ -71,6 +77,22 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     return { id: 'house', label: 'House', kwh: summary.house_kwh, cost: summary.house_cost ?? null, meterId: null, children };
   }
   return { id: 'all', label: 'Everything measured', kwh: inside, cost: sumMoney(top.map((c) => c.cost)), meterId: null, children: top };
+}
+
+/** What a band says about itself: its energy and its cost ("42.2 kWh · $6.58"), or the cost alone for a narrow screen. Every band says its cost when it
+ * has one; none is left with only kWh because it is short. */
+export function figureText(node: Pick<FlowNode, 'kwh' | 'cost'>, estimated: boolean | undefined, withKwh = true): string {
+  const cost = node.cost != null ? formatMoney(node.cost, estimated) : '';
+  return (withKwh ? [formatKwh(node.kwh), cost] : [cost]).filter(Boolean).join(' · ');
+}
+
+/** The room the labels of the last column need to the right of it, so the longest "name 42.2 kWh · $6.58" is not cut off: about 6.6 px a character,
+ * never less than `least` nor more than `most`. */
+export function labelRoom(tree: FlowNode, estimated: boolean | undefined, scale: number, least: number, most: number): number {
+  let deepest: FlowNode[] = [tree];
+  while (deepest.some((n) => n.children.length > 0)) deepest = deepest.flatMap((n) => (n.children.length > 0 ? n.children : [n]));
+  const chars = Math.max(...deepest.map((n) => `${n.label} ${figureText(n, estimated)}`.length));
+  return Math.round(Math.min(most, Math.max(least, chars * 6.6 * scale + 12)));
 }
 
 export interface LNode {

@@ -2,8 +2,8 @@
 // the width it has, so the text stays the size of the page's text on a phone as well. Each meter's name opens its page.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { meterPath } from './Bars';
-import { flowTree, layoutFlow, type LNode, type VirtualParts } from './flow';
-import { formatKwh, formatMoney, type Meter, type Summary } from './lib';
+import { figureText, flowTree, labelRoom, layoutFlow, type LNode, type VirtualParts } from './flow';
+import type { Meter, Summary } from './lib';
 import { pcParts, usePcDetails } from './pcparts';
 import { uiScale } from './uiscale';
 
@@ -30,14 +30,16 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
   if (!tree || tree.kwh <= 0) return <p class="note">Nothing recorded in this period to draw.</p>;
   const narrow = width < 520;
   const scale = uiScale();
-  const layout = layoutFlow(tree, width, Math.round((narrow ? 132 : 230) * scale), scale);
+  const est = summary.cost_estimated;
+  const room = narrow ? Math.round(132 * scale) : labelRoom(tree, est, scale, 230 * scale, 380 * scale);
+  const layout = layoutFlow(tree, width, room, scale);
   const byId = new Map(meters.map((m) => [m.id, m]));
   const shade = (n: LNode) => (n.node.rest ? 'rest' : (SHADES[Math.min(n.depth, SHADES.length - 1)] ?? 'n3'));
   const href = (n: LNode) => {
     const m = n.node.meterId ? byId.get(n.node.meterId) : undefined;
     return m ? meterPath(m) : undefined;
   };
-  const figure = (n: LNode) => [formatKwh(n.node.kwh), n.node.cost != null ? formatMoney(n.node.cost, summary.cost_estimated) : ''].filter(Boolean).join(' · ');
+  const figure = (n: LNode) => figureText(n.node, est);
 
   return (
     <div ref={box} class="flow">
@@ -74,7 +76,7 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
               ) : (
                 <>
                   {label}
-                  {!narrow && <tspan class="small"> {formatKwh(n.node.kwh)}</tspan>}
+                  <tspan class="small"> {figureText(n.node, est, !narrow)}</tspan>
                 </>
               )}
             </text>

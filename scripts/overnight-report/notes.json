@@ -241,6 +241,30 @@
    "commit": "",
    "tests": "Web: the house tree with a PC and a plug on no circuit (beside the circuits, the remainder is house minus all of them and the parts add up to the house), without a whole-house clamp (root is Everything measured and includes them), once placed under a circuit (inside it, not at the top), and a plug with no figures is left out.",
    "notes": "In the demo the PC was detached from the Office circuit just for this picture, so Office's own reading still contains it and it is counted in both places; on a real setup where the PC is on no metered circuit that does not happen. If a plug really is on a metered circuit but its circuit was never chosen, it is counted beside the circuit and the remainder is understated until the circuit is chosen."
+  },
+  {
+   "id": "flow-labels",
+   "title": "Every band of the flow chart shows its dollars, and a meter that used nothing has no band",
+   "kind": "fix",
+   "summary": "Short bands used to show only their kWh (the dollars were only in the hover text), so some labels had a price and some did not. Now <strong>every band says its energy and its cost</strong>, and a meter that used nothing over the period (a welder outlet at 0.00 kWh) is <strong>not drawn at all</strong>.",
+   "details": [
+    "<strong>Why it was uneven:</strong> a band tall enough for two lines showed \"42.2 kWh \u00b7 $6.58\"; a short one had room for one line and showed only its kWh. The label now carries the cost on one line too, and the room kept for the last column's labels grows to fit the longest \"name kWh \u00b7 $\" so it is not cut off.",
+    "<strong>Zero bands:</strong> a meter with no energy over the period gets no band, inside a panel or at the top. It is still in the Hierarchy list, and still has its own page. A meter that used nothing but holds something that did is kept.",
+    "<strong>Phone width:</strong> labels show the cost alone (the kWh is in the tooltip), so they fit."
+   ],
+   "images": [
+    {
+     "path": "img/flow-labels-mcp-Claude_Browser-blob-1792890206720-huoudt.jpg",
+     "caption": "Desktop: every band says kWh and dollars."
+    },
+    {
+     "path": "img/flow-labels-mcp-Claude_Browser-blob-1792890232952-8bdzj6.jpg",
+     "caption": "Phone: the cost beside each name."
+    }
+   ],
+   "commit": "",
+   "tests": "Web: the label text (kWh and cost, cost alone, energy only when no price is known), the room for the longest label within limits, and the zero rule (no band for a meter that used nothing, inside a panel or at the top, nor for a part of nothing; a zero meter's own page still draws).",
+   "notes": "The demo has no meter at exactly zero, so the zero rule is shown by the tests, not a screenshot. On a phone the chart is crowded: the label of a tall band in the middle column can run into the labels of the column beside it, as it did before this change."
   }
  ]
 }
