@@ -166,8 +166,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         <RateNote kwh={kwh} cost={cost} />
       </section>
 
-      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
-
       {live.notes.length > 0 && (
         <section class="card warn" aria-live="polite">
           {live.notes.map((n) => (
@@ -183,6 +181,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
         </section>
       )}
+
+      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
 
       <section class="card">
         <h2>Circuits</h2>
