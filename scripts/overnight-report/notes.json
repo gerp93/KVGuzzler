@@ -117,20 +117,19 @@
    "id": "proposed",
    "title": "Not built yet: the to-do and proposed list",
    "kind": "finding",
-   "summary": "You woke up and asked me to stop and list what was left, so this is the list to review. Three of your backlog items were not started; one was designed and then taken out rather than left half done; the rest are my own ideas, in the order I would do them.",
+   "summary": "What is left after the three you picked (average current of a run, CSV export, unusual days), which are done. Charging at cheaper hours was dropped because you have no time-of-use rates yet.",
    "details": [
     "<strong>From your backlog, not built:</strong>",
-    "<strong>Data checks panel</strong> (Hierarchy tab): things that look wrong, each with a plain-language fix. Designed, not shipped. The rules I had settled on: a meter inside another that used more than its parent (a problem if it still happens in the last hour, a warning if only earlier in the week, which is what happens when clamps are paired late); the main circuits adding up to more than the house; a device that stopped answering (its meters are covered by it, not listed separately); a meter that has never recorded or stopped reporting while its device answers; a clamp reading backwards (from the server's own note); gaps of more than an hour or 5% in a week; no price saved. Pure rules in their own package so each is a test on made-up facts, the API gathers the facts. The draft is kept in the shared notes folder (<code>data-checks-draft-checks.go.txt</code>), not in the branch.",
-    "<strong>Month projection and comparison:</strong> month-to-date kWh and cost with \"at this pace: $X for the month\" on the Live page, and a \"vs the period before\" change (up or down percent) on the tiles of the Live page and a meter page. Needs a month-to-date and a previous-period query that reuse the same price schedule.",
+    "<strong>Data checks panel</strong> (Hierarchy tab): things that look wrong, each with a plain-language fix. Designed, not shipped. The rules: a meter inside another that used more than its parent (a problem if it still happens in the last hour, a warning if only earlier in the week, which is what happens when clamps are paired late); the main circuits adding up to more than the house; a device that stopped answering; a meter that has never recorded or stopped reporting while its device answers; a clamp reading backwards (from the server's own note); gaps of more than an hour or 5% in a week; no price saved. The draft is kept in the shared notes folder (<code>data-checks-draft-checks.go.txt</code>), not in the branch.",
+    "<strong>Month projection and comparison:</strong> month-to-date kWh and cost with \"at this pace: $X for the month\" on the Live page, and a \"vs the period before\" change (up or down percent) on the Live tiles and a meter page.",
     "<strong>Heat map:</strong> hour of day by weekday of average power for the house and any meter, a compact SVG on the meter page and the Live page.",
-    "<strong>My own ideas, in the order I would do them:</strong>",
-    "<strong>Cheaper charging hours:</strong> for a meter with runs (the EV), what the same runs would have cost at the cheapest hours of a time-of-use tariff. Directly useful to an EV owner and the data is already there (runs plus the looked-up tariff).",
-    "<strong>Average current of a run</strong> and the 80% rule judged on a run's length (three hours or more) rather than on the highest minute, so a short spike no longer warns.",
-    "<strong>Anomaly view:</strong> days far above that meter's usual (same weekday), with the cause (which circuit changed).",
-    "<strong>Unmetered always-on:</strong> the house floor against the floors of what is metered. In the demo it is 460 W against 40 W for the biggest meter. Floors are not additive, so it needs a careful wording, not a subtraction.",
-    "<strong>CSV export</strong> of the tree and of runs; a <strong>cost-per-day sparkline</strong> on each tree row; a <strong>weekly summary text</strong> (what you used, what it cost, what changed, the biggest run); an <strong>\"explain this number\" popover</strong>; a printable layout.",
+    "<strong>More ideas, in the order I would do them:</strong>",
+    "<strong>Unmetered always-on:</strong> the house floor against the floors of what is metered (460 W against 40 W for the biggest meter in the demo). Floors are not additive, so it needs careful wording.",
+    "<strong>Weekly summary text</strong> (what you used, what it cost, what changed, the biggest run, any unusual day), a <strong>cost-per-day sparkline</strong> on each tree row, an <strong>\"explain this number\" popover</strong>, a printable layout.",
     "<strong>Runs polish:</strong> hide the Runs card for a meter whose average run is under about ten minutes (a fridge compressor); handle a charge that crosses midnight in the simulator.",
-    "<strong>Keyboard and screen-reader pass</strong> of the Hierarchy tab and the flow chart; performance with many meters (each page asks the server once per meter today)."
+    "<strong>Unusual days:</strong> recognise a long absence (a trip) so the first normal day after it is not flagged.",
+    "<strong>Keyboard and screen-reader pass</strong> of the Hierarchy tab and the flow chart; performance with many meters (each page asks the server once per meter today).",
+    "<strong>Dropped:</strong> charging at cheaper hours (needs a time-of-use tariff; you have one rate)."
    ],
    "images": [],
    "commit": "",
@@ -201,6 +200,27 @@
    "commit": "",
    "tests": "Go: the tree order (mains first, children after their parent, a meter whose parent is hidden at the top, a loop cannot repeat a meter, the mains is never inside anything); the runs CSV (header, all three charges, exact first row, file name, 404); the meters CSV parsed with a CSV reader (order, path, inside count, breaker, the meter's own kWh, a formula-looking label written as text). Contract paths validate.",
    "notes": "Not verified: opening the files in Excel or Sheets (the format follows the existing exports, which were). The file name uses the server's local dates. The download buttons are plain links, so they cannot show an error: a bad request would save an error file."
+  },
+  {
+   "id": "anomalies",
+   "title": "Unusual days: when the house or a meter used far more than it usually does",
+   "kind": "insight",
+   "summary": "An <strong>Unusual days</strong> card on the Live page and on each meter's page: the days that used far more than that kind of day usually does, with how much more, what the extra cost and <strong>which meter caused it</strong>. In the demo house: <em>Thu 15 Oct, HVAC: 54.7 kWh instead of the usual 29.2, 25.5 kWh more, about $4.04</em> (a hot day).",
+   "details": [
+    "<strong>How a day is judged:</strong> against the middle (median) of the same kind of day, a weekday or a weekend day, over the four weeks before it. A house that always uses more on a Saturday is not unusual on a Saturday. It must be unusual three ways at once: at least 1.5 times the usual, at least 3.5 typical swings above it (so a noisy meter's ordinary ups and downs are not reported), and at least 1 kWh more for the house or 0.3 kWh for a meter (so a meter that uses almost nothing does not flag on a small blip). With fewer than four earlier days of that kind it says nothing, and today is never judged because it is still going.",
+    "<strong>No double counting:</strong> if the garage panel and the EV charger inside it are both unusual on the same day, only the biggest holder is listed (the house if it was unusual, else the panel) and the charger is named as the cause (<em>Mostly EV charger +30 kWh</em>). The causes are already part of the figure; they are never added to it. A meter's own page lists its own unusual days even when something that holds it explains them.",
+    "<strong>API:</strong> <code>GET /api/v1/anomalies?days=30&amp;meter_id=</code>, a pure <code>anomaly</code> package for the rule, contract schemas and an example.",
+    "<strong>On the Live page</strong> it says so when nothing was unusual in 30 days; on a meter's page the card is left out when there is nothing to say."
+   ],
+   "images": [
+    {
+     "path": "img/anomalies-mcp-Claude_Browser-blob-1792888290696-u7c89x.jpg",
+     "caption": "The Live page: the demo house's one unusual day in the last 30, an HVAC day on a hot afternoon."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: the rule (a spike is found with its extra, a steady weekly pattern is not unusual, a noisy meter's ordinary swings are not, small extras and too little history say nothing, today and days with no data are never judged, the biggest extra first) and the API on 40 made-up days (the house day lists the charger as its cause and the garage panel is not listed again, the fridge is listed alone, a meter's page gets its own, days validated). Web: wording helpers. Contract example validates.",
+   "notes": "Not verified on your real house, which has only recently had its clamps and little history: with fewer than four earlier days of a kind nothing is said, so for the first weeks the card will say there is nothing unusual. The demo's history is made up and only three weeks long. Holidays and trips (a week of low use, then back to normal) are not recognised as such: the first normal day after a long absence can look high if the absence filled most of the four weeks."
   }
  ]
 }

@@ -67,6 +67,9 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   (`amps.ts`, `breakerVerdict`) a run of 3 h+ whose average current (`minutes.avg_a`) was 80% of the breaker or more is the warning; a single high minute is only a note when the meter's runs are known; above 100% always warns.
 - **CSV exports of the runs and the tree** (`export_tables.go`): `GET /meters/{id}/runs.csv` lists every run (the JSON lists the newest 500) through the same `computeRuns` as the card, and `GET /tree.csv` lists every shown
   meter in Hierarchy order with `inside_count`; a parent's row contains its children's, so those rows are never meant to be added. Labels go through `csvCell` (nothing runs as a formula).
+- **Unusual days** (`server/internal/anomaly`, `GET /api/v1/anomalies`, `web/src/AnomalyCard.tsx`): a complete local day is unusual when it is far above the median of the same kind of day (weekday or weekend) over the 4 weeks before it,
+  by three measures at once (1.5x the usual, 3.5 typical swings, and at least 1 kWh for the house / 0.3 kWh for a meter more); under 4 earlier days of the kind says nothing, today is never judged. A meter whose day is explained by
+  something that holds it being unusual the same day is **named as a cause, not listed again**, and causes are already in the figure, never added to it.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

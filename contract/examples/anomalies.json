@@ -1,0 +1,31 @@
+{
+  "from": "2026-09-24",
+  "to": "2026-10-23",
+  "days": [
+    {
+      "date": "2026-10-19",
+      "meter_id": null,
+      "label": "House",
+      "kwh": 52.4,
+      "usual_kwh": 21.8,
+      "extra_kwh": 30.6,
+      "extra_cost": "4.83",
+      "ratio": 2.4,
+      "causes": [
+        { "meter_id": "refoss-em16p-1:ch-03", "label": "EV charger", "extra_kwh": 24.9 },
+        { "meter_id": "refoss-em16p-1:ch-11", "label": "Workshop", "extra_kwh": 3.1 }
+      ]
+    },
+    {
+      "date": "2026-10-11",
+      "meter_id": "refoss-em16p-1:ch-06",
+      "label": "Fridge",
+      "kwh": 3.1,
+      "usual_kwh": 1.5,
+      "extra_kwh": 1.6,
+      "extra_cost": "0.25",
+      "ratio": 2.07,
+      "causes": []
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
 import type { ApplianceGroup, CarbonConfig, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { MeterRuns } from './runs';
 
@@ -119,6 +120,8 @@ export const api = {
   removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
   houseHistory: () => request<HouseHistory>('api/v1/history'),
   houseEstimate: (window: string) => request<ComputerEstimate>(`api/v1/estimate?${q({ window })}`),
+  /** The days the house or a meter used far more than usual (the last `days` complete days). */
+  anomalies: (days: number, meterId?: string) => request<Anomalies>(`api/v1/anomalies?${q({ days: String(days), meter_id: meterId })}`),
   /** Where a meter's runs can be downloaded as a CSV, and every meter in tree order (plain links: the browser saves them). */
   runsExportUrl: (meterId: string, from: string, to: string) => `api/v1/meters/${encodeURIComponent(meterId)}/runs.csv?${q({ from, to })}`,
   treeExportUrl: (from: string, to: string) => `api/v1/tree.csv?${q({ from, to })}`,

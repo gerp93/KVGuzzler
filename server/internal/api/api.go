@@ -73,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs", s.meterRuns)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs.csv", s.runsExport)
 	mux.HandleFunc("GET /api/v1/tree.csv", s.treeExport)
+	mux.HandleFunc("GET /api/v1/anomalies", s.anomalies)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/baseload", s.meterBaseLoad)
 	mux.HandleFunc("GET /api/v1/baseload", s.houseBaseLoad)
 	mux.HandleFunc("GET /api/v1/live", s.live)

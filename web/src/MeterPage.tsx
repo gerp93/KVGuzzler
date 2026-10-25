@@ -7,6 +7,7 @@ import { Chart, lineFrom, type Line } from './Chart';
 import { FlowChart } from './FlowChart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
+import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { CurrentCard } from './Breaker';
 import { RateNote } from './RateNote';
@@ -129,6 +130,8 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
       {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
 
       {meter && <BaseLoadCard meterId={id} period={period as PeriodKey} />}
+
+      {meter && <AnomalyCard meterId={id} quiet />}
 
       {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
 
