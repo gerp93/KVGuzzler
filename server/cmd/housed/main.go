@@ -124,7 +124,7 @@ func seedSimHistory(ctx context.Context, st *store.Store, src *sim.Source, days 
 	return sim.History(ctx, time.Now(), days, func(rows []sim.MinuteRow) error {
 		out := make([]store.MinuteRow, len(rows))
 		for i, r := range rows {
-			out[i] = store.MinuteRow{MeterID: r.MeterID, Minute: r.Minute, AvgW: r.AvgW, MaxW: r.MaxW, Seconds: r.Seconds, MaxA: r.MaxA}
+			out[i] = store.MinuteRow{MeterID: r.MeterID, Minute: r.Minute, AvgW: r.AvgW, MaxW: r.MaxW, Seconds: r.Seconds, MaxA: r.MaxA, AvgA: r.AvgA}
 		}
 		return st.AddMinutes(ctx, out)
 	})

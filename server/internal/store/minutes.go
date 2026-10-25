@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 // MeterMinutes is every recorded minute of one meter in [from, to), in time order, for finding the times it was working (package runs).
 func (s *Store) MeterMinutes(ctx context.Context, meterID string, from, to time.Time) ([]runs.Point, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT minute, avg_w, max_w, seconds FROM minutes
+	rows, err := s.db.QueryContext(ctx, `SELECT minute, avg_w, max_w, seconds, avg_a, max_a FROM minutes
 WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`, meterID, from.Unix(), to.Unix())
 	if err != nil {
 		return nil, err
@@ -20,10 +21,18 @@ WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`, meterID, fro
 	for rows.Next() {
 		var t int64
 		var p runs.Point
-		if err := rows.Scan(&t, &p.AvgW, &p.MaxW, &p.Seconds); err != nil {
+		var avgA, maxA sql.NullFloat64
+		if err := rows.Scan(&t, &p.AvgW, &p.MaxW, &p.Seconds, &avgA, &maxA); err != nil {
 			return nil, err
 		}
 		p.Minute = time.Unix(t, 0).UTC()
+		if avgA.Valid {
+			p.AvgAmps, p.HaveAmps = avgA.Float64, true
+			p.MaxAmps = maxA.Float64
+			if !maxA.Valid {
+				p.MaxAmps = avgA.Float64
+			}
+		}
 		out = append(out, p)
 	}
 	return out, rows.Err()

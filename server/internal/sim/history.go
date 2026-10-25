@@ -14,6 +14,7 @@ type MinuteRow struct {
 	Seconds float64
 	// MaxA is the highest current of the minute (nil when the reading has none).
 	MaxA *float64
+	AvgA *float64
 }
 
 // History is what the simulated house would have recorded each minute from `days` days before `end` up to `end` (the start of a minute), so a demo has
@@ -38,8 +39,8 @@ func History(ctx context.Context, end time.Time, days int, add func([]MinuteRow)
 		for _, r := range at(t.Add(30 * time.Second)) {
 			row := MinuteRow{MeterID: r.MeterID, Minute: t, AvgW: r.Watts, MaxW: r.Watts * 1.03, Seconds: 60}
 			if r.Amps != nil {
-				a := *r.Amps * 1.03
-				row.MaxA = &a
+				a, avg := *r.Amps*1.03, *r.Amps
+				row.MaxA, row.AvgA = &a, &avg
 			}
 			batch = append(batch, row)
 		}

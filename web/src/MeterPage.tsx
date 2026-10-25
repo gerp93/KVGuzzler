@@ -126,11 +126,11 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
         </section>
       )}
 
-      {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} />}
+      {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
 
       {meter && <BaseLoadCard meterId={id} period={period as PeriodKey} />}
 
-      {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} />}
+      {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
 
       {data && data.lines.length > 0 && (
         <section class="card wide">

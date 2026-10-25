@@ -17,6 +17,9 @@ type Point struct {
 	AvgW    float64
 	MaxW    float64
 	Seconds float64
+	// AvgAmps and MaxAmps are the current of the minute, when the meter reports one (HaveAmps).
+	AvgAmps, MaxAmps float64
+	HaveAmps         bool
 }
 
 // Run is one stretch of the meter working.
@@ -27,6 +30,9 @@ type Run struct {
 	KWh       float64   `json:"kwh"`
 	AvgWatts  float64   `json:"avg_watts"`
 	PeakWatts float64   `json:"peak_watts"`
+	// AvgAmps is the current over the run, weighted by the time it was reported; PeakAmps the highest minute's. Null when the meter reports none.
+	AvgAmps  *float64 `json:"avg_amps"`
+	PeakAmps *float64 `json:"peak_amps"`
 }
 
 // Defaults for Detect.
@@ -51,7 +57,7 @@ func percentile(sorted []float64, p float64) float64 {
 }
 
 // Threshold picks the level above which a minute counts as working: a quarter of the way from the meter's resting power (its 10th percentile) up to
-// its working power (its 95th), never below 10 W. A meter that barely changes has no such level: +Inf, so nothing in it is a run.
+// its working power (its 99th, so a meter that works only a few percent of the time, a water heater, still has one), never below 10 W. A meter that barely changes has no such level: +Inf, so nothing in it is a run.
 func Threshold(points []Point) float64 {
 	vals := make([]float64, 0, len(points))
 	for _, p := range points {
@@ -63,7 +69,7 @@ func Threshold(points []Point) float64 {
 		return math.Inf(1)
 	}
 	sort.Float64s(vals)
-	base, peak := percentile(vals, 0.10), percentile(vals, 0.95)
+	base, peak := percentile(vals, 0.10), percentile(vals, 0.99)
 	if peak-base < minSpread {
 		return math.Inf(1)
 	}
@@ -98,10 +104,19 @@ func Detect(points []Point, threshold float64, gapMinutes, minMinutes int) []Run
 	var out []Run
 	for _, s := range spans {
 		r := Run{Start: points[s.first].Minute}
-		var ws float64
+		var ws, aWs, aSecs, aPeak float64
 		for _, p := range points[s.first : s.last+1] {
 			ws += p.AvgW * p.Seconds
 			r.PeakWatts = math.Max(r.PeakWatts, p.MaxW)
+			if p.HaveAmps && p.Seconds > 0 {
+				aWs += p.AvgAmps * p.Seconds
+				aSecs += p.Seconds
+				aPeak = math.Max(aPeak, p.MaxAmps)
+			}
+		}
+		if aSecs > 0 {
+			avg, peak := aWs/aSecs, aPeak
+			r.AvgAmps, r.PeakAmps = &avg, &peak
 		}
 		last := points[s.last].Minute
 		r.End = last.Add(time.Minute)

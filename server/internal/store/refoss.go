@@ -149,12 +149,13 @@ func (s *Store) mergeLegHistory(ctx context.Context, ownerID, legID string) erro
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a)
-SELECT ?, minute, avg_w, max_w, seconds, max_a FROM minutes WHERE meter_id = ?
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a, avg_a)
+SELECT ?, minute, avg_w, max_w, seconds, max_a, avg_a FROM minutes WHERE meter_id = ?
 ON CONFLICT(meter_id, minute) DO UPDATE SET
   avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / max(seconds, excluded.seconds),
   max_w   = max_w + excluded.max_w,
   max_a   = CASE WHEN max_a IS NULL THEN excluded.max_a WHEN excluded.max_a IS NULL THEN max_a ELSE max(max_a, excluded.max_a) END,
+  avg_a   = CASE WHEN avg_a IS NULL THEN excluded.avg_a WHEN excluded.avg_a IS NULL THEN avg_a ELSE max(avg_a, excluded.avg_a) END,
   seconds = max(seconds, excluded.seconds)`, ownerID, legID); err != nil {
 		return err
 	}

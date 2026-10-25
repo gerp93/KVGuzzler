@@ -1,6 +1,6 @@
 // Current and breakers: the card on a meter's page (what it draws in amps now and at most, and how much of its breaker that is) and the field in the
 // Hierarchy tab's wiring panel where the breaker's size is said. A 240 V pair's current is the larger leg's, never the two added (the server says so).
-import { breakerAdvice, breakerLevel, breakerOptions, breakerPercent, formatAmps, formatVolts } from './amps';
+import { breakerOptions, breakerPercent, breakerVerdict, formatAmps, formatVolts, type RunCurrent } from './amps';
 import type { Meter } from './lib';
 import { routePath } from './route';
 
@@ -10,16 +10,16 @@ interface Now {
 }
 
 /** What the meter draws in amps right now and at most over the period, and how much of its breaker that is. Hidden for a meter that reports no current. */
-export function CurrentCard({ meter, now, peakAmps }: { meter: Meter; now: Now; peakAmps: number | null | undefined }) {
+export function CurrentCard({ meter, now, peakAmps, runs }: { meter: Meter; now: Now; peakAmps: number | null | undefined; runs: RunCurrent[] | null }) {
   if (now.amps == null && peakAmps == null) return null;
   const breaker = meter.breaker_amps ?? null;
   const nowPct = breakerPercent(now.amps, breaker);
   const peakPct = breakerPercent(peakAmps, breaker);
-  const level = breakerLevel(peakPct);
-  const advice = breakerAdvice(peakPct, breaker);
+  const verdict = breakerVerdict(peakPct, runs, breaker);
+  const level = verdict.level;
   const settable = meter.scope === 'circuit';
   return (
-    <section class={`card${level && level !== 'ok' ? ' warn' : ''}`}>
+    <section class={`card${level === 'sustained' || level === 'over' ? ' warn' : ''}`}>
       <h2>Current</h2>
       <div class="stats three">
         <div class="stat">
@@ -38,12 +38,12 @@ export function CurrentCard({ meter, now, peakAmps }: { meter: Meter; now: Now; 
         </div>
       </div>
       {peakPct != null && (
-        <div class={`breaker-bar ${level ?? ''}`} role="img" aria-label={`The highest current was ${peakPct}% of the breaker`}>
+        <div class={`breaker-bar ${level === 'sustained' ? 'high' : level === 'over' ? 'over' : ''}`} role="img" aria-label={`The highest current was ${peakPct}% of the breaker`}>
           <i style={{ width: `${Math.min(100, peakPct)}%` }} />
           <b style={{ left: '80%' }} aria-hidden="true" />
         </div>
       )}
-      {advice && <p class="breaker-warning">{advice}</p>}
+      {verdict.text && <p class={level === 'brief' ? 'caption' : 'breaker-warning'}>{verdict.text}</p>}
       {breaker == null && settable && (
         <p class="caption">
           Say how big its breaker is (open its row in the <a href={routePath('hierarchy')}>Hierarchy tab</a>, then Breaker size) to see how much of it is used.

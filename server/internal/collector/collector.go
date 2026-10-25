@@ -29,6 +29,8 @@ type acc struct {
 	// maxA is the highest current seen in the minute; haveA says whether the meter reported one at all.
 	maxA  float64
 	haveA bool
+	// aWs and aSecs are the current times the seconds it was reported for, so its average is over the time it was reported, not the whole minute.
+	aWs, aSecs float64
 }
 
 type state struct {
@@ -235,6 +237,8 @@ func (c *Collector) step(ctx context.Context, st *state, t time.Time) {
 		}
 		if r.Amps != nil && *r.Amps >= 0 {
 			a.maxA, a.haveA = math.Max(a.maxA, *r.Amps), true
+			a.aWs += *r.Amps * dt
+			a.aSecs += dt
 		}
 	}
 }
@@ -249,11 +253,15 @@ func (c *Collector) flushLocked(ctx context.Context, st *state) {
 	for id, a := range st.acc {
 		if a.secs > 0 {
 			// A failed write is not retried: the minute is lost rather than counted twice.
-			var amps *float64
+			var maxA, avgA *float64
 			if a.haveA {
-				amps = &a.maxA
+				maxA = &a.maxA
+				if a.aSecs > 0 {
+					avg := a.aWs / a.aSecs
+					avgA = &avg
+				}
 			}
-			_ = c.store.AddMinuteAmps(ctx, id, time.Unix(st.minute, 0), a.ws/a.secs, a.max, amps, a.secs)
+			_ = c.store.AddMinuteCurrent(ctx, id, time.Unix(st.minute, 0), a.ws/a.secs, a.max, avgA, maxA, a.secs)
 		}
 	}
 	st.acc = map[string]*acc{}

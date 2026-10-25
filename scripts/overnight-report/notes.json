@@ -151,6 +151,31 @@
    "commit": "",
    "tests": "",
    "notes": "Not verified: both branches running together. I did not merge either into the other."
+  },
+  {
+   "id": "run-current",
+   "title": "Average current of a run, and a breaker warning that looks at how long a load lasted",
+   "kind": "feature",
+   "summary": "Each run now shows its <strong>average current</strong>, and the breaker warning is judged the way the 80% rule is written: by <strong>runs of three hours or more</strong>, not by one high minute. A charger that averaged 84% of a 35 A breaker for 6.6 hours is warned about; a water heater that peaked at 97% for 40 minutes is only mentioned.",
+   "details": [
+    "<strong>Storage:</strong> the average current of each minute is kept next to its highest (a new nullable <code>avg_a</code> column, additive; a minute written in pieces merges by time, and a meter that reports no current has none, never 0 A). History written before this has no average current, so only runs from now on carry one.",
+    "<strong>On a run:</strong> <code>avg_amps</code> (over the time the current was reported) and <code>peak_amps</code> on each run in <code>/meters/{id}/runs</code>. The Runs card shows it beside each run's length, and the summary line says what is typical (<em>typically 29.2 A, 84% of the 35 A breaker</em>).",
+    "<strong>The warning:</strong> a run of 3 hours or more whose average was 80% of the breaker or above is a warning and its length is underlined; above 100% at any minute is always a warning; a high minute with no such run is a neutral note. For a meter with no runs (one that does not work in stretches) it falls back to the highest minute.",
+    "<strong>A bug this found:</strong> run detection learned the \"working\" level from the 95th percentile of a meter's minutes, so a meter that works under 5% of the time (the demo's water heater, 1.2 hours a day) was called steady and got no Runs card at all. It now uses the 99th; a test covers a meter that works 2% of the time."
+   ],
+   "images": [
+    {
+     "path": "img/run-current-mcp-Claude_Browser-blob-1792887727690-qjs1e7.jpg",
+     "caption": "The EV charger with its breaker set to 35 A: long runs averaged 84% of it, so they are underlined and the card warns."
+    },
+    {
+     "path": "img/run-current-mcp-Claude_Browser-blob-1792887794459-didzy8.jpg",
+     "caption": "The water heater on a 20 A breaker: it reached 97% but only in 40-minute runs, so it is a note, not a warning. It now has a Runs card."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: the run's average current weighted by time and nil without any (runs package), the minute merge and MeterMinutes (store), the API's avg_amps and peak_amps (and null for a meter with no current), a meter that works 2% of the time has a level. Web: the verdict rules, the longest run that breaks the 80% rule, typical current. Contract example validates.",
+   "notes": "Not verified on a real Refoss or a real car. A charge that tapers in many steps and drops below the working level for more than 5 minutes is split into several runs and may then look shorter than 3 hours. Currents before this change are not backfilled."
   }
  ]
 }
