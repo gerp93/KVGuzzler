@@ -4,12 +4,13 @@ import { Chart, lineFrom, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { EnergyHistory } from './EnergyHistory';
 import { Estimator } from './Estimator';
+import { Kpi, KpiRow } from './Kpi';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
 import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
-  COUNT_PC, carbonNote, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, toggleCount,
+  COUNT_PC, carbonNote, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, periodWords, toggleCount,
   type Meter, type MeterSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
@@ -105,59 +106,49 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
 
       {detail && (
         <>
-          <section class="card hero">
-            <div class="row">
-              <h2>{detail.computer.name}</h2>
-              <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          <header class="page-head">
+            <div>
+              <h2 class="page-title">{detail.computer.name}</h2>
             </div>
-            <div class="stats">
-              <div class="stat">
-                <span class="caption">Energy</span>
-                <p class="big small">{(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'}</p>
-              </div>
-              <div class="stat">
-                <span class="caption">Cost</span>
-                <p class="big small">{(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'}</p>
-              </div>
-              <div class="stat">
-                <span class="caption">Right now</span>
-                <p class="big small">{nowWatts != null ? formatWatts(nowWatts) : '—'}</p>
-              </div>
-              <div class="stat">
-                <span class="caption">Max draw</span>
-                <p class="big small">{peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'}</p>
-              </div>
-            </div>
-            {hasPlugs && (
-              <div class="count" role="group" aria-label="What to count">
-                <span class="caption">Count:</span>
-                {detail.wall && (
-                  <label>
-                    <input type="checkbox" checked={!off.has(COUNT_PC)} onChange={() => toggle(COUNT_PC)} /> PC
-                  </label>
-                )}
-                {detail.peripherals.map((p) => (
-                  <label key={p.meter_id}>
-                    <input type="checkbox" checked={!off.has(p.meter_id)} onChange={() => toggle(p.meter_id)} /> {label(p.meter_id)}
-                  </label>
-                ))}
-              </div>
-            )}
-            <p class="caption">
-              {hasPlugs
-                ? counted && counted.parts.length > 0
-                  ? `Counting ${counted.parts.join(', ')}. Each is measured on its own plug; the PC's figure does not include the others.${peakIsBound ? ' The highest draw is an upper bound: the parts need not peak together.' : ''}`
-                  : 'Nothing is counted: tick the PC or a plug above.'
-                : detail.wall
-                  ? 'The whole PC at the wall.'
-                  : 'No plug is tied to this computer yet. Tie its wall plug to it under Computers in the Hierarchy tab.'}
-              {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
-            </p>
-            {counted && carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh) && (
-              <p class="caption">{carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)}</p>
-            )}
-            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
-          </section>
+            <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          </header>
+          <KpiRow>
+            <Kpi tone="now" label="Right now" value={nowWatts != null ? formatWatts(nowWatts) : '—'} />
+            <Kpi tone="energy" label="Energy" value={(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'} hint={periodWords(period as PeriodKey)} />
+            <Kpi tone="cost" label="Cost" value={(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
+            <Kpi tone="peak" label="Highest draw" value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'} hint={peakIsBound ? 'an upper bound' : 'the most in one reading'} />
+          </KpiRow>
+          <div class="kpi-notes">
+            {hasPlugs && (
+              <div class="count" role="group" aria-label="What to count">
+                <span class="caption">Count:</span>
+                {detail.wall && (
+                  <label>
+                    <input type="checkbox" checked={!off.has(COUNT_PC)} onChange={() => toggle(COUNT_PC)} /> PC
+                  </label>
+                )}
+                {detail.peripherals.map((p) => (
+                  <label key={p.meter_id}>
+                    <input type="checkbox" checked={!off.has(p.meter_id)} onChange={() => toggle(p.meter_id)} /> {label(p.meter_id)}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p class="caption">
+              {hasPlugs
+                ? counted && counted.parts.length > 0
+                  ? `Counting ${counted.parts.join(', ')}. Each is measured on its own plug; the PC's figure does not include the others.${peakIsBound ? ' The highest draw is an upper bound: the parts need not peak together.' : ''}`
+                  : 'Nothing is counted: tick the PC or a plug above.'
+                : detail.wall
+                  ? 'The whole PC at the wall.'
+                  : 'No plug is tied to this computer yet. Tie its wall plug to it under Computers in the Hierarchy tab.'}
+              {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
+            </p>
+            {counted && carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh) && (
+              <p class="caption">{carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)}</p>
+            )}
+            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
+          </div>
 
           {liveNow && <PcLiveCard live={liveNow} />}
 

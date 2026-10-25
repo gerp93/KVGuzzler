@@ -642,7 +642,6 @@ select:focus-visible {
 
   main > .hero,
   main > .wide,
-  main > .band > .wide,
   .tree-layout .wide,
   main > .chips,
   main > .warn,
@@ -1449,23 +1448,6 @@ main:has(> .page-narrow) {
   }
 }
 
-/* The live page's bands and the hero's notes are only groupings: on a small screen they have no box of their own */
-.band,
-.hero-notes {
-  display: contents;
-}
-
-/* In two columns the circuits list is the tall card: it runs down two rows, so what comes next fills the space beside it instead of leaving a hole */
-@media (min-width: 720px) and (max-width: 1799px) {
-  main.page-live {
-    grid-auto-flow: row dense;
-  }
-
-  main.page-live .circuits-card {
-    grid-row: span 2;
-  }
-}
-
 /* A page arrives, it does not jump */
 main > * {
   animation: rise 0.28s ease-out both;
@@ -1548,71 +1530,6 @@ main > * {
     gap: 16px;
     max-width: none;
     padding: 20px 40px 48px;
-  }
-
-  /* The live page, in the order a person reads it: the figures that matter at the top, over time beside what draws it, where it goes beside what never
-     stops, then the smaller tools in a row that fills the width. Each band's cards are as tall as the tallest of them, so no card sits in a box of
-     empty space. */
-  main.page-live > .hero {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-    column-gap: 4rem;
-    align-items: center;
-  }
-
-  main.page-live > .hero > .row,
-  main.page-live > .hero > .hero-notes {
-    grid-column: 1 / -1;
-  }
-
-  main.page-live > .hero > .livefig {
-    grid-column: 1;
-  }
-
-  main.page-live > .hero > .insight {
-    grid-column: 1;
-    margin: 0;
-  }
-
-  main.page-live > .hero > .stats {
-    grid-column: 2;
-    grid-row: 2 / span 2;
-    padding-top: 0;
-    border-top: 0;
-  }
-
-  main.page-live > .hero .stats .big.small {
-    font-size: 2.6rem;
-  }
-
-  .band {
-    grid-column: 1 / -1;
-    display: grid;
-    gap: 16px;
-    align-items: stretch;
-    min-width: 0;
-  }
-
-  .band:empty {
-    display: none;
-  }
-
-  /* The narrower column must stay wide enough for a list row to be one line (the rows restack below about 34rem), so it is two fifths until the
-     screen is very wide. */
-  .band-main,
-  .band-flow {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  }
-
-  .band-tiles {
-    grid-template-columns: repeat(auto-fit, minmax(25rem, 1fr));
-  }
-
-  main > .band > .card,
-  main > .band > .wide {
-    grid-column: auto;
-    min-width: 0;
   }
 
   .top .conn {
@@ -1714,18 +1631,22 @@ main > * {
   main.page-hierarchy-meter > *,
   main.page-hierarchy-computer > *,
   main.page-hierarchy-group > * {
-    display: block;
-    width: 100%;
     margin: 0 0 16px;
     break-inside: avoid;
   }
 
-  main.page-hierarchy-meter > .hero,
-  main.page-hierarchy-computer > .hero,
-  main.page-hierarchy-group > .hero,
   main.page-hierarchy-meter > .back,
   main.page-hierarchy-computer > .back,
   main.page-hierarchy-group > .back,
+  main.page-hierarchy-meter > .page-head,
+  main.page-hierarchy-computer > .page-head,
+  main.page-hierarchy-group > .page-head,
+  main.page-hierarchy-meter > .kpis,
+  main.page-hierarchy-computer > .kpis,
+  main.page-hierarchy-group > .kpis,
+  main.page-hierarchy-meter > .kpi-notes,
+  main.page-hierarchy-computer > .kpi-notes,
+  main.page-hierarchy-group > .kpi-notes,
   main.page-hierarchy-meter > .warn,
   main.page-hierarchy-computer > .warn,
   main.page-hierarchy-group > .warn,
@@ -1733,35 +1654,6 @@ main > * {
   main.page-hierarchy-computer > .note,
   main.page-hierarchy-group > .note {
     column-span: all;
-  }
-
-  /* The hero is a strip: the figures on the left, what they mean on the right */
-  main.page-hierarchy-meter > .hero,
-  main.page-hierarchy-computer > .hero,
-  main.page-hierarchy-group > .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    column-gap: 4rem;
-    align-items: center;
-  }
-
-  main.page-hierarchy-meter > .hero > .row,
-  main.page-hierarchy-computer > .hero > .row,
-  main.page-hierarchy-group > .hero > .row {
-    grid-column: 1 / -1;
-  }
-
-  main.page-hierarchy-meter > .hero > .stats,
-  main.page-hierarchy-computer > .hero > .stats,
-  main.page-hierarchy-group > .hero > .stats {
-    grid-column: 1;
-    grid-row: 2 / span 6;
-  }
-
-  main.page-hierarchy-meter > .hero > :not(.row):not(.stats),
-  main.page-hierarchy-computer > .hero > :not(.row):not(.stats),
-  main.page-hierarchy-group > .hero > :not(.row):not(.stats) {
-    grid-column: 2;
   }
 
   /* History: the chart takes the width and the list of meters to compare is a column of its own as tall as the chart, so there is no hole under it */
@@ -1819,11 +1711,6 @@ main > * {
   main.page-hierarchy-computer,
   main.page-hierarchy-group {
     column-count: 3;
-  }
-
-  .band-main,
-  .band-flow {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 
   :root {

@@ -47,3 +47,29 @@ const ICONS = {
 export function TabIcon({ name }: { name: keyof typeof ICONS }) {
   return ICONS[name];
 }
+
+// Small icons for the figure tiles: smaller than the tab bar's, in the text colour.
+const FIGURES = {
+  now: <path d="M13 2 4 14h7l-1 8 9-12h-7z" />,
+  energy: (
+    <>
+      <rect x="3" y="8" width="16" height="9" rx="2" />
+      <path d="M21 11v3M7 11v3M11 11v3" />
+    </>
+  ),
+  cost: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M14.5 9.2c-.4-.8-1.4-1.2-2.5-1.2-1.4 0-2.5.7-2.5 1.8s1 1.6 2.5 2 2.5.9 2.5 2-1.1 1.9-2.5 1.9c-1.2 0-2.2-.5-2.6-1.4M12 6.5V8m0 8v1.5" />
+    </>
+  ),
+  peak: <path d="M3 17 9 11l4 4 8-9M15 6h6v6" />,
+};
+
+export function FigureIcon({ name }: { name: keyof typeof FIGURES }) {
+  return (
+    <svg class="kpi-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {FIGURES[name]}
+    </svg>
+  );
+}

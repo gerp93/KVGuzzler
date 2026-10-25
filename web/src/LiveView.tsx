@@ -7,18 +7,20 @@ import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
 import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
-import { Chart, lineFrom, type Line } from './Chart';
+import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
+import { Kpi, KpiRow } from './Kpi';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
+import { measuredTotals, topLevelMeters } from './measured';
 import { Skeleton } from './Skeleton';
 import { Spark, useTrail } from './Spark';
 import { routePath } from './route';
 import { RateNote } from './RateNote';
 import {
-  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, pcSlices, sumByTime, unmetered,
+  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, periodWords, pcSlices, sumByTime, unmetered,
   type Meter, type Live, type PeriodKey, type Summary,
 } from './lib';
 
@@ -62,23 +64,30 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const [period, setPeriod] = useStored('period', '24h');
   const { data: live, error } = usePoll<Live>(api.live, 2000, []);
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
-  const trail = useTrail(live?.house_watts, live?.time);
+  // With whole-house clamps the page is the house. Without them nothing says what the whole house used, so it adds up what is measured at the top of the
+  // tree ("Everything measured") and says so, instead of showing dashes.
+  const whole = mains.length > 0;
+  const subjects = whole ? mains : topLevelMeters(meters);
+  const nowWatts = whole ? live?.house_watts : measuredTotals(meters, undefined, live?.readings ?? []).watts;
+  const trail = useTrail(nowWatts, live?.time);
+  const title = whole ? 'House' : 'Everything measured';
 
-  // The period's figures change slowly: read them once a minute, and when the period or the clamps change.
+  // The period's figures change slowly: read them once a minute, and when the period or the meters change.
   const { data: figures } = usePoll<Period>(
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
-      const [summary, series] = await Promise.all([api.summary(from, to), Promise.all(mains.map((m) => api.series(m.id, from, to)))]);
+      const [summary, series] = await Promise.all([api.summary(from, to), Promise.all(subjects.map((m) => api.series(m.id, from, to)))]);
       const points = series.length > 0 ? sumByTime(series) : [];
       return {
         summary,
-        // The house line is the mains legs added together, the one sum that is sound; every other meter keeps to its own row.
-        line: points.length > 0 ? lineFrom('House', '--color-text', points) : undefined,
+        // The line is the mains legs added together (or, without them, the top-level meters added together): the sums that are sound. Every other
+        // meter keeps to its own row.
+        line: points.length > 0 ? lineFrom(title, '--color-text', points) : undefined,
         domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] as [number, number],
       };
     },
     60_000,
-    [period, mains.map((m) => m.id).join(',')],
+    [period, subjects.map((m) => m.id).join(',')],
   );
 
   if (!live) return error ? <p class="note">{`Waiting for the server: ${error.message}`}</p> : <Skeleton />;
@@ -111,63 +120,27 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const scale = house ?? Math.max(0, ...circuits.map((r) => r.watts), ...pc.map((r) => r.watts));
 
   const summary = figures?.summary;
-  const kwh = summary?.house_kwh ?? null;
-  const cost = summary?.house_cost ?? null;
-  const peak = summary?.house_peak_watts ?? null;
-  const carbon = carbonNote(summary?.house_carbon_g, kwh, summary?.house_carbon_estimated_kwh ?? 0);
+  const measured = measuredTotals(meters, summary, live.readings);
+  const kwh = whole ? (summary?.house_kwh ?? null) : measured.kwh;
+  const cost = whole ? (summary?.house_cost ?? null) : measured.cost;
+  const peak = whole ? (summary?.house_peak_watts ?? null) : measured.peakWatts;
+  const carbon = whole ? carbonNote(summary?.house_carbon_g, kwh, summary?.house_carbon_estimated_kwh ?? 0) : null;
+  const span = periodWords(period as PeriodKey);
 
   return (
     <>
-      <section class="card hero">
-        <div class="row">
-          <h2>House</h2>
-          <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+      <header class="page-head">
+        <div>
+          <h2 class="page-title">{title}</h2>
+          {top && top.watts > 0 && (
+            <p class="page-sub">
+              Biggest circuit right now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, {formatWatts(top.watts)}
+              {nowWatts != null && nowWatts > 0 ? ` (${Math.round((top.watts / nowWatts) * 100)}% of the total)` : ''}
+            </p>
+          )}
         </div>
-        <div class="livefig">
-          <div>
-            <span class="caption">
-              <i aria-hidden="true" />
-              Right now
-            </span>
-            <p class="big">{formatWatts(house)}</p>
-          </div>
-          <Spark values={trail} label="The last few minutes of the house's draw" />
-        </div>
-        {top && top.watts > 0 && (
-          <p class="insight">
-            Biggest circuit right now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, {formatWatts(top.watts)}
-            {house != null && house > 0 ? ` (${Math.round((top.watts / house) * 100)}% of the house)` : ''}.
-          </p>
-        )}
-        <div class="stats three">
-          <div class="stat">
-            <span class="caption">Energy</span>
-            <p class="big small">{kwh != null ? formatKwh(kwh) : '—'}</p>
-          </div>
-          <div class="stat">
-            <span class="caption">Cost</span>
-            <p class="big small">{cost != null ? formatMoney(cost, summary?.cost_estimated) : '—'}</p>
-            {cost == null && kwh != null && (
-              <a class="hintlink" href={routePath('settings')}>
-                Set a price
-              </a>
-            )}
-          </div>
-          <div class="stat">
-            <span class="caption">Max draw</span>
-            <p class="big small">{peak != null ? `≤ ${formatWatts(peak)}` : '—'}</p>
-          </div>
-        </div>
-        <div class="hero-notes">
-          <p class="caption">
-            {house === null
-              ? 'No whole-house clamp is reporting yet.'
-              : 'The mains clamps added together. The highest draw is an upper bound: the two legs need not peak in the same second.'}
-          </p>
-          {carbon && <p class="caption">{carbon}</p>}
-          <RateNote kwh={kwh} cost={cost} />
-        </div>
-      </section>
+        <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+      </header>
 
       {live.notes.length > 0 && (
         <section class="card warn" aria-live="polite">
@@ -177,19 +150,54 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         </section>
       )}
 
-      {/* On a small screen the bands are only a way of keeping the order (they have no box of their own); on a very wide one each is a row:
-          what the house drew over time beside what draws it, where the energy goes beside what never stops, then the smaller tools side by side. */}
+      <KpiRow>
+        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)}>
+          <Spark values={trail} label="The last few minutes of the draw" />
+        </Kpi>
+        <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={span} />
+        <Kpi
+          tone="cost"
+          label="Cost"
+          value={cost != null ? formatMoney(cost, summary?.cost_estimated) : '—'}
+          hint={
+            cost == null && kwh != null ? (
+              <a class="hintlink" href={routePath('settings')}>
+                Set a price
+              </a>
+            ) : (
+              span
+            )
+          }
+        />
+        <Kpi tone="peak" label="Highest draw" value={peak != null ? formatWatts(peak) : '—'} hint="an upper bound: the meters need not peak together" />
+      </KpiRow>
+      <div class="kpi-notes">
+        <p class="caption">
+          {whole
+            ? 'The mains clamps added together. The highest draw is an upper bound: the two legs need not peak in the same second.'
+            : 'No whole-house clamp is reporting yet, so this adds up everything measured at the top of the tree (circuits, plugs and computers that are on no panel). It is not the whole house.'}
+        </p>
+        {carbon && <p class="caption">{carbon}</p>}
+        <RateNote kwh={kwh} cost={cost} />
+      </div>
+
       <div class="band band-main">
         {figures?.line && (
-          <section class="card wide chart-card">
-            <h2>Power over time</h2>
-            <Chart lines={[figures.line]} domain={figures.domain} />
-            <p class="caption">The mains clamps added together. Compare circuits with the house in History.</p>
+          <section class="panel panel-chart">
+            <div class="panel-head">
+              <h2>Power over time</h2>
+              <a class="panel-link" href={routePath('history')}>
+                Compare meters in History
+              </a>
+            </div>
+            <Chart lines={[figures.line]} domain={figures.domain} height={wideChartHeight()} />
           </section>
         )}
 
-        <section class="card circuits-card">
-          <h2>Circuits</h2>
+        <section class="panel panel-circuits">
+          <div class="panel-head">
+            <h2>Circuits</h2>
+          </div>
           {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
           {rest !== null && (
             <p class="derived">
@@ -205,43 +213,38 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
 
       <div class="band band-flow">
         {summary && circuits.length > 0 && (
-          <section class="card flow-card">
-            <h2>Where it goes</h2>
+          <section class="panel panel-flow">
+            <div class="panel-head">
+              <h2>Where it goes</h2>
+              <span class="panel-note">each band as wide as its energy</span>
+            </div>
             <FlowChart meters={meters} summary={summary} />
-            <p class="caption">Over the period picked above: each band is as wide as the energy through it.</p>
           </section>
         )}
 
-        {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
-      </div>
-
-      <div class="band band-tiles">
-        {mains.length > 0 && <AnomalyCard />}
-
-        {pc.length > 0 && (
-          <section class="card">
-            <h2>Also measured</h2>
-            <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
-            <p class="caption">
-              The PC is plugged into one of the circuits above, so this is part of it, never added to the house or circuit
-              figures.
-            </p>
+        {(whole || pc.length > 0) && (
+          <section class="panel panel-insights">
+            {whole && <BaseLoadCard period={period as PeriodKey} />}
+            {whole && <AnomalyCard />}
+            {pc.length > 0 && (
+              <section class="card">
+                <h2>Also measured</h2>
+                <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
+                <p class="caption">Plugged into circuits nothing clamps, so they sit beside the circuits above, never inside them or added to them.</p>
+              </section>
+            )}
           </section>
         )}
-
-        {mains.length > 0 && (
-          <Estimator
-            load={api.houseEstimate}
-            deps={[]}
-            basisOf={houseUsageBasis}
-            who="the house"
-            nowWatts={house}
-            nowWhat="the mains clamps"
-          />
-        )}
-
-        {mains.length > 0 && <HouseHistoryCard period={period as PeriodKey} />}
       </div>
+
+      {whole && (
+        <section class="panel panel-tools">
+          <div class="panel-cols">
+            <Estimator load={api.houseEstimate} deps={[]} basisOf={houseUsageBasis} who="the house" nowWatts={house} nowWhat="the mains clamps" />
+            <HouseHistoryCard period={period as PeriodKey} />
+          </div>
+        </section>
+      )}
     </>
   );
 }

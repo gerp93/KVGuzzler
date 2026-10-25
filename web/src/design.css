@@ -1,0 +1,388 @@
+/* The look of the live page: figure tiles, panels and bands. One surface style for tiles and panels, one spacing scale, text in the text colours (the
+   colour is carried by the small marks: a tile's edge and icon). Everything is drawn from the theme's custom properties, so every theme works. */
+
+/* The favorites switcher is one segmented control, not a row of loose buttons */
+main > .chips[role='group'] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+main > .chips[role='group'] button {
+  padding: 6px 16px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+}
+
+main > .chips[role='group'] button[aria-pressed='true'] {
+  color: var(--on-primary, var(--color-text));
+  background: var(--color-primary-action);
+}
+
+/* Page head: what this page is, and the period it is about */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-top: 4px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.2vw, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.page-sub {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.page-sub a {
+  color: var(--color-text);
+}
+
+/* The head, the tiles and their notes always go across the whole page */
+main > .page-head,
+main > .kpis,
+main > .kpi-notes {
+  grid-column: 1 / -1;
+}
+
+/* Figure tiles */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  --kpi-accent: var(--color-accent-blue);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 18px 16px 24px;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--kpi-accent);
+}
+
+.kpi-now {
+  --kpi-accent: var(--color-primary-action);
+}
+
+.kpi-energy {
+  --kpi-accent: var(--color-accent-blue);
+}
+
+.kpi-cost {
+  --kpi-accent: var(--color-accent-green);
+}
+
+.kpi-peak {
+  --kpi-accent: var(--color-accent-muted);
+}
+
+.kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kpi-ico {
+  flex: none;
+  color: var(--kpi-accent);
+}
+
+.kpi-live {
+  width: 8px;
+  height: 8px;
+  margin-left: 2px;
+  background: var(--color-accent-green);
+  border-radius: 50%;
+  animation: pulse 2.4s ease-out infinite;
+}
+
+.kpi-value {
+  margin: 2px 0 0;
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+.kpi-value .unit {
+  margin-left: 0.3em;
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.kpi-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.kpi-now .kpi-value {
+  font-size: clamp(2.6rem, 7vw, 4rem);
+}
+
+.kpi-now .spark {
+  flex: none;
+  max-width: none;
+  height: 2.6rem;
+  margin: 10px 0 0;
+}
+
+.kpi-notes {
+  display: grid;
+  gap: 2px;
+  margin-top: -4px;
+}
+
+.kpi-notes .caption {
+  margin: 0;
+}
+
+@media (max-width: 719px) {
+  .kpi-now,
+  .kpi-now ~ .kpi:last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
+
+  /* The switcher scrolls sideways rather than wrapping into a blob */
+  main > .chips[role='group'] {
+    flex-wrap: nowrap;
+    width: auto;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  main > .chips[role='group'] button {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 720px) {
+  .kpis {
+    grid-template-columns: 1.7fr 1fr 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+/* Panels: one surface for a group of related things. The cards put inside one (the insights, the tools) are its sections, divided by a line, not
+   boxes inside a box. */
+.panel {
+  min-width: 0;
+  container-type: inline-size;
+  padding: 16px 16px 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+@media (min-width: 720px) {
+  .panel {
+    padding: 18px 22px 22px;
+  }
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 14px;
+}
+
+.panel-head h2,
+.panel .card h2 {
+  margin: 0 0 14px;
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+}
+
+.panel-head h2 {
+  margin: 0;
+}
+
+.panel-link,
+.panel-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.panel-link {
+  text-decoration: none;
+}
+
+.panel-link:hover,
+.panel-link:focus-visible {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.panel .card {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.panel > .card + .card {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--color-border);
+}
+
+.panel-cols {
+  display: grid;
+  gap: 22px;
+}
+
+.panel-cols > .card + .card {
+  padding-top: 22px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (min-width: 1000px) {
+  .panel-cols {
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+    gap: 0;
+  }
+
+  .panel-cols > .card {
+    padding: 0 28px;
+  }
+
+  .panel-cols > .card:first-child {
+    padding-left: 0;
+  }
+
+  .panel-cols > .card:last-child {
+    padding-right: 0;
+  }
+
+  .panel-cols > .card + .card {
+    padding-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--color-border);
+  }
+}
+
+/* The live page: one column of panels on a phone and a desktop; on a very wide screen the bands put two side by side. */
+main.page-live {
+  gap: 16px;
+}
+
+.band {
+  display: contents;
+}
+
+@media (min-width: 720px) {
+  main.page-live {
+    gap: 20px;
+  }
+
+  main.page-live > *,
+  main.page-live > .band > .panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1800px) {
+  main.page-live {
+    gap: 24px;
+  }
+
+  .band {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 24px;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .band:empty {
+    display: none;
+  }
+
+  main.page-live > .band > .panel {
+    grid-column: auto;
+  }
+
+  .band > .panel:only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 2800px) {
+  .band {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+/* On a very wide screen the tiles are wide: the figures grow with them */
+@media (min-width: 1800px) {
+  .kpi {
+    padding: 22px 26px 22px 32px;
+    gap: 6px;
+  }
+
+  .kpi-value {
+    font-size: clamp(2.4rem, 2.5vw, 3.6rem);
+  }
+
+  .kpi-now .kpi-value {
+    font-size: clamp(3.4rem, 4vw, 5.6rem);
+  }
+
+  .kpi-now .spark {
+    height: 4rem;
+  }
+
+  .kpi-label {
+    font-size: 0.78rem;
+  }
+
+  .kpi-hint {
+    font-size: 0.88rem;
+  }
+}

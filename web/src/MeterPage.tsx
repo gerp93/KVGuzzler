@@ -5,6 +5,7 @@ import { api } from './api';
 import { Bars } from './Bars';
 import { Chart, lineFrom, type Line } from './Chart';
 import { FlowChart } from './FlowChart';
+import { Kpi, KpiRow } from './Kpi';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { AnomalyCard } from './AnomalyCard';
@@ -13,7 +14,7 @@ import { CurrentCard } from './Breaker';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
-import { carbonNote, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
+import { carbonNote, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
 
 interface Loaded {
   summary: Summary;
@@ -83,33 +84,26 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
       )}
       {!meter && <p class="note">There is no such meter.</p>}
       {meter && (
-        <section class="card hero">
-          <div class="row">
-            <h2>{meter.label}</h2>
+        <>
+          <header class="page-head">
+            <div>
+              <h2 class="page-title">{meter.label}</h2>
+              {share != null && <p class="page-sub">{share}% of the house over {periodWords(period as PeriodKey)}</p>}
+            </div>
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          </header>
+          <KpiRow>
+            <Kpi tone="now" label="Right now" value={formatWatts(watts)} />
+            <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={periodWords(period as PeriodKey)} />
+            <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
+            <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint="the most in one reading" />
+          </KpiRow>
+          <div class="kpi-notes">
+            <p class="caption">Its own reading already counts everything inside it.</p>
+            {carbon && <p class="caption">{carbon}</p>}
+            <RateNote kwh={kwh} cost={mine?.cost ?? null} />
           </div>
-          <div class="stats">
-            <div class="stat">
-              <span class="caption">Energy</span>
-              <p class="big small">{kwh != null ? formatKwh(kwh) : '—'}</p>
-            </div>
-            <div class="stat">
-              <span class="caption">Cost</span>
-              <p class="big small">{mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'}</p>
-            </div>
-            <div class="stat">
-              <span class="caption">Right now</span>
-              <p class="big small">{formatWatts(watts)}</p>
-            </div>
-            <div class="stat">
-              <span class="caption">Max draw</span>
-              <p class="big small">{mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'}</p>
-            </div>
-          </div>
-          <p class="caption">{share != null ? `${share}% of the house over this period. ` : ''}Its own reading already counts everything inside it.</p>
-          {carbon && <p class="caption">{carbon}</p>}
-          <RateNote kwh={kwh} cost={mine?.cost ?? null} />
-        </section>
+        </>
       )}
 
       {/* The chart first (what happened), then what it draws in amps and its runs, what is inside it, and the slower facts. */}
