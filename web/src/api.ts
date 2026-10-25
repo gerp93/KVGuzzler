@@ -119,6 +119,9 @@ export const api = {
   removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
   houseHistory: () => request<HouseHistory>('api/v1/history'),
   houseEstimate: (window: string) => request<ComputerEstimate>(`api/v1/estimate?${q({ window })}`),
+  /** Where a meter's runs can be downloaded as a CSV, and every meter in tree order (plain links: the browser saves them). */
+  runsExportUrl: (meterId: string, from: string, to: string) => `api/v1/meters/${encodeURIComponent(meterId)}/runs.csv?${q({ from, to })}`,
+  treeExportUrl: (from: string, to: string) => `api/v1/tree.csv?${q({ from, to })}`,
   houseExportUrl: (from: string, to: string) => `api/v1/export.csv?${q({ from, to })}`,
   openEi: () => request<OpenEiStatus>('api/v1/openei'),
   setOpenEiKey: (apiKey: string) =>

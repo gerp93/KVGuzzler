@@ -134,3 +134,15 @@ button.link {
   text-decoration: underline wavy var(--color-accent-red);
   text-underline-offset: 3px;
 }
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.runs + a.button,
+.card > a.button.csv {
+  margin-top: 8px;
+}

@@ -65,6 +65,8 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   as `max_amps` / `peak_amps`. **A 240 V pair carries the same current in both legs: its amps are the larger leg's, never the two added** (live in the Refoss source, in the stored minutes and when pairing merges old history),
   and its volts are the two legs added. A breaker size (1 to 1000 A, circuits only in the UI) is only used to say what share of it a current is. The 80% rule is for a load that runs 3 hours or more, so
   (`amps.ts`, `breakerVerdict`) a run of 3 h+ whose average current (`minutes.avg_a`) was 80% of the breaker or more is the warning; a single high minute is only a note when the meter's runs are known; above 100% always warns.
+- **CSV exports of the runs and the tree** (`export_tables.go`): `GET /meters/{id}/runs.csv` lists every run (the JSON lists the newest 500) through the same `computeRuns` as the card, and `GET /tree.csv` lists every shown
+  meter in Hierarchy order with `inside_count`; a parent's row contains its children's, so those rows are never meant to be added. Labels go through `csvCell` (nothing runs as a formula).
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

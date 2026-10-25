@@ -122,6 +122,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/runs.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A meter's runs over a period, as a CSV download.
+         * @description One row per run (all of them, where the JSON answer lists the newest 500): start and end in the server's local time, minutes, kWh,
+         *     average and peak watts, average and peak amps (blank when the meter reports no current) and the cost (blank when no price is known).
+         *     Found the same way as `GET /meters/{meterId}/runs`, with the same `min_watts`.
+         */
+        get: operations["exportMeterRunsCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tree.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every shown meter over a period, as a CSV download, in the order of the Hierarchy tab.
+         * @description One row per meter: its label, id, type, scope, device, where it sits ("Garage panel > EV charger"), how many meters are directly inside it
+         *     (`inside_count`), its energy, cost, highest power and current, its breaker and the hours it reported. A meter's own reading already contains
+         *     the ones inside it, so the rows are never meant to be added: `inside_count` says which rows hold others. A label a spreadsheet could run as a
+         *     formula is written as text.
+         */
+        get: operations["exportTreeCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/baseload": {
         parameters: {
             query?: never;
@@ -1631,6 +1676,62 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    exportMeterRunsCsv: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+                min_watts?: number;
+            };
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, sent as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    exportTreeCsv: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, sent as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["Problem"];
         };
     };
     getMeterBaseLoad: {

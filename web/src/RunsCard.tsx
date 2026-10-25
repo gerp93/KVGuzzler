@@ -1,6 +1,7 @@
 // A meter's runs: each time it was working (a car charging, a dryer drying), with its length, energy and cost, and a line that sums them up.
 // Hidden for a meter that barely changes. The server finds the runs from the recorded minutes; nothing here is added to any other figure.
 import { useState } from 'preact/hooks';
+import { api } from './api';
 import { breakerLevel, breakerPercent, formatAmps, typicalAmps } from './amps';
 import { formatKwh, formatMoney, formatWatts } from './lib';
 import { runBars, runLength, runStats, runWhen, type MeterRuns } from './runs';
@@ -43,6 +44,9 @@ export function RunsCard({ runs, breaker }: { runs: MeterRuns; breaker?: number 
               </li>
             ))}
           </ol>
+          <a class="button" href={api.runsExportUrl(runs.meter_id, runs.from, runs.to)} download>
+            Download the runs as CSV
+          </a>
           {runs.runs.length > SHOWN && (
             <button type="button" class="link" onClick={() => setAll(!all)}>
               {all ? 'Show fewer' : `Show all ${runs.runs.length}`}
