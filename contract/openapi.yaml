@@ -1317,7 +1317,7 @@ components:
             - type: 'null'
     MeterRun:
       type: object
-      required: [start, end, minutes, kwh, avg_watts, peak_watts, cost]
+      required: [start, end, minutes, kwh, avg_watts, peak_watts, avg_amps, peak_amps, cost]
       properties:
         start:
           type: string
@@ -1336,6 +1336,12 @@ components:
           type: number
         peak_watts:
           type: number
+        avg_amps:
+          type: [number, 'null']
+          description: The current over the run, weighted by the time it was reported; null when the meter reports none.
+        peak_amps:
+          type: [number, 'null']
+          description: The highest minute's current; null when the meter reports none.
         cost:
           oneOf:
             - $ref: '#/components/schemas/Money'

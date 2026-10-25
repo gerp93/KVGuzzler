@@ -10,6 +10,8 @@
       "kwh": 32.4,
       "avg_watts": 7200,
       "peak_watts": 7410,
+      "avg_amps": 30.0,
+      "peak_amps": 30.9,
       "cost": "4.92"
     },
     {
@@ -19,6 +21,8 @@
       "kwh": 19.8,
       "avg_watts": 7200,
       "peak_watts": 7390,
+      "avg_amps": 29.9,
+      "peak_amps": 30.8,
       "cost": "3.00"
     }
   ],

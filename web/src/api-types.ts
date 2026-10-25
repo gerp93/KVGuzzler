@@ -867,6 +867,10 @@ export interface components {
             kwh: number;
             avg_watts: number;
             peak_watts: number;
+            /** @description The current over the run, weighted by the time it was reported; null when the meter reports none. */
+            avg_amps: number | null;
+            /** @description The highest minute's current; null when the meter reports none. */
+            peak_amps: number | null;
             /** @description The run's energy at the price of the local day it started; null when no price is known. */
             cost: components["schemas"]["Money"] | null;
         };

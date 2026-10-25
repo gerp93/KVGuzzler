@@ -21,10 +21,12 @@ type runsBody struct {
 	MeterKWh       float64  `json:"meter_kwh"`
 	Truncated      bool     `json:"truncated"`
 	Runs           []struct {
-		Start   time.Time `json:"start"`
-		Minutes int       `json:"minutes"`
-		KWh     float64   `json:"kwh"`
-		Cost    *string   `json:"cost"`
+		Start    time.Time `json:"start"`
+		Minutes  int       `json:"minutes"`
+		KWh      float64   `json:"kwh"`
+		Cost     *string   `json:"cost"`
+		AvgAmps  *float64  `json:"avg_amps"`
+		PeakAmps *float64  `json:"peak_amps"`
 	} `json:"runs"`
 	Totals struct {
 		Count          int     `json:"count"`
@@ -65,7 +67,7 @@ func runsServer(t *testing.T) (*httptest.Server, time.Time) {
 				w = 7200
 			}
 			rows = append(rows,
-				store.MinuteRow{MeterID: "charger", Minute: at, AvgW: w, MaxW: w, Seconds: 60},
+				store.MinuteRow{MeterID: "charger", Minute: at, AvgW: w, MaxW: w, Seconds: 60, AvgA: amps(w / 240), MaxA: amps(w/240 + 1)},
 				store.MinuteRow{MeterID: "fridge", Minute: at, AvgW: 90 + float64(m%3), MaxW: 95, Seconds: 60},
 				// The mains: leg A carries the charger's 7.2 kW on top of 500 W, leg B 400 W. Leg B is missing for the first hour of day one.
 				store.MinuteRow{MeterID: "ma", Minute: at, AvgW: 500 + w - 3, MaxW: 600 + w, Seconds: 60})
@@ -83,6 +85,8 @@ func runsServer(t *testing.T) (*httptest.Server, time.Time) {
 	t.Cleanup(srv.Close)
 	return srv, start
 }
+
+func amps(a float64) *float64 { return &a }
 
 func runsURL(srv *httptest.Server, id string, from, to time.Time, extra string) string {
 	return fmt.Sprintf("%s/api/v1/meters/%s/runs?from=%s&to=%s%s", srv.URL, id, from.Format(time.RFC3339), to.Format(time.RFC3339), extra)
@@ -177,5 +181,21 @@ func TestRunsRefuseBadAsks(t *testing.T) {
 		if r.StatusCode != want {
 			t.Errorf("%s: %d, want %d", name, r.StatusCode, want)
 		}
+	}
+}
+
+func TestARunKnowsItsAverageAndPeakCurrentWhenTheMeterReportsOne(t *testing.T) {
+	srv, start := runsServer(t)
+	var b runsBody
+	get(t, runsURL(srv, "charger", start, start.Add(72*time.Hour), ""), &b)
+	r := b.Runs[0]
+	// 7.2 kW at 240 V is 30 A, the average over the run (the minutes at rest around it are not part of it); the highest minute was 1 A more.
+	if r.AvgAmps == nil || math.Abs(*r.AvgAmps-30) > 1e-9 || r.PeakAmps == nil || math.Abs(*r.PeakAmps-31) > 1e-9 {
+		t.Errorf("run current = %v avg, %v peak, want 30 and 31", r.AvgAmps, r.PeakAmps)
+	}
+	// A meter that never reported a current has none: null, not 0 A.
+	get(t, runsURL(srv, "fridge", start, start.Add(72*time.Hour), "&min_watts=92"), &b)
+	if len(b.Runs) == 0 || b.Runs[0].AvgAmps != nil || b.Runs[0].PeakAmps != nil {
+		t.Errorf("fridge runs = %+v: no current was ever reported", b.Runs)
 	}
 }

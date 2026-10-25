@@ -1,16 +1,18 @@
 // A meter's runs: each time it was working (a car charging, a dryer drying), with its length, energy and cost, and a line that sums them up.
 // Hidden for a meter that barely changes. The server finds the runs from the recorded minutes; nothing here is added to any other figure.
 import { useState } from 'preact/hooks';
+import { breakerLevel, breakerPercent, formatAmps, typicalAmps } from './amps';
 import { formatKwh, formatMoney, formatWatts } from './lib';
 import { runBars, runLength, runStats, runWhen, type MeterRuns } from './runs';
 
 const SHOWN = 8;
 
-export function RunsCard({ runs }: { runs: MeterRuns }) {
+export function RunsCard({ runs, breaker }: { runs: MeterRuns; breaker?: number | null }) {
   const [all, setAll] = useState(false);
   const stats = runStats(runs);
   const list = all ? runs.runs : runs.runs.slice(0, SHOWN);
   const bars = runBars(list);
+  const usualAmps = typicalAmps(runs.runs);
   const now = new Date();
   return (
     <section class="card">
@@ -21,6 +23,7 @@ export function RunsCard({ runs }: { runs: MeterRuns }) {
           <p class="runs-summary">
             <strong>{stats.count}</strong> {stats.count === 1 ? 'run' : 'runs'} · about <strong>{formatKwh(stats.avgKwh)}</strong>
             {stats.avgCost != null && <> and <strong>{formatMoney(stats.avgCost.toFixed(2), runs.cost_estimated)}</strong></>} each · {runLength(stats.avgMinutes)} on average, the longest {runLength(stats.longestMinutes)}
+            {usualAmps != null && <>, typically {formatAmps(usualAmps)}{breaker ? ` (${breakerPercent(usualAmps, breaker)}% of the ${breaker} A breaker)` : ''}</>}
           </p>
           <ol class="runs" aria-label="Recent runs, newest first">
             {list.map((r, i) => (
@@ -29,7 +32,10 @@ export function RunsCard({ runs }: { runs: MeterRuns }) {
                 <span class="bar" aria-hidden="true">
                   <i style={{ width: `${bars[i]}%` }} />
                 </span>
-                <span class="num len">{runLength(r.minutes)}</span>
+                <span class={`num len${r.minutes >= 180 && breakerLevel(breakerPercent(r.avg_amps, breaker)) !== null && breakerLevel(breakerPercent(r.avg_amps, breaker)) !== 'ok' ? ' hot' : ''}`} title={r.avg_amps != null ? `${formatAmps(r.avg_amps)} on average, ${formatAmps(r.peak_amps)} at most` : undefined}>
+                  {runLength(r.minutes)}
+                  {r.avg_amps != null ? ` · ${formatAmps(r.avg_amps)}` : ''}
+                </span>
                 <span class="num cost">
                   {formatKwh(r.kwh)}
                   {r.cost != null ? ` · ${formatMoney(r.cost, runs.cost_estimated)}` : ''}

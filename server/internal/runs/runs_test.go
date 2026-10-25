@@ -92,3 +92,42 @@ func TestMissingMinutesEndARunLikeALongGapAndPartialMinutesCountForWhatWasSeen(t
 		t.Errorf("half-covered minutes: %+v", got)
 	}
 }
+
+func TestARunsAverageCurrentIsOverTheTimeItWasReportedAndNilWithoutOne(t *testing.T) {
+	pts := day(600, 5, [3]float64{100, 60, 3000})
+	// 20 A for the first half hour of the run, 30 A for the second; the minutes before and after it report 1 A and are not part of it.
+	for i := range pts {
+		a := 1.0
+		if i >= 100 && i < 130 {
+			a = 20
+		} else if i >= 130 && i < 160 {
+			a = 30
+		}
+		pts[i].AvgAmps, pts[i].MaxAmps, pts[i].HaveAmps = a, a+2, true
+	}
+	got := Detect(pts, 500, DefaultGapMinutes, DefaultMinMinutes)
+	if len(got) != 1 || got[0].AvgAmps == nil || got[0].PeakAmps == nil {
+		t.Fatalf("runs = %+v", got)
+	}
+	if math.Abs(*got[0].AvgAmps-25) > 1e-9 || math.Abs(*got[0].PeakAmps-32) > 1e-9 {
+		t.Errorf("avg %v peak %v, want 25 and 32", *got[0].AvgAmps, *got[0].PeakAmps)
+	}
+	// Without a current on any minute the run has none.
+	plain := Detect(day(600, 5, [3]float64{100, 60, 3000}), 500, DefaultGapMinutes, DefaultMinMinutes)
+	if len(plain) != 1 || plain[0].AvgAmps != nil || plain[0].PeakAmps != nil {
+		t.Errorf("a run without currents: %+v", plain)
+	}
+}
+
+func TestAMeterThatWorksOnlyAFewPercentOfTheTimeStillHasARunLevel(t *testing.T) {
+	// A water heater: 30 minutes of 4.4 kW in a day, zero the rest (2% of the time). The 95th percentile of such a day is zero, the 99th is not.
+	pts := day(1440, 0, [3]float64{360, 30, 4400})
+	th := Threshold(pts)
+	if math.IsInf(th, 1) {
+		t.Fatal("a meter that works 2% of the time was called steady")
+	}
+	got := Detect(pts, th, DefaultGapMinutes, DefaultMinMinutes)
+	if len(got) != 1 || got[0].Minutes != 30 || math.Abs(got[0].KWh-2.2) > 1e-9 {
+		t.Errorf("runs = %+v, want the one half-hour heating, 2.2 kWh", got)
+	}
+}

@@ -47,3 +47,62 @@ export function breakerOptions(current: number | null | undefined): number[] {
   const sizes = current != null && !BREAKER_SIZES.includes(current) ? [...BREAKER_SIZES, current] : BREAKER_SIZES;
   return [...sizes].sort((a, b) => a - b);
 }
+
+/** A load that runs this long (minutes) has to stay at or below 80% of its breaker. */
+export const SUSTAINED_MINUTES = 180;
+
+export interface RunCurrent {
+  start: string;
+  minutes: number;
+  avg_amps?: number | null | undefined;
+}
+
+/** The run that most strongly breaks the continuous-load rule: one of 3 hours or more whose average current was 80% of the breaker or more. */
+export function sustainedHigh(runs: RunCurrent[], breaker: number | null | undefined): { run: RunCurrent; percent: number } | null {
+  let worst: { run: RunCurrent; percent: number } | null = null;
+  for (const run of runs) {
+    const pct = run.minutes >= SUSTAINED_MINUTES ? breakerPercent(run.avg_amps, breaker) : null;
+    if (pct !== null && pct >= 80 && (worst === null || pct > worst.percent)) worst = { run, percent: pct };
+  }
+  return worst;
+}
+
+export type VerdictLevel = 'ok' | 'brief' | 'sustained' | 'over';
+
+/**
+ * What to say about a circuit's breaker. The rule is about a load that keeps running (3 hours or more), so with the meter's runs known a single
+ * high minute is only mentioned, not warned about; without them (a meter that does not run in stretches) the highest minute is all there is.
+ */
+export function breakerVerdict(peakPct: number | null, runs: RunCurrent[] | null, breaker: number | null | undefined): { level: VerdictLevel; text: string | null } {
+  if (peakPct === null) return { level: 'ok', text: null };
+  if (peakPct > 100) return { level: 'over', text: breakerAdvice(peakPct, breaker) };
+  if (runs === null) {
+    const advice = breakerAdvice(peakPct, breaker);
+    return { level: advice ? 'sustained' : 'ok', text: advice };
+  }
+  const long = sustainedHigh(runs, breaker);
+  if (long) {
+    const hours = Math.round((long.run.minutes / 60) * 10) / 10;
+    return {
+      level: 'sustained',
+      text: `Its run of ${hours} hours averaged ${long.percent}% of its ${breaker} A breaker. A load that runs for 3 hours or more should stay at or below 80% of the breaker.`,
+    };
+  }
+  if (peakPct >= 80) {
+    return { level: 'brief', text: `It reached ${peakPct}% of its ${breaker} A breaker, but no run of 3 hours or more averaged above 80%: only a load that lasts that long has to stay under it.` };
+  }
+  return { level: 'ok', text: null };
+}
+
+/** The usual current of a meter's runs, in amps: the runs' averages weighted by their length; null when none reports one. */
+export function typicalAmps(runs: RunCurrent[]): number | null {
+  let weighted = 0;
+  let minutes = 0;
+  for (const r of runs) {
+    if (r.avg_amps != null) {
+      weighted += r.avg_amps * r.minutes;
+      minutes += r.minutes;
+    }
+  }
+  return minutes > 0 ? weighted / minutes : null;
+}

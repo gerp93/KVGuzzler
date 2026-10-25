@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -143,5 +144,30 @@ INSERT INTO minutes VALUES ('m', 1000020, 100, 120, 60);`); err != nil {
 	ms, err := s.Meters(context.Background())
 	if err != nil || len(ms) != 1 || ms[0].BreakerAmps != nil {
 		t.Errorf("meters = %+v %v", ms, err)
+	}
+}
+
+func TestTheAverageCurrentOfAMinuteMergesByTimeAndReachesTheRunFinder(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	ids := monitor(t, s, "refoss-avg", 1)
+	t0 := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	f := func(v float64) *float64 { return &v }
+	// 20 s at 10 A then 40 s at 25 A: 20 A over the minute, weighted by time; a third write with no current leaves it alone.
+	if err := s.AddMinuteCurrent(ctx, ids[0], t0, 1000, 1100, f(10), f(11), 20); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMinuteCurrent(ctx, ids[0], t0, 1000, 1100, f(25), f(26), 40); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMinute(ctx, ids[0], t0, 1000, 1000, 10); err != nil {
+		t.Fatal(err)
+	}
+	pts, err := s.MeterMinutes(ctx, ids[0], t0, t0.Add(time.Minute))
+	if err != nil || len(pts) != 1 || !pts[0].HaveAmps {
+		t.Fatalf("points = %+v, %v", pts, err)
+	}
+	if math.Abs(pts[0].AvgAmps-(10*20+25*40)/60.0) > 1e-9 || pts[0].MaxAmps != 26 {
+		t.Errorf("avg %v max %v, want 20 and 26", pts[0].AvgAmps, pts[0].MaxAmps)
 	}
 }

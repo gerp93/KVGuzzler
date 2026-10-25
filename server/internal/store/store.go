@@ -201,6 +201,15 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 			return fmt.Errorf("store: migrate: %w", err)
 		}
 	}
+	// And before the average current of each minute was kept (a run's average current is worked out from it).
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('minutes') WHERE name = 'avg_a'`).Scan(&has); err != nil {
+		return fmt.Errorf("store: migrate: %w", err)
+	}
+	if has == 0 {
+		if _, err := db.Exec(`ALTER TABLE minutes ADD COLUMN avg_a REAL`); err != nil {
+			return fmt.Errorf("store: migrate: %w", err)
+		}
+	}
 	// And before a meter could say how big its breaker is.
 	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = 'breaker_amps'`).Scan(&has); err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
@@ -407,19 +416,26 @@ func (s *Store) AddMinute(ctx context.Context, meterID string, minute time.Time,
 // upsertMinute adds covered time to a minute that may already have rows. The highest current is kept like the highest power, and stays null for
 // a meter that never reported one (a minute with a current in one half and none in the other keeps the one there is).
 const upsertMinute = `
-INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a) VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a, avg_a) VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(meter_id, minute) DO UPDATE SET
   avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / (seconds + excluded.seconds),
   max_w   = max(max_w, excluded.max_w),
   max_a   = CASE WHEN max_a IS NULL THEN excluded.max_a WHEN excluded.max_a IS NULL THEN max_a ELSE max(max_a, excluded.max_a) END,
+  avg_a   = CASE WHEN avg_a IS NULL THEN excluded.avg_a WHEN excluded.avg_a IS NULL THEN avg_a
+            ELSE (avg_a * seconds + excluded.avg_a * excluded.seconds) / (seconds + excluded.seconds) END,
   seconds = seconds + excluded.seconds`
 
 // AddMinuteAmps is AddMinute with the highest current (amps) seen in the covered time; nil when the meter does not report one.
 func (s *Store) AddMinuteAmps(ctx context.Context, meterID string, minute time.Time, avgW, maxW float64, maxA *float64, seconds float64) error {
+	return s.AddMinuteCurrent(ctx, meterID, minute, avgW, maxW, nil, maxA, seconds)
+}
+
+// AddMinuteCurrent is AddMinute with the average and the highest current (amps) seen in the covered time; nil for one the meter does not report.
+func (s *Store) AddMinuteCurrent(ctx context.Context, meterID string, minute time.Time, avgW, maxW float64, avgA, maxA *float64, seconds float64) error {
 	if seconds <= 0 {
 		return nil
 	}
-	_, err := s.db.ExecContext(ctx, upsertMinute, meterID, minute.Unix(), avgW, maxW, seconds, nullFloat(maxA))
+	_, err := s.db.ExecContext(ctx, upsertMinute, meterID, minute.Unix(), avgW, maxW, seconds, nullFloat(maxA), nullFloat(avgA))
 	return err
 }
 
@@ -437,8 +453,9 @@ type MinuteRow struct {
 	AvgW    float64
 	MaxW    float64
 	Seconds float64
-	// MaxA is the highest current (amps) in the minute; nil when the meter does not report one.
+	// MaxA and AvgA are the highest and the average current (amps) in the minute; nil when the meter does not report one.
 	MaxA *float64
+	AvgA *float64
 }
 
 // AddMinutes writes many minutes in one transaction, merging into any minute that already has rows exactly as AddMinute does.
@@ -457,7 +474,7 @@ func (s *Store) AddMinutes(ctx context.Context, rows []MinuteRow) error {
 		if r.Seconds <= 0 {
 			continue
 		}
-		if _, err := stmt.ExecContext(ctx, r.MeterID, r.Minute.Unix(), r.AvgW, r.MaxW, r.Seconds, nullFloat(r.MaxA)); err != nil {
+		if _, err := stmt.ExecContext(ctx, r.MeterID, r.Minute.Unix(), r.AvgW, r.MaxW, r.Seconds, nullFloat(r.MaxA), nullFloat(r.AvgA)); err != nil {
 			return err
 		}
 	}

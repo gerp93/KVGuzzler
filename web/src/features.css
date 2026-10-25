@@ -127,3 +127,10 @@ button.link {
 .badge.over {
   background: color-mix(in srgb, var(--color-accent-red) 65%, transparent);
 }
+
+/* A run of 3 hours or more that averaged above 80% of its breaker */
+.runs .len.hot {
+  font-weight: 700;
+  text-decoration: underline wavy var(--color-accent-red);
+  text-underline-offset: 3px;
+}
