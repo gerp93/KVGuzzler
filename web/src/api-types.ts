@@ -122,6 +122,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The days the house, or a meter, used far more than it usually does.
+         * @description A day is unusual when it is far above the middle (median) of the same kind of day, a weekday or a weekend day, over the four weeks before it,
+         *     by three measures at once: at least 1.5 times as much, at least 3.5 typical swings above it, and at least a set amount more (1 kWh for the
+         *     house, 0.3 kWh for a meter). With fewer than four such days before it, nothing is said. Only complete days up to yesterday are looked at.
+         *     Without `meter_id` the answer is the house (the mains legs added) and every meter; a meter whose day is explained by something that holds it
+         *     being unusual the same day is named as a cause of that day (`causes`, the meters inside it that were unusual and hold no unusual meter of their
+         *     own), not listed again. Causes are already part of the figure and are never added to it. With `meter_id` it is that meter's own days.
+         */
+        get: operations["getAnomalies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/runs.csv": {
         parameters: {
             query?: never;
@@ -890,6 +915,43 @@ export interface components {
              *     different meters need not coincide.
              */
             parts?: components["schemas"]["BaseLoadPart"][];
+        };
+        AnomalyCause: {
+            meter_id: string;
+            label: string;
+            /** @description How much more than its own usual that meter used that day. */
+            extra_kwh: number;
+        };
+        AnomalyDay: {
+            /**
+             * Format: date
+             * @description The local day.
+             */
+            date: string;
+            /** @description The meter whose day it was; null for the whole house. */
+            meter_id: string | null;
+            label: string;
+            kwh: number;
+            /** @description The median of the same kind of day (weekday or weekend) over the four weeks before. */
+            usual_kwh: number;
+            extra_kwh: number;
+            /** @description The extra energy at that day's price; null when no price is known. */
+            extra_cost: components["schemas"]["Money"] | null;
+            /** @description kwh over usual_kwh; 0 when the usual is nothing. */
+            ratio: number;
+            /** @description At most three, the biggest first. */
+            causes: components["schemas"]["AnomalyCause"][];
+        };
+        Anomalies: {
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description The last complete day looked at (yesterday).
+             */
+            to: string;
+            /** @description Newest day first, the biggest extra first within a day. */
+            days: components["schemas"]["AnomalyDay"][];
         };
         BaseLoadPart: {
             meter_id: string;
@@ -1672,6 +1734,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeterRuns"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getAnomalies: {
+        parameters: {
+            query?: {
+                /** @description How many days back to look. Default 30, at most 90. */
+                days?: number;
+                /** @description Only this meter's unusual days. */
+                meter_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Anomalies"];
                 };
             };
             400: components["responses"]["Problem"];

@@ -230,6 +230,44 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/anomalies:
+    get:
+      tags: [Read]
+      operationId: getAnomalies
+      summary: The days the house, or a meter, used far more than it usually does.
+      description: |
+        A day is unusual when it is far above the middle (median) of the same kind of day, a weekday or a weekend day, over the four weeks before it,
+        by three measures at once: at least 1.5 times as much, at least 3.5 typical swings above it, and at least a set amount more (1 kWh for the
+        house, 0.3 kWh for a meter). With fewer than four such days before it, nothing is said. Only complete days up to yesterday are looked at.
+        Without `meter_id` the answer is the house (the mains legs added) and every meter; a meter whose day is explained by something that holds it
+        being unusual the same day is named as a cause of that day (`causes`, the meters inside it that were unusual and hold no unusual meter of their
+        own), not listed again. Causes are already part of the figure and are never added to it. With `meter_id` it is that meter's own days.
+      parameters:
+        - name: days
+          in: query
+          required: false
+          description: How many days back to look. Default 30, at most 90.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+        - name: meter_id
+          in: query
+          required: false
+          description: Only this meter's unusual days.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Anomalies'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/meters/{meterId}/runs.csv:
     get:
       tags: [Read]
@@ -1351,6 +1389,66 @@ components:
             different meters need not coincide.
           items:
             $ref: '#/components/schemas/BaseLoadPart'
+    AnomalyCause:
+      type: object
+      required: [meter_id, label, extra_kwh]
+      properties:
+        meter_id:
+          type: string
+        label:
+          type: string
+        extra_kwh:
+          type: number
+          description: How much more than its own usual that meter used that day.
+    AnomalyDay:
+      type: object
+      required: [date, meter_id, label, kwh, usual_kwh, extra_kwh, extra_cost, ratio, causes]
+      properties:
+        date:
+          type: string
+          format: date
+          description: The local day.
+        meter_id:
+          type: [string, 'null']
+          description: The meter whose day it was; null for the whole house.
+        label:
+          type: string
+        kwh:
+          type: number
+        usual_kwh:
+          type: number
+          description: The median of the same kind of day (weekday or weekend) over the four weeks before.
+        extra_kwh:
+          type: number
+        extra_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: The extra energy at that day's price; null when no price is known.
+        ratio:
+          type: number
+          description: kwh over usual_kwh; 0 when the usual is nothing.
+        causes:
+          type: array
+          description: At most three, the biggest first.
+          items:
+            $ref: '#/components/schemas/AnomalyCause'
+    Anomalies:
+      type: object
+      required: [from, to, days]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+          description: The last complete day looked at (yesterday).
+        days:
+          type: array
+          description: Newest day first, the biggest extra first within a day.
+          items:
+            $ref: '#/components/schemas/AnomalyDay'
     BaseLoadPart:
       type: object
       required: [meter_id, label, watts, kwh_per_year, cost_per_year]

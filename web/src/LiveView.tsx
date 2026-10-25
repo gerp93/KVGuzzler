@@ -5,6 +5,7 @@ import { api } from './api';
 import { Bars, meterPath } from './Bars';
 import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
+import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, type Line } from './Chart';
 import { Estimator } from './Estimator';
@@ -197,6 +198,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       </section>
 
       {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
+
+      {mains.length > 0 && <AnomalyCard />}
 
       {summary && circuits.length > 0 && (
         <section class="card flow-card">

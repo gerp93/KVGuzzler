@@ -21,6 +21,7 @@ const examples = {
   'house-history.json': 'HouseHistory',
   'meter-runs.json': 'MeterRuns',
   'baseload.json': 'BaseLoad',
+  'anomalies.json': 'Anomalies',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });

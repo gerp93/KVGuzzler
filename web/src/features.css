@@ -146,3 +146,29 @@ button.link {
 .card > a.button.csv {
   margin-top: 8px;
 }
+
+/* Unusual days */
+.anomalies {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.anomalies li {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 8px;
+}
+
+.anomalies .when {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 480px) {
+  .anomalies li {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
