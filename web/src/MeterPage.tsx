@@ -112,6 +112,20 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
         </section>
       )}
 
+      {/* The chart first (what happened), then what it draws in amps and its runs, what is inside it, and the slower facts. */}
+      {data && data.lines.length > 0 && (
+        <section class="card wide">
+          <h2>Power over time</h2>
+          <Chart lines={data.lines} domain={data.domain} />
+          {data.lines.length > 1 && <p class="caption">Each line is read on its own: the meters inside it are part of the first line, not added to it.</p>}
+        </section>
+      )}
+      {data && data.lines.length === 0 && meter && <p class="note">Nothing recorded for this meter in this period.</p>}
+
+      {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
+
+      {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
+
       {meter && list.length > 0 && (
         <section class="card">
           <h2>Inside it</h2>
@@ -127,22 +141,9 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
         </section>
       )}
 
-      {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
-
       {meter && <BaseLoadCard meterId={id} period={period as PeriodKey} />}
 
       {meter && <AnomalyCard meterId={id} quiet />}
-
-      {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
-
-      {data && data.lines.length > 0 && (
-        <section class="card wide">
-          <h2>Power over time</h2>
-          <Chart lines={data.lines} domain={data.domain} />
-          {data.lines.length > 1 && <p class="caption">Each line is read on its own: the meters inside it are part of the first line, not added to it.</p>}
-        </section>
-      )}
-      {data && data.lines.length === 0 && meter && <p class="note">Nothing recorded for this meter in this period.</p>}
     </>
   );
 }

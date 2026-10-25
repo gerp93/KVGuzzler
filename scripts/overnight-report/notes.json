@@ -265,6 +265,41 @@
    "commit": "",
    "tests": "Web: the label text (kWh and cost, cost alone, energy only when no price is known), the room for the longest label within limits, and the zero rule (no band for a meter that used nothing, inside a panel or at the top, nor for a part of nothing; a zero meter's own page still draws).",
    "notes": "The demo has no meter at exactly zero, so the zero rule is shown by the tests, not a screenshot. On a phone the chart is crowded: the label of a tall band in the middle column can run into the labels of the column beside it, as it did before this change."
+  },
+  {
+   "id": "ultra-wide",
+   "title": "Ultra-wide layouts, redone page by page",
+   "kind": "fix",
+   "summary": "On a very wide screen the pages looked like boxes dropped on a grid: one small card with empty space under it, tiles of different heights in a row, the chart at the very bottom. Each page now has a layout of its own, built for how it is read. Phone and normal desktop layouts are unchanged apart from a couple of small order and fill improvements.",
+   "details": [
+    "<strong>Live:</strong> read top to bottom. A strip across the top with the figure that matters (<em>right now</em>, with its trend) and the period's energy, cost and highest draw beside it. Then <em>power over time</em> beside <em>circuits</em> (what happened next to what draws it), <em>where it goes</em> beside <em>always on</em>, then the smaller tools (unusual days, also measured, cost estimator, energy history) as one row that fills the width. Every row's cards are as tall as the tallest of them. At about 2000 px the circuits column is kept wide enough that its rows stay one line each.",
+    "<strong>A meter, a computer, a group:</strong> the figures as a strip across the top, then the cards in 2, 3 or 4 columns (by screen width) that fill from the top, each card whole. A short card is never left in a box of empty space and the page is as short as its cards allow: on a 3440 x 1440 screen a meter's or a computer's whole page fits without scrolling. On every size the chart now comes first after the figures.",
+    "<strong>Hierarchy:</strong> the flow chart with devices, computers and groups under it (as many across as fit) on the left, the tree on the right: two columns of nearly equal height instead of one box on the left with the rest empty. From 3800 px it is three columns as before.",
+    "<strong>History:</strong> the chart takes the width and the list of meters to compare is a column of its own, as tall as the chart, instead of a short box at the top right with a hole beneath it.",
+    "<strong>Two-column desktop (720 to 1800 px):</strong> the circuits list, the tall card, runs down two rows so the card beside it is no longer followed by a hole.",
+    "How it was checked: the layout was measured in the browser at 2000, 3440 and 5120 px wide (every card's position and size, so holes show up as numbers) and looked at in the downscaled screenshots below; the phone and 1280 px layouts were checked for overflow and order."
+   ],
+   "images": [
+    {
+     "path": "img/ultra-wide-mcp-Claude_Browser-blob-1792894469946-w8v3wq.jpg",
+     "caption": "Live at 3440 px: the figures as a strip, power over time beside the circuits, where it goes beside always on (the tools row is below, out of view)."
+    },
+    {
+     "path": "img/ultra-wide-mcp-Claude_Browser-blob-1792894487104-alswwl.jpg",
+     "caption": "A meter's page at 3440 px: the whole page, in three columns, on one screen."
+    },
+    {
+     "path": "img/ultra-wide-mcp-Claude_Browser-blob-1792894516276-sqgjvu.jpg",
+     "caption": "Hierarchy at 3440 px: chart and the three small cards on the left, the tree on the right."
+    },
+    {
+     "path": "img/ultra-wide-mcp-Claude_Browser-blob-1792894516276-b33m5h.jpg",
+     "caption": "History at 3440 px: the chart and a full-height list of meters to compare."
+    }
+   ],
+   "commit": "",
+   "tests": "Layout is CSS and wrapper elements, so it is checked by measuring in the browser (card positions and sizes at 2000, 3440 and 5120 px, and at 1280 and 375 px for overflow), not by unit tests; the web typecheck, tests and build pass.",
+   "notes": "I could only look at the ultra-wide pages as small screenshots (the pane is far narrower than the emulated screen), so text legibility at those sizes is judged from the measurements and the font scaling already in place, not seen at full size. A short card in the first column of a meter's page can leave a gap at the bottom of that column (the columns are balanced by height, not exact). Settings and Help keep their centred, readable columns."
   }
  ]
 }
