@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Chart, lineFrom, type Line } from './Chart';
+import { Chart, lineFrom, tallChartHeight, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { periodRange, sumByTime, type Meter, type PeriodKey } from './lib';
@@ -39,28 +39,32 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
 
   return (
     <>
-      <section class="card">
+      <section class="card wide chart-card">
         <div class="row">
           <h2>Power over time</h2>
           <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
         </div>
         {error && <p class="note">{error.message}</p>}
         {data && data.lines.some((l) => l.x.length > 0) ? (
-          <Chart lines={data.lines} domain={data.domain} />
+          <Chart lines={data.lines} domain={data.domain} height={tallChartHeight()} />
         ) : (
           <p class="note">{data ? 'Nothing recorded in this period yet.' : 'Loading…'}</p>
         )}
         <p class="caption">Average watts per point. The house line is the mains clamps; the others are drawn separately.</p>
       </section>
 
-      <section class="card">
+      <section class="card wide aside-card">
         <h2>Compare with the house (up to 3)</h2>
         <div class="chips">
-          {others.map((c) => (
-            <button key={c.id} type="button" aria-pressed={chosen.some((x) => x.id === c.id)} onClick={() => toggle(c.id)}>
-              {c.label}
-            </button>
-          ))}
+          {others.map((c) => {
+            const at = chosen.findIndex((x) => x.id === c.id);
+            return (
+              <button key={c.id} type="button" aria-pressed={at >= 0} disabled={at < 0 && chosen.length >= 3} onClick={() => toggle(c.id)}>
+                {at >= 0 && <i class="swatch" style={{ background: `var(${COLORS[at % COLORS.length]})` }} aria-hidden="true" />}
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </section>
     </>

@@ -3,6 +3,21 @@
 :root {
   --gap: 12px;
   --radius: 8px;
+  --tap: 2.75rem; /* the smallest comfortable touch target */
+  --bar-h: 3.75rem; /* the phone's bottom tab bar */
+}
+
+/* The themes give a button's fill but not the text on it, and some fills are light and some dark: black or white, whichever reads. */
+body {
+  --on-primary: oklch(from var(--color-primary-action) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+  /* The themes' muted text is too faint on their own surfaces (about 3.4:1); this is the text colour pulled slightly toward the surface. */
+  --muted: color-mix(in srgb, var(--color-text) 92%, var(--color-surface));
+  --on-top: oklch(from var(--color-top-bar-bg) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 4rem;
 }
 
 * {
@@ -11,7 +26,8 @@
 
 body {
   margin: 0;
-  font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font: 1rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
   color: var(--color-text);
   background: var(--color-bg);
 }
@@ -50,42 +66,114 @@ button:hover:not(:disabled) {
   top: 0;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 4px var(--gap);
+  min-height: 3rem;
   padding: 8px 16px;
+  color: var(--on-top, var(--color-text));
   background: var(--color-top-bar-bg);
 }
 
 .top h1 {
   margin: 0;
   font-size: 1.1rem;
+  white-space: nowrap;
 }
 
+/* The server's state, always in sight: a dot and a word. */
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 0.8rem;
+}
+
+.conn i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  box-shadow: 0 0 0 0 var(--color-accent-green);
+  animation: pulse 2.4s ease-out infinite;
+}
+
+.conn.off {
+  color: var(--color-accent-red);
+}
+
+.conn.off i {
+  background: var(--color-accent-red);
+  animation: none;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-green) 60%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+.banner {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent-red) 35%, var(--color-bg));
+  border-bottom: 1px solid var(--color-accent-red);
+}
+
+/* A phone: the sections live in a bar at the thumb's reach, icon over label. */
 .top nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
   display: flex;
-  flex: 1 1 100%;
-  gap: 4px;
-  overflow-x: auto;
+  height: calc(var(--bar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-top-bar-bg);
+  border-top: 1px solid var(--color-border);
 }
 
 .top nav a {
-  flex: 1 0 auto;
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  color: inherit;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--on-top, var(--color-text));
   text-align: center;
   text-decoration: none;
 }
 
-.top nav a:hover {
-  background: var(--color-top-bar-hover);
+.top nav a[aria-current='page'] {
+  opacity: 1;
+  font-weight: 600;
 }
 
-.top nav a[aria-current='page'] {
+.top nav a[aria-current='page'] .ico {
+  padding: 3px 14px;
+  box-sizing: content-box;
+  margin: -3px 0;
+  color: var(--on-primary, var(--color-text));
   background: var(--color-primary-action);
-  color: var(--color-primary-action-text, var(--color-text));
+  border-radius: 999px;
 }
+
+.top nav a .ico {
+  width: 22px;
+  height: 22px;
+  transition: background 0.15s;
+}
+
+body {
+  padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
+}
+
 
 main {
   display: grid;
@@ -138,7 +226,7 @@ main {
 .note {
   margin: 8px 0 0;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .note {
@@ -182,21 +270,24 @@ main {
 }
 
 .bars .bar {
-  height: 10px;
+  height: 8px;
   overflow: hidden;
-  background: var(--color-bg);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
+  border-radius: 4px;
 }
 
 .bars .bar i {
   display: block;
   height: 100%;
+  min-width: 2px;
   background: var(--color-accent-blue);
+  border-radius: 4px;
+  transition: width 0.5s ease;
 }
 
 /* What a sub-panel's feed carries beyond its own circuits: derived, so quieter than a measured row */
 .bars li.rest {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -207,7 +298,7 @@ main {
 }
 
 .cost {
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .derived {
@@ -217,7 +308,7 @@ main {
   margin: 12px 0 0;
   padding-top: 8px;
   border-top: 1px dashed var(--color-border);
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 /* Controls */
@@ -241,7 +332,7 @@ main {
 .seg button[aria-pressed='true'],
 .chips button[aria-pressed='true'] {
   background: var(--color-primary-action);
-  color: var(--color-primary-action-text, var(--color-text));
+  color: var(--on-primary, var(--color-text));
 }
 
 .chips {
@@ -327,7 +418,7 @@ select {
 .hier-energy,
 .hier-cost {
   min-width: 4.5rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .hier-energy,
@@ -339,7 +430,7 @@ select {
   display: none;
   margin-top: 12px;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 /* Wide enough, the columns line up down the list: name, what it is, now, energy and cost over the period, then the buttons. */
@@ -413,7 +504,7 @@ button.icon:disabled {
 
 .drag {
   cursor: grab;
-  color: var(--color-text-muted);
+  color: var(--muted);
   user-select: none;
 }
 
@@ -427,7 +518,7 @@ button.icon:disabled {
   text-align: center;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px dashed var(--color-text-muted);
+  border: 1px dashed var(--muted);
   border-radius: var(--radius);
 }
 
@@ -468,7 +559,7 @@ input[type='radio'] {
   padding: 0;
   margin-bottom: 4px;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .check {
@@ -495,9 +586,54 @@ select:focus-visible {
 }
 
 @media (min-width: 720px) {
+  body {
+    padding-bottom: 0;
+  }
+
+  /* A wider page: the sections go back to the top bar. */
   .top nav {
-    flex: 0 1 auto;
-    margin-left: auto;
+    position: static;
+    height: auto;
+    padding: 0;
+    gap: 4px;
+    background: none;
+    border: 0;
+  }
+
+  .top nav a {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 1rem;
+    border-radius: var(--radius);
+  }
+
+  .top nav a:hover {
+    background: var(--color-top-bar-hover);
+  }
+
+  .top nav a[aria-current='page'] {
+    background: var(--color-primary-action);
+    color: var(--on-primary, var(--color-text));
+  }
+
+  .top nav a[aria-current='page'] .ico {
+    padding: 0;
+    margin: 0;
+    background: none;
+  }
+
+  .conn {
+    margin-right: 0;
+  }
+
+  .top h1 {
+    margin-right: 12px;
+  }
+
+  .top .conn {
+    margin-right: auto;
   }
 
   main {
@@ -506,6 +642,7 @@ select:focus-visible {
 
   main > .hero,
   main > .wide,
+  .tree-layout .wide,
   main > .chips,
   main > .warn,
   main > .note {
@@ -527,7 +664,7 @@ select:focus-visible {
 
 .field > span {
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .bill-form {
@@ -699,7 +836,7 @@ select:focus-visible {
 
 .part.rest,
 .swatch.rest {
-  background: var(--color-text-muted);
+  background: var(--muted);
 }
 
 .legend {
@@ -730,7 +867,7 @@ details {
 
 summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 a.button {
@@ -757,21 +894,6 @@ a.button {
   gap: 6px;
 }
 
-/* Five tabs have to fit a phone without scrolling the bar sideways */
-@media (max-width: 480px) {
-  .top nav a {
-    flex: 1 1 auto;
-    padding: 8px 6px;
-    font-size: 0.9rem;
-  }
-}
-
-/* Six period buttons have to fit a phone's width without pushing the card wider than the page */
-@media (max-width: 480px) {
-  .seg button {
-    padding: 6px 6px;
-  }
-}
 
 /* The flow chart: bands as wide as the energy through them, drawn in the theme's colours */
 .flow {
@@ -799,16 +921,16 @@ a.button {
 .flow rect.n1 { fill: var(--color-accent-blue); }
 .flow rect.n2 { fill: var(--color-accent-red); }
 .flow rect.n3 { fill: var(--color-accent-muted); }
-.flow rect.rest { fill: var(--color-text-muted); opacity: 0.55; }
+.flow rect.rest { fill: var(--muted); opacity: 0.55; }
 .flow path.n0 { stroke: var(--color-accent-green); }
 .flow path.n1 { stroke: var(--color-accent-blue); }
 .flow path.n2 { stroke: var(--color-accent-red); }
 .flow path.n3 { stroke: var(--color-accent-muted); }
-.flow path.rest { stroke: var(--color-text-muted); }
+.flow path.rest { stroke: var(--muted); }
 
 .flow text {
   fill: var(--color-text);
-  font-size: 12px;
+  font-size: calc(12px * var(--s, 1));
   paint-order: stroke;
   stroke: var(--color-surface);
   stroke-width: 3px;
@@ -816,8 +938,8 @@ a.button {
 }
 
 .flow text .small {
-  fill: var(--color-text-muted);
-  font-size: 11px;
+  fill: var(--muted);
+  font-size: calc(11px * var(--s, 1));
 }
 
 .flow a text {
@@ -834,7 +956,7 @@ a.button {
 }
 
 .hier-row.virtual .part-name {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -879,6 +1001,673 @@ a.button {
 
 /* The column titles above a list of bars */
 .bars li.head {
-  color: var(--color-text-muted);
+  color: var(--muted);
   font-size: 0.85rem;
+}
+
+
+/* ---- UX pass ---- */
+
+/* Period picker: one line always; the short labels on a phone */
+.seg.period {
+  max-width: 100%;
+}
+
+.seg.period button {
+  min-height: 2.25rem;
+  white-space: nowrap;
+}
+
+.seg.period .short {
+  display: inline;
+}
+
+.seg.period .long {
+  display: none;
+}
+
+@media (min-width: 560px) {
+  .seg.period .short {
+    display: none;
+  }
+
+  .seg.period .long {
+    display: inline;
+  }
+}
+
+/* A card too narrow for four columns (a phone, or half a desktop page): a meter is two lines, name and watts, then the bar, then the period's figures. */
+@container (max-width: 34rem) {
+  .bars li,
+  .bars.wide li,
+  .bars a.rowlink,
+  .bars.wide a.rowlink {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name now'
+      'bar bar'
+      'fig fig';
+    gap: 4px 8px;
+  }
+
+  .bars li > .name,
+  .bars a.rowlink > .name {
+    grid-area: name;
+  }
+
+  .bars li > .bar,
+  .bars a.rowlink > .bar {
+    grid-area: bar;
+  }
+
+  .bars li > .num:not(.cost),
+  .bars a.rowlink > .num:not(.cost) {
+    grid-area: now;
+    font-weight: 600;
+  }
+
+  .bars li > .num.cost,
+  .bars a.rowlink > .num.cost {
+    grid-area: fig;
+    min-width: 0;
+    font-size: 0.85rem;
+    text-align: left;
+  }
+
+  .bars li.head {
+    display: none;
+  }
+
+  .bars {
+    gap: 14px;
+  }
+
+  .bars li.rest .bar {
+    display: none;
+  }
+}
+
+/* Rows of a label and its figures line up in columns */
+.settings li:has(> .num) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(5rem, auto) minmax(4.5rem, auto);
+  gap: 8px;
+}
+
+.settings li:has(> .num) > .num:last-child:not(.cost) {
+  grid-column: 2 / -1;
+}
+
+/* A quiet "About this" under a heading, for the long explanations */
+details.hint {
+  margin: 4px 0 8px;
+}
+
+details.hint summary {
+  display: inline-block;
+  padding: 2px 0;
+  font-size: 0.85rem;
+  list-style: none;
+}
+
+details.hint summary::-webkit-details-marker {
+  display: none;
+}
+
+details.hint summary::before {
+  content: 'ⓘ ';
+}
+
+details.hint[open] summary {
+  color: var(--color-text);
+}
+
+details.hint .caption {
+  margin-top: 4px;
+}
+
+/* The live figure at the top of the house */
+.livefig {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.livefig .big {
+  font-size: clamp(2.6rem, 11vw, 4.2rem);
+}
+
+.livefig .caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+}
+
+.livefig .caption i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  animation: pulse 2.4s ease-out infinite;
+}
+
+.spark {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 22rem;
+  height: 3.2rem;
+  color: var(--color-accent-blue);
+}
+
+.spark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.spark path.area {
+  fill: currentColor;
+  opacity: 0.18;
+  stroke: none;
+}
+
+.spark path.line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark {
+  position: relative;
+}
+
+.spark .dotmark {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.hero .stats.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.hero .stat .big.small {
+  font-size: clamp(1.25rem, 5.2vw, 2rem);
+}
+
+.stat .caption {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+}
+
+.stat a.hintlink {
+  font-size: 0.8rem;
+}
+
+/* Waiting for the server: grey blocks where the cards will be, not a lone word */
+.skel {
+  display: grid;
+  gap: var(--gap);
+}
+
+.skel > div {
+  height: 7rem;
+  background: linear-gradient(90deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-text) 10%, var(--color-surface)) 50%, var(--color-surface) 100%);
+  background-size: 200% 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skel > div:first-child {
+  height: 11rem;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Touch screens: every control is at least a thumb tall */
+@media (pointer: coarse) {
+  button,
+  a.button,
+  .chips button,
+  .seg button,
+  input:not([type='checkbox']):not([type='radio']),
+  select {
+    min-height: var(--tap);
+  }
+
+  .check,
+  .count label {
+    min-height: var(--tap);
+  }
+}
+
+a {
+  color: var(--color-text);
+  text-underline-offset: 3px;
+}
+
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.card {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* Hierarchy on a phone: name and watts on the first line, then what it is, then its energy and cost, then the buttons. */
+@media (max-width: 899px) {
+  .hier {
+    gap: 12px;
+  }
+
+  .hier-row {
+    padding: 8px 8px 8px 10px;
+    background: color-mix(in srgb, var(--color-text) 4%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .hier-main {
+    gap: 4px 8px;
+  }
+
+  .hier-main .grow {
+    flex: 1 1 0;
+    min-width: 7rem;
+  }
+
+  .hier-watts {
+    order: 1;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .hier-tag {
+    flex: 1 0 100%;
+    order: 2;
+    padding-left: 2.25rem;
+  }
+
+  /* Empty, it still keeps the line break that separates the name's line from the figures. */
+  .hier-tag:empty {
+    height: 0;
+    margin: -4px 0 0;
+    padding: 0;
+  }
+
+  .hier-energy,
+  .hier-cost {
+    order: 3;
+    min-width: 0;
+    padding-left: 2.25rem;
+    text-align: left;
+    font-size: 0.9rem;
+  }
+
+  .hier-cost {
+    padding-left: 0;
+  }
+
+  .hier-actions {
+    flex: 1 0 100%;
+    order: 4;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .hier-panel {
+    margin-left: 0;
+  }
+}
+
+/* Dragging needs a mouse; a touch screen moves meters with the arrows and the "which panel" list */
+@media (hover: none) {
+  .hier-main .drag {
+    display: none;
+  }
+}
+
+/* Cards are as tall as what is in them: a short card beside a long one stays short instead of stretching into an empty box. */
+main {
+  align-items: start;
+}
+
+main > .caption {
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  main > .caption {
+    grid-column: 1 / -1;
+  }
+
+}
+
+@container (min-width: 34.01rem) {
+  .bars li,
+  .bars a.rowlink {
+    grid-template-columns: minmax(0, 12rem) 1fr auto;
+  }
+
+  .bars.wide li,
+  .bars.wide a.rowlink {
+    grid-template-columns: minmax(0, 12rem) 1fr auto auto;
+  }
+}
+
+/* A name with a line of detail under it (a program, its CPU and GPU energy) wraps instead of being cut off */
+.bars .name:has(.caption) {
+  white-space: normal;
+}
+
+/* The chart's key: left, small, with what the pointer is on */
+.chart .u-legend {
+  margin-top: 4px;
+  text-align: left;
+}
+
+.chart .u-legend .u-series {
+  padding: 2px 8px 2px 0;
+}
+
+.chart .u-legend .u-series:first-child {
+  color: var(--muted);
+}
+
+/* Forms and prose read best in one column of a sensible width */
+main:has(> .page-narrow) {
+  grid-template-columns: minmax(0, 44rem);
+  justify-content: center;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 2rem;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+/* A phone: the choices in a segmented control share the card's width, one line each */
+@media (max-width: 559px) {
+  .seg:not(.period) {
+    display: flex;
+    width: 100%;
+  }
+
+  .seg:not(.period) button {
+    flex: 1 1 0;
+    padding-inline: 4px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (pointer: coarse) {
+  button.icon,
+  a.button.icon,
+  button.twisty,
+  button.show-btn {
+    min-width: var(--tap);
+    min-height: var(--tap);
+  }
+}
+
+/* A page arrives, it does not jump */
+main > * {
+  animation: rise 0.28s ease-out both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The compare list: a swatch shows which line is whose */
+.chips button .swatch {
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+.chart .u-legend {
+  font-size: 0.8rem;
+}
+
+.chart .u-legend .u-marker {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 2px;
+}
+
+.chart .u-legend .u-series th {
+  padding-right: 4px;
+}
+
+.insight {
+  margin: 12px 0 0;
+  font-size: 0.95rem;
+}
+
+/* A button that follows a field has room above it */
+.field ~ button {
+  margin-top: 12px;
+}
+
+/* ---- Ultra-wide monitors (a 34-49" curved panel is 3440 to 5120 px across) ----
+   Under 1800 px nothing here applies. Above it the page stops being a column and becomes a wall of cards on a grid of 6, 8 or 12
+   tracks, the text grows with the screen, and each page arranges its own cards (the house as a band of figures and chart over its
+   lists, the hierarchy as the flow chart beside the tree, Settings as columns). */
+:root {
+  --s: 1; /* the text scale, for what is drawn in pixels */
+}
+
+.tree-layout,
+.tree-rail,
+.tree-stack {
+  display: contents;
+}
+
+@media (min-width: 1800px) {
+  html {
+    font-size: 112.5%;
+  }
+
+  :root {
+    --s: 1.125;
+    --cols: 6;
+    --card: 2;
+    --hero: 2;
+    --chart: 4;
+    --wide: 4;
+    --flow: 2;
+  }
+
+  .top {
+    padding-inline: 40px;
+  }
+
+  main {
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-flow: row dense;
+    gap: 16px;
+    max-width: none;
+    padding: 20px 40px 48px;
+  }
+
+  /* The house wall: a row of tiles is as tall as its tallest. */
+  main.page-live {
+    align-items: stretch;
+  }
+
+  .top .conn {
+    margin-right: 0;
+  }
+
+  .top nav {
+    margin-left: 32px;
+  }
+
+  main > .card,
+  main > .hero,
+  main > .wide {
+    grid-column: span var(--card);
+  }
+
+  main > .hero {
+    grid-column: span var(--hero);
+  }
+
+  main > .chart-card {
+    grid-column: span var(--chart);
+  }
+
+  main > .wide:not(.chart-card):not(.aside-card) {
+    grid-column: span var(--wide);
+  }
+
+  main > .aside-card {
+    grid-column: span var(--hero);
+  }
+
+  main > .flow-card {
+    grid-column: span var(--flow);
+  }
+
+  main > .warn:not(.tile),
+  main > .chips,
+  main > .note,
+  main > .back,
+  main > .caption,
+  main > .banner {
+    grid-column: 1 / -1;
+  }
+
+  /* The hierarchy: the flow chart stays in view beside the tree */
+  .tree-layout {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 68rem);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .tree-rail {
+    display: block;
+    position: sticky;
+    top: 4.5rem;
+  }
+
+  .tree-stack {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* Settings and Help: forms and prose in columns of a readable width, centred */
+  main.page-settings,
+  main.page-help {
+    justify-content: center;
+  }
+
+  main.page-settings {
+    grid-template-columns: repeat(3, minmax(0, 34rem));
+  }
+
+  main.page-help {
+    grid-template-columns: repeat(2, minmax(0, 40rem));
+  }
+
+  main.page-settings > *,
+  main.page-help > * {
+    grid-column: auto;
+  }
+
+  main.page-settings > .page-narrow,
+  main.page-help > .page-narrow {
+    grid-column: 1 / -1;
+  }
+
+  .stats {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 2800px) {
+  :root {
+    --s: 1.25;
+    --cols: 8;
+    --chart: 6;
+    --wide: 6;
+    --flow: 3;
+  }
+
+  html {
+    font-size: 125%;
+  }
+}
+
+@media (min-width: 3800px) {
+  :root {
+    --cols: 12;
+    --hero: 3;
+    --chart: 9;
+    --wide: 8;
+    --flow: 6;
+  }
+
+  .tree-layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  }
+
+  /* The tree takes the first column of the stack and the devices, computers and groups sit beside it */
+  .tree-stack {
+    grid-template-columns: minmax(0, 68rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tree-stack > :first-child {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .tree-stack > :not(:first-child) {
+    grid-column: 2;
+  }
 }

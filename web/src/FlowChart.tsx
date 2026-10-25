@@ -5,6 +5,7 @@ import { meterPath } from './Bars';
 import { flowTree, layoutFlow, type LNode, type VirtualParts } from './flow';
 import { formatKwh, formatMoney, type Meter, type Summary } from './lib';
 import { pcParts, usePcDetails } from './pcparts';
+import { uiScale } from './uiscale';
 
 const SHADES = ['n0', 'n1', 'n2', 'n3'];
 
@@ -28,7 +29,8 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
   const tree = flowTree(meters, summary, root, virtual);
   if (!tree || tree.kwh <= 0) return <p class="note">Nothing recorded in this period to draw.</p>;
   const narrow = width < 520;
-  const layout = layoutFlow(tree, width, narrow ? 120 : 190);
+  const scale = uiScale();
+  const layout = layoutFlow(tree, width, Math.round((narrow ? 132 : 230) * scale), scale);
   const byId = new Map(meters.map((m) => [m.id, m]));
   const shade = (n: LNode) => (n.node.rest ? 'rest' : (SHADES[Math.min(n.depth, SHADES.length - 1)] ?? 'n3'));
   const href = (n: LNode) => {
@@ -39,7 +41,7 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
 
   return (
     <div ref={box} class="flow">
-      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} height={layout.height} role="img" aria-label="Where the energy went, from the whole to its parts">
+      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} height={layout.height} role="group" aria-label="Where the energy went, from the whole to its parts">
         {layout.links.map((l) => {
           const mid = (l.from.x + layout.nodeWidth + l.to.x) / 2;
           const x0 = l.from.x + layout.nodeWidth;
@@ -71,7 +73,8 @@ export function FlowChart({ meters, summary, root }: { meters: Meter[]; summary:
                 </>
               ) : (
                 <>
-                  {label} <tspan class="small">{formatKwh(n.node.kwh)}</tspan>
+                  {label}
+                  {!narrow && <tspan class="small"> {formatKwh(n.node.kwh)}</tspan>}
                 </>
               )}
             </text>

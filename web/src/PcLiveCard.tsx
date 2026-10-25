@@ -27,7 +27,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
 
   return (
     <>
-      <section class={`card${stale ? ' warn' : ''}`}>
+      <section class={`card tile${stale ? ' warn' : ''}`}>
         <div class="row">
           <h2>Right now</h2>
           <span class="caption">{stale ? `Not answering: last heard ${formatAge(live.age_seconds ?? 0)}` : `Updated ${formatAge(live.age_seconds ?? 0)}`}</span>

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { Skeleton } from './Skeleton';
 import { Chart, lineFrom, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
 import { EnergyHistory } from './EnergyHistory';
@@ -100,7 +101,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
           <p>{error.message}</p>
         </section>
       )}
-      {!data && !error && <p class="note">Loading…</p>}
+      {!data && !error && <Skeleton />}
 
       {detail && (
         <>
@@ -149,7 +150,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
                   : 'Nothing is counted: tick the PC or a plug above.'
                 : detail.wall
                   ? 'The whole PC at the wall.'
-                  : 'No plug is tied to this computer yet. Tie its wall plug in Settings.'}
+                  : 'No plug is tied to this computer yet. Tie its wall plug to it under Computers in the Hierarchy tab.'}
               {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
             </p>
             {counted && carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh) && (
@@ -184,7 +185,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
           )}
 
           {data.lines.some((l) => l.x.length > 0) && (
-            <section class="card">
+            <section class="card wide">
               <h2>Power over time</h2>
               <Chart lines={data.lines} domain={data.domain} />
               <p class="caption">Each plug on its own line. They are not added together.</p>
@@ -205,7 +206,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
           <EnergyHistory id={id} period={period as PeriodKey} />
 
           {data.inside.some((l) => l.x.length > 0) && (
-            <section class="card">
+            <section class="card wide">
               <h2>Inside the PC over time</h2>
               <Chart lines={data.inside} domain={data.domain} shades={data.shades} />
               <p class="caption">
