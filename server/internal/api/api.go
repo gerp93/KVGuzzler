@@ -70,6 +70,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/devices", s.devices)
 	mux.HandleFunc("GET /api/v1/meters", s.meters)
 	mux.HandleFunc("PATCH /api/v1/meters/{meterId}", s.updateMeter)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs", s.meterRuns)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/baseload", s.meterBaseLoad)
+	mux.HandleFunc("GET /api/v1/baseload", s.houseBaseLoad)
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
@@ -257,12 +260,14 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 		ParentID json.RawMessage `json:"parent_id"`
 		// A favorite is offered on the live page as a one-click choice.
 		Favorite *bool `json:"favorite"`
+		// The size of the breaker the meter is on, in amps, or null to forget it; absent leaves it alone.
+		BreakerAmps json.RawMessage `json:"breaker_amps"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
-		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil && body.Favorite == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type, parent_id and/or favorite")
+		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil && body.Favorite == nil && body.BreakerAmps == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type, parent_id, favorite and/or breaker_amps")
 		return
 	}
 	if body.Label != nil {
@@ -303,6 +308,13 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var breaker *float64
+	if body.BreakerAmps != nil {
+		if err := json.Unmarshal(body.BreakerAmps, &breaker); err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "breaker_amps is a number of amps or null")
+			return
+		}
+	}
 	var mtype *model.MeterType
 	if body.Type != nil {
 		t := model.MeterType(*body.Type)
@@ -319,6 +331,9 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && body.Favorite != nil {
 		ch, err = s.Store.SetMeterFavorite(r.Context(), id, *body.Favorite)
+	}
+	if err == nil && body.BreakerAmps != nil {
+		ch, err = s.Store.SetMeterBreaker(r.Context(), id, breaker)
 	}
 	if err == nil && body.ComputerID != nil {
 		ch, err = s.Store.AssignMeter(r.Context(), id, computerID)
@@ -542,6 +557,7 @@ func (s *Server) meterSummary(ctx context.Context, ch model.Meter, from, to time
 		peak := t.PeakWatts
 		cs.PeakWatts = &peak
 	}
+	cs.PeakAmps = t.PeakAmps
 	var readErr error
 	priced := schedule.Cost(func(f, end time.Time) float64 {
 		tot, err := s.Store.Totals(ctx, ch.ID, f, end)

@@ -140,7 +140,7 @@ func (s *Store) setPair(ctx context.Context, c model.Meter, with *string) error 
 
 // mergeLegHistory adds what the second leg recorded into the circuit's minutes, and removes it from the leg: the two clamps are one circuit, so
 // their history is too. Energy is added exactly (power times covered seconds, minute by minute); a minute only one of them recorded is copied; the
-// highest reading of a minute is the two added, an upper bound as everywhere else for two legs. The leg's own rows are removed so that pairing
+// highest power of a minute is the two added, an upper bound as everywhere else for two legs, but the highest current is the larger of the two: one breaker carries the same current in both legs, so amps are never added. The leg's own rows are removed so that pairing
 // again later cannot add them a second time.
 func (s *Store) mergeLegHistory(ctx context.Context, ownerID, legID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -149,11 +149,12 @@ func (s *Store) mergeLegHistory(ctx context.Context, ownerID, legID string) erro
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds)
-SELECT ?, minute, avg_w, max_w, seconds FROM minutes WHERE meter_id = ?
+INSERT INTO minutes(meter_id, minute, avg_w, max_w, seconds, max_a)
+SELECT ?, minute, avg_w, max_w, seconds, max_a FROM minutes WHERE meter_id = ?
 ON CONFLICT(meter_id, minute) DO UPDATE SET
   avg_w   = (avg_w * seconds + excluded.avg_w * excluded.seconds) / max(seconds, excluded.seconds),
   max_w   = max_w + excluded.max_w,
+  max_a   = CASE WHEN max_a IS NULL THEN excluded.max_a WHEN excluded.max_a IS NULL THEN max_a ELSE max(max_a, excluded.max_a) END,
   seconds = max(seconds, excluded.seconds)`, ownerID, legID); err != nil {
 		return err
 	}

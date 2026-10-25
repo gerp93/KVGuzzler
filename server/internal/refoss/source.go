@@ -213,6 +213,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 		return w, true
 	}
 
+	// amps and volts of an input: its clamp's current (never negative) and the voltage it is measured against.
 	var readings []model.Reading
 	var notes, active []string
 	for n := 1; n <= inputsOf; n++ {
@@ -229,11 +230,16 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 			continue
 		}
 		label := InputLabel(n)
+		volts, amps := inputs[n].Voltage, math.Abs(inputs[n].Current)
 		if other := settings[id].PairWith; other != "" {
 			if m, ok := inputOfMeter(other); ok {
 				if w2, ok := watts(m); ok {
 					w += w2
 					label += "+" + InputLabel(m)
+					// One 240 V breaker carries the same current through both of its legs: the current is the larger leg's, never the two added,
+					// while the voltage across the load is the two legs' (each is measured against its own phase) added.
+					volts += inputs[m].Voltage
+					amps = math.Max(amps, math.Abs(inputs[m].Current))
 				}
 			}
 		}
@@ -243,7 +249,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 			}
 			continue
 		}
-		readings = append(readings, model.Reading{MeterID: id, Watts: w})
+		readings = append(readings, model.Reading{MeterID: id, Watts: w, Volts: &volts, Amps: &amps})
 	}
 	s.mu.Lock()
 	s.notes, s.active = notes, active

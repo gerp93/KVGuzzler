@@ -71,6 +71,9 @@ type Meter struct {
 	ParentID *string `json:"parent_id"`
 	// Favorite marks a meter the user wants one click away: it appears as a choice on the live page. Kept here so every device sees the same ones.
 	Favorite bool `json:"favorite"`
+	// BreakerAmps is the size of the breaker this meter is on, as the user said (nil when they have not). It is only used to say how much of it a
+	// current is: the continuous-load rule keeps a load that runs for hours under 80% of it.
+	BreakerAmps *float64 `json:"breaker_amps"`
 }
 
 type Reading struct {
@@ -92,6 +95,8 @@ type Point struct {
 	AvgWatts float64   `json:"avg_watts"`
 	MaxWatts float64   `json:"max_watts"`
 	KWh      float64   `json:"kwh"`
+	// MaxAmps is the highest current in the bucket; nil for a meter that reports none.
+	MaxAmps *float64 `json:"max_amps"`
 }
 
 type Series struct {
@@ -111,7 +116,9 @@ type MeterSummary struct {
 	// CarbonEstimatedKWh is the part of KWh whose carbon was worked out at an average because its own hour had no saved grid intensity.
 	CarbonEstimatedKWh *float64 `json:"carbon_estimated_kwh"`
 	PeakWatts          *float64 `json:"peak_watts"`
-	MonitoredHours     float64  `json:"monitored_hours"`
+	// PeakAmps is the highest current in the period; nil when the meter reports none. For a 240 V pair it is the larger leg, never the two added.
+	PeakAmps       *float64 `json:"peak_amps"`
+	MonitoredHours float64  `json:"monitored_hours"`
 }
 
 type Summary struct {

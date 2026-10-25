@@ -8,6 +8,7 @@ package collector
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -23,7 +24,12 @@ const (
 	noteLifetime  = time.Hour
 )
 
-type acc struct{ ws, max, secs float64 }
+type acc struct {
+	ws, max, secs float64
+	// maxA is the highest current seen in the minute; haveA says whether the meter reported one at all.
+	maxA  float64
+	haveA bool
+}
 
 type state struct {
 	src      source.Source
@@ -227,6 +233,9 @@ func (c *Collector) step(ctx context.Context, st *state, t time.Time) {
 		if r.Watts > a.max {
 			a.max = r.Watts
 		}
+		if r.Amps != nil && *r.Amps >= 0 {
+			a.maxA, a.haveA = math.Max(a.maxA, *r.Amps), true
+		}
 	}
 }
 
@@ -240,7 +249,11 @@ func (c *Collector) flushLocked(ctx context.Context, st *state) {
 	for id, a := range st.acc {
 		if a.secs > 0 {
 			// A failed write is not retried: the minute is lost rather than counted twice.
-			_ = c.store.AddMinute(ctx, id, time.Unix(st.minute, 0), a.ws/a.secs, a.max, a.secs)
+			var amps *float64
+			if a.haveA {
+				amps = &a.maxA
+			}
+			_ = c.store.AddMinuteAmps(ctx, id, time.Unix(st.minute, 0), a.ws/a.secs, a.max, amps, a.secs)
 		}
 	}
 	st.acc = map[string]*acc{}

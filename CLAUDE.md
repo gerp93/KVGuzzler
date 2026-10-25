@@ -54,6 +54,16 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
 - **Deployment settings are never committed.** The box's address, the port and the server settings (`HOUSED_TZ`...) live in
   `~/.config/kvguzzler/deploy.env` on the PC and `/etc/housed/housed.env` on the box; the repo has only `scripts/deploy.env.example` with
   placeholders. Deploy with `scripts/deploy-server.sh` (see `server/README.md`); it restores the old binary if the new one does not answer.
+- **Runs** (`server/internal/runs`, `GET /api/v1/meters/{id}/runs`, `web/src/RunsCard.tsx`): the times a meter was working, found from the stored minutes only. The working level is a quarter of the way from the meter's
+  10th to its 95th percentile (never below 10 W), learned from at least the last 30 days so an hour is judged like a month, or `min_watts`; a meter whose spread is under 15 W has no level and no runs (`threshold_watts` null,
+  the card hides). A dip of up to 5 minutes does not end a run, under 3 minutes is not a run. A run is listed in the period it **starts** in and is followed 12 h past the period's end; its cost is its energy at the price of the
+  day it started (null without a price, never zero), the totals count all runs even past the 500 listed. Runs are a view of one meter's own reading: never added to anything.
+- **Always on** (`server/internal/baseload`, `GET /api/v1/baseload` for the house, `GET /api/v1/meters/{id}/baseload`, `web/src/BaseLoadCard.tsx`): the 5th percentile of a meter's minute averages over the period (not the lowest minute),
+  with the average of the same minutes for its share, and a year of it priced at today's price (null without a price); under 60 minutes of data answers 204. The house is the mains legs added minute by minute, leaving out
+  a minute where a leg is missing. `parts` (house only) are the floors of the meters that hold no other meter: **each is its own floor, never added to each other or to the house's**.
+- **Amps and breakers** (`minutes.max_a`, `meters.breaker_amps`, `web/src/amps.ts`, `Breaker.tsx`): the highest current of each minute is kept next to the highest power (nullable: a meter that reports none has none, never 0 A) and shown
+  as `max_amps` / `peak_amps`. **A 240 V pair carries the same current in both legs: its amps are the larger leg's, never the two added** (live in the Refoss source, in the stored minutes and when pairing merges old history),
+  and its volts are the two legs added. A breaker size (1 to 1000 A, circuits only in the UI) is only used to say what share of it a current is: below 80% is fine, 80% to 100% is above what a steady load should draw, above is over.
 - **Computers** are their own kind of appliance (`/api/v1/computers`): a name, optionally a PC collector that reports its insides
   (`source_id`), one wall plug (a `pc`-scope plug: the whole PC at the wall) and any number of peripherals (`plug`-scope plugs, each a separate
   device). A collector's first push adds its computer; a plug added as "my PC's plug" joins the one computer without a wall plug, else gets a

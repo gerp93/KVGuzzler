@@ -7,6 +7,8 @@ import { useState } from 'preact/hooks';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
+import { breakerLevel, breakerPercent } from './amps';
+import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
 import { FlowChart } from './FlowChart';
@@ -48,13 +50,15 @@ interface Shared {
   /** The name of a computer, by id: a plug that is its wall plug or one of its peripherals says so on its row. */
   computerName: (id: string) => string;
   watts: Map<string, number>;
+  /** Each meter's live volts and amps, when it reports them. */
+  currents: Map<string, { volts: number | null | undefined; amps: number | null | undefined }>;
   dragging: string | null;
   setDragging: (id: string | null) => void;
   onChanged: () => void;
 }
 
 function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; shared: Shared }) {
-  const { all, figures, estimated, deviceName, isOnlyMeterOfDevice, computerName, watts, dragging, setDragging, onChanged } = shared;
+  const { all, figures, estimated, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged } = shared;
   const depth = rows[at]!.depth;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
@@ -90,6 +94,8 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
   const placeable = meter.scope !== 'mains';
 
   const watt = watts.get(meter.id);
+  const livePct = breakerPercent(currents.get(meter.id)?.amps, meter.breaker_amps);
+  const nearBreaker = livePct !== null && breakerLevel(livePct) !== 'ok' ? livePct : null;
   const used = figures.get(meter.id);
   // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
   const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
@@ -157,6 +163,11 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
           </label>
         )}
         <span class="caption hier-tag" title={tag}>
+          {nearBreaker !== null && (
+            <span class={`badge ${nearBreaker > 100 ? 'over' : 'high'}`} title={`Drawing ${nearBreaker}% of its ${meter.breaker_amps} A breaker right now`}>
+              {nearBreaker}% of breaker
+            </span>
+          )}{' '}
           {tag}
         </span>
         <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
@@ -247,6 +258,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
               </label>
             </>
           )}
+          {inPanel && <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />}
           {placeable && (
             <label class="field">
               <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
@@ -346,10 +358,11 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const computerNames = new Map((computers ?? []).map((c) => [c.id, c.name]));
   const computerName = (id: string) => computerNames.get(id) ?? '';
   const watts = new Map((live?.readings ?? []).map((r) => [r.meter_id, r.watts]));
+  const currents = new Map((live?.readings ?? []).map((r) => [r.meter_id, { volts: r.volts, amps: r.amps }]));
   const rows = arrangeByPanel(shownMeters(meters));
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged };
 
   return (
     <>

@@ -1,0 +1,129 @@
+/* Styles of the overnight features (runs, always on, ...). Kept apart from styles.css so the two do not collide. */
+.stats.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+
+/* A meter's runs: each time it was working, newest first */
+.runs-summary {
+  margin: 0 0 8px;
+}
+
+.runs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runs li {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5rem) 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.runs .bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.runs .bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-green);
+}
+
+@media (max-width: 480px) {
+  .runs li {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'when cost' 'bar len';
+    gap: 2px 8px;
+  }
+  .runs .when {
+    grid-area: when;
+  }
+  .runs .cost {
+    grid-area: cost;
+  }
+  .runs .bar {
+    grid-area: bar;
+  }
+  .runs .len {
+    grid-area: len;
+  }
+}
+
+button.link {
+  margin-top: 8px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent-blue);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Current and breakers */
+.breaker-bar {
+  position: relative;
+  height: 10px;
+  margin: 10px 0 4px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 5px;
+}
+
+.breaker-bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-green);
+}
+
+.breaker-bar.high i {
+  background: var(--color-accent-muted);
+}
+
+.breaker-bar.over i {
+  background: var(--color-accent-red);
+}
+
+/* The 80% line a steady load should stay under */
+.breaker-bar b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-text);
+  opacity: 0.6;
+}
+
+.breaker-warning {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.badge {
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+}
+
+/* Readable on every theme: the text colour on a tint of the warning colour */
+.badge {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent-red) 30%, transparent);
+  border-color: var(--color-accent-red);
+}
+
+.badge.over {
+  background: color-mix(in srgb, var(--color-accent-red) 65%, transparent);
+}

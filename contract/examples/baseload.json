@@ -1,0 +1,17 @@
+{
+  "scope": "house",
+  "watts": 312.4,
+  "avg_watts": 1180.7,
+  "share": 0.26,
+  "minutes": 10080,
+  "kwh_per_year": 2738.4,
+  "cost_per_year": "432.67",
+  "rate": "0.1580",
+  "rate_estimated": false,
+  "from": "2026-10-17T05:00:00Z",
+  "to": "2026-10-24T05:00:00Z",
+  "parts": [
+    { "meter_id": "refoss-em16p-1:ch-06", "label": "Fridge", "watts": 92.1, "kwh_per_year": 807.3, "cost_per_year": "127.55" },
+    { "meter_id": "refoss-em16p-1:ch-11", "label": "Office", "watts": 41.0, "kwh_per_year": 359.4, "cost_per_year": "56.78" }
+  ]
+}

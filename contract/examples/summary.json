@@ -27,6 +27,7 @@
       "cost": "14.46",
       "carbon_g": 42400,
       "peak_watts": 5400.0,
+      "peak_amps": 22.9,
       "monitored_hours": 744
     },
     {

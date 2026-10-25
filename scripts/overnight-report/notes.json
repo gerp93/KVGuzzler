@@ -1,0 +1,156 @@
+{
+ "meta": {
+  "intro": "A branch of ideas built on top of everything merged so far, run against a made-up house on this computer. Each section is one thing that was built, with what it does, how it was checked, and a screenshot of it running.",
+  "how": "<p>Everything here lives on one branch that was never merged or deployed, so your real server, its history and its settings are exactly as you left them. The numbers on the screenshots belong to a <strong>made-up house</strong> (a simulator with three weeks of generated history), so they are not your electricity. The screenshots are of the real dashboard code, running locally.</p><p>Each section says <em>feature</em> (something new), <em>insight</em> (something the data can now tell you), <em>fix</em> (something that was wrong) or <em>finding</em> (something I noticed). If you like a piece, ask for it to be made into a pull request; the commits are small and in order, so pieces can be picked one at a time.</p>"
+ },
+ "entries": [
+  {
+   "id": "demo",
+   "title": "A demo house to run all of this on",
+   "kind": "feature",
+   "summary": "The simulator now behaves like a believable house instead of a repeating pattern, so every feature below could be shown with realistic data without touching your real server.",
+   "details": [
+    "A <strong>garage sub-panel</strong> (the EV charger and a workshop inside it) and a <strong>desk PC and monitor</strong> on the office circuit, next to the circuits it already had.",
+    "Each day has its own plan worked out from the date: the car charges on about 70% of nights and tapers off at the end, the dryer runs on some days, the air conditioner works harder on a hot day, the office is quiet at the weekend. The same day always looks the same, and the live readings follow the same plans as the history.",
+    "<code>-sim-days 21</code> writes three weeks of made-up history once; <code>scripts/demo.sh</code> runs everything on its own port with its own temporary database and <code>scripts/demo-seed.py</code> lays it out the way you have yours: nesting, a computer with its collector's CPU, GPU and memory, a group, favorites and a price.",
+    "Tests: the history has every meter for every minute, is identical when made twice, never exceeds a meter's cap, and a window can run past midnight."
+   ],
+   "images": [
+    {
+     "path": "img/demo-mcp-Claude_Browser-blob-1792827427941-u4sxet.jpg",
+     "caption": "The flow chart over seven days of the demo house: the house, the garage panel holding the EV charger and the workshop, and the desk PC's parts."
+    }
+   ],
+   "commit": "a99f39f",
+   "tests": "go test ./... passes"
+  },
+  {
+   "id": "runs",
+   "title": "Runs: every time the car charged or the dryer ran",
+   "kind": "feature",
+   "summary": "A meter's page now has a <strong>Runs</strong> card: each stretch the meter was really working (a charging session, a dryer load, an oven preheat), with how long it lasted, how much energy it took and what it cost. For the EV charger it reads like a charging log: <em>7 runs, about 21 kWh and $3.36 each, 3 h on average</em>.",
+   "details": [
+    "<strong>Why it matters:</strong> a bill is a monthly lump; a run is something you can act on. \"A charge costs $3.36 and I do it five nights a week\" is a number you can compare with the public charger or with moving the charge to the cheap hours.",
+    "<strong>How a run is found</strong> (no new device reading, only the minutes already stored): the level that counts as working is a quarter of the way from the meter's resting power (its 10th percentile) to its working power (its 95th), learned from the last 30 days so that looking at one hour is judged by the same level as a month. A dip of up to five minutes does not end a run (a heating element clicking off), and a stretch shorter than three minutes is not a run. A meter whose busiest and quietest minutes differ by less than 15 W (a router) has no level and no card.",
+    "<strong>API:</strong> <code>GET /api/v1/meters/{id}/runs?from&to</code> with an optional <code>min_watts</code>. It gives the level, the runs newest first (at most 500), each with start, end, minutes, kWh, average and peak watts and a cost, plus totals over all runs and the meter's own energy so the card can say what share of the meter the runs hold. A run is listed in the period it <em>starts</em> in and is followed up to 12 hours past the end so it is whole. The cost is the run's energy at the price of the day it started (the same schedule code every other figure uses; no price saved gives no cost, never a zero).",
+    "<strong>Phone:</strong> on a narrow screen each run becomes two lines (when and cost on the first, the bar and length on the second).",
+    "<strong>Note for the demo:</strong> the simulator plans each day on its own, so a charge that would cross midnight is cut at midnight into two runs (\"Fri 12:00 AM\" is the tail of Thursday night's charge). A real car would not do this; it is a simulator artefact."
+   ],
+   "images": [
+    {
+     "path": "img/runs-mcp-Claude_Browser-blob-1792844213056-42xkx9.jpg",
+     "caption": "The EV charger over seven days: seven charging sessions beside the power chart that shows the same seven plateaus."
+    },
+    {
+     "path": "img/runs-mcp-Claude_Browser-blob-1792844271840-pnxjmd.jpg",
+     "caption": "The same card at phone width (375 px)."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: five API tests (charges listed newest first with exact kWh, cost at the day's price, a steady fridge has no runs, a run belongs to the period it starts in and is whole, bad asks are refused), plus the earlier detection tests. Web: runs.test.ts. Contract example <code>meter-runs.json</code> validates against the schema.",
+   "files": [
+    "server/internal/api/runs.go",
+    "server/internal/store/minutes.go",
+    "web/src/RunsCard.tsx",
+    "web/src/runs.ts",
+    "contract/openapi.yaml"
+   ],
+   "notes": "Not verified: on your real house (only the simulator's charger was looked at), and with a car that tapers its charge in many small steps (the 5-minute dip rule may split such a charge). A compressor that cycles (a fridge) also gets a Runs card, with many short runs: that is true to what it does but not very useful; the card could be hidden for runs shorter than ten minutes on average."
+  },
+  {
+   "id": "baseload",
+   "title": "Always on: the power the house never goes below",
+   "kind": "insight",
+   "summary": "A new <strong>Always on</strong> card on the Live page (for the house) and on every meter's page: the power it hardly ever drops below, what a year of that costs, and what share of everything it uses is on all day and night. In the demo house: <em>460 W, $637 a year, 12% of use</em>.",
+   "details": [
+    "<strong>Why it matters:</strong> the always-on floor is the part of the bill you pay for doing nothing, and the easiest part to cut (a standby box, an old freezer, a monitor that never sleeps). Seeing it as a yearly dollar figure makes it concrete.",
+    "<strong>How it is worked out:</strong> the 5th percentile of the minute averages over the period picked (not the single lowest minute, so one dropped reading or glitched clamp cannot set it). A year of it is priced at today's price; the share is the floor divided by the average of the same minutes. Under an hour of recorded minutes it says nothing (the endpoint answers 204 and the card is not drawn).",
+    "<strong>The house</strong> is the two mains legs added minute by minute; a minute where one leg is missing is left out, so the sum is never one leg short. Nothing is added to anything else.",
+    "<strong>\"What each meter rests at\"</strong> (house card only): each meter that holds no other meter, biggest first. They are explicitly <em>not</em> added to each other or to the house's floor, because the quietest minutes of different meters need not coincide; the card says so.",
+    "<strong>API:</strong> <code>GET /api/v1/baseload?from&to</code> and <code>GET /api/v1/meters/{id}/baseload?from&to</code>; contract schema <code>BaseLoad</code> and example <code>baseload.json</code>."
+   ],
+   "images": [
+    {
+     "path": "img/baseload-mcp-Claude_Browser-blob-1792844570024-t2j8fl.jpg",
+     "caption": "The Live page over seven days: the house never goes below 460 W; a year of that is $637. The list beneath shows what each meter rests at."
+    },
+    {
+     "path": "img/baseload-mcp-Claude_Browser-blob-1792844570025-732dvz.jpg",
+     "caption": "The same card on the Office circuit's page at phone width."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: <code>baseload</code> package tests (what it rests at, one glitched minute does not set it, under an hour says nothing, negative and broken readings are not power, a meter that uses nothing has no share) and API tests (a meter's floor, its yearly cost at the saved price with no cost when no price is saved, the house floor never one leg short, the breakdown lists only meters that hold nothing, 204/404/400 cases). Web: <code>baseload.test.ts</code>. Contract example validates.",
+   "notes": "Finding in the demo: the house floor (460 W) is much larger than any meter's own floor (the biggest is 40 W), because the simulator has about 300 W of unmetered base load. On a real house that gap (the floor of the house minus the floors of what is metered) would say how much always-on power no clamp sees; I did not turn it into a number, because floors of different meters are not additive. A cycling appliance (the fridge) rests at its off level between cycles, so its floor reads as 4 W rather than its average; the card says so. Not verified on your real house."
+  },
+  {
+   "id": "amps",
+   "title": "Amps and breakers: how close is each circuit to tripping",
+   "kind": "feature",
+   "summary": "The Refoss monitor's current and voltage used to be read and thrown away. Now each meter shows its <strong>live volts and amps</strong>, the <strong>highest amps of every minute</strong> is stored next to the highest watts, and you can say how big each breaker is: the dashboard then shows <strong>what share of the breaker</strong> the circuit used and warns above <strong>80%</strong>.",
+   "details": [
+    "<strong>Why it matters:</strong> a circuit that runs near its breaker's size for hours (an EV charger, a water heater, a space heater) is the one that trips, or that an electrician would want to hear about. The 80% line is the continuous-load rule: a load that runs for three hours or more should stay at or below 80% of the breaker.",
+    "<strong>Storage:</strong> a new nullable <code>max_a</code> column on the per-minute rows (an additive migration; older databases open unchanged and their old minutes simply have no current) and a nullable <code>breaker_amps</code> on meters. The contract gets <code>max_amps</code> on series points, <code>peak_amps</code> on meter summaries and <code>breaker_amps</code> on meters and the meter update.",
+    "<strong>240 V pairs:</strong> one breaker carries the <em>same</em> current in both legs, so a pair's amps are the <strong>larger leg</strong>, never the sum, and its voltage is the two legs added (about 237 V). This holds live (the Refoss source), in the stored minutes and when two clamps are paired late and their earlier history is merged (power is added, amps are not). Each of these is a test.",
+    "<strong>Where you see it:</strong> a <em>Current</em> card on each meter's page (right now with volts, highest in the period, and the share of the breaker with a bar marked at 80% and a warning sentence); a <em>Breaker size</em> list in the Hierarchy tab's wiring panel (the usual sizes 15 to 200 A; \"Not set\" forgets it) with the live reading beside it; and a small badge on a Hierarchy row, \"90% of breaker\", whenever a circuit is above 80% right now.",
+    "<strong>Demo:</strong> the seed script sets breaker sizes; the water heater's is deliberately too small (20 A for a 4.4 kW element), so the demo shows a warning: it reached 97% of its 20 A breaker."
+   ],
+   "images": [
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845009802-mgbeej.jpg",
+     "caption": "The water heater's page over seven days: the highest current was 19.3 A on a 20 A breaker (97%), with the 80% line marked and the warning."
+    },
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845044289-5dprtt.jpg",
+     "caption": "The Breaker size list in a row's wiring panel, with the live reading beside it."
+    },
+    {
+     "path": "img/amps-mcp-Claude_Browser-blob-1792845127384-0nge4t.png",
+     "caption": "A row warns while its circuit is above 80% of its breaker (HVAC, with its breaker set to 15 A for the picture)."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: store tests (a minute written in halves keeps the larger current, a meter that never reported one has none rather than 0 A, series carry each bucket's highest, pairing keeps the larger leg and adds the power, breaker sizes are validated, a database from before the column opens), a Refoss source test (own volts and amps; a pair is the larger leg's amps and the legs' volts added), API tests (summary and series carry the amps and agree with watts over volts, breaker set, forgotten and refused when 0, negative, over 1000 or not a number). Web: amps.test.ts. Contract examples validate.",
+   "notes": "Not verified against a real Refoss: the demo's volts and amps come from the simulator, and a real EM16P's current is read as the monitor reports it (never negative). The 80% rule is judged on the highest minute, not on how long a load really ran: a short spike above 80% also warns. A run's own average current is not yet shown (idea for later). The house card has no amps: the legs are not added. Breaker size is offered for circuits only (not the mains or a plug)."
+  },
+  {
+   "id": "proposed",
+   "title": "Not built yet: the to-do and proposed list",
+   "kind": "finding",
+   "summary": "You woke up and asked me to stop and list what was left, so this is the list to review. Three of your backlog items were not started; one was designed and then taken out rather than left half done; the rest are my own ideas, in the order I would do them.",
+   "details": [
+    "<strong>From your backlog, not built:</strong>",
+    "<strong>Data checks panel</strong> (Hierarchy tab): things that look wrong, each with a plain-language fix. Designed, not shipped. The rules I had settled on: a meter inside another that used more than its parent (a problem if it still happens in the last hour, a warning if only earlier in the week, which is what happens when clamps are paired late); the main circuits adding up to more than the house; a device that stopped answering (its meters are covered by it, not listed separately); a meter that has never recorded or stopped reporting while its device answers; a clamp reading backwards (from the server's own note); gaps of more than an hour or 5% in a week; no price saved. Pure rules in their own package so each is a test on made-up facts, the API gathers the facts. The draft is kept in the shared notes folder (<code>data-checks-draft-checks.go.txt</code>), not in the branch.",
+    "<strong>Month projection and comparison:</strong> month-to-date kWh and cost with \"at this pace: $X for the month\" on the Live page, and a \"vs the period before\" change (up or down percent) on the tiles of the Live page and a meter page. Needs a month-to-date and a previous-period query that reuse the same price schedule.",
+    "<strong>Heat map:</strong> hour of day by weekday of average power for the house and any meter, a compact SVG on the meter page and the Live page.",
+    "<strong>My own ideas, in the order I would do them:</strong>",
+    "<strong>Cheaper charging hours:</strong> for a meter with runs (the EV), what the same runs would have cost at the cheapest hours of a time-of-use tariff. Directly useful to an EV owner and the data is already there (runs plus the looked-up tariff).",
+    "<strong>Average current of a run</strong> and the 80% rule judged on a run's length (three hours or more) rather than on the highest minute, so a short spike no longer warns.",
+    "<strong>Anomaly view:</strong> days far above that meter's usual (same weekday), with the cause (which circuit changed).",
+    "<strong>Unmetered always-on:</strong> the house floor against the floors of what is metered. In the demo it is 460 W against 40 W for the biggest meter. Floors are not additive, so it needs a careful wording, not a subtraction.",
+    "<strong>CSV export</strong> of the tree and of runs; a <strong>cost-per-day sparkline</strong> on each tree row; a <strong>weekly summary text</strong> (what you used, what it cost, what changed, the biggest run); an <strong>\"explain this number\" popover</strong>; a printable layout.",
+    "<strong>Runs polish:</strong> hide the Runs card for a meter whose average run is under about ten minutes (a fridge compressor); handle a charge that crosses midnight in the simulator.",
+    "<strong>Keyboard and screen-reader pass</strong> of the Hierarchy tab and the flow chart; performance with many meters (each page asks the server once per meter today)."
+   ],
+   "images": [],
+   "commit": "",
+   "tests": "",
+   "notes": "Nothing on this list is in the branch."
+  },
+  {
+   "id": "coordination",
+   "title": "Another session is redesigning the same screens (PR #75)",
+   "kind": "finding",
+   "summary": "A cloud session (\"Responsive UI optimization\") has an open pull request, <a href=\"https://github.com/gerp93/KVGuzzler/pull/75\">#75</a>, with a big pass over the dashboard's look: 29 files, about 1,180 lines added. It edits the same screens this branch adds cards to, so the order they land in matters.",
+   "details": [
+    "<strong>What it changes:</strong> a phone tab bar, a Live page with a trend line, meter lists that restack by card width, the Hierarchy rows on a phone, a period picker with short labels, ultra-wide layouts and a large block of new CSS. It touches <code>LiveView.tsx</code>, <code>MeterPage.tsx</code>, <code>HierarchyView.tsx</code> and <code>styles.css</code>, as this branch does.",
+    "<strong>Coordination:</strong> I sent it a message listing my files; it cannot reply to me (cloud sessions cannot message back), but its notes file <code>web/UX_NOTES.md</code> in the PR names this branch and says whoever lands second merges main. A trial merge of the two (nothing written) comes out <strong>clean, with no conflicts</strong>, because this branch keeps all its styles in a separate <code>features.css</code> and edits the shared files only a few lines at a time.",
+    "<strong>What to expect:</strong> the cards here (Runs, Always on, Current) use the existing <code>.bars</code> and <code>.stats</code> classes, not the new shared pieces in PR #75 (<code>Hint</code>, <code>Skeleton</code>, container-query rows). After both land they will work but may need a visual pass, mainly the phone and ultra-wide layouts. I did not look at them together."
+   ],
+   "images": [],
+   "commit": "",
+   "tests": "",
+   "notes": "Not verified: both branches running together. I did not merge either into the other."
+  }
+ ]
+}

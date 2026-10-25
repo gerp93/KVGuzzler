@@ -99,6 +99,72 @@ export interface paths {
         patch: operations["updateMeter"];
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The times a meter was working over a period (a car charging, a dryer drying).
+         * @description Found from the recorded minutes alone: a run is a stretch where the meter drew clearly more than it does at rest. A short dip inside a
+         *     run does not end it and a blip of a minute or two is not a run. The level that counts as working is learned from the meter's last 30 days
+         *     (so an hour is judged by the same level as a month) unless `min_watts` is given. A meter that barely changes has no such level
+         *     (`threshold_watts` is null) and no runs. A run is listed in the period it starts in; the newest 500 are listed and `totals` counts all.
+         */
+        get: operations["getMeterRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/meters/{meterId}/baseload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The power a meter never goes below over a period, its yearly cost and its share of what it uses.
+         * @description The 5th percentile of the meter's minute averages (not the lowest minute: a dropout must not set it), with the average of the same
+         *     minutes so the always-on share can be said. A year of it is priced at today's price. 204 when under an hour of minutes was recorded.
+         *     A view of the meter's own reading: never added to any other meter's figure.
+         */
+        get: operations["getMeterBaseLoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/baseload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The power the whole house never goes below over a period.
+         * @description Same as a meter's base load, for the mains legs added minute by minute (a minute where one leg is missing is left out, so the sum is
+         *     never one leg short). 204 when no mains meter is shown or under an hour of minutes was recorded.
+         */
+        get: operations["getHouseBaseLoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/live": {
         parameters: {
             query?: never;
@@ -676,6 +742,11 @@ export interface components {
              *     not reported on its own. Only a Refoss meter has it.
              */
             pair_with?: string | null;
+            /**
+             * @description The size of the breaker this meter is on, in amps, as the user said; null when not said. Only used to say how much of the breaker a
+             *     current is (the continuous-load rule keeps a load that runs for hours under 80% of it).
+             */
+            breaker_amps?: number | null;
         };
         MeterUpdate: {
             label?: string;
@@ -710,11 +781,15 @@ export interface components {
              *     is only a grouping, so it may also be a computer's plug or sit inside another meter.
              */
             group_id?: string | null;
+            /** @description The size of the breaker the meter is on, in amps, or null to forget it. */
+            breaker_amps?: number | null;
         };
         Reading: {
             meter_id: string;
             watts: number;
+            /** @description The voltage the reading is measured against. A 240 V pair reports its two legs added. */
             volts?: number | null;
+            /** @description The current. A 240 V pair carries the same current in both legs, so this is the larger leg's, never the two added. */
             amps?: number | null;
         };
         Live: {
@@ -734,11 +809,94 @@ export interface components {
             avg_watts: number;
             max_watts: number;
             kwh: number;
+            /** @description The highest current in the bucket (a 240 V pair's is the larger leg's); null for a meter that reports none. */
+            max_amps?: number | null;
         };
         Series: {
             meter_id: string;
             bucket: components["schemas"]["Bucket"];
             points: components["schemas"]["SeriesPoint"][];
+        };
+        BaseLoad: {
+            /** @enum {string} */
+            scope: "house" | "meter";
+            meter_id?: string;
+            /** @description The 5th percentile of the minute averages, the power it hardly ever goes below. */
+            watts: number;
+            /** @description The average of the same minutes. */
+            avg_watts: number;
+            /** @description The part (0 to 1) of what it uses that is always on. */
+            share: number;
+            /** @description How many recorded minutes the figure rests on. */
+            minutes: number;
+            kwh_per_year: number;
+            /** @description A year of that power at today's price; null when no price is known. */
+            cost_per_year: components["schemas"]["Money"] | null;
+            /** @description Today's price per kWh that the yearly cost used. */
+            rate: components["schemas"]["Money"] | null;
+            rate_estimated: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /**
+             * @description House only: the always-on power of the meters that hold no other meter (the fridge, the workshop, the desk PC), biggest first, at
+             *     most 8. Each is that meter's own floor; they are never added to the house's or to each other, because the lowest minutes of
+             *     different meters need not coincide.
+             */
+            parts?: components["schemas"]["BaseLoadPart"][];
+        };
+        BaseLoadPart: {
+            meter_id: string;
+            label: string;
+            watts: number;
+            kwh_per_year: number;
+            cost_per_year: components["schemas"]["Money"] | null;
+        };
+        MeterRun: {
+            /** Format: date-time */
+            start: string;
+            /**
+             * Format: date-time
+             * @description The end of the last working minute.
+             */
+            end: string;
+            /** @description From the first to the last working minute, the short dips inside it included. */
+            minutes: number;
+            /** @description Every recorded minute from the first working one to the last, the dips inside it included. */
+            kwh: number;
+            avg_watts: number;
+            peak_watts: number;
+            /** @description The run's energy at the price of the local day it started; null when no price is known. */
+            cost: components["schemas"]["Money"] | null;
+        };
+        /** @description Over every run that starts in the period, also those past the listed 500. */
+        MeterRunTotals: {
+            count: number;
+            kwh: number;
+            /** @description Null unless every run has a price. */
+            cost: components["schemas"]["Money"] | null;
+            /** @description The runs' minutes added. */
+            minutes: number;
+            longest_minutes: number;
+            peak_watts: number;
+        };
+        MeterRuns: {
+            meter_id: string;
+            /** @description The level above which a minute counts as working; null for a meter that barely changes. */
+            threshold_watts: number | null;
+            /** @description Everything the meter used over the period, so the runs' share of it can be said. */
+            meter_kwh: number;
+            /** @description Newest first, at most 500. */
+            runs: components["schemas"]["MeterRun"][];
+            totals: components["schemas"]["MeterRunTotals"];
+            truncated: boolean;
+            /** @description True when any run was priced at an estimated price (a day after the latest bill). */
+            cost_estimated: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
         };
         MeterSummary: {
             meter_id: string;
@@ -754,6 +912,8 @@ export interface components {
             /** @description The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity. */
             carbon_estimated_kwh?: number | null;
             peak_watts?: number | null;
+            /** @description The highest current in the period; null when the meter reports none. For a 240 V pair it is the larger leg's, never the two added. */
+            peak_amps?: number | null;
             /** @description Hours inside the period in which this meter actually reported. */
             monitored_hours?: number;
         };
@@ -1436,6 +1596,106 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    getMeterRuns: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+                /** @description Count a minute as working from this many watts up, instead of the learned level. */
+                min_watts?: number;
+            };
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeterRuns"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMeterBaseLoad: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseLoad"];
+                };
+            };
+            /** @description Under an hour of minutes was recorded in the period. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getHouseBaseLoad: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseLoad"];
+                };
+            };
+            /** @description Nothing to say yet. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
         };
     };
     getLive: {

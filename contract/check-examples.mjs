@@ -19,6 +19,8 @@ const examples = {
   'tariff-candidates.json': 'TariffCandidates',
   'carbon-config.json': 'CarbonConfig',
   'house-history.json': 'HouseHistory',
+  'meter-runs.json': 'MeterRuns',
+  'baseload.json': 'BaseLoad',
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });
