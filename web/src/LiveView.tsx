@@ -166,8 +166,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         <RateNote kwh={kwh} cost={cost} />
       </section>
 
-      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
-
       {live.notes.length > 0 && (
         <section class="card warn" aria-live="polite">
           {live.notes.map((n) => (
@@ -197,6 +195,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <p class="caption">Over the period, {formatKwh(summary.unmetered_kwh)} of the house's energy went through no circuit clamp.</p>
         )}
       </section>
+
+      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
 
       {summary && circuits.length > 0 && (
         <section class="card flow-card">
