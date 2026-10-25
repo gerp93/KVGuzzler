@@ -182,6 +182,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         </section>
       )}
 
+      {mains.length > 0 && <BaseLoadCard period={period as PeriodKey} />}
+
       <section class="card">
         <h2>Circuits</h2>
         {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
