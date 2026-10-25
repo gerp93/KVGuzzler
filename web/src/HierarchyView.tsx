@@ -385,9 +385,16 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
       <section class="card wide">
         <div class="row">
           <h2>Hierarchy</h2>
-          <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>
-            ＋ Add
-          </button>
+          <div class="inline-actions">
+            {summary && (
+              <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked above, in this order, as a spreadsheet file">
+                Download as CSV
+              </a>
+            )}
+            <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+              ＋ Add
+            </button>
+          </div>
         </div>
         {adding && (
           <AddPanel

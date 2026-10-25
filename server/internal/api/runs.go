@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"sort"
@@ -53,40 +54,56 @@ type runsAnswer struct {
 // meterRuns lists the times a meter was working over a period: a car charging, a dryer drying. It reads only the recorded minutes. A run is
 // listed in the period it starts in.
 func (s *Server) meterRuns(w http.ResponseWriter, r *http.Request) {
-	from, to, err := parsePeriod(r)
-	if err != nil {
-		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+	id, from, to, minWatts, ok := s.runsRequest(w, r)
+	if !ok {
 		return
 	}
-	_, byID, err := s.enabledMeters(r.Context())
+	out, err := s.computeRuns(r.Context(), id, from, to, minWatts, maxRuns)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	id := r.PathValue("meterId")
-	if _, ok := byID[id]; !ok {
-		writeProblem(w, http.StatusNotFound, "unknown_meter", "no such meter")
-		return
+	writeJSON(w, http.StatusOK, out)
+}
+
+// runsRequest reads and checks what a runs request asks for (the meter, the period, an optional level); it answers the problem itself and says false.
+func (s *Server) runsRequest(w http.ResponseWriter, r *http.Request) (id string, from, to time.Time, minWatts *float64, ok bool) {
+	from, to, err := parsePeriod(r)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+		return "", from, to, nil, false
 	}
-	var minWatts *float64
+	_, byID, err := s.enabledMeters(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return "", from, to, nil, false
+	}
+	id = r.PathValue("meterId")
+	if _, found := byID[id]; !found {
+		writeProblem(w, http.StatusNotFound, "unknown_meter", "no such meter")
+		return "", from, to, nil, false
+	}
 	if v := r.URL.Query().Get("min_watts"); v != "" {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil || f <= 0 || math.IsInf(f, 0) || math.IsNaN(f) || f > 1e6 {
 			writeProblem(w, http.StatusBadRequest, "bad_min_watts", "min_watts is a positive number of watts")
-			return
+			return "", from, to, nil, false
 		}
 		minWatts = &f
 	}
+	return id, from, to, minWatts, true
+}
 
+// computeRuns finds a meter's runs over a period and prices them. At most limit are listed (0 lists all); the totals always count every run.
+func (s *Server) computeRuns(ctx context.Context, id string, from, to time.Time, minWatts *float64, limit int) (runsAnswer, error) {
 	readFrom := from
 	if lb := to.Add(-thresholdLookback); lb.Before(readFrom) {
 		readFrom = lb
 	}
 	// A little past the end too, so a run that begins inside the period and carries on after it is whole.
-	points, err := s.Store.MeterMinutes(r.Context(), id, readFrom, to.Add(runTail))
+	points, err := s.Store.MeterMinutes(ctx, id, readFrom, to.Add(runTail))
 	if err != nil {
-		serverError(w, err)
-		return
+		return runsAnswer{}, err
 	}
 	threshold := runs.Threshold(points)
 	if minWatts != nil {
@@ -99,17 +116,15 @@ func (s *Server) meterRuns(w http.ResponseWriter, r *http.Request) {
 		t := threshold
 		out.ThresholdWatts = &t
 	}
-	tot, err := s.Store.Totals(r.Context(), id, from, to)
+	tot, err := s.Store.Totals(ctx, id, from, to)
 	if err != nil {
-		serverError(w, err)
-		return
+		return runsAnswer{}, err
 	}
 	out.MeterKWh = tot.KWh
 
-	cfg, err := s.rateConfig(r.Context())
+	cfg, err := s.rateConfig(ctx)
 	if err != nil {
-		serverError(w, err)
-		return
+		return runsAnswer{}, err
 	}
 	schedule := cfg.Schedule(s.Loc)
 	var cost rates.Money
@@ -142,9 +157,9 @@ func (s *Server) meterRuns(w http.ResponseWriter, r *http.Request) {
 		out.Totals.Cost = &c
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Start.After(items[j].Start) })
-	if len(items) > maxRuns {
-		items, out.Truncated = items[:maxRuns], true
+	if limit > 0 && len(items) > limit {
+		items, out.Truncated = items[:limit], true
 	}
 	out.Runs = items
-	writeJSON(w, http.StatusOK, out)
+	return out, nil
 }

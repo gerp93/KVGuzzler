@@ -176,6 +176,31 @@
    "commit": "",
    "tests": "Go: the run's average current weighted by time and nil without any (runs package), the minute merge and MeterMinutes (store), the API's avg_amps and peak_amps (and null for a meter with no current), a meter that works 2% of the time has a level. Web: the verdict rules, the longest run that breaks the 80% rule, typical current. Contract example validates.",
    "notes": "Not verified on a real Refoss or a real car. A charge that tapers in many steps and drops below the working level for more than 5 minutes is split into several runs and may then look shorter than 3 hours. Currents before this change are not backfilled."
+  },
+  {
+   "id": "csv",
+   "title": "CSV export of the runs and of the meter tree",
+   "kind": "feature",
+   "summary": "Two spreadsheet downloads: <strong>a meter's runs</strong> (a button on its Runs card) and <strong>every meter in tree order</strong> (a button in the Hierarchy tab). Both are for the period picked on screen.",
+   "details": [
+    "<strong>Runs CSV</strong> (<code>GET /api/v1/meters/{id}/runs.csv</code>): one row per run, <em>all</em> of them (the screen lists the newest 500), with start and end in local time, minutes, kWh, average and peak watts, average and peak amps (blank when the meter reports none) and the cost at that day's price (blank with no price). It uses the same run finding as the card, so the two always agree.",
+    "<strong>Meters CSV</strong> (<code>GET /api/v1/tree.csv</code>): one row per shown meter in the Hierarchy tab's order (the mains first, then each meter followed by what is inside it) with its type, scope, device, where it sits (<code>Garage panel &gt; EV charger</code>), energy, cost, highest watts and amps, breaker size and the hours it reported. Its <code>inside_count</code> column says which rows contain others, because a parent's reading already counts its children, so the rows are <strong>not meant to be added</strong>.",
+    "A name a spreadsheet could run as a formula (starting with =, + or @) is written as text, as in the existing exports; the plain-number format (a dot, no thousands separator) is the same too.",
+    "The run finding was split into a function the JSON answer and the CSV both call, so there is one place that decides what a run is."
+   ],
+   "images": [
+    {
+     "path": "img/csv-mcp-Claude_Browser-blob-1792888034366-0818ez.jpg",
+     "caption": "The EV charger's page with the new Download the runs as CSV button."
+    },
+    {
+     "path": "img/csv-mcp-Claude_Browser-blob-1792888046943-ps8jp4.jpg",
+     "caption": "The Hierarchy tab with Download as CSV beside + Add."
+    }
+   ],
+   "commit": "",
+   "tests": "Go: the tree order (mains first, children after their parent, a meter whose parent is hidden at the top, a loop cannot repeat a meter, the mains is never inside anything); the runs CSV (header, all three charges, exact first row, file name, 404); the meters CSV parsed with a CSV reader (order, path, inside count, breaker, the meter's own kWh, a formula-looking label written as text). Contract paths validate.",
+   "notes": "Not verified: opening the files in Excel or Sheets (the format follows the existing exports, which were). The file name uses the server's local dates. The download buttons are plain links, so they cannot show an error: a bad request would save an error file."
   }
  ]
 }

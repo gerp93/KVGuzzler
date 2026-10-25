@@ -230,6 +230,58 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/runs.csv:
+    get:
+      tags: [Read]
+      operationId: exportMeterRunsCsv
+      summary: A meter's runs over a period, as a CSV download.
+      description: |
+        One row per run (all of them, where the JSON answer lists the newest 500): start and end in the server's local time, minutes, kWh,
+        average and peak watts, average and peak amps (blank when the meter reports no current) and the cost (blank when no price is known).
+        Found the same way as `GET /meters/{meterId}/runs`, with the same `min_watts`.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: min_watts
+          in: query
+          required: false
+          schema:
+            type: number
+            exclusiveMinimum: 0
+      responses:
+        '200':
+          description: The CSV, sent as an attachment.
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/tree.csv:
+    get:
+      tags: [Read]
+      operationId: exportTreeCsv
+      summary: Every shown meter over a period, as a CSV download, in the order of the Hierarchy tab.
+      description: |
+        One row per meter: its label, id, type, scope, device, where it sits ("Garage panel > EV charger"), how many meters are directly inside it
+        (`inside_count`), its energy, cost, highest power and current, its breaker and the hours it reported. A meter's own reading already contains
+        the ones inside it, so the rows are never meant to be added: `inside_count` says which rows hold others. A label a spreadsheet could run as a
+        formula is written as text.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: The CSV, sent as an attachment.
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Problem'
   /api/v1/meters/{meterId}/baseload:
     get:
       tags: [Read]
