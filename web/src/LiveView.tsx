@@ -1,6 +1,7 @@
 // The main dashboard: the whole house, with the same kinds of figure a computer's page has (energy, cost, right now, highest draw, carbon,
 // an estimator, a history list, a CSV and a chart), then each circuit. The house is the mains clamps alone: circuits and plugs are parts of
 // it and are never added to it.
+import { useMemo } from 'preact/hooks';
 import { api } from './api';
 import { Bars, meterPath } from './Bars';
 import { ComputerView } from './ComputerView';
@@ -91,6 +92,9 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
     60_000,
     [period, subjects.map((m) => m.id).join(',')],
   );
+
+  // One array while the figures are the same ones: the chart is rebuilt when this is a different object, and this page re-renders every 2 seconds.
+  const chartLines = useMemo(() => (figures?.line ? [figures.line] : []), [figures]);
 
   if (!live) return error ? <p class="note">{`Waiting for the server: ${error.message}`}</p> : <Skeleton />;
 
@@ -207,7 +211,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
                 Compare meters in History
               </a>
             </div>
-            <Chart lines={[figures.line]} domain={figures.domain} height={wideChartHeight()} />
+            <Chart lines={chartLines} domain={figures.domain} height={wideChartHeight()} />
           </section>
         )}
 
