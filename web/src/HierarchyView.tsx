@@ -5,6 +5,7 @@
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
+import { Watts } from './Watts';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
@@ -22,7 +23,7 @@ import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import {
-  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
+  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
@@ -171,7 +172,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
           )}{' '}
           {tag}
         </span>
-        <span class="num hier-watts">{watt !== undefined ? formatWatts(watt) : ''}</span>
+        <span class="num hier-watts">{watt !== undefined ? <Watts w={watt} /> : ''}</span>
         <span class="num hier-energy">{used ? formatKwh(used.kwh) : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
         <div class="hier-actions">
@@ -292,7 +293,7 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
           {part.label}
         </span>
         <span class="caption hier-tag">{part.remainder ? 'wall plug less the parts' : 'from its collector'}</span>
-        <span class="num hier-watts">{part.watts != null ? formatWatts(part.watts) : ''}</span>
+        <span class="num hier-watts">{part.watts != null ? <Watts w={part.watts} /> : ''}</span>
         <span class="num hier-energy">{formatKwh(part.kwh)}</span>
         <span class="num hier-cost">{part.cost != null ? formatMoney(part.cost, true) : '—'}</span>
         <div class="hier-actions">

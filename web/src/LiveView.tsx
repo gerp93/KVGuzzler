@@ -9,6 +9,7 @@ import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { Kpi, KpiRow } from './Kpi';
+import { Watts } from './Watts';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
@@ -134,7 +135,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <h2 class="page-title">{title}</h2>
           {top && top.watts > 0 && (
             <p class="page-sub">
-              Biggest circuit right now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, {formatWatts(top.watts)}
+              Biggest circuit right now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, <Watts w={top.watts} />
               {nowWatts != null && nowWatts > 0 ? ` (${Math.round((top.watts / nowWatts) * 100)}% of the total)` : ''}
             </p>
           )}
@@ -202,7 +203,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           {rest !== null && (
             <p class="derived">
               <span>Other (not metered)</span>
-              <span class="num">{formatWatts(rest)}</span>
+              <span class="num"><Watts w={rest} /></span>
             </p>
           )}
           {summary?.unmetered_kwh != null && (

@@ -5,7 +5,8 @@ import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
-import { formatKwh, formatMoney, formatWatts, type ApplianceGroup, type GroupDetail, type Meter } from './lib';
+import { Watts } from './Watts';
+import { formatKwh, formatMoney, type ApplianceGroup, type GroupDetail, type Meter } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
@@ -128,7 +129,7 @@ function GroupRow({
         <span class="caption hier-tag">
           {members.length} {members.length === 1 ? 'meter' : 'meters'}
         </span>
-        <span class="num hier-watts">{now !== null ? formatWatts(now) : ''}</span>
+        <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
         <span class="num hier-energy">{detail ? formatKwh(detail.total_kwh) : ''}</span>
         <span class="num hier-cost">{detail?.total_cost != null ? formatMoney(detail.total_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">

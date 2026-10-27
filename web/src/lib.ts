@@ -80,9 +80,14 @@ export function periodWords(key: PeriodKey): string {
   }
 }
 
+/** Whether a draw is shown in kilowatts rather than watts: the point at which a figure is big enough to stand out. */
+export function isKilowatts(w: number | null | undefined): boolean {
+  return w !== null && w !== undefined && Math.abs(w) >= 1000;
+}
+
 export function formatWatts(w: number | null | undefined): string {
   if (w === null || w === undefined) return '—';
-  return Math.abs(w) >= 1000 ? `${(w / 1000).toFixed(2)} kW` : `${Math.round(w)} W`;
+  return isKilowatts(w) ? `${(w / 1000).toFixed(2)} kW` : `${Math.round(w)} W`;
 }
 
 export function formatKwh(k: number | null | undefined): string {

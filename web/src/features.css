@@ -172,3 +172,14 @@ button.link {
     gap: 0;
   }
 }
+
+/* A draw in kilowatts takes the theme's hot colour, so a big draw shows at a glance (Watts.tsx for a figure in a line, Kpi.tsx for the lead tile) */
+.big-draw {
+  color: var(--color-accent-red);
+  font-weight: 700;
+}
+
+.kpi.hot .kpi-value .figure,
+.kpi.hot .kpi-value .unit {
+  color: var(--color-accent-red);
+}
