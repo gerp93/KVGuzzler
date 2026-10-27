@@ -250,9 +250,12 @@ func (s *Store) UpsertMeter(ctx context.Context, c model.Meter) error {
 	if c.MaxWatts != nil {
 		max = *c.MaxWatts
 	}
+	// A device registers its meters every time the server starts, and a Refoss input always says "circuit": a meter the user made the house (mains)
+	// stays the house, or every restart would turn the whole-house figure off.
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO meters(id, device_id, idx, scope, label, enabled, max_watts) VALUES (?, ?, ?, ?, ?, 1, ?)
-ON CONFLICT(id) DO UPDATE SET device_id = excluded.device_id, idx = excluded.idx, scope = excluded.scope, max_watts = excluded.max_watts`,
+ON CONFLICT(id) DO UPDATE SET device_id = excluded.device_id, idx = excluded.idx, max_watts = excluded.max_watts,
+  scope = CASE WHEN meters.scope = 'mains' AND excluded.scope = 'circuit' THEN meters.scope ELSE excluded.scope END`,
 		c.ID, c.DeviceID, idx, string(c.Scope), c.Label, max)
 	return err
 }
