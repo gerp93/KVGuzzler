@@ -7,7 +7,6 @@ import { Bars, meterPath } from './Bars';
 import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
 import { AnomalyCard } from './AnomalyCard';
-import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
@@ -246,7 +245,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
 
         <section class="panel panel-insights">
           <GuzzlersCard meters={meters} summary={summary} houseKwh={kwh} period={period as PeriodKey} />
-          {whole && <BaseLoadCard period={period as PeriodKey} />}
           {whole && <AnomalyCard />}
           {pc.length > 0 && (
             <section class="card">
