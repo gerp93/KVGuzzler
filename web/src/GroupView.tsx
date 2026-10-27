@@ -6,6 +6,7 @@ import { Kpi, KpiRow } from './Kpi';
 import { PeriodPicker } from './Periods';
 import { formatKwh, formatMoney, periodRange, periodWords, sumByTime, type Meter, type GroupDetail, type PeriodKey } from './lib';
 import { routePath } from './route';
+import { Kwh } from './Watts';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
 
@@ -87,7 +88,7 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
                   <span class="bar" aria-hidden="true">
                     <i style={{ width: `${top > 0 ? (m.kwh / top) * 100 : 0}%` }} />
                   </span>
-                  <span class="num">{formatKwh(m.kwh)}</span>
+                  <span class="num"><Kwh k={m.kwh} /></span>
                   <span class="num cost">{m.cost != null ? formatMoney(m.cost, detail.cost_estimated) : ''}</span>
                 </li>
               ))}

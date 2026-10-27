@@ -5,8 +5,8 @@ import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
-import { Watts } from './Watts';
-import { formatKwh, formatMoney, type Computer, type ComputerDetail, type Meter } from './lib';
+import { Kwh, Watts } from './Watts';
+import { formatMoney, type Computer, type ComputerDetail, type Meter } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
@@ -139,7 +139,7 @@ function ComputerRow({
         <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
-        <span class="num hier-energy">{detail?.setup_kwh != null ? formatKwh(detail.setup_kwh) : ''}</span>
+        <span class="num hier-energy">{detail?.setup_kwh != null ? <Kwh k={detail.setup_kwh} /> : ''}</span>
         <span class="num hier-cost">{detail?.setup_cost != null ? formatMoney(detail.setup_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">
           <a class="button icon" href={routePath('hierarchy', 'computer', computer.id)} title="Open the computer's page" aria-label={`Open ${computer.name}`}>

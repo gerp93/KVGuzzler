@@ -1,9 +1,10 @@
 // What the PC's own collector reported about its insides: its sensors, the programs it blames, and the times it was not
 // recording. Shown inside a computer's detail; none of it is added to the house or circuit figures.
 import {
-  formatDuration, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, programRows, programSplit, runDuration, runKwh,
+  formatDuration, formatKwh, formatMoney, gapLabel, groupComponents, programRows, programSplit, runDuration, runKwh,
   type PcComponent, type PcSource,
 } from './lib';
+import { Kwh, Watts } from './Watts';
 
 function ComponentBars({ rows }: { rows: PcComponent[] }) {
   const top = Math.max(0, ...rows.map((r) => r.kwh));
@@ -15,8 +16,8 @@ function ComponentBars({ rows }: { rows: PcComponent[] }) {
           <span class="bar" aria-hidden="true">
             <i style={{ width: `${top > 0 ? (c.kwh / top) * 100 : 0}%` }} />
           </span>
-          <span class="num">{formatKwh(c.kwh)}</span>
-          <span class="num cost">{c.avg_watts != null ? `avg ${formatWatts(c.avg_watts)}` : ''}</span>
+          <span class="num"><Kwh k={c.kwh} /></span>
+          <span class="num cost">{c.avg_watts != null ? <>avg <Watts w={c.avg_watts} /></> : ''}</span>
         </li>
       ))}
     </ul>
@@ -43,7 +44,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
               <p class="caption">Parts of a sensor above, shown for information and never added to it.</p>
             </>
           )}
-          {pc.total_peak_watts != null && <p class="caption">Highest the sensors reached together: {formatWatts(pc.total_peak_watts)}.</p>}
+          {pc.total_peak_watts != null && <p class="caption">Highest the sensors reached together: <Watts w={pc.total_peak_watts} />.</p>}
         </section>
       )}
 
@@ -67,7 +68,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
         <section class="card">
           <h2>Who used the power (an estimate)</h2>
           <p class="note">
-            CPU and GPU together: {formatKwh(programsKwh)}
+            CPU and GPU together: <Kwh k={programsKwh} />
             {pc.programs.every((p) => p.cost != null) ? `, ${formatMoney(pc.programs.reduce((t, p) => t + Number(p.cost), 0).toFixed(2), true)}` : ''}
           </p>
           {splitTotal > 0 && (
@@ -97,7 +98,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
                 <span class={`bar ${r.kind}`} aria-hidden="true">
                   <i style={{ width: `${r.share * 100}%` }} />
                 </span>
-                <span class="num">{formatKwh(r.kwh)}</span>
+                <span class="num"><Kwh k={r.kwh} /></span>
                 <span class="num cost">{r.cost != null ? formatMoney(r.cost, true) : ''}</span>
               </li>
             ))}
@@ -127,7 +128,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
                     {new Date(r.start).toLocaleString()}, {formatDuration(runDuration(r))}
                   </span>
                 </span>
-                <span class="num">{formatKwh(runKwh(r))}</span>
+                <span class="num"><Kwh k={runKwh(r)} /></span>
                 {r.cost != null && <span class="num cost">{formatMoney(r.cost, true)}</span>}
               </li>
             ))}
@@ -149,7 +150,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
                   {gapLabel(gap.reason)}, {new Date(gap.from).toLocaleString()} for{' '}
                   {formatDuration((Date.parse(gap.to) - Date.parse(gap.from)) / 1000)}
                 </span>
-                {gap.plug_kwh != null && <span class="caption">plug's own counter: {formatKwh(gap.plug_kwh)}</span>}
+                {gap.plug_kwh != null && <span class="caption">plug's own counter: <Kwh k={gap.plug_kwh} /></span>}
               </li>
             ))}
           </ul>

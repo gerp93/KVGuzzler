@@ -8,10 +8,10 @@ export type KpiTone = 'now' | 'energy' | 'cost' | 'peak';
 
 export function Kpi({ label, value, tone, hint, children }: { label: string; value: string; tone: KpiTone; hint?: ComponentChildren; children?: ComponentChildren }) {
   const [figure, unit] = splitFigure(value);
-  // The lead tile is what is drawn this moment: in kilowatts it is a big draw, and the figure takes the hot colour.
-  const hot = tone === 'now' && unit === 'kW';
+  // The kilo unit (kW, kWh) is a big figure and takes the hot colour; watts and watt-hours take the cool one. Money and the rest stay as they are.
+  const heat = unit === 'kW' || unit === 'kWh' ? ' hot' : unit === 'W' || unit === 'Wh' ? ' cool' : '';
   return (
-    <div class={`kpi kpi-${tone}${hot ? ' hot' : ''}`}>
+    <div class={`kpi kpi-${tone}${heat}`}>
       <span class="kpi-label">
         <FigureIcon name={tone} />
         {label}

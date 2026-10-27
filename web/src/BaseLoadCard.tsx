@@ -3,7 +3,8 @@
 import { api } from './api';
 import { baseLoadSentence, lookedAt, shareText, yearKwh, type BaseLoad } from './baseload';
 import { usePoll } from './hooks';
-import { formatMoney, formatWatts, periodRange, type PeriodKey } from './lib';
+import { formatMoney, periodRange, type PeriodKey } from './lib';
+import { Watts } from './Watts';
 
 /** Under this a meter's floor is noise. */
 const MIN_METER_WATTS = 1;
@@ -35,7 +36,7 @@ export function BaseLoadStats({ data, what, span = 'the period' }: { data: BaseL
       <div class="stats three">
         <div class="stat">
           <span class="caption">Never below</span>
-          <p class="big small">{formatWatts(data.watts)}</p>
+          <p class="big small"><Watts w={data.watts} /></p>
         </div>
         <div class="stat">
           <span class="caption">A year of it</span>

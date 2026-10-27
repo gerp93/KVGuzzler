@@ -5,8 +5,8 @@ import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
-import { Watts } from './Watts';
-import { formatKwh, formatMoney, type ApplianceGroup, type GroupDetail, type Meter } from './lib';
+import { Kwh, Watts } from './Watts';
+import { formatMoney, type ApplianceGroup, type GroupDetail, type Meter } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
@@ -134,7 +134,7 @@ function GroupRow({
         <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
-        <span class="num hier-energy">{detail ? formatKwh(detail.total_kwh) : ''}</span>
+        <span class="num hier-energy">{detail ? <Kwh k={detail.total_kwh} /> : ''}</span>
         <span class="num hier-cost">{detail?.total_cost != null ? formatMoney(detail.total_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">
           <a class="button icon" href={routePath('hierarchy', 'group', group.id)} title="Open the group's page" aria-label={`Open ${group.name}`}>

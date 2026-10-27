@@ -2,7 +2,8 @@
 import { api } from './api';
 import { usePoll } from './hooks';
 import { routePath } from './route';
-import { formatKwh, formatMoney, historyDetail, periodRange, type PeriodKey } from './lib';
+import { formatMoney, historyDetail, periodRange, type PeriodKey } from './lib';
+import { Kwh } from './Watts';
 
 export function EnergyHistory({ id, period }: { id: string; period: PeriodKey }) {
   const { data, error } = usePoll(() => api.computerHistory(id), 60_000, [id]);
@@ -22,7 +23,7 @@ export function EnergyHistory({ id, period }: { id: string; period: PeriodKey })
                 {p.label}
                 <span class="caption block">{historyDetail(p)}</span>
               </span>
-              <span class="num">{formatKwh(p.kwh)}</span>
+              <span class="num"><Kwh k={p.kwh} /></span>
               {p.cost != null && <span class="num cost">{formatMoney(p.cost, p.cost_estimated)}</span>}
             </li>
           ))}

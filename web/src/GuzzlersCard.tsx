@@ -7,7 +7,8 @@ import { BaseLoadStats } from './BaseLoadCard';
 import { meterPath } from './Bars';
 import { topGuzzlers, type GuzzlerBy, type GuzzlerMode } from './guzzlers';
 import { usePoll, useStored } from './hooks';
-import { formatKwh, formatMoney, formatWatts, periodRange, periodWords, type Meter, type PeriodKey, type Summary } from './lib';
+import { formatMoney, periodRange, periodWords, type Meter, type PeriodKey, type Summary } from './lib';
+import { Kwh, Watts } from './Watts';
 
 const SHOWN = 5;
 
@@ -93,9 +94,19 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
                 <i style={{ width: `${top > 0 ? Math.max(1, (value(g) / top) * 100) : 0}%` }} />
               </span>
               <span class="num peak" title={mode === 'rest' ? 'The power it hardly ever goes below' : 'The most it drew in the period'}>
-                {mode === 'rest' ? `${formatWatts(g.restWatts)} on` : g.peakWatts != null ? `up to ${formatWatts(g.peakWatts)}` : ''}
+                {mode === 'rest' ? (
+                  <>
+                    <Watts w={g.restWatts} /> on
+                  </>
+                ) : g.peakWatts != null ? (
+                  <>
+                    up to <Watts w={g.peakWatts} />
+                  </>
+                ) : (
+                  ''
+                )}
               </span>
-              <span class="num">{formatKwh(g.kwh)}</span>
+              <span class="num"><Kwh k={g.kwh} /></span>
               <span class="num cost">
                 {g.cost != null ? formatMoney(g.cost, summary?.cost_estimated) : '—'}
                 {g.share != null ? ` · ${g.share}%` : ''}

@@ -3,8 +3,9 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { breakerLevel, breakerPercent, formatAmps, typicalAmps } from './amps';
-import { formatKwh, formatMoney, formatWatts } from './lib';
+import { formatMoney } from './lib';
 import { runBars, runLength, runStats, runWhen, type MeterRuns } from './runs';
+import { Kwh, Watts } from './Watts';
 
 const SHOWN = 8;
 
@@ -18,11 +19,11 @@ export function RunsCard({ runs, breaker }: { runs: MeterRuns; breaker?: number 
   return (
     <section class="card">
       <h2>Runs</h2>
-      {!stats && <p class="note">No run in this period (it works above about {formatWatts(runs.threshold_watts)}).</p>}
+      {!stats && <p class="note">No run in this period (it works above about <Watts w={runs.threshold_watts} />).</p>}
       {stats && (
         <>
           <p class="runs-summary">
-            <strong>{stats.count}</strong> {stats.count === 1 ? 'run' : 'runs'} · about <strong>{formatKwh(stats.avgKwh)}</strong>
+            <strong>{stats.count}</strong> {stats.count === 1 ? 'run' : 'runs'} · about <strong><Kwh k={stats.avgKwh} /></strong>
             {stats.avgCost != null && <> and <strong>{formatMoney(stats.avgCost.toFixed(2), runs.cost_estimated)}</strong></>} each · {runLength(stats.avgMinutes)} on average, the longest {runLength(stats.longestMinutes)}
             {usualAmps != null && <>, typically {formatAmps(usualAmps)}{breaker ? ` (${breakerPercent(usualAmps, breaker)}% of the ${breaker} A breaker)` : ''}</>}
           </p>
@@ -38,7 +39,7 @@ export function RunsCard({ runs, breaker }: { runs: MeterRuns; breaker?: number 
                   {r.avg_amps != null ? ` · ${formatAmps(r.avg_amps)}` : ''}
                 </span>
                 <span class="num cost">
-                  {formatKwh(r.kwh)}
+                  <Kwh k={r.kwh} />
                   {r.cost != null ? ` · ${formatMoney(r.cost, runs.cost_estimated)}` : ''}
                 </span>
               </li>
@@ -54,7 +55,7 @@ export function RunsCard({ runs, breaker }: { runs: MeterRuns; breaker?: number 
           )}
           <p class="caption">
             {stats.shareOfMeter != null ? `Runs hold ${stats.shareOfMeter}% of this meter's energy in the period; the rest is what it draws at rest. ` : ''}
-            A run is a stretch above about {formatWatts(runs.threshold_watts)}, found from the recorded minutes; a short dip does not end it.
+            A run is a stretch above about <Watts w={runs.threshold_watts} />, found from the recorded minutes; a short dip does not end it.
             {runs.truncated ? ' Only the newest 500 are listed; the figures count them all.' : ''}
           </p>
         </>
