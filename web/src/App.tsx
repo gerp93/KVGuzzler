@@ -3,6 +3,7 @@ import { api, VersionMismatch } from './api';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
 import { HistoryView } from './HistoryView';
+import { HouseNow } from './HouseNow';
 import { TabIcon } from './Icons';
 import { usePoll, useStored } from './hooks';
 import { LiveView } from './LiveView';
@@ -63,6 +64,7 @@ export function App() {
             </a>
           ))}
         </nav>
+        <HouseNow meters={meters} />
       </header>
       {offline && (
         <p class="banner" role="alert">

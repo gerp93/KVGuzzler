@@ -602,8 +602,13 @@ select:focus-visible {
     height: auto;
     padding: 0;
     gap: 4px;
+    margin-left: 32px;
     background: none;
     border: 0;
+  }
+
+  .top .conn {
+    margin-right: 0;
   }
 
   .top nav a {
