@@ -10,6 +10,27 @@ import { Kwh } from './Watts';
 /** A cost per mile without its unit, for the big figure (the unit is in the caption under it). */
 const perMile = (m: string | null | undefined, estimated?: boolean): string => formatPerMile(m, estimated).replace('/mi', '');
 
+/** A meter that is probably the car's charger by its name. */
+const LOOKS_LIKE_CHARGER = /\b(ev|tesla|car|charger|charging|vehicle)\b/i;
+
+/** On the page of a circuit or plug named like a charger and not marked yet: one button that turns on the odometer and the cost per mile. */
+export function EvPrompt({ meter, onChanged }: { meter: Meter; onChanged: () => void }) {
+  const [problem, setProblem] = useState('');
+  if (meter.ev || (meter.scope !== 'circuit' && meter.scope !== 'plug') || !LOOKS_LIKE_CHARGER.test(meter.label)) return null;
+  return (
+    <section class="card ev">
+      <h2>Electric vehicle</h2>
+      <p>
+        Does {meter.label} charge your electric vehicle? Mark it and this page takes the car's odometer now and then (say, once a month) and works out what a mile costs, to set beside a gas car's.
+      </p>
+      <button type="button" onClick={() => void api.updateMeter(meter.id, { ev: true }).then(onChanged, (e: Error) => setProblem(e.message))}>
+        Yes, track its miles and cost per mile
+      </button>
+      {problem && <p class="note error">{problem}</p>}
+    </section>
+  );
+}
+
 export function EvCard({ meter }: { meter: Meter }) {
   const [version, setVersion] = useState(0);
   const { data, error } = usePoll<MeterEv>(() => api.meterEv(meter.id), 60_000, [meter.id, version]);

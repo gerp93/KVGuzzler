@@ -13,19 +13,17 @@ import { breakerLevel, breakerPercent, formatAmps, formatVolts } from './amps';
 import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
-import { FlowChart } from './FlowChart';
 import { flowTree } from './flow';
 import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
-import { PeriodPicker } from './Periods';
 import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import { restRows, type RestRow } from './treeRest';
 import {
-  arrangeByPanel, canHold, clampName, formatMoney, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
+  arrangeByPanel, canHold, clampName, formatMoney, indentTarget, outdentTarget, periodRange, periodWords, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
@@ -104,7 +102,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
   // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
   const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
   const owner = meter.type === 'computer' ? ofComputer : meter.scope === 'plug' && ofComputer ? `peripheral of ${ofComputer}` : '';
-  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', meter.ev ? 'electric vehicle' : '', owner, refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
+  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', meter.ev ? 'EV charger' : '', owner, refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
   const dragged = dragging ? all.find((c) => c.id === dragging) : undefined;
   const dropOk = !!dragged && dragged.id !== meter.id && canHold(meter, dragged, all);
 
@@ -207,6 +205,16 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
 
       {open && (
         <div class="hier-panel">
+          {(meter.scope === 'circuit' || meter.scope === 'plug') && (
+            <fieldset>
+              <legend>Electric vehicle charger</legend>
+              <label class="check">
+                <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
+                This meter charges my electric vehicle
+              </label>
+              <p class="caption block">Its page then takes the car's odometer now and then (once a month is plenty) and works out what a mile costs, to set beside a gas car's.</p>
+            </fieldset>
+          )}
           {refoss && (
             <>
               <fieldset>
@@ -265,16 +273,6 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
             </>
           )}
           {inPanel && <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />}
-          {(meter.scope === 'circuit' || meter.scope === 'plug') && (
-            <fieldset>
-              <legend>Electric vehicle</legend>
-              <label class="check">
-                <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
-                This meter charges an electric vehicle
-              </label>
-              <p class="caption block">Its page then takes the car's odometer now and then, and works out what a mile costs.</p>
-            </fieldset>
-          )}
           {placeable && (
             <label class="field">
               <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
@@ -367,7 +365,7 @@ function Hidden({ meter, deviceName, onChanged }: { meter: Meter; deviceName: st
 export function HierarchyView({ meters, open, onChanged }: { meters: Meter[]; open: string[]; onChanged: () => void }) {
   const [kind, id] = open;
   const back = { href: routePath('hierarchy'), label: 'Hierarchy' };
-  if (kind === 'meter' && id) return <MeterPage id={id} meters={meters} back={back} />;
+  if (kind === 'meter' && id) return <MeterPage id={id} meters={meters} back={back} onChanged={onChanged} />;
   if (kind === 'computer' && id) return <ComputerView id={id} meters={meters} />;
   if (kind === 'group' && id) return <GroupView id={id} meters={meters} />;
   return <Tree meters={meters} onChanged={onChanged} />;
@@ -380,8 +378,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const [dragging, setDragging] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
-  // The same period as the Live page (they share the saved choice); only the energy and cost columns follow it.
-  const [period, setPeriod] = useStored('period', '24h');
+  // The same period as the Live page (they share the saved choice, made there): this is a setup page, so it has no picker of its own; only the energy and cost columns follow it.
+  const [period] = useStored('period', '24h');
   const { data: summary } = usePoll<Summary>(
     () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
@@ -414,26 +412,13 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   return (
     <>
       <div class="tree-layout">
-        <div class="tree-rail">
-      <section class="card wide">
-        <div class="row">
-          <h2>Where the energy goes</h2>
-          <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
-        </div>
-        {summary ? <FlowChart meters={meters} summary={summary} /> : <p class="note">Loading…</p>}
-        <Hint>
-          Each band is as wide as the energy that went through it over the period. A meter's band already counts what is inside it, so the parts of a band
-          never add to more than the band itself: what is left over is "Other (not metered)". The Energy and Cost columns below follow the same period.
-        </Hint>
-      </section>
-        </div>
         <div class="tree-stack">
       <section class="card wide">
         <div class="row">
           <h2>Hierarchy</h2>
           <div class="inline-actions">
             {summary && (
-              <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked above, in this order, as a spreadsheet file">
+              <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked on the Live page, in this order, as a spreadsheet file">
                 Download as CSV
               </a>
             )}
@@ -454,7 +439,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         <Hint>
           Every meter, laid out as the house is wired: the whole house on top, with the main panel's circuits beneath it. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
-          Nothing here is sent to a device.
+          Nothing here is sent to a device. The Energy and Cost columns are over {periodWords(period as PeriodKey)}, the period picked on the other pages.
         </Hint>
         {error && <p class="note error">{error}</p>}
         {dragging && (

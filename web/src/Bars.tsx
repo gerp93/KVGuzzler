@@ -1,4 +1,4 @@
-// A list of meters as bars: name, live watts, and (over a period) energy, cost and share. A meter that holds others is followed by the ones
+// A list of meters as bars in a table: name, live watts, and (over a period) energy, cost and share, each in a column of its own under a heading. A meter that holds others is followed by the ones
 // inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
 import { Kwh, Watts } from './Watts';
 import { formatMoney, houseShare, type MeterSummary, type Row, type Summary } from './lib';
@@ -7,13 +7,20 @@ import { routePath } from './route';
 export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; summary?: Summary; baseKwh: number | null }) {
   const find = (id: string): MeterSummary | undefined => summary?.meters.find((c) => c.meter_id === id);
   return (
-    <ul class="bars wide">
+    <ul class="bars cols">
       {/* Two different things sit side by side: what it draws right now, and what it used over the period picked. */}
+      <li class="head group" aria-hidden="true">
+        <span />
+        <span class="num">Right now</span>
+        <span class="num">Over the period</span>
+      </li>
       <li class="head" aria-hidden="true">
         <span />
         <span />
-        <span class="num">Now</span>
-        <span class="num">Over the period</span>
+        <span class="num">Power</span>
+        <span class="num">Energy</span>
+        <span class="num">Cost</span>
+        <span class="num">Share</span>
       </li>
       {rows.map((r) => {
         // A parent already holds what is inside it: what it carries beyond them is its figure less theirs.
@@ -38,14 +45,10 @@ export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; 
               <i style={{ width: `${of > 0 ? Math.min(100, (r.watts / of) * 100) : 0}%` }} />
             </span>
             <span class="num"><Watts w={r.watts} /></span>
-            <span class="num cost">
-              {mine && (
-                <>
-                  <Kwh k={mine.kwh} />
-                  {mine.cost != null ? ` · ${formatMoney(mine.cost, summary?.cost_estimated)}` : ''}
-                  {share != null ? ` · ${share}%` : ''}
-                </>
-              )}
+            <span class="figs">
+              <span class="num energy">{mine && <Kwh k={mine.kwh} />}</span>
+              <span class="num cost">{mine && mine.cost != null ? formatMoney(mine.cost, summary?.cost_estimated) : ''}</span>
+              <span class="num share">{share != null ? `${share}%` : ''}</span>
             </span>
           </li>
         );

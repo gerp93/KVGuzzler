@@ -439,8 +439,8 @@ select {
   color: var(--muted);
 }
 
-/* Wide enough, the columns line up down the list: name, what it is, now, energy and cost over the period, then the buttons. */
-@media (min-width: 900px) {
+/* Wide enough (the card, not the window: the card may be a narrow column), the columns line up down the list: name, what it is, now, amps, volts, energy and cost over the period, then the buttons. */
+@container (min-width: 52rem) {
   .hier-row > .hier-main {
     display: grid;
     grid-template-columns: 2rem 1rem minmax(8rem, 1fr) minmax(0, 13rem) 4.5rem 4rem 3.5rem 5.5rem 4.5rem 12.5rem;
@@ -1310,8 +1310,8 @@ summary:focus-visible {
   container-type: inline-size;
 }
 
-/* Hierarchy on a phone: name and watts on the first line, then what it is, then its energy and cost, then the buttons. */
-@media (max-width: 899px) {
+/* Hierarchy in a narrow card (a phone, or a column beside another): name and watts on the first line, then what it is, then its energy and cost, then the buttons. */
+@container (max-width: 51.99rem) {
   .hier {
     gap: 12px;
   }
@@ -1536,7 +1536,6 @@ main > * {
 }
 
 .tree-layout,
-.tree-rail,
 .tree-stack,
 .tree-extra {
   display: contents;
@@ -1612,7 +1611,7 @@ main > * {
     grid-column: 1 / -1;
   }
 
-  /* The hierarchy in two columns of about equal height: the flow chart with the devices, computers and groups on the left, the tree on the right.
+  /* The hierarchy in two columns of about equal height: the devices, computers and groups on the left, the tree on the right.
      The last row is the flexible one, so the tree (which spans all of them) never stretches the rows of the cards beside it. */
   .tree-layout {
     display: grid;
@@ -1621,12 +1620,6 @@ main > * {
     grid-template-rows: auto auto auto auto 1fr;
     gap: 16px;
     align-items: start;
-  }
-
-  .tree-rail {
-    display: block;
-    grid-column: 1;
-    grid-row: 1;
   }
 
   .tree-stack {
@@ -1642,7 +1635,7 @@ main > * {
     grid-column: 1;
   }
 
-  /* Devices, computers and groups side by side under the chart, as many across as fit */
+  /* Devices, computers and groups side by side, as many across as fit */
   .tree-extra {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
@@ -1786,23 +1779,16 @@ main > * {
   }
 
   .tree-layout {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
   }
 
-  /* Three columns: the flow chart stays in view on the left; the tree takes the first column of the stack and the devices, computers and groups
-     sit beside it */
-  .tree-rail {
-    position: sticky;
-    top: 4.5rem;
-    grid-row: auto;
-  }
-
+  /* Two columns: the tree, and the devices, computers and groups beside it */
   .tree-stack {
     display: grid;
     gap: 16px;
     min-width: 0;
-    grid-column: 2;
+    grid-column: 1;
     grid-template-columns: minmax(0, 68rem) minmax(0, 1fr);
     align-items: start;
   }
@@ -1814,5 +1800,130 @@ main > * {
 
   .tree-stack > :not(:first-child) {
     grid-column: 2;
+  }
+}
+
+/* The meters table (Bars.tsx): a column each for the power now and the period's energy, cost and share, with a line between the columns. Narrow, the period's figures share one line under the bar. */
+@container (min-width: 34.01rem) {
+  .bars.cols {
+    gap: 0;
+  }
+
+  .bars.cols li {
+    grid-template-columns: minmax(0, 12rem) minmax(3rem, 1fr) 5.5rem 6rem 5rem 4.75rem;
+    gap: 0;
+    padding-block: 5px;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  }
+
+  .bars.cols li.head {
+    padding-block: 2px;
+    border-bottom: 0;
+  }
+
+  .bars.cols li.head.group {
+    grid-template-columns: minmax(0, 12rem) minmax(3rem, 1fr) 5.5rem 15.75rem;
+    padding-top: 0;
+  }
+
+  .bars.cols li.head.group > .num {
+    border-bottom: 1px solid var(--color-border);
+    text-align: center;
+  }
+
+  .bars.cols li.head.group > span:first-child {
+    grid-column: 1 / 3;
+  }
+
+  .bars.cols li .name {
+    padding-right: 8px;
+  }
+
+  .bars.cols li .bar {
+    margin-right: 12px;
+  }
+
+  .bars.cols .figs {
+    display: contents;
+  }
+
+  .bars.cols li:not(.head) > .num,
+  .bars.cols li:not(.head) .figs > .num,
+  .bars.cols li.head:not(.group) > .num {
+    padding-inline: 8px;
+    border-left: 1px solid var(--color-border);
+  }
+}
+
+@container (max-width: 34rem) {
+  .bars.cols .figs {
+    display: flex;
+    grid-area: fig;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    font-size: 0.85rem;
+  }
+
+  .bars.cols .figs > .num {
+    min-width: 0;
+  }
+
+  .bars.cols .figs > .num:not(:empty) + .num:not(:empty)::before {
+    content: '· ';
+  }
+}
+
+/* A new server version is ready: the page in this tab is the old one until it is reloaded */
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: var(--color-primary-action);
+  color: var(--on-primary, var(--color-text));
+}
+
+/* The period choice: an island floating at the bottom of the window, centred, above the phone's tab bar */
+.period-island {
+  position: fixed;
+  bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 12px);
+  left: 50%;
+  z-index: 4;
+  max-width: calc(100vw - 24px);
+  transform: translateX(-50%);
+  padding: 6px;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.period-island .seg.period {
+  border-radius: 999px;
+}
+
+body.has-period main {
+  padding-bottom: 6rem;
+}
+
+@media (min-width: 720px) {
+  .period-island {
+    bottom: 16px;
+  }
+}
+
+/* A middling window: the title, sections and the house's figures do not fit one line, so the last wraps to a second line instead of pushing the page wider */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .top nav {
+    order: 3;
+    flex: 1 0 100%;
+    margin-left: 0;
   }
 }

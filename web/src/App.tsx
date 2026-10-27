@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
@@ -37,6 +37,27 @@ export function App() {
   const rateSettings = usePoll(api.rates, 60_000, [rev]);
   setCurrencyCode(rateSettings.data?.currency);
 
+  // The server is updated without the page knowing: when its version changes, this tab is showing the old dashboard. Reload at once if nobody is looking, else offer it.
+  const firstVersion = useRef<string | undefined>(undefined);
+  const [stale, setStale] = useState(false);
+  const version = status.data?.server_version;
+  useEffect(() => {
+    if (!version) return;
+    if (firstVersion.current === undefined) firstVersion.current = version;
+    else if (version !== firstVersion.current) {
+      if (document.hidden) window.location.reload();
+      else setStale(true);
+    }
+  }, [version]);
+  useEffect(() => {
+    if (!stale) return;
+    const onVisible = () => {
+      if (document.hidden) window.location.reload();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [stale]);
+
   const mismatch = [status.error, loaded.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
   // The old Appliances tab became the hierarchy: its links open the same things there.
   const active: TabId = TABS.find((t) => t.id === (route.tab === 'appliances' ? 'hierarchy' : route.tab))?.id ?? 'live';
@@ -69,6 +90,14 @@ export function App() {
       {offline && (
         <p class="banner" role="alert">
           Can't reach the house server{status.error ? ` (${status.error.message})` : ''}. What is shown may be out of date; trying again every few seconds.
+        </p>
+      )}
+      {stale && (
+        <p class="update-banner" role="status">
+          A new version of this page is ready.
+          <button type="button" onClick={() => window.location.reload()}>
+            Reload
+          </button>
         </p>
       )}
       <main class={`page page-${active}${route.rest[0] ? ` page-${active}-${route.rest[0]}` : ''}`}>
