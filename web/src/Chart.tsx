@@ -73,7 +73,11 @@ export function wideChartHeight(): number {
   return Math.max(defaultHeight(), Math.min(520, Math.round(window.innerHeight * 0.36)));
 }
 
-export function Chart({ lines, domain, shades = [], height = defaultHeight() }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
+// The default for `shades` must be one array, not a new `[]` on each render: the chart is rebuilt when any of its inputs is a different object, and a page that
+// re-renders every couple of seconds (the live page) would tear the chart down and build it again each time, shrinking the page for a moment under the reader.
+const NO_SHADES: Shade[] = [];
+
+export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeight() }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
