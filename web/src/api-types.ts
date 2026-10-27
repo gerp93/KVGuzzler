@@ -778,6 +778,11 @@ export interface components {
             database_path?: string;
             /** @description The size of the database file, without its write-ahead log. */
             database_bytes?: number;
+            /**
+             * Format: date-time
+             * @description When anything was first recorded (a meter's or a PC's sensors'); absent while nothing is. The dashboard hides the periods longer than this.
+             */
+            data_since?: string;
             /** @description Plain-language things that need attention (a device stopped answering, a reading dropped). */
             notes: string[];
         };

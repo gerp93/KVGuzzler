@@ -72,6 +72,19 @@ export function periodRange(key: PeriodKey, now: Date): { from: string; to: stri
   return { from: new Date(end - ms).toISOString(), to: new Date(end).toISOString() };
 }
 
+/** The periods the recorded history reaches back to, for the picker: a longer one would only show the same data again, so it is left out until there is
+ *  that much. The first (an hour), "all time" and the one picked are always kept; year to date needs data from before 1 January. With nothing known all are kept. */
+export function visiblePeriods(since: string | null | undefined, selected: PeriodKey, now: Date): typeof PERIODS {
+  const first = since ? Date.parse(since) : NaN;
+  if (!Number.isFinite(first)) return PERIODS;
+  const have = now.getTime() - first;
+  return PERIODS.filter((p, i) => {
+    if (i === 0 || p.key === 'all' || p.key === selected) return true;
+    const need = p.key === 'ytd' ? now.getTime() - new Date(now.getFullYear(), 0, 1).getTime() : p.ms;
+    return have >= need;
+  });
+}
+
 /** The period in words, for a line under a figure: "the last 7 days". */
 export function periodWords(key: PeriodKey): string {
   switch (key) {
@@ -154,12 +167,16 @@ export function setCurrencyCode(code: string | null | undefined): void {
   symbol = currencySymbol(code);
 }
 
-/** A money string with the currency's sign and two decimals. `estimated` marks a price that rests on a stand-in rate with a leading ≈. */
+/** A money string with the currency's sign and two decimals. `estimated` marks a price that rests on a stand-in rate with a leading ≈. An amount that is
+ *  more than nothing but under half a cent is "<$0.01", never "$0.00": the server sends it to the sixth decimal, so a real zero is told from a rounded one. */
 export function formatMoney(m: string | null | undefined, estimated = false): string {
   if (m === null || m === undefined) return '—';
   const n = Number(m);
   if (!Number.isFinite(n)) return '—';
-  return `${estimated ? '≈ ' : ''}${n < 0 ? '-' : ''}${symbol}${Math.abs(n).toFixed(2)}`;
+  const sign = n < 0 ? '-' : '';
+  const shown = Math.abs(n).toFixed(2);
+  if (n !== 0 && Number(shown) === 0) return `${estimated ? '≈ ' : ''}<${symbol}0.01`;
+  return `${estimated ? '≈ ' : ''}${sign}${symbol}${shown}`;
 }
 
 /** A cost per mile: three decimals, because a mile of electricity costs a few cents. */

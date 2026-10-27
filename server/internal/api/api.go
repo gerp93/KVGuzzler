@@ -7,6 +7,7 @@ package api
 
 import (
 	"context"
+	"sync"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -48,6 +49,26 @@ type Server struct {
 	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
 	// how big it is. Empty reports nothing.
 	DatabasePath string
+
+	// firstData caches when anything was first recorded (a full scan of the minutes): it only ever moves earlier, so it is read again every few minutes.
+	firstMu      sync.Mutex
+	firstData    time.Time
+	firstChecked time.Time
+}
+
+// dataSince is when anything was first recorded, for the dashboard to hide the periods longer than the history; false when nothing is recorded yet.
+func (s *Server) dataSince(ctx context.Context) (time.Time, bool) {
+	s.firstMu.Lock()
+	defer s.firstMu.Unlock()
+	if !s.firstData.IsZero() && s.now().Sub(s.firstChecked) < 10*time.Minute {
+		return s.firstData, true
+	}
+	t, ok, err := s.Store.FirstData(ctx)
+	if err != nil || !ok {
+		return time.Time{}, false
+	}
+	s.firstData, s.firstChecked = t, s.now()
+	return t, true
 }
 
 type problem struct {
@@ -143,12 +164,15 @@ func notImplemented(w http.ResponseWriter, _ *http.Request) {
 	writeProblem(w, http.StatusNotImplemented, "not_implemented", "this part of the API is not built yet")
 }
 
-func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	st := map[string]any{
 		"api_version":    Version,
 		"server_version": s.Version,
 		"time":           s.now().UTC(),
 		"notes":          s.Collector.Notes(),
+	}
+	if t, ok := s.dataSince(r.Context()); ok {
+		st["data_since"] = t
 	}
 	// "Local" is not an IANA zone name, so it is only reported when the server was given a real one (-tz).
 	if name := s.Loc.String(); name != "Local" {

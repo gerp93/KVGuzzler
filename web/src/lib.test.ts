@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -130,6 +130,12 @@ describe('formatting and periods', () => {
     expect(formatMoney('0.199155')).toBe('$0.20');
     expect(formatMoney('61.9')).toBe('$61.90');
     expect(formatMoney('-4')).toBe('-$4.00');
+    // More than nothing but under half a cent is not shown as no money at all; a real zero is.
+    expect(formatMoney('0.0015')).toBe('<$0.01');
+    expect(formatMoney('0.000852', true)).toBe('≈ <$0.01');
+    expect(formatMoney('0.005')).toBe('$0.01');
+    expect(formatMoney('0.00')).toBe('$0.00');
+    expect(formatMoney('0')).toBe('$0.00');
     expect(formatMoney('13.68', true)).toBe('≈ $13.68');
     expect(formatMoney(null)).toBe('—');
     expect(formatMoney('abc')).toBe('—');
@@ -280,6 +286,32 @@ describe('programs over a period', () => {
   it('names a program with the many-small-programs label', () => {
     const rows = programRows([prog(OTHERS, 0.01, 0, 90)], null);
     expect(rows[0]!.note).toBe('many small programs together · active up to 2 min');
+  });
+});
+
+describe('the periods the history reaches', () => {
+  const now = new Date(2026, 9, 27, 18, 0, 0);
+  const keys = (since: Date | string | null | undefined, selected: PeriodKey = '24h') =>
+    visiblePeriods(since instanceof Date ? since.toISOString() : since, selected, now).map((p) => p.key);
+
+  it('offers only the periods there is as much data as', () => {
+    expect(keys(new Date(2026, 9, 27, 13, 0, 0), '1h')).toEqual(['1h', '3h', 'all']);
+    expect(keys(new Date(2026, 9, 27, 10, 1, 0), '1h')).toEqual(['1h', '3h', 'all']);
+    expect(keys(new Date(2026, 9, 27, 10, 0, 0), '1h')).toEqual(['1h', '3h', '8h', 'all']);
+    expect(keys(new Date(2026, 9, 20, 18, 0, 0), '1h')).toEqual(['1h', '3h', '8h', '24h', '3d', '7d', 'all']);
+  });
+
+  it('keeps year to date for when there is data from before 1 January, and the year for a whole year', () => {
+    expect(keys(new Date(2026, 0, 2, 0, 0, 0), '1h')).not.toContain('ytd');
+    expect(keys(new Date(2026, 0, 1, 0, 0, 0), '1h')).toContain('ytd');
+    expect(keys(new Date(2026, 0, 1, 0, 0, 0), '1h')).not.toContain('1y');
+    expect(keys(new Date(2025, 9, 26, 0, 0, 0), '1h')).toEqual(['1h', '3h', '8h', '24h', '3d', '7d', '14d', '30d', 'ytd', '1y', 'all']);
+  });
+
+  it('always keeps the one picked, and everything when it is not known when recording began', () => {
+    expect(keys(new Date(2026, 9, 27, 13, 0, 0), '1y')).toEqual(['1h', '3h', '1y', 'all']);
+    expect(keys(null)).toHaveLength(11);
+    expect(keys('nonsense')).toHaveLength(11);
   });
 });
 
