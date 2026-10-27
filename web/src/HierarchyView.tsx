@@ -9,7 +9,7 @@ import { Watts } from './Watts';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
-import { breakerLevel, breakerPercent } from './amps';
+import { breakerLevel, breakerPercent, formatAmps, formatVolts } from './amps';
 import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
@@ -173,6 +173,8 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
           {tag}
         </span>
         <span class="num hier-watts">{watt !== undefined ? <Watts w={watt} /> : ''}</span>
+        <span class="num hier-amps">{watt !== undefined ? formatAmps(currents.get(meter.id)?.amps) : ''}</span>
+        <span class="num hier-volts">{watt !== undefined ? formatVolts(currents.get(meter.id)?.volts) : ''}</span>
         <span class="num hier-energy">{used ? formatKwh(used.kwh) : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
         <div class="hier-actions">
@@ -294,6 +296,8 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
         </span>
         <span class="caption hier-tag">{part.remainder ? 'wall plug less the parts' : 'from its collector'}</span>
         <span class="num hier-watts">{part.watts != null ? <Watts w={part.watts} /> : ''}</span>
+        <span class="hier-amps" />
+        <span class="hier-volts" />
         <span class="num hier-energy">{formatKwh(part.kwh)}</span>
         <span class="num hier-cost">{part.cost != null ? formatMoney(part.cost, true) : '—'}</span>
         <div class="hier-actions">
@@ -436,6 +440,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
             <div class="hier-head" aria-hidden="true">
               <span class="hier-tag" />
               <span class="num">Now</span>
+              <span class="num">Amps</span>
+              <span class="num">Volts</span>
               <span class="num">Energy</span>
               <span class="num">Cost</span>
             </div>

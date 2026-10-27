@@ -64,6 +64,8 @@ export function GroupsCard({
           <div class="hier-head" aria-hidden="true">
             <span class="hier-tag" />
             <span class="num">Now</span>
+            <span class="num">Amps</span>
+            <span class="num">Volts</span>
             <span class="num">Energy</span>
             <span class="num">Cost</span>
           </div>
@@ -130,6 +132,8 @@ function GroupRow({
           {members.length} {members.length === 1 ? 'meter' : 'meters'}
         </span>
         <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
+        <span class="hier-amps" />
+        <span class="hier-volts" />
         <span class="num hier-energy">{detail ? formatKwh(detail.total_kwh) : ''}</span>
         <span class="num hier-cost">{detail?.total_cost != null ? formatMoney(detail.total_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">

@@ -414,6 +414,12 @@ select {
   margin: 0;
 }
 
+.hier-amps,
+.hier-volts {
+  min-width: 3.5rem;
+  color: var(--muted);
+}
+
 .hier-watts,
 .hier-energy,
 .hier-cost {
@@ -437,13 +443,13 @@ select {
 @media (min-width: 900px) {
   .hier-row > .hier-main {
     display: grid;
-    grid-template-columns: 2rem 1rem minmax(8rem, 1fr) minmax(0, 13rem) 4.5rem 5.5rem 4.5rem 12.5rem;
+    grid-template-columns: 2rem 1rem minmax(8rem, 1fr) minmax(0, 13rem) 4.5rem 4rem 3.5rem 5.5rem 4.5rem 12.5rem;
     gap: 8px;
   }
 
   .hier-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem 4.5rem 12.5rem;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 4rem 3.5rem 5.5rem 4.5rem 12.5rem;
     gap: 8px;
     padding-right: 0;
   }
@@ -1311,6 +1317,18 @@ summary:focus-visible {
     min-width: 0;
     font-weight: 600;
     color: var(--color-text);
+  }
+
+  .hier-amps,
+  .hier-volts {
+    order: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+  }
+
+  .hier-amps:empty,
+  .hier-volts:empty {
+    display: none;
   }
 
   .hier-tag {
