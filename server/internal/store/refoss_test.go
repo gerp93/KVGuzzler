@@ -44,6 +44,9 @@ func TestAClampsSignAndScopeAreSetAndKept(t *testing.T) {
 		if !again.Invert {
 			t.Errorf("the sign was lost when the meter was registered again: %+v", again)
 		}
+		if again.Scope != model.ScopeMains || again.Type != model.TypeHouse {
+			t.Errorf("the whole house was lost when the meter was registered again (a restart): scope %q, type %q", again.Scope, again.Type)
+		}
 	}
 	bad := model.TypeDevice
 	if _, err := s.SetMeterWiring(ctx, ids[0], WiringChange{Type: &bad}); !errors.Is(err, ErrInvalid) {

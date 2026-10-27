@@ -143,6 +143,8 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   A clamp on backwards reads negative on a load: `invert` (Flip sign) fixes it in software; a reading still negative after that is dropped and **said so by name** in the notes (the
   `source.Noter` interface), never counted as zero. Every input is a meter when the monitor is added, and the ones with nothing on them at that moment are switched off (they come
   back in Settings). All are circuits until set to `mains` per meter (a monitor on the main panel). A clamp's sign and pairing are the user's: **never change them for the user**. **Pairing two clamps merges what each recorded before into the circuit's history** (`Store.mergeLegHistory`: energy added exactly minute by minute, the highest readings added, the leg's own rows removed so pairing again cannot add them twice); without that, a circuit paired after it had been recording reads only one leg for as far back as they were apart.
+  **A device registers its meters again every time the server starts** (`Store.UpsertMeter`), and a Refoss input always says "circuit": a meter the user made the house (scope `mains`) must keep it, or each restart
+  (a deploy, a power cut) silently turns the whole-house figure off and the Live page adds the top-level meters instead (a garage panel counted twice). `TestAClampsSignAndScopeAreSetAndKept` checks it.
   The monitor is only ever read (`Refoss.DeviceInfo.Get`, `Refoss.Status.Get`); the energy is integrated by the collector from the instantaneous power, as for a plug.
   **Not checked on an EM06P or on the main panel** (only a garage sub-panel's three circuits).
 
