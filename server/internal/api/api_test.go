@@ -78,6 +78,18 @@ func TestStatusAndVersionHeader(t *testing.T) {
 	}
 }
 
+func TestStatusSaysWhenRecordingBegan(t *testing.T) {
+	srv, _ := newServer(t, 3)
+	var st struct {
+		DataSince *time.Time `json:"data_since"`
+	}
+	get(t, srv.URL+"/api/v1/status", &st)
+	// The first whole minute recorded is the simulated house's first, and nothing is older.
+	if st.DataSince == nil || st.DataSince.Before(day.Add(-time.Minute)) || st.DataSince.After(day.Add(time.Minute)) {
+		t.Errorf("data_since %v, want about %v", st.DataSince, day)
+	}
+}
+
 func TestLiveHouseIsTheMainsAlone(t *testing.T) {
 	srv, _ := newServer(t, 2)
 	var chs struct{ Meters []model.Meter }

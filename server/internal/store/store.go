@@ -505,6 +505,18 @@ func (s *Store) FirstMinute(ctx context.Context, meterID string) (time.Time, boo
 	return time.Unix(first.Int64, 0).UTC(), true, nil
 }
 
+// FirstData is the first minute anything at all was recorded (a meter's, or a PC's sensors'), or false when nothing was.
+func (s *Store) FirstData(ctx context.Context) (time.Time, bool, error) {
+	var first sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(m) FROM (SELECT MIN(minute) AS m FROM minutes UNION ALL SELECT MIN(minute) FROM pc_minutes)`).Scan(&first); err != nil {
+		return time.Time{}, false, err
+	}
+	if !first.Valid {
+		return time.Time{}, false, nil
+	}
+	return time.Unix(first.Int64, 0).UTC(), true, nil
+}
+
 // Totals is a meter's energy, highest reading and covered time in [from, to).
 func (s *Store) Totals(ctx context.Context, meterID string, from, to time.Time) (Totals, error) {
 	var ws, peak, secs float64
