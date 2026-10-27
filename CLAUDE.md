@@ -89,6 +89,13 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   member already contains** (a plug on a circuit that is in the same group, through `parent_id`, however deep): it is listed (`not_added` in the detail) but not
   added a second time. The cost is shown only when every counted member has one. A hidden meter is neither shown nor counted. Groups are managed in the Hierarchy
   tab (`GroupsCard.tsx`: name, members chosen from a list, totals in the same columns as the tree) and each has a page (`#/hierarchy/group/<id>`).
+- **Electric vehicles** are a mark on a meter, not a second thing to wire (`ev` on a meter, `store/ev.go`, `api/ev.go`, `EvCard.tsx`): the Hierarchy tab's "This meter charges an
+  electric vehicle" box, only for a circuit or a plug (the mains is refused), and the meter is measured and summed exactly as before. Its page then takes **odometer readings** (`odometer_readings`:
+  a local calendar day and the miles the user typed; nothing is read from the car). A reading counts as taken at the start of its day, so a stretch runs from the start of one reading's day to the
+  start of the next's, and `GET /meters/{id}/ev` divides that stretch's miles into the meter's energy and its price (`meterSummary`, so the same `RateSchedule` as everywhere): cost per mile, miles per kWh
+  at the wall (charging losses included), and `since_last` for the days after the latest reading, which has no miles yet. An odometer only goes up (a reading out of order is refused); a stretch with no energy
+  recorded has no cost per mile, never a free one; `coverage` says how much of a stretch the meter was measured (an unanswering device is not credited, so a low figure means the cost is too low) and the
+  card says so. Turning the mark off keeps the readings. There is no gas comparison yet: it is the cost per mile the user sets beside a gas car's.
 - **Panels nest** (`parent_id` on a meter, `store/parent.go`): a `circuit` that feeds a sub-panel holds the circuits clamped inside it, and a plug, a computer's
   wall plug (`pc`) or a peripheral says which circuit it is on. A circuit with no parent is on the main panel, under the house; there can be several top-level
   entries and nothing needs a main monitor to exist. The parent's own reading already contains its children's, so they

@@ -74,6 +74,15 @@ type Meter struct {
 	// BreakerAmps is the size of the breaker this meter is on, as the user said (nil when they have not). It is only used to say how much of it a
 	// current is: the continuous-load rule keeps a load that runs for hours under 80% of it.
 	BreakerAmps *float64 `json:"breaker_amps"`
+	// EV says the user marked this meter as one that charges an electric vehicle: its page then takes odometer readings and works out the cost
+	// per mile. Only a circuit or a plug can be one. The meter is measured exactly as before.
+	EV bool `json:"ev"`
+}
+
+// OdometerReading is the car's odometer on a local calendar day, as the user typed it.
+type OdometerReading struct {
+	Day   string  `json:"day"`
+	Miles float64 `json:"miles"`
 }
 
 type Reading struct {

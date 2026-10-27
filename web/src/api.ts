@@ -3,6 +3,7 @@ import type { ApplianceGroup, CarbonConfig, Meter, Computer, ComputerDetail, Com
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { MeterRuns } from './runs';
+import type { MeterEv } from './ev';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -52,6 +53,16 @@ export const api = {
   houseBaseLoad: (from: string, to: string) => request<BaseLoad | undefined>(`api/v1/baseload?${q({ from, to })}`),
   /** The times a meter was working over a period (a car charging, a dryer drying). */
   meterRuns: (meterId: string, from: string, to: string) => request<MeterRuns>(`api/v1/meters/${encodeURIComponent(meterId)}/runs?${q({ from, to })}`),
+  /** A charging meter's odometer readings with the miles, energy and cost per mile of each stretch between them. */
+  meterEv: (meterId: string) => request<MeterEv>(`api/v1/meters/${encodeURIComponent(meterId)}/ev`),
+  putOdometer: (meterId: string, day: string, miles: number) =>
+    request<MeterEv>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/odometer/${encodeURIComponent(day)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ miles }),
+    }),
+  deleteOdometer: (meterId: string, day: string) =>
+    request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/odometer/${encodeURIComponent(day)}`, { method: 'DELETE' }),
   devices: () => request<{ devices: Device[] }>('api/v1/devices').then((r) => r.devices),
   addDevice: (nd: NewDevice) =>
     request<Device>('api/v1/devices', {
@@ -141,7 +152,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }),
-  updateMeter: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; favorite?: boolean; type?: 'house' | 'sub_panel' | 'circuit'; parent_id?: string | null; breaker_amps?: number | null }) =>
+  updateMeter: (id: string, body: { label?: string; enabled?: boolean; computer_id?: string | null; group_id?: string | null; invert?: boolean; pair_with?: string | null; favorite?: boolean; type?: 'house' | 'sub_panel' | 'circuit'; parent_id?: string | null; breaker_amps?: number | null; ev?: boolean }) =>
     request<Meter>(`api/v1/meters/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

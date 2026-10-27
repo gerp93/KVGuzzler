@@ -11,6 +11,7 @@ import { PeriodPicker } from './Periods';
 import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { CurrentCard } from './Breaker';
+import { EvCard } from './EvCard';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
@@ -117,6 +118,8 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
       {data && data.lines.length === 0 && meter && <p class="note">Nothing recorded for this meter in this period.</p>}
 
       {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
+
+      {meter?.ev && <EvCard meter={meter} />}
 
       {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
 

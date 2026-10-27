@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSchema + computersSchema + groupsSchema + carbonSchema)
+INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSchema + computersSchema + groupsSchema + carbonSchema + evSchema)
 	if err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}
@@ -181,7 +181,7 @@ INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSche
 	}
 	// And before a clamp's sign could be flipped and its two legs paired.
 	// And before a circuit could be part of a sub-panel's feed.
-	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT", "type TEXT", "favorite INTEGER NOT NULL DEFAULT 0"} {
+	for _, col := range []string{"invert INTEGER NOT NULL DEFAULT 0", "pair_with TEXT", "parent_id TEXT", "type TEXT", "favorite INTEGER NOT NULL DEFAULT 0", "ev INTEGER NOT NULL DEFAULT 0"} {
 		name := col[:strings.IndexByte(col, ' ')]
 		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('meters') WHERE name = ?`, name).Scan(&has); err != nil {
 			return fmt.Errorf("store: migrate: %w", err)
@@ -280,8 +280,8 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	var max, breaker sql.NullFloat64
 	var computer, group, pair, parent, typ sql.NullString
 	var scope string
-	var enabled, invert, favorite int
-	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent, &typ, &favorite, &breaker); err != nil {
+	var enabled, invert, favorite, ev int
+	if err := sc.Scan(&c.ID, &c.DeviceID, &idx, &scope, &c.Label, &enabled, &max, &computer, &group, &invert, &pair, &parent, &typ, &favorite, &breaker, &ev); err != nil {
 		return c, err
 	}
 	c.Invert = invert == 1
@@ -289,6 +289,7 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 		c.BreakerAmps = &breaker.Float64
 	}
 	c.Favorite = favorite == 1
+	c.EV = ev == 1
 	c.Type = model.MeterType(typ.String) // as saved; settleTypes turns it into what the meter is
 	if parent.Valid {
 		c.ParentID = &parent.String
@@ -314,7 +315,7 @@ func scanMeter(sc interface{ Scan(...any) error }) (model.Meter, error) {
 	return c, nil
 }
 
-const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id, type, favorite, breaker_amps`
+const meterCols = `id, device_id, idx, scope, label, enabled, max_watts, computer_id, group_id, invert, pair_with, parent_id, type, favorite, breaker_amps, ev`
 
 // settleTypes fills in each meter's Type: the mains is the house, plugs are devices, and a circuit is a sub-panel when circuits sit inside it
 // (or the user said so) and a circuit otherwise. The user's own choice, kept in the type column, wins for a circuit.

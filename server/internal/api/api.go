@@ -72,6 +72,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/meters/{meterId}", s.updateMeter)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs", s.meterRuns)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/runs.csv", s.runsExport)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev", s.meterEV)
+	mux.HandleFunc("PUT /api/v1/meters/{meterId}/ev/odometer/{day}", s.putOdometer)
+	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/odometer/{day}", s.deleteOdometer)
 	mux.HandleFunc("GET /api/v1/tree.csv", s.treeExport)
 	mux.HandleFunc("GET /api/v1/anomalies", s.anomalies)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/baseload", s.meterBaseLoad)
@@ -265,12 +268,14 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 		Favorite *bool `json:"favorite"`
 		// The size of the breaker the meter is on, in amps, or null to forget it; absent leaves it alone.
 		BreakerAmps json.RawMessage `json:"breaker_amps"`
+		// Whether the meter charges an electric vehicle: its page then takes odometer readings.
+		EV *bool `json:"ev"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil || (body.Label == nil && body.Enabled == nil && body.ComputerID == nil && body.GroupID == nil &&
-		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil && body.Favorite == nil && body.BreakerAmps == nil) {
-		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type, parent_id, favorite and/or breaker_amps")
+		body.Invert == nil && body.PairWith == nil && body.Type == nil && body.ParentID == nil && body.Favorite == nil && body.BreakerAmps == nil && body.EV == nil) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "send a label, enabled, computer_id, group_id, invert, pair_with, type, parent_id, favorite, breaker_amps and/or ev")
 		return
 	}
 	if body.Label != nil {
@@ -334,6 +339,9 @@ func (s *Server) updateMeter(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && body.Favorite != nil {
 		ch, err = s.Store.SetMeterFavorite(r.Context(), id, *body.Favorite)
+	}
+	if err == nil && body.EV != nil {
+		ch, err = s.Store.SetMeterEV(r.Context(), id, *body.EV)
 	}
 	if err == nil && body.BreakerAmps != nil {
 		ch, err = s.Store.SetMeterBreaker(r.Context(), id, breaker)

@@ -20,6 +20,7 @@ const examples = {
   'carbon-config.json': 'CarbonConfig',
   'house-history.json': 'HouseHistory',
   'meter-runs.json': 'MeterRuns',
+  'meter-ev.json': 'MeterEv',
   'baseload.json': 'BaseLoad',
   'anomalies.json': 'Anomalies',
 };
