@@ -10,6 +10,7 @@ import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { formatAmps, formatVolts } from './amps';
+import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
 import { Watts } from './Watts';
 import { Estimator } from './Estimator';
@@ -243,19 +244,18 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           </section>
         )}
 
-        {(whole || pc.length > 0) && (
-          <section class="panel panel-insights">
-            {whole && <BaseLoadCard period={period as PeriodKey} />}
-            {whole && <AnomalyCard />}
-            {pc.length > 0 && (
-              <section class="card">
-                <h2>Also measured</h2>
-                <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
-                <p class="caption">Plugged into circuits nothing clamps, so they sit beside the circuits above, never inside them or added to them.</p>
-              </section>
-            )}
-          </section>
-        )}
+        <section class="panel panel-insights">
+          <GuzzlersCard meters={meters} summary={summary} houseKwh={kwh} period={period as PeriodKey} />
+          {whole && <BaseLoadCard period={period as PeriodKey} />}
+          {whole && <AnomalyCard />}
+          {pc.length > 0 && (
+            <section class="card">
+              <h2>Also measured</h2>
+              <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
+              <p class="caption">Plugged into circuits nothing clamps, so they sit beside the circuits above, never inside them or added to them.</p>
+            </section>
+          )}
+        </section>
       </div>
 
       {whole && (

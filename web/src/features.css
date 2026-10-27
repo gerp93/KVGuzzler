@@ -249,3 +249,54 @@ button.link {
   font-weight: 600;
   color: var(--color-text);
 }
+
+/* The top guzzlers: a ranked list, the bars against the biggest */
+.guzzler-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guzzler-list li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.guzzler-list .rank {
+  color: var(--muted);
+  text-align: right;
+}
+
+.guzzler-list .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guzzler-list .bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.guzzler-list .bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-green);
+}
+
+@media (max-width: 480px) {
+  .guzzler-list li {
+    grid-template-columns: 1.4rem minmax(0, 1fr) auto auto;
+  }
+
+  .guzzler-list .bar {
+    display: none;
+  }
+}
