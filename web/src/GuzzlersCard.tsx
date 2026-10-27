@@ -11,6 +11,14 @@ import { formatKwh, formatMoney, formatWatts, periodRange, periodWords, type Met
 
 const SHOWN = 5;
 
+/** What an always-on level is learned from is at least this long, so a short period (an hour) still has one: a level needs an hour or more of minutes, and an hour is no sample of "hardly ever goes below". */
+const MIN_LOOK_MS = 24 * 3600_000;
+
+/** The start of the window the always-on levels are read over: the period's, or the 24 hours before its end when the period is shorter. */
+function widen(from: string, to: string): string {
+  return new Date(Math.min(Date.parse(from), Date.parse(to) - MIN_LOOK_MS)).toISOString();
+}
+
 export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Meter[]; summary: Summary | undefined; houseKwh: number | null | undefined; period: PeriodKey }) {
   const [savedMode, setMode] = useStored('guzzlers-mode', 'active');
   const [saved, setBy] = useStored('guzzlers-by', 'kwh');
@@ -19,11 +27,13 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
   const { data: base } = usePoll(
     async () => {
       const { from, to } = periodRange(period, new Date());
-      return (await api.houseBaseLoad(from, to)) ?? null;
+      return (await api.houseBaseLoad(widen(from, to), to)) ?? null;
     },
     60_000,
     [period],
   );
+  const widened = periodRange(period, new Date());
+  const lookedFurther = Date.parse(widened.to) - Date.parse(widened.from) < MIN_LOOK_MS;
   const rests = new Map((base?.parts ?? []).map((p) => [p.meter_id, p.watts]));
   const priced = (summary?.meters ?? []).some((f) => f.cost != null && f.kwh > 0);
   const mode: GuzzlerMode = savedMode === 'rest' ? 'rest' : 'active';
@@ -51,10 +61,10 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
       </div>
       <p class="caption">
         {mode === 'rest'
-          ? `Always on, over ${periodWords(period)}: the steady draw each one hardly ever goes below, day or night.`
+          ? `Always on, over ${periodWords(period)}: the steady draw each one hardly ever goes below, day or night.${lookedFurther ? ' The level is learned from the last 24 hours, so a short period still has one.' : ''}`
           : `Working, over ${periodWords(period)}: the energy each one used above its idle level, with the most it pulled.`}
       </p>
-      {mode === 'rest' && base && <BaseLoadStats data={base} what="this meter" />}
+      {mode === 'rest' && base && <BaseLoadStats data={base} what="this meter" span={lookedFurther ? 'the last 24 hours' : 'the period'} />}
       {mode === 'active' && priced && (
         <div class="seg small" role="group" aria-label="Rank by">
           <button type="button" aria-pressed={by === 'kwh'} onClick={() => setBy('kwh')}>

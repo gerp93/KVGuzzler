@@ -29,7 +29,7 @@ export function BaseLoadCard({ meterId, period }: { meterId?: string; period: Pe
 }
 
 /** The figures and the sentence of an always-on reading: shared by a meter's own card and the house's, which sits in the Top guzzlers card under "At rest". */
-export function BaseLoadStats({ data, what }: { data: BaseLoad; what: string }) {
+export function BaseLoadStats({ data, what, span = 'the period' }: { data: BaseLoad; what: string; span?: string }) {
   return (
     <>
       <div class="stats three">
@@ -48,7 +48,7 @@ export function BaseLoadStats({ data, what }: { data: BaseLoad; what: string }) 
         </div>
       </div>
       <p class="caption">
-        {baseLoadSentence(data, what)} Worked out as the level it is above 95% of the time, from {lookedAt(data.minutes)} of readings in the period
+        {baseLoadSentence(data, what)} Worked out as the level it is above 95% of the time, from {lookedAt(data.minutes)} of readings in {span}
         {data.cost_per_year != null ? ", priced at today's rate" : ''}.
       </p>
     </>
