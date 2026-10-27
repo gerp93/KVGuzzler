@@ -5,7 +5,8 @@ import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
-import { formatKwh, formatMoney, formatWatts, type Computer, type ComputerDetail, type Meter } from './lib';
+import { Watts } from './Watts';
+import { formatKwh, formatMoney, type Computer, type ComputerDetail, type Meter } from './lib';
 import { routePath } from './route';
 
 interface Loaded {
@@ -133,7 +134,7 @@ function ComputerRow({
         <span class="caption hier-tag" title="The wall plug plus the peripherals">
           setup · {count} {count === 1 ? 'plug' : 'plugs'}
         </span>
-        <span class="num hier-watts">{now !== null ? formatWatts(now) : ''}</span>
+        <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
         <span class="num hier-energy">{detail?.setup_kwh != null ? formatKwh(detail.setup_kwh) : ''}</span>
         <span class="num hier-cost">{detail?.setup_cost != null ? formatMoney(detail.setup_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">

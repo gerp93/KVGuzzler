@@ -1,5 +1,6 @@
 // The PC right now, as its collector last saw it: what each part is drawing, how much of the whole PC that is, and which programs are
 // causing it. A look is not history: the page asks for a new one every few seconds and says how old the one it shows is.
+import { Watts } from './Watts';
 import {
   formatAge, formatWatts, idleText, isLiveStale, liveSplit, programsNow, sharePercent,
   type PcLive,
@@ -13,7 +14,7 @@ function Row({ name, watts, base, hint }: { name: string; watts: number; base: n
       <span class="bar" aria-hidden="true">
         <i style={{ width: `${base > 0 ? Math.min(100, (watts / base) * 100) : 0}%` }} />
       </span>
-      <span class="num">{formatWatts(watts)}</span>
+      <span class="num"><Watts w={watts} /></span>
       <span class="num cost">{hint ?? (share != null ? `${share}%` : '')}</span>
     </li>
   );
@@ -97,7 +98,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
                 <span class="bar" aria-hidden="true">
                   <i style={{ width: `${topProgram > 0 ? (p.watts / topProgram) * 100 : 0}%` }} />
                 </span>
-                <span class="num">{formatWatts(p.watts)}</span>
+                <span class="num"><Watts w={p.watts} /></span>
                 <span class="num cost">
                   CPU {formatWatts(p.cpuWatts)} · GPU {formatWatts(p.gpuWatts)}
                 </span>

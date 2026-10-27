@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -58,6 +58,15 @@ describe('scopes are never summed across each other', () => {
     expect(underHouse(none)).toBe(none);
     const two = arrangeByPanel([ch('h1', 'mains'), ch('h2', 'mains'), ch('a', 'circuit')]);
     expect(underHouse(two)).toBe(two);
+  });
+
+  it('isKilowatts is the point where formatWatts changes unit', () => {
+    expect(isKilowatts(999.4)).toBe(false);
+    expect(isKilowatts(1000)).toBe(true);
+    expect(isKilowatts(-7300)).toBe(true);
+    expect(isKilowatts(null)).toBe(false);
+    expect(formatWatts(7300)).toBe('7.30 kW');
+    expect(formatWatts(999.4)).toBe('999 W');
   });
 
   it('splitSummary does not fold the PC into the circuits', () => {
