@@ -602,8 +602,13 @@ select:focus-visible {
     height: auto;
     padding: 0;
     gap: 4px;
+    margin-left: 32px;
     background: none;
     border: 0;
+  }
+
+  .top .conn {
+    margin-right: 0;
   }
 
   .top nav a {
@@ -1671,6 +1676,13 @@ main > * {
   main.page-hierarchy-meter > .note,
   main.page-hierarchy-computer > .note,
   main.page-hierarchy-group > .note {
+    column-span: all;
+  }
+
+  /* The chart of a page is the one card that takes the whole width: half a screen this wide would leave it short and squeezed beside the cards that are not charts */
+  main.page-hierarchy-meter > .card.wide,
+  main.page-hierarchy-computer > .card.wide,
+  main.page-hierarchy-group > .card.wide {
     column-span: all;
   }
 

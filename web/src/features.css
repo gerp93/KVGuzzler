@@ -249,3 +249,103 @@ button.link {
   font-weight: 600;
   color: var(--color-text);
 }
+
+/* The top guzzlers: a ranked list, the bars against the biggest */
+.guzzler-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guzzler-list li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.guzzler-list .rank {
+  color: var(--muted);
+  text-align: right;
+}
+
+.guzzler-list .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guzzler-list .bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.guzzler-list .bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-green);
+}
+
+@media (max-width: 480px) {
+  .guzzler-list li {
+    grid-template-columns: 1.4rem minmax(0, 1fr) auto auto;
+  }
+
+  .guzzler-list .bar {
+    display: none;
+  }
+}
+
+/* The house's draw in the top bar: at the far right, a figure to read from across the room, with its amps and volts beside it */
+.top .house-now {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-left: auto;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.house-now .label {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.house-now .watts {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.house-now .extra {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.house-now.stale {
+  opacity: 0.5;
+}
+
+/* A phone has room for the figure alone */
+@media (max-width: 719px) {
+  .house-now .extra,
+  .house-now .label {
+    display: none;
+  }
+}
+
+@media (min-width: 1800px) {
+  .house-now .watts {
+    font-size: 1.6rem;
+  }
+
+  .house-now .extra {
+    font-size: 1.15rem;
+  }
+}
