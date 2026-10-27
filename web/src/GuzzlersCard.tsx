@@ -1,8 +1,9 @@
 // The top guzzlers of the period picked on the Live page, in two views that switch at the top: the ones that WORK (they go up and down, and pull a lot while they
 // run: an EV charger, a dryer) ranked by the energy they used above their idle level, and the ones that REST (always on at a steady draw: a fridge, a network
-// closet) ranked by that always-on power. Only meters that hold nothing are ranked (see guzzlers.ts), so no energy is listed twice and nothing is added to anything.
+// closet) ranked by that always-on power, under the house's own always-on figures (what it never goes below, a year of it). Only meters that hold nothing are ranked (see guzzlers.ts), so no energy is listed twice and nothing is added to anything.
 import { useState } from 'preact/hooks';
 import { api } from './api';
+import { BaseLoadStats } from './BaseLoadCard';
 import { meterPath } from './Bars';
 import { topGuzzlers, type GuzzlerBy, type GuzzlerMode } from './guzzlers';
 import { usePoll, useStored } from './hooks';
@@ -53,6 +54,7 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
           ? `Always on, over ${periodWords(period)}: the steady draw each one hardly ever goes below, day or night.`
           : `Working, over ${periodWords(period)}: the energy each one used above its idle level, with the most it pulled.`}
       </p>
+      {mode === 'rest' && base && <BaseLoadStats data={base} what="this meter" />}
       {mode === 'active' && priced && (
         <div class="seg small" role="group" aria-label="Rank by">
           <button type="button" aria-pressed={by === 'kwh'} onClick={() => setBy('kwh')}>
