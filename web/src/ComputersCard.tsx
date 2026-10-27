@@ -63,6 +63,8 @@ export function ComputersCard({
           <div class="hier-head" aria-hidden="true">
             <span class="hier-tag" />
             <span class="num">Now</span>
+            <span class="num">Amps</span>
+            <span class="num">Volts</span>
             <span class="num">Energy</span>
             <span class="num">Cost</span>
           </div>
@@ -135,6 +137,8 @@ function ComputerRow({
           setup · {count} {count === 1 ? 'plug' : 'plugs'}
         </span>
         <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
+        <span class="hier-amps" />
+        <span class="hier-volts" />
         <span class="num hier-energy">{detail?.setup_kwh != null ? formatKwh(detail.setup_kwh) : ''}</span>
         <span class="num hier-cost">{detail?.setup_cost != null ? formatMoney(detail.setup_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
         <div class="hier-actions">

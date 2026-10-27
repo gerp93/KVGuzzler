@@ -8,6 +8,7 @@ import { FlowChart } from './FlowChart';
 import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
+import { formatAmps, formatVolts } from './amps';
 import { Kpi, KpiRow } from './Kpi';
 import { Watts } from './Watts';
 import { Estimator } from './Estimator';
@@ -115,6 +116,9 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const placed = slices.filter((r) => r.meter.parent_id && base.some((b) => b.meter.id === r.meter.parent_id));
   const circuits = nestCircuits([...base, ...placed]);
   const house = live.house_watts ?? null;
+  // The mains' volts and amps, when one meter is the whole house (several mains are different feeds: their currents are never added).
+  const feed = whole && mains.length === 1 ? live.readings.find((r) => r.meter_id === mains[0]!.id) : undefined;
+  const feedNow = feed && (feed.volts != null || feed.amps != null) ? `${formatVolts(feed.volts)} · ${formatAmps(feed.amps)}` : undefined;
   const rest = unmetered(house, circuits);
   // Bars are shares of the house when there is a house figure, else of the biggest load shown.
   const pc = slices.filter((r) => !placed.includes(r));
@@ -152,7 +156,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       )}
 
       <KpiRow>
-        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)}>
+        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)} hint={feedNow}>
           <Spark values={trail} label="The last few minutes of the draw" />
         </Kpi>
         <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={span} />
