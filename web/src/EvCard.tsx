@@ -31,6 +31,20 @@ export function EvPrompt({ meter, onChanged }: { meter: Meter; onChanged: () => 
   );
 }
 
+/** The newest odometer reading typed in for a charging meter, wherever the meter is shown: "18,240 mi" with its day, or a plain "no odometer reading yet". */
+export function OdometerNow({ meterId, brief }: { meterId: string; brief?: boolean }) {
+  const { data } = usePoll<MeterEv>(() => api.meterEv(meterId), 60_000, [meterId]);
+  if (!data) return null;
+  const latest = data.readings[data.readings.length - 1];
+  if (!latest) return <span class="odometer none">{brief ? 'no odometer yet' : 'No odometer reading yet'}</span>;
+  return (
+    <span class="odometer" title={`Odometer as typed on ${dayLabel(latest.day)}`}>
+      <strong class="num">{formatMiles(latest.miles)}</strong>
+      {!brief && <span class="caption"> as of {dayLabel(latest.day)}</span>}
+    </span>
+  );
+}
+
 export function EvCard({ meter }: { meter: Meter }) {
   const [version, setVersion] = useState(0);
   const { data, error } = usePoll<MeterEv>(() => api.meterEv(meter.id), 60_000, [meter.id, version]);
@@ -72,10 +86,18 @@ export function EvCard({ meter }: { meter: Meter }) {
   const totals = data?.totals ?? null;
   const readings = data?.readings ?? [];
   const stretches = [...(data?.intervals ?? [])].reverse();
+  const latest = readings[readings.length - 1];
   return (
     <section class="card ev">
       <h2>Electric vehicle</h2>
       {error && !data && <p class="note error">{error.message}</p>}
+      {data && (
+        <div class="stat ev-odometer">
+          <span class="caption">Odometer</span>
+          <p class="big ev-figure">{latest ? formatMiles(latest.miles) : '—'}</p>
+          <span class="caption">{latest ? `last reading, ${dayLabel(latest.day)}` : 'no reading yet: type one below'}</span>
+        </div>
+      )}
       {totals && (
         <div class="stats three">
           <div class="stat">
