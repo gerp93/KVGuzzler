@@ -261,7 +261,7 @@ button.link {
 
 .guzzler-list li {
   display: grid;
-  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) auto auto;
+  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
@@ -291,12 +291,27 @@ button.link {
   background: var(--color-accent-green);
 }
 
+/* At rest the bars are blue: a different kind of guzzler, not a smaller one */
+.guzzler-list.rest .bar i {
+  background: var(--color-accent-blue);
+}
+
+.guzzler-list .peak {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.seg.small {
+  margin: 4px 0 0;
+}
+
 @media (max-width: 480px) {
   .guzzler-list li {
     grid-template-columns: 1.4rem minmax(0, 1fr) auto auto;
   }
 
-  .guzzler-list .bar {
+  .guzzler-list .bar,
+  .guzzler-list .peak {
     display: none;
   }
 }
