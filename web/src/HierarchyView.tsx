@@ -102,7 +102,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
   // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
   const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
   const owner = meter.type === 'computer' ? ofComputer : meter.scope === 'plug' && ofComputer ? `peripheral of ${ofComputer}` : '';
-  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', owner, refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
+  const tag = [legs !== meter.label ? legs : '', TYPE_WORDS[meter.type] ?? '', meter.ev ? 'electric vehicle' : '', owner, refoss ? deviceName(meter.device_id) : ''].filter(Boolean).join(' · ');
   const dragged = dragging ? all.find((c) => c.id === dragging) : undefined;
   const dropOk = !!dragged && dragged.id !== meter.id && canHold(meter, dragged, all);
 
@@ -263,6 +263,16 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
             </>
           )}
           {inPanel && <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />}
+          {(meter.scope === 'circuit' || meter.scope === 'plug') && (
+            <fieldset>
+              <legend>Electric vehicle</legend>
+              <label class="check">
+                <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
+                This meter charges an electric vehicle
+              </label>
+              <p class="caption block">Its page then takes the car's odometer now and then, and works out what a mile costs.</p>
+            </fieldset>
+          )}
           {placeable && (
             <label class="field">
               <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>

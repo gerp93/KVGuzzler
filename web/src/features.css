@@ -183,3 +183,61 @@ button.link {
 .kpi.hot .kpi-value .unit {
   color: var(--color-accent-red);
 }
+
+/* A charging meter's odometer card */
+.ev-stretches {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-stretches li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.ev-stretches .caption {
+  margin: 0;
+}
+
+/* The three figures of the card sit in a narrow column: a size that fits the longest of them (a thousand kWh) */
+.ev-figure {
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  white-space: nowrap;
+}
+
+.ev-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.ev-form .field {
+  margin-top: 0;
+}
+
+.ev-readings {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-readings li {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+

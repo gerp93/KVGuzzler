@@ -230,6 +230,87 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/ev:
+    get:
+      tags: [Read]
+      operationId: getMeterEv
+      summary: A charging meter's odometer readings, with the miles, energy and cost per mile of each stretch between them.
+      description: |
+        For a meter marked `ev` (the circuit or plug that charges an electric vehicle). The user adds the car's odometer now and then; each
+        stretch between two readings is the miles driven over the energy the meter used in the same days, priced at each local day's rate.
+        A reading counts as taken at the start of its day. `coverage` says how much of a stretch the meter was measured (time a device did not
+        answer is not credited, so a low figure means the cost per mile is too low). `since_last` is what the meter has used since the latest
+        reading, which has no miles yet. 409 when the meter is not marked `ev`.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterEv'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/ev/odometer/{day}:
+    put:
+      tags: [Settings]
+      operationId: putOdometer
+      summary: Save the car's odometer on a day (replacing that day's reading).
+      description: |
+        An odometer only goes up: a reading below the one before it, or above the one after it, is refused (400). Answers like `getMeterEv`.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - name: day
+          in: path
+          required: true
+          description: A local calendar day, `2026-10-26`.
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [miles]
+              additionalProperties: false
+              properties:
+                miles:
+                  type: number
+                  minimum: 0
+                  maximum: 10000000
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterEv'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: deleteOdometer
+      summary: Remove the odometer reading of a day.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - name: day
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/anomalies:
     get:
       tags: [Read]
@@ -1232,6 +1313,91 @@ components:
           description: |
             The size of the breaker this meter is on, in amps, as the user said; null when not said. Only used to say how much of the breaker a
             current is (the continuous-load rule keeps a load that runs for hours under 80% of it).
+        ev:
+          type: boolean
+          description: "The user said this meter charges an electric vehicle: its page takes odometer readings (`getMeterEv`). Only a circuit or a plug can."
+    OdometerReading:
+      type: object
+      required: [day, miles]
+      properties:
+        day:
+          type: string
+          format: date
+        miles:
+          type: number
+    MeterEv:
+      type: object
+      required: [meter_id, readings, intervals, totals, since_last, cost_estimated]
+      properties:
+        meter_id:
+          type: string
+        readings:
+          type: array
+          description: The odometer readings, oldest first.
+          items:
+            $ref: '#/components/schemas/OdometerReading'
+        intervals:
+          type: array
+          description: One per pair of neighbouring readings, oldest first.
+          items:
+            type: object
+            required: [from_day, to_day, miles, kwh, cost, cost_per_mile, miles_per_kwh, coverage, cost_estimated]
+            properties:
+              from_day:
+                type: string
+                format: date
+              to_day:
+                type: string
+                format: date
+              miles:
+                type: number
+              kwh:
+                type: number
+                description: What the meter used from the start of `from_day` to the start of `to_day`.
+              cost:
+                type: [string, 'null']
+                description: The energy priced at each local day's rate, a decimal string; null when no price is known.
+              cost_per_mile:
+                type: [string, 'null']
+                description: A decimal string; null with no price or no miles.
+              miles_per_kwh:
+                type: [number, 'null']
+              coverage:
+                type: number
+                minimum: 0
+                maximum: 1
+                description: The share of the stretch the meter was measured.
+              cost_estimated:
+                type: boolean
+        totals:
+          type: [object, 'null']
+          description: Every stretch added up; null until there are two readings.
+          required: [miles, kwh, cost, cost_per_mile, miles_per_kwh]
+          properties:
+            miles:
+              type: number
+            kwh:
+              type: number
+            cost:
+              type: [string, 'null']
+            cost_per_mile:
+              type: [string, 'null']
+            miles_per_kwh:
+              type: [number, 'null']
+        since_last:
+          type: [object, 'null']
+          description: What the meter has used since the latest reading; null with no readings.
+          required: [from_day, kwh, cost]
+          properties:
+            from_day:
+              type: string
+              format: date
+            kwh:
+              type: number
+            cost:
+              type: [string, 'null']
+        cost_estimated:
+          type: boolean
     MeterUpdate:
       type: object
       minProperties: 1
@@ -1279,6 +1445,9 @@ components:
           exclusiveMinimum: 0
           maximum: 1000
           description: The size of the breaker the meter is on, in amps, or null to forget it.
+        ev:
+          type: boolean
+          description: Whether the meter charges an electric vehicle (a circuit or a plug only; 400 for the mains). Turning it off keeps the odometer readings.
     Reading:
       type: object
       required: [meter_id, watts]

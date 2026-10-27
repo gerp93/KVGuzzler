@@ -122,6 +122,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/ev": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A charging meter's odometer readings, with the miles, energy and cost per mile of each stretch between them.
+         * @description For a meter marked `ev` (the circuit or plug that charges an electric vehicle). The user adds the car's odometer now and then; each
+         *     stretch between two readings is the miles driven over the energy the meter used in the same days, priced at each local day's rate.
+         *     A reading counts as taken at the start of its day. `coverage` says how much of a stretch the meter was measured (time a device did not
+         *     answer is not credited, so a low figure means the cost per mile is too low). `since_last` is what the meter has used since the latest
+         *     reading, which has no miles yet. 409 when the meter is not marked `ev`.
+         */
+        get: operations["getMeterEv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/meters/{meterId}/ev/odometer/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save the car's odometer on a day (replacing that day's reading).
+         * @description An odometer only goes up: a reading below the one before it, or above the one after it, is refused (400). Answers like `getMeterEv`.
+         */
+        put: operations["putOdometer"];
+        post?: never;
+        /** Remove the odometer reading of a day. */
+        delete: operations["deleteOdometer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/anomalies": {
         parameters: {
             query?: never;
@@ -817,6 +862,52 @@ export interface components {
              *     current is (the continuous-load rule keeps a load that runs for hours under 80% of it).
              */
             breaker_amps?: number | null;
+            /** @description The user said this meter charges an electric vehicle: its page takes odometer readings (`getMeterEv`). Only a circuit or a plug can. */
+            ev?: boolean;
+        };
+        OdometerReading: {
+            /** Format: date */
+            day: string;
+            miles: number;
+        };
+        MeterEv: {
+            meter_id: string;
+            /** @description The odometer readings, oldest first. */
+            readings: components["schemas"]["OdometerReading"][];
+            /** @description One per pair of neighbouring readings, oldest first. */
+            intervals: {
+                /** Format: date */
+                from_day: string;
+                /** Format: date */
+                to_day: string;
+                miles: number;
+                /** @description What the meter used from the start of `from_day` to the start of `to_day`. */
+                kwh: number;
+                /** @description The energy priced at each local day's rate, a decimal string; null when no price is known. */
+                cost: string | null;
+                /** @description A decimal string; null with no price or no miles. */
+                cost_per_mile: string | null;
+                miles_per_kwh: number | null;
+                /** @description The share of the stretch the meter was measured. */
+                coverage: number;
+                cost_estimated: boolean;
+            }[];
+            /** @description Every stretch added up; null until there are two readings. */
+            totals: {
+                miles: number;
+                kwh: number;
+                cost: string | null;
+                cost_per_mile: string | null;
+                miles_per_kwh: number | null;
+            } | null;
+            /** @description What the meter has used since the latest reading; null with no readings. */
+            since_last: {
+                /** Format: date */
+                from_day: string;
+                kwh: number;
+                cost: string | null;
+            } | null;
+            cost_estimated: boolean;
         };
         MeterUpdate: {
             label?: string;
@@ -853,6 +944,8 @@ export interface components {
             group_id?: string | null;
             /** @description The size of the breaker the meter is on, in amps, or null to forget it. */
             breaker_amps?: number | null;
+            /** @description Whether the meter charges an electric vehicle (a circuit or a plug only; 400 for the mains). Turning it off keeps the odometer readings. */
+            ev?: boolean;
         };
         Reading: {
             meter_id: string;
@@ -1737,6 +1830,84 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMeterEv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeterEv"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    putOdometer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+                /** @description A local calendar day, `2026-10-26`. */
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    miles: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeterEv"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    deleteOdometer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             404: components["responses"]["Problem"];
         };
     };

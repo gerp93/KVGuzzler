@@ -137,6 +137,14 @@ export function formatMoney(m: string | null | undefined, estimated = false): st
   return `${estimated ? '≈ ' : ''}${n < 0 ? '-' : ''}${symbol}${Math.abs(n).toFixed(2)}`;
 }
 
+/** A cost per mile: three decimals, because a mile of electricity costs a few cents. */
+export function formatPerMile(m: string | null | undefined, estimated = false): string {
+  if (m === null || m === undefined) return '—';
+  const n = Number(m);
+  if (!Number.isFinite(n)) return '—';
+  return `${estimated ? '≈ ' : ''}${symbol}${Math.abs(n).toFixed(3)}/mi`;
+}
+
 /** Above this per kWh a rate is almost certainly cents typed as dollars. */
 export const SUSPICIOUSLY_HIGH_RATE = 1;
 

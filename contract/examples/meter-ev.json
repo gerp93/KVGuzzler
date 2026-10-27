@@ -1,0 +1,15 @@
+{
+  "meter_id": "refoss-192.168.1.88:em2",
+  "readings": [
+    { "day": "2026-09-01", "miles": 18240 },
+    { "day": "2026-10-01", "miles": 18755 },
+    { "day": "2026-10-26", "miles": 19090 }
+  ],
+  "intervals": [
+    { "from_day": "2026-09-01", "to_day": "2026-10-01", "miles": 515, "kwh": 148.6, "cost": "23.03", "cost_per_mile": "0.044718", "miles_per_kwh": 3.466, "coverage": 1, "cost_estimated": false },
+    { "from_day": "2026-10-01", "to_day": "2026-10-26", "miles": 335, "kwh": 99.2, "cost": "15.38", "cost_per_mile": "0.045910", "miles_per_kwh": 3.377, "coverage": 0.98, "cost_estimated": false }
+  ],
+  "totals": { "miles": 850, "kwh": 247.8, "cost": "38.41", "cost_per_mile": "0.045188", "miles_per_kwh": 3.43 },
+  "since_last": { "from_day": "2026-10-26", "kwh": 11.4, "cost": "1.77" },
+  "cost_estimated": false
+}
