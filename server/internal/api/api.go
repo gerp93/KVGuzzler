@@ -7,12 +7,12 @@ package api
 
 import (
 	"context"
-	"sync"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/carbon"
