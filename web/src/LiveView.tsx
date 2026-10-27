@@ -129,6 +129,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const kwh = whole ? (summary?.house_kwh ?? null) : measured.kwh;
   const cost = whole ? (summary?.house_cost ?? null) : measured.cost;
   const peak = whole ? (summary?.house_peak_watts ?? null) : measured.peakWatts;
+  // The most current the one whole-house meter carried in the period (a 240 V pair's is the larger leg: never the legs added).
+  const peakAmps = whole && mains.length === 1 ? summary?.meters.find((m) => m.meter_id === mains[0]!.id)?.peak_amps : undefined;
   const carbon = whole ? carbonNote(summary?.house_carbon_g, kwh, summary?.house_carbon_estimated_kwh ?? 0) : null;
   const span = periodWords(period as PeriodKey);
 
@@ -156,7 +158,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       )}
 
       <KpiRow>
-        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)} hint={feedNow}>
+        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)} hint={feedNow ? <span class="now-current">{feedNow}</span> : undefined}>
           <Spark values={trail} label="The last few minutes of the draw" />
         </Kpi>
         <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={span} />
@@ -174,7 +176,17 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
             )
           }
         />
-        <Kpi tone="peak" label="Highest draw" value={peak != null ? formatWatts(peak) : '—'} hint="an upper bound: the meters need not peak together" />
+        <Kpi
+          tone="peak"
+          label="Highest draw"
+          value={peak != null ? formatWatts(peak) : '—'}
+          hint={
+            <>
+              {peakAmps != null && <span class="now-current">{formatAmps(peakAmps)} at most</span>}
+              an upper bound: the meters need not peak together
+            </>
+          }
+        />
       </KpiRow>
       <div class="kpi-notes">
         <p class="caption">
