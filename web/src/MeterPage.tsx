@@ -11,7 +11,7 @@ import { PeriodPicker } from './Periods';
 import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { CurrentCard } from './Breaker';
-import { EvCard } from './EvCard';
+import { EvCard, EvPrompt } from './EvCard';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
@@ -27,7 +27,7 @@ interface Loaded {
 // The chart's lines: the meter in the text colour, the meters inside it each in a colour of their own.
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
 
-export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; back?: { href: string; label: string } }) {
+export function MeterPage({ id, meters, back, onChanged }: { id: string; meters: Meter[]; back?: { href: string; label: string }; onChanged?: () => void }) {
   const [period, setPeriod] = useStored('period', '24h');
   const meter = meters.find((m) => m.id === id);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
@@ -120,6 +120,7 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
       {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
 
       {meter?.ev && <EvCard meter={meter} />}
+      {meter && onChanged && <EvPrompt meter={meter} onChanged={onChanged} />}
 
       {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
 

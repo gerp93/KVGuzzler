@@ -42,7 +42,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
       <section class="card wide chart-card">
         <div class="row">
           <h2>Power over time</h2>
-          <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+          <PeriodPicker value={period as PeriodKey} onChange={setPeriod} inline />
         </div>
         {error && <p class="note">{error.message}</p>}
         {data && data.lines.some((l) => l.x.length > 0) ? (
