@@ -275,8 +275,18 @@ describe('programs over a period', () => {
 });
 
 describe('year and all-time periods', () => {
-  it('has a year and an all-time choice after the 30 days', () => {
-    expect(PERIODS.map((p) => p.key)).toEqual(['1h', '24h', '7d', '30d', '1y', 'all']);
+  it('has hours, days, year to date, a year and an all-time choice, shortest first', () => {
+    expect(PERIODS.map((p) => p.key)).toEqual(['1h', '3h', '8h', '24h', '3d', '7d', '14d', '30d', 'ytd', '1y', 'all']);
+    const spans = (['3h', '8h', '3d', '14d'] as const).map((k) => {
+      const r = periodRange(k, new Date('2026-10-22T18:04:11Z'));
+      return (Date.parse(r.to) - Date.parse(r.from)) / 3600_000;
+    });
+    expect(spans).toEqual([3, 8, 72, 336]);
+    // Year to date starts on 1 January in the viewer's own time and ends at the next whole minute.
+    const now = new Date(2026, 9, 22, 18, 4, 11);
+    const ytd = periodRange('ytd', now);
+    expect(new Date(ytd.from).getTime()).toBe(new Date(2026, 0, 1).getTime());
+    expect(Date.parse(ytd.to)).toBe(new Date(2026, 9, 22, 18, 5, 0).getTime());
     const year = periodRange('1y', new Date('2026-10-22T18:04:11Z'));
     expect(year.to).toBe('2026-10-22T18:05:00.000Z');
     expect(Date.parse(year.to) - Date.parse(year.from)).toBe(365 * 24 * 3600_000);

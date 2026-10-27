@@ -43,22 +43,32 @@ export type RateConfig = S['RateConfig'];
 export type Bill = S['Bill'];
 export type FixedFee = S['FixedFee'];
 
-export type PeriodKey = '1h' | '24h' | '7d' | '30d' | '1y' | 'all';
+export type PeriodKey = '1h' | '3h' | '8h' | '24h' | '3d' | '7d' | '14d' | '30d' | 'ytd' | '1y' | 'all';
 
+const HOUR = 3600_000;
+const DAY = 24 * HOUR;
+
+/** `ms` is a rolling span ending now; `ytd` has none, it starts at the first minute of the local year (see `periodRange`). */
 export const PERIODS: { key: PeriodKey; label: string; ms: number }[] = [
-  { key: '1h', label: 'Hour', ms: 3600_000 },
-  { key: '24h', label: '24 hours', ms: 24 * 3600_000 },
-  { key: '7d', label: '7 days', ms: 7 * 24 * 3600_000 },
-  { key: '30d', label: '30 days', ms: 30 * 24 * 3600_000 },
-  { key: '1y', label: 'Year', ms: 365 * 24 * 3600_000 },
+  { key: '1h', label: 'Hour', ms: HOUR },
+  { key: '3h', label: '3 hours', ms: 3 * HOUR },
+  { key: '8h', label: '8 hours', ms: 8 * HOUR },
+  { key: '24h', label: '24 hours', ms: DAY },
+  { key: '3d', label: '3 days', ms: 3 * DAY },
+  { key: '7d', label: '7 days', ms: 7 * DAY },
+  { key: '14d', label: '14 days', ms: 14 * DAY },
+  { key: '30d', label: '30 days', ms: 30 * DAY },
+  { key: 'ytd', label: 'Year to date', ms: 0 },
+  { key: '1y', label: 'Year', ms: 365 * DAY },
   // Everything ever recorded: it starts long before any data, and a chart narrows it to where the data starts (see `effectiveDomain`).
-  { key: 'all', label: 'All time', ms: 25 * 365 * 24 * 3600_000 },
+  { key: 'all', label: 'All time', ms: 25 * 365 * DAY },
 ];
 
-/** The period ending at the next whole minute after `now`, as the RFC 3339 strings the API wants. */
+/** The period ending at the next whole minute after `now`, as the RFC 3339 strings the API wants. Year to date starts at midnight on 1 January, this computer's local time. */
 export function periodRange(key: PeriodKey, now: Date): { from: string; to: string } {
-  const ms = PERIODS.find((p) => p.key === key)?.ms ?? PERIODS[0]!.ms;
   const end = Math.floor(now.getTime() / 60_000) * 60_000 + 60_000;
+  if (key === 'ytd') return { from: new Date(now.getFullYear(), 0, 1).toISOString(), to: new Date(end).toISOString() };
+  const ms = PERIODS.find((p) => p.key === key)?.ms ?? PERIODS[0]!.ms;
   return { from: new Date(end - ms).toISOString(), to: new Date(end).toISOString() };
 }
 
@@ -67,12 +77,22 @@ export function periodWords(key: PeriodKey): string {
   switch (key) {
     case '1h':
       return 'the last hour';
+    case '3h':
+      return 'the last 3 hours';
+    case '8h':
+      return 'the last 8 hours';
     case '24h':
       return 'the last 24 hours';
+    case '3d':
+      return 'the last 3 days';
     case '7d':
       return 'the last 7 days';
+    case '14d':
+      return 'the last 14 days';
     case '30d':
       return 'the last 30 days';
+    case 'ytd':
+      return 'this year so far';
     case '1y':
       return 'the last year';
     default:
