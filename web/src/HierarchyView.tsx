@@ -14,6 +14,7 @@ import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
 import { FlowChart } from './FlowChart';
+import { flowTree } from './flow';
 import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
@@ -22,6 +23,7 @@ import { PeriodPicker } from './Periods';
 import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
+import { restRows, type RestRow } from './treeRest';
 import {
   arrangeByPanel, canHold, clampName, formatKwh, formatMoney, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
@@ -320,6 +322,32 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
   );
 }
 
+/** "Other (not metered)" under a meter that holds others: what its own reading carries beyond the meters listed inside it. Read-only, and never added to anything. */
+function RestLine({ rest }: { rest: RestRow }) {
+  const house = rest.parent.scope === 'mains';
+  const title = house
+    ? 'What the whole house used that none of the circuits and plugs listed under it accounts for'
+    : `What ${rest.parent.label} carried beyond the meters listed inside it`;
+  return (
+    <li class="hier-row virtual" style={{ marginLeft: `${rest.depth * 1.25}rem` }}>
+      <div class="hier-main">
+        <span />
+        <span />
+        <span class="grow part-name" title={title}>
+          Other (not metered)
+        </span>
+        <span class="caption hier-tag">{house ? `${rest.parent.label} less what is listed below` : `${rest.parent.label} less what is listed inside`}</span>
+        <span class="num hier-watts">{rest.watts != null ? <Watts w={rest.watts} /> : ''}</span>
+        <span class="hier-amps" />
+        <span class="hier-volts" />
+        <span class="num hier-energy">{formatKwh(rest.kwh)}</span>
+        <span class="num hier-cost">{rest.cost != null ? formatMoney(rest.cost) : '—'}</span>
+        <div class="hier-actions" />
+      </div>
+    </li>
+  );
+}
+
 function Hidden({ meter, deviceName, onChanged }: { meter: Meter; deviceName: string; onChanged: () => void }) {
   const [error, setError] = useState('');
   return (
@@ -376,6 +404,9 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const watts = new Map((live?.readings ?? []).map((r) => [r.meter_id, r.watts]));
   const currents = new Map((live?.readings ?? []).map((r) => [r.meter_id, { volts: r.volts, amps: r.amps }]));
   const rows = underHouse(arrangeByPanel(shownMeters(meters)));
+  // What each meter that holds others carries beyond them, drawn after the last row inside it, from the flow chart's own figures for the period.
+  const rests = new Map<number, RestRow[]>();
+  for (const r of summary ? restRows(rows, flowTree(meters, summary), watts, live?.house_watts) : []) rests.set(r.after, [...(rests.get(r.after) ?? []), r]);
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
   const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged };
@@ -465,6 +496,9 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
                     <Row meter={meter} rows={rows} at={at} shared={shared} />
                     {parts.map((p) => (
                       <PartRow key={`${meter.id}:${p.key}`} part={p} depth={depth + 1} href={page} />
+                    ))}
+                    {(rests.get(at) ?? []).map((r) => (
+                      <RestLine key={`rest-${r.parent.id}`} rest={r} />
                     ))}
                   </Fragment>
                 );
