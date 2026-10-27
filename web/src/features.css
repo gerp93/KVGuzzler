@@ -241,3 +241,11 @@ button.link {
   font-size: 0.9rem;
 }
 
+
+/* The house's volts and amps under its Right now figure: a size to read from across the room, in the text colour rather than the quiet hint colour */
+.kpi-hint .now-current {
+  display: block;
+  font-size: clamp(1.15rem, 1.6vw, 1.9rem);
+  font-weight: 600;
+  color: var(--color-text);
+}
