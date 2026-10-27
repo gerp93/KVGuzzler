@@ -13,6 +13,7 @@ import { breakerLevel, breakerPercent, formatAmps, formatVolts } from './amps';
 import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
+import { OdometerNow } from './EvCard';
 import { flowTree } from './flow';
 import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
@@ -170,6 +171,12 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
               {nearBreaker}% of breaker
             </span>
           )}{' '}
+          {meter.ev && (
+            <>
+              <OdometerNow meterId={meter.id} brief />
+              {' · '}
+            </>
+          )}
           {tag}
         </span>
         <span class="num hier-watts">{watt !== undefined ? <Watts w={watt} /> : ''}</span>
@@ -212,6 +219,11 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
                 <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
                 This meter charges my electric vehicle
               </label>
+              {meter.ev && (
+                <p class="block">
+                  Odometer: <OdometerNow meterId={meter.id} />
+                </p>
+              )}
               <p class="caption block">Its page then takes the car's odometer now and then (once a month is plenty) and works out what a mile costs, to set beside a gas car's.</p>
             </fieldset>
           )}
