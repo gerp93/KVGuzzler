@@ -3,7 +3,7 @@
 // parent's own reading already contains the ones inside, so none of this is added up.
 import { api } from './api';
 import { Bars } from './Bars';
-import { Chart, lineFrom, type Line } from './Chart';
+import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { FlowChart } from './FlowChart';
 import { Kpi, KpiRow } from './Kpi';
 import { usePoll, useStored } from './hooks';
@@ -111,7 +111,7 @@ export function MeterPage({ id, meters, back }: { id: string; meters: Meter[]; b
       {data && data.lines.length > 0 && (
         <section class="card wide">
           <h2>Power over time</h2>
-          <Chart lines={data.lines} domain={data.domain} />
+          <Chart lines={data.lines} domain={data.domain} height={wideChartHeight()} />
           {data.lines.length > 1 && <p class="caption">Each line is read on its own: the meters inside it are part of the first line, not added to it.</p>}
         </section>
       )}

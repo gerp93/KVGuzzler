@@ -1674,6 +1674,13 @@ main > * {
     column-span: all;
   }
 
+  /* The chart of a page is the one card that takes the whole width: half a screen this wide would leave it short and squeezed beside the cards that are not charts */
+  main.page-hierarchy-meter > .card.wide,
+  main.page-hierarchy-computer > .card.wide,
+  main.page-hierarchy-group > .card.wide {
+    column-span: all;
+  }
+
   /* History: the chart takes the width and the list of meters to compare is a column of its own as tall as the chart, so there is no hole under it */
   main.page-history {
     grid-template-columns: minmax(0, 1fr) 24rem;
