@@ -209,6 +209,16 @@ export function arrangeByPanel(list: Meter[]): { meter: Meter; depth: number }[]
   return out;
 }
 
+/** Puts the whole-house meter on a line of its own with everything else one level beneath it: a circuit with no parent is on the main panel, so it is
+ * inside what the house clamps measure. Only when exactly one house meter is shown; with none, or several, nothing says which one a top-level
+ * circuit hangs from, so the rows are left as they are. The house is never a parent in the data (the server refuses it): this is only how the tree reads. */
+export function underHouse(rows: { meter: Meter; depth: number }[]): { meter: Meter; depth: number }[] {
+  const houses = rows.filter((r) => r.meter.scope === 'mains');
+  const house = houses[0];
+  if (houses.length !== 1 || !house || house.depth !== 0) return rows;
+  return [house, ...rows.filter((r) => r !== house).map((r) => ({ ...r, depth: r.depth + 1 }))];
+}
+
 /** The name a Refoss input has on the monitor itself (A1 to C6), or null for anything else. */
 export function inputName(m: Meter): string | null {
   const n = m.index;
