@@ -1022,11 +1022,24 @@ a.button {
 /* Period picker: one line always; the short labels on a phone */
 .seg.period {
   max-width: 100%;
+  overflow-x: auto;
+}
+
+/* A grid item is as wide as its content unless told otherwise: eleven choices must scroll inside the page, not widen it. */
+.page-head {
+  min-width: 0;
 }
 
 .seg.period button {
   min-height: 2.25rem;
+  padding-inline: 8px;
   white-space: nowrap;
+}
+
+@media (min-width: 560px) {
+  .seg.period button {
+    padding-inline: 12px;
+  }
 }
 
 .seg.period .short {
@@ -1037,7 +1050,8 @@ a.button {
   display: none;
 }
 
-@media (min-width: 560px) {
+/* Eleven choices: the long words need room, so the short ones stay until the screen is wide. */
+@media (min-width: 1100px) {
   .seg.period .short {
     display: none;
   }

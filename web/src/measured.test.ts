@@ -51,8 +51,9 @@ describe('everything measured', () => {
 
 describe('the period in words', () => {
   it('names each period, and all of them for all time', () => {
-    expect(['1h', '24h', '7d', '30d', '1y', 'all'].map((k) => periodWords(k as never))).toEqual([
-      'the last hour', 'the last 24 hours', 'the last 7 days', 'the last 30 days', 'the last year', 'all recorded time',
+    expect(['1h', '3h', '8h', '24h', '3d', '7d', '14d', '30d', 'ytd', '1y', 'all'].map((k) => periodWords(k as never))).toEqual([
+      'the last hour', 'the last 3 hours', 'the last 8 hours', 'the last 24 hours', 'the last 3 days', 'the last 7 days', 'the last 14 days',
+      'the last 30 days', 'this year so far', 'the last year', 'all recorded time',
     ]);
   });
 });
