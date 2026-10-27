@@ -22,7 +22,7 @@ import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import {
-  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, usualPartner,
+  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, formatWatts, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
@@ -360,7 +360,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const computerName = (id: string) => computerNames.get(id) ?? '';
   const watts = new Map((live?.readings ?? []).map((r) => [r.meter_id, r.watts]));
   const currents = new Map((live?.readings ?? []).map((r) => [r.meter_id, { volts: r.volts, amps: r.amps }]));
-  const rows = arrangeByPanel(shownMeters(meters));
+  const rows = underHouse(arrangeByPanel(shownMeters(meters)));
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
   const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged };
@@ -406,7 +406,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           />
         )}
         <Hint>
-          Every meter, laid out as the house is wired. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
+          Every meter, laid out as the house is wired: the whole house on top, with the main panel's circuits beneath it. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
           counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
           Nothing here is sent to a device.
         </Hint>
