@@ -1,7 +1,7 @@
 // A list of meters as bars: name, live watts, and (over a period) energy, cost and share. A meter that holds others is followed by the ones
 // inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
-import { Watts } from './Watts';
-import { formatKwh, formatMoney, houseShare, type MeterSummary, type Row, type Summary } from './lib';
+import { Kwh, Watts } from './Watts';
+import { formatMoney, houseShare, type MeterSummary, type Row, type Summary } from './lib';
 import { routePath } from './route';
 
 export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; summary?: Summary; baseKwh: number | null }) {
@@ -39,7 +39,13 @@ export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; 
             </span>
             <span class="num"><Watts w={r.watts} /></span>
             <span class="num cost">
-              {mine ? `${formatKwh(mine.kwh)}${mine.cost != null ? ` · ${formatMoney(mine.cost, summary?.cost_estimated)}` : ''}${share != null ? ` · ${share}%` : ''}` : ''}
+              {mine && (
+                <>
+                  <Kwh k={mine.kwh} />
+                  {mine.cost != null ? ` · ${formatMoney(mine.cost, summary?.cost_estimated)}` : ''}
+                  {share != null ? ` · ${share}%` : ''}
+                </>
+              )}
             </span>
           </li>
         );

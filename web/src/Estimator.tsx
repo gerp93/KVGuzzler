@@ -2,9 +2,10 @@
 import { usePoll, useStored } from './hooks';
 import { routePath } from './route';
 import {
-  ESTIMATE_WINDOWS, estimateLines, formatKwh, formatMoney, formatWatts,
+  ESTIMATE_WINDOWS, estimateLines, formatMoney, formatWatts,
   type AverageUse, type ComputerEstimate, type EstimateMode,
 } from './lib';
+import { Kwh } from './Watts';
 
 const MODES: { key: EstimateMode; label: string }[] = [
   { key: 'constant', label: 'Constant load' },
@@ -105,7 +106,7 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
           {lines.map((l) => (
             <li key={l.label}>
               <span class="grow">{l.label}</span>
-              <span class="num">{formatKwh(l.kwh)}</span>
+              <span class="num"><Kwh k={l.kwh} /></span>
               {l.cost != null && <span class="num cost">{formatMoney(l.cost, est?.rate_estimated ?? false)}</span>}
             </li>
           ))}

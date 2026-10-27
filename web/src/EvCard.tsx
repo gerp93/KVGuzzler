@@ -5,6 +5,7 @@ import { api } from './api';
 import { dayLabel, formatEfficiency, formatMiles, lowCoverage, parseMiles, stretchLabel, today, type MeterEv } from './ev';
 import { usePoll } from './hooks';
 import { formatKwh, formatMoney, formatPerMile, type Meter } from './lib';
+import { Kwh } from './Watts';
 
 /** A cost per mile without its unit, for the big figure (the unit is in the caption under it). */
 const perMile = (m: string | null | undefined, estimated?: boolean): string => formatPerMile(m, estimated).replace('/mi', '');
@@ -83,7 +84,7 @@ export function EvCard({ meter }: { meter: Meter }) {
               <span class="when">{stretchLabel(s)}</span>
               <strong class="num">{formatPerMile(s.cost_per_mile, s.cost_estimated)}</strong>
               <span class="caption">
-                {formatMiles(s.miles)} · {formatKwh(s.kwh)}
+                {formatMiles(s.miles)} · <Kwh k={s.kwh} />
                 {s.cost != null ? ` · ${formatMoney(s.cost, s.cost_estimated)}` : ''}
                 {s.miles_per_kwh != null ? ` · ${formatEfficiency(s.miles_per_kwh)}` : ''}
               </span>
@@ -100,7 +101,7 @@ export function EvCard({ meter }: { meter: Meter }) {
       )}
       {data?.since_last && readings.length > 0 && (
         <p class="caption">
-          Since {dayLabel(data.since_last.from_day)} this meter has used {formatKwh(data.since_last.kwh)}
+          Since {dayLabel(data.since_last.from_day)} this meter has used <Kwh k={data.since_last.kwh} />
           {data.since_last.cost != null ? ` (${formatMoney(data.since_last.cost, data.cost_estimated)})` : ''}; its miles come with the next reading.
         </p>
       )}

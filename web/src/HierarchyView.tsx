@@ -5,7 +5,7 @@
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
-import { Watts } from './Watts';
+import { Kwh, Watts } from './Watts';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
@@ -25,7 +25,7 @@ import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
 import { restRows, type RestRow } from './treeRest';
 import {
-  arrangeByPanel, canHold, clampName, formatKwh, formatMoney, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
+  arrangeByPanel, canHold, clampName, formatMoney, indentTarget, outdentTarget, periodRange, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
@@ -177,7 +177,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
         <span class="num hier-watts">{watt !== undefined ? <Watts w={watt} /> : ''}</span>
         <span class="num hier-amps">{watt !== undefined ? formatAmps(currents.get(meter.id)?.amps) : ''}</span>
         <span class="num hier-volts">{watt !== undefined ? formatVolts(currents.get(meter.id)?.volts) : ''}</span>
-        <span class="num hier-energy">{used ? formatKwh(used.kwh) : ''}</span>
+        <span class="num hier-energy">{used ? <Kwh k={used.kwh} /> : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
         <div class="hier-actions">
           <button
@@ -310,7 +310,7 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
         <span class="num hier-watts">{part.watts != null ? <Watts w={part.watts} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
-        <span class="num hier-energy">{formatKwh(part.kwh)}</span>
+        <span class="num hier-energy"><Kwh k={part.kwh} /></span>
         <span class="num hier-cost">{part.cost != null ? formatMoney(part.cost, true) : '—'}</span>
         <div class="hier-actions">
           <a class="button icon" href={href} title="Open the computer's page" aria-label={`Open the computer's page for ${part.label}`}>
@@ -340,7 +340,7 @@ function RestLine({ rest }: { rest: RestRow }) {
         <span class="num hier-watts">{rest.watts != null ? <Watts w={rest.watts} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
-        <span class="num hier-energy">{formatKwh(rest.kwh)}</span>
+        <span class="num hier-energy"><Kwh k={rest.kwh} /></span>
         <span class="num hier-cost">{rest.cost != null ? formatMoney(rest.cost) : '—'}</span>
         <div class="hier-actions" />
       </div>

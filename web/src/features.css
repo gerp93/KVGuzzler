@@ -173,15 +173,24 @@ button.link {
   }
 }
 
-/* A draw in kilowatts takes the theme's hot colour, so a big draw shows at a glance (Watts.tsx for a figure in a line, Kpi.tsx for the lead tile) */
+/* Kilowatts and kilowatt-hours take the theme's hot colour and watts and watt-hours its cool one, so a big figure shows at a glance (Watts.tsx for a figure in a line, Kpi.tsx for a tile) */
 .big-draw {
   color: var(--color-accent-red);
   font-weight: 700;
 }
 
+.small-draw {
+  color: var(--color-accent-blue);
+}
+
 .kpi.hot .kpi-value .figure,
 .kpi.hot .kpi-value .unit {
   color: var(--color-accent-red);
+}
+
+.kpi.cool .kpi-value .figure,
+.kpi.cool .kpi-value .unit {
+  color: var(--color-accent-blue);
 }
 
 /* A charging meter's odometer card */

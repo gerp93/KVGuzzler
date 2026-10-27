@@ -14,6 +14,7 @@ import {
   type Meter, type MeterSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
+import { Kwh } from './Watts';
 
 const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red', '--color-accent-muted'];
 
@@ -155,7 +156,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
           {detail.peripherals.length > 0 && detail.setup_kwh != null && (
             <section class="card">
               <h2>The whole desk</h2>
-              <p class="big small">{formatKwh(detail.setup_kwh)}</p>
+              <p class="big small"><Kwh k={detail.setup_kwh} /></p>
               <p class="caption">
                 The PC plus all of its peripherals{detail.setup_cost != null ? `, ${formatMoney(detail.setup_cost, detail.cost_estimated)}` : ''}, whatever is
                 ticked above.
@@ -167,7 +168,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
                     <span class="bar" aria-hidden="true">
                       <i style={{ width: `${detail.setup_kwh! > 0 ? (p.kwh / detail.setup_kwh!) * 100 : 0}%` }} />
                     </span>
-                    <span class="num">{formatKwh(p.kwh)}</span>
+                    <span class="num"><Kwh k={p.kwh} /></span>
                     <span class="num cost">{p.cost != null ? formatMoney(p.cost, detail.cost_estimated) : ''}</span>
                   </li>
                 ))}

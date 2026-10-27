@@ -11,7 +11,7 @@ import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
-import { Watts } from './Watts';
+import { Kwh, Watts } from './Watts';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
@@ -227,7 +227,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
             </p>
           )}
           {summary?.unmetered_kwh != null && (
-            <p class="caption">Over the period, {formatKwh(summary.unmetered_kwh)} of the house's energy went through no circuit clamp.</p>
+            <p class="caption">Over the period, <Kwh k={summary.unmetered_kwh} /> of the house's energy went through no circuit clamp.</p>
           )}
         </section>
       </div>

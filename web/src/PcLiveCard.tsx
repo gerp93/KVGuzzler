@@ -2,7 +2,7 @@
 // causing it. A look is not history: the page asks for a new one every few seconds and says how old the one it shows is.
 import { Watts } from './Watts';
 import {
-  formatAge, formatWatts, idleText, isLiveStale, liveSplit, programsNow, sharePercent,
+  formatAge, idleText, isLiveStale, liveSplit, programsNow, sharePercent,
   type PcLive,
 } from './lib';
 
@@ -34,7 +34,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
           <span class="caption">{stale ? `Not answering: last heard ${formatAge(live.age_seconds ?? 0)}` : `Updated ${formatAge(live.age_seconds ?? 0)}`}</span>
         </div>
         {stale && <p class="note">The PC may be asleep, off, or its collector stopped. These are its last readings.</p>}
-        <p class="big small">{formatWatts(split.baseWatts)}</p>
+        <p class="big small"><Watts w={split.baseWatts} /></p>
         <p class="caption">
           {split.baseIsWall
             ? 'The whole PC at the wall, as the PC itself reads its plug.'
@@ -100,7 +100,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
                 </span>
                 <span class="num"><Watts w={p.watts} /></span>
                 <span class="num cost">
-                  CPU {formatWatts(p.cpuWatts)} · GPU {formatWatts(p.gpuWatts)}
+                  CPU <Watts w={p.cpuWatts} /> · GPU <Watts w={p.gpuWatts} />
                 </span>
               </li>
             ))}

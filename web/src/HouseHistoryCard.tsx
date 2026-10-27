@@ -2,7 +2,8 @@
 import { api } from './api';
 import { usePoll } from './hooks';
 import { routePath } from './route';
-import { formatCarbon, formatKwh, formatMoney, formatWatts, periodRange, type PeriodKey } from './lib';
+import { formatCarbon, formatMoney, periodRange, type PeriodKey } from './lib';
+import { Kwh, Watts } from './Watts';
 
 export function HouseHistoryCard({ period }: { period: PeriodKey }) {
   const { data, error } = usePoll(() => api.houseHistory(), 60_000, []);
@@ -21,12 +22,22 @@ export function HouseHistoryCard({ period }: { period: PeriodKey }) {
               <span class="grow">
                 {p.label}
                 <span class="caption block">
-                  {[p.peak_watts != null ? `highest draw ≤ ${formatWatts(p.peak_watts)}` : '', p.carbon_g != null ? formatCarbon(p.carbon_g) : '']
-                    .filter(Boolean)
-                    .join(' · ') || 'the mains clamps'}
+                  {p.peak_watts == null && p.carbon_g == null ? (
+                    'the mains clamps'
+                  ) : (
+                    <>
+                      {p.peak_watts != null && (
+                        <>
+                          highest draw ≤ <Watts w={p.peak_watts} />
+                        </>
+                      )}
+                      {p.peak_watts != null && p.carbon_g != null && ' · '}
+                      {p.carbon_g != null && formatCarbon(p.carbon_g)}
+                    </>
+                  )}
                 </span>
               </span>
-              <span class="num">{formatKwh(p.kwh)}</span>
+              <span class="num"><Kwh k={p.kwh} /></span>
               {p.cost != null && <span class="num cost">{formatMoney(p.cost, p.cost_estimated)}</span>}
             </li>
           ))}

@@ -110,6 +110,11 @@ export function formatWatts(w: number | null | undefined): string {
   return isKilowatts(w) ? `${(w / 1000).toFixed(2)} kW` : `${Math.round(w)} W`;
 }
 
+/** Whether an amount of energy is written in kilowatt-hours (not watt-hours, and not nothing at all): the point at which it is shown in the hot colour. */
+export function isKilowattHours(k: number | null | undefined): boolean {
+  return k !== null && k !== undefined && Math.abs(k) >= 0.01;
+}
+
 export function formatKwh(k: number | null | undefined): string {
   if (k === null || k === undefined) return '—';
   if (k !== 0 && Math.abs(k) < 0.01) return `${(k * 1000).toFixed(1)} Wh`;
