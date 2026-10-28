@@ -3,6 +3,7 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatEfficiency, formatMiles, lowCoverage, parseMiles, stretchLabel, today, type MeterEv } from './ev';
+import { FordCard } from './FordCard';
 import { usePoll } from './hooks';
 import { formatKwh, formatMoney, formatPerMile, type Meter } from './lib';
 import { Kwh } from './Watts';
@@ -161,6 +162,8 @@ export function EvCard({ meter }: { meter: Meter }) {
         </button>
       </form>
       {problem && <p class="note error">{problem}</p>}
+
+      <FordCard meter={meter} onRead={() => setVersion((v) => v + 1)} />
 
       {readings.length > 0 && (
         <details>

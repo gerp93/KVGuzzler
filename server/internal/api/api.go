@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/carbon"
+	"github.com/gerp93/KVGuzzler/server/internal/ford"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
@@ -46,6 +47,8 @@ type Server struct {
 	Lookup openei.Lookup
 	// Carbon reads the grid's carbon intensity; nil means the real sources.
 	Carbon *carbon.Client
+	// Ford reads the vehicle's odometer from Ford; nil means the real service.
+	Ford *ford.Client
 	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
 	// how big it is. Empty reports nothing.
 	DatabasePath string
@@ -59,6 +62,10 @@ type Server struct {
 	levelsMu     sync.Mutex
 	levelsAnswer *levelsAnswer
 	levelsAt     time.Time
+
+	// fordFeed is the one feed that reads the odometer from Ford (see ford.go), made on first use.
+	fordOnce sync.Once
+	fordFeed *ford.Feed
 }
 
 // dataSince is when anything was first recorded, for the dashboard to hide the periods longer than the history; false when nothing is recorded yet.
@@ -141,6 +148,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/carbon/series", s.carbonSeries)
 	mux.HandleFunc("PUT /api/v1/carbon", s.putCarbon)
 	mux.HandleFunc("DELETE /api/v1/carbon", s.deleteCarbon)
+	mux.HandleFunc("GET /api/v1/ford", s.answerFord)
+	mux.HandleFunc("PUT /api/v1/ford", s.putFord)
+	mux.HandleFunc("DELETE /api/v1/ford", s.deleteFord)
+	mux.HandleFunc("POST /api/v1/ford/link", s.startFordLink)
+	mux.HandleFunc("POST /api/v1/ford/link/complete", s.finishFordLink)
+	mux.HandleFunc("POST /api/v1/ford/read", s.readFord)
 	return withVersion(mux)
 }
 

@@ -18,6 +18,7 @@ const examples = {
   'computer-estimate.json': 'ComputerEstimate',
   'tariff-candidates.json': 'TariffCandidates',
   'carbon-config.json': 'CarbonConfig',
+  'ford-link.json': 'FordLink',
   'house-history.json': 'HouseHistory',
   'meter-runs.json': 'MeterRuns',
   'meter-ev.json': 'MeterEv',

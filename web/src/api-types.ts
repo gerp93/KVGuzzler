@@ -745,6 +745,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ford": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How the car's odometer is read from Ford, and what the last read said. Never returns the client secret or a token. */
+        get: operations["getFord"];
+        /**
+         * Save the Ford developer application the odometer is read through, and the meter that charges the car.
+         * @description The client ID and secret are the owner's own, from a personal application registered at developer.ford.com, and the owner's Ford password is
+         *     never typed into this server. The secret is write-only and is kept in a private file on the server, not in the database; leave it out to keep
+         *     the saved one. A new client ID, secret or token address makes the saved permission useless (the vehicle has to be linked again); the
+         *     account-linking address, the unit and the meter keep it.
+         */
+        put: operations["setFord"];
+        post?: never;
+        /** Remove the setup and the saved permission. The odometer readings already saved are kept. */
+        delete: operations["removeFord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ford/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the address the owner opens to sign in at Ford and agree to share the vehicle.
+         * @description The address carries a fresh unpredictable `state`. The owner signs in on Ford's own page, and Ford sends the browser to the registered redirect
+         *     address with a one-time `code` (valid 10 minutes). That address usually leads nowhere (a `localhost` redirect), and the owner pastes it into
+         *     `completeFordLink`.
+         */
+        post: operations["startFordLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ford/link/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish linking with the address the browser was sent to after the owner agreed, and read the odometer once.
+         * @description The address's `state` has to be the one `startFordLink` gave out (409 when none is waiting or it is over 15 minutes old, 400 when it differs or
+         *     has no code). A code is single-use: after one was tried, the link has to be started again. 502 says what Ford refused.
+         */
+        post: operations["completeFordLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ford/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the odometer from Ford now (the server also reads it by itself four times a day).
+         * @description The odometer is saved as the reading of today's local day for the charging meter, unless it has not moved since the latest reading. Ford's
+         *     own limit is one request per 30 seconds. Ford's complaints are in the answer's `last_outcome`, not an error status.
+         */
+        post: operations["readFord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/carbon/series": {
         parameters: {
             query?: never;
@@ -1355,6 +1444,60 @@ export interface components {
             place?: string;
             /** @description Omit to keep the saved key. */
             key?: string;
+        };
+        FordLink: {
+            /** @description Whether a client ID, secret and the addresses are saved. The secret itself is never returned. */
+            configured: boolean;
+            /** @description Whether the owner has agreed to share the vehicle (a refresh token is held). */
+            linked: boolean;
+            /** @description The saved permission is gone (expired, revoked or never given), so the vehicle has to be linked again. Nothing is asked of Ford until then. */
+            needs_link: boolean;
+            client_id?: string;
+            /** @description The account-linking address copied from the developer dashboard. */
+            authorize_url?: string;
+            token_url?: string;
+            /**
+             * @description What Ford's odometer is in, as the owner chose it.
+             * @enum {string}
+             */
+            odometer_unit?: "km" | "miles";
+            /** @description The charging meter whose odometer readings are kept up to date. */
+            meter_id?: string;
+            /** Format: date-time */
+            last_check: string | null;
+            /** @description What the last read said, in plain language. */
+            last_outcome: string | null;
+            /** @description The odometer as Ford gave it, in `odometer_unit`. */
+            last_raw: number | null;
+            /** @description Where in Ford's answer the odometer was found (like `metrics.odometer.value`), so it can be checked. */
+            last_found: string | null;
+            /** @description The odometer in miles, as saved. */
+            last_miles: number | null;
+            /** @description The local day the reading was saved for. */
+            last_day: string | null;
+        };
+        FordUpdate: {
+            client_id: string;
+            /** @description Required the first time; omit to keep the saved one. */
+            client_secret?: string;
+            /** @description The account-linking address from the developer dashboard (View oAuth URLs). It has the client ID and the registered redirect address; its state is replaced. */
+            authorize_url: string;
+            /** @description Where the code and the refresh token are exchanged (the B2C code exchange of Ford's Postman collection). https, a name rather than an IP address. */
+            token_url: string;
+            /** @enum {string} */
+            odometer_unit: "km" | "miles";
+            /** @description A meter marked as charging an electric vehicle. */
+            meter_id: string;
+        };
+        FordLinkStart: {
+            /** @description Open this to sign in at Ford and agree. */
+            url: string;
+            /** @description Where Ford sends the browser afterwards; the address to paste back starts with it. */
+            redirect_uri: string;
+        };
+        FordLinkComplete: {
+            /** @description The whole address the browser went to after the owner agreed (or just its query), with `code` and `state`. */
+            redirect: string;
         };
         /**
          * @description The PC collector's own reading scopes, kept as they are in its code.
@@ -2943,6 +3086,138 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    getFord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordLink"];
+                };
+            };
+        };
+    };
+    setFord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FordUpdate"];
+            };
+        };
+        responses: {
+            /** @description The saved setup (without the secret). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordLink"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    removeFord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    startFordLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The address to open. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordLinkStart"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    completeFordLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FordLinkComplete"];
+            };
+        };
+        responses: {
+            /** @description The setup and the first read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordLink"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    readFord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setup and what the read said. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordLink"];
+                };
+            };
+            409: components["responses"]["Problem"];
         };
     };
     getCarbonSeries: {
