@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/carbon"
-	"github.com/gerp93/KVGuzzler/server/internal/ford"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
+	"github.com/gerp93/KVGuzzler/server/internal/ford"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 	"github.com/gerp93/KVGuzzler/server/internal/openei"
 	"github.com/gerp93/KVGuzzler/server/internal/pcrelay"
