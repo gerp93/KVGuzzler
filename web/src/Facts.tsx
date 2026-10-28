@@ -5,10 +5,10 @@ export interface Fact {
   value: string;
 }
 
-/** `table`: a two-column table, the label on the left and its value on the right, for the details under a page's tiles. */
-export function Facts({ items, table }: { items: Fact[]; table?: boolean }) {
+/** `table`: a two-column table, the label on the left and its value on the right, for the details of a page. With a `title` it is headed. */
+export function Facts({ items, table, title }: { items: Fact[]; table?: boolean; title?: string }) {
   if (items.length === 0) return null;
-  return (
+  const list = (
     <dl class={table ? 'facts table' : 'facts'}>
       {items.map((f) => (
         <div key={f.label}>
@@ -17,5 +17,13 @@ export function Facts({ items, table }: { items: Fact[]; table?: boolean }) {
         </div>
       ))}
     </dl>
+  );
+  return table && title ? (
+    <section class="facts-card">
+      <h3>{title}</h3>
+      {list}
+    </section>
+  ) : (
+    list
   );
 }

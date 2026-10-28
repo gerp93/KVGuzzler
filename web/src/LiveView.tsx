@@ -4,7 +4,6 @@
 import { useMemo } from 'preact/hooks';
 import { api } from './api';
 import { Bars, meterPath } from './Bars';
-import { ComputerView } from './ComputerView';
 import { FlowChart } from './FlowChart';
 import { AnomalyCard } from './AnomalyCard';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
@@ -13,7 +12,6 @@ import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
 import { Lowest, Watts } from './Watts';
 import { Facts } from './Facts';
-import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { measuredTotals, topLevelMeters } from './measured';
@@ -33,34 +31,9 @@ interface Period {
   domain: [number, number];
 }
 
-/** The live page: the whole house, or (when some meters are marked as favorites) one click to any of them instead: the computer, the EV
- * charger, a sub-panel. A favorite opens the same page it has in the Hierarchy tab. */
+/** The live page: the whole house. A meter, a computer or a group opens on its own page from the links in the tables and the Hierarchy tab. */
 export function LiveView({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => void }) {
-  const [focus, setFocus] = useStored('live-focus', '');
-  const favorites = meters.filter((m) => m.favorite && m.enabled);
-  const chosen = favorites.find((m) => m.id === focus);
-  if (favorites.length === 0) return <House meters={meters} onAddDevice={onAddDevice} />;
-  return (
-    <>
-      <div class="chips" role="group" aria-label="What to show">
-        <button type="button" aria-pressed={!chosen} onClick={() => setFocus('')}>
-          House
-        </button>
-        {favorites.map((m) => (
-          <button key={m.id} type="button" aria-pressed={chosen?.id === m.id} onClick={() => setFocus(m.id)}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-      {!chosen ? (
-        <House meters={meters} onAddDevice={onAddDevice} />
-      ) : chosen.scope === 'pc' && chosen.computer_id ? (
-        <ComputerView id={chosen.computer_id} meters={meters} embedded />
-      ) : (
-        <MeterPage id={chosen.id} meters={meters} />
-      )}
-    </>
-  );
+  return <House meters={meters} onAddDevice={onAddDevice} />;
 }
 
 function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => void }) {
@@ -143,29 +116,13 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   // One whole-house meter (a 240 V pair is one) has its own exact highest reading; with several, or none (the top-level meters added), the peaks need not coincide: an upper bound.
   const peakIsBound = !(whole && mains.length === 1);
   const peakAmps = whole && mains.length === 1 ? summary?.meters.find((m) => m.meter_id === mains[0]!.id)?.peak_amps : undefined;
-  const carbon = whole ? carbonFacts(summary?.house_carbon_g, kwh, summary?.house_carbon_estimated_kwh ?? 0) : [];
+  const carbon = whole ? carbonFacts(summary?.house_carbon_g, kwh) : [];
   const span = periodWords(period as PeriodKey);
 
   return (
     <>
-      <header class="page-head">
-        <div>
-          <h2 class="page-title">{title}</h2>
-          {(!whole || (top && top.watts > 0)) && (
-            <p class="page-sub">
-              {!whole && 'Top-level meters only · no whole-house clamp'}
-              {!whole && top && top.watts > 0 && ' · '}
-              {top && top.watts > 0 && (
-                <>
-                  Largest now: <a href={meterPath(top.meter)}>{top.meter.label}</a>, <Watts w={top.watts} />
-                  {nowWatts != null && nowWatts > 0 ? ` (${Math.round((top.watts / nowWatts) * 100)}%)` : ''}
-                </>
-              )}
-            </p>
-          )}
-        </div>
-        <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
-      </header>
+      <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+      {!whole && <p class="caption">Top-level meters only: there is no whole-house clamp, so this is not the whole house.</p>}
 
       {live.notes.length > 0 && (
         <section class="card warn" aria-live="polite">
@@ -176,7 +133,20 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       )}
 
       <KpiRow>
-        <Kpi tone="now" label="Right now" value={formatWatts(nowWatts ?? null)} hint={feedNow ? <span class="now-current">{feedNow}</span> : undefined}>
+        <Kpi
+          tone="now"
+          label="Right now"
+          value={formatWatts(nowWatts ?? null)}
+          hint={feedNow ? <span class="now-current">{feedNow}</span> : undefined}
+          corner={
+            top && top.watts > 0 ? (
+              <>
+                Largest: <a href={meterPath(top.meter)}>{top.meter.label}</a> <Watts w={top.watts} />
+                {nowWatts != null && nowWatts > 0 ? ` · ${Math.round((top.watts / nowWatts) * 100)}%` : ''}
+              </>
+            ) : undefined
+          }
+        >
           <Spark values={trail} label="The last few minutes of the draw" />
         </Kpi>
         <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={span} />
@@ -211,10 +181,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           }
         />
       </KpiRow>
-      <div class="kpi-notes">
-        <Facts items={carbon} table />
-        <RateNote kwh={kwh} cost={cost} table />
-      </div>
 
       <div class="band band-main">
         {figures?.line && (
@@ -253,6 +219,12 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         </section>
       </div>
 
+
+      {/* What the figures above rest on: slower facts, below what happens now */}
+      <div class="kpi-notes">
+        <Facts items={carbon} table title="Carbon footprint" />
+        <RateNote kwh={kwh} cost={cost} table title="Electricity price" />
+      </div>
     </>
   );
 }

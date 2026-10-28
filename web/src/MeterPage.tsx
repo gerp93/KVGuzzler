@@ -60,7 +60,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
   const kwh = mine?.kwh ?? null;
   const houseKwh = data?.summary.house_kwh ?? null;
   const share = mine ? houseShare(mine.kwh, houseKwh) : null;
-  const carbon = carbonFacts(mine?.carbon_g, kwh, mine?.carbon_estimated_kwh ?? 0);
+  const carbon = carbonFacts(mine?.carbon_g, kwh);
   const watts = live?.readings.find((r) => r.meter_id === id)?.watts ?? null;
 
   // What is inside it right now, nested as wired, the meter itself dropped from the list.
@@ -101,10 +101,6 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />peak reading</>} />
           </KpiRow>
-          <div class="kpi-notes">
-            <Facts items={carbon} table />
-            <RateNote kwh={kwh} cost={mine?.cost ?? null} table />
-          </div>
         </>
       )}
 
@@ -141,6 +137,13 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
       {meter && <BaseLoadCard meterId={id} period={period as PeriodKey} />}
 
       {meter && <AnomalyCard meterId={id} quiet />}
+
+      {meter && (
+        <div class="kpi-notes">
+          <Facts items={carbon} table title="Carbon footprint" />
+          <RateNote kwh={kwh} cost={mine?.cost ?? null} table title="Electricity price" />
+        </div>
+      )}
     </>
   );
 }

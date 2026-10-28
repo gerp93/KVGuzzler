@@ -35,8 +35,7 @@ function ago(iso: string | null | undefined): string {
 }
 
 /** One computer: the whole PC at its plug, the desk around it, and (when a collector reports for it) its insides. */
-/** `embedded` leaves out the way back, for when the page is shown inside another (a favorite on the live page). */
-export function ComputerView({ id, meters, embedded = false }: { id: string; meters: Meter[]; embedded?: boolean }) {
+export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
   const label = (meterId: string) => meters.find((c) => c.id === meterId)?.label ?? meterId;
 
@@ -93,11 +92,9 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
   const peakIsBound = hasPlugs ? (counted?.peakIsBound ?? false) : false;
   return (
     <>
-      {!embedded && (
-        <a class="back" href={routePath('hierarchy')}>
-          ← Hierarchy
-        </a>
-      )}
+      <a class="back" href={routePath('hierarchy')}>
+        ← Hierarchy
+      </a>
 
       {error && (
         <section class="card warn">
@@ -138,8 +135,6 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             )}
             {hasPlugs && counted && counted.parts.length === 0 && <p class="caption">Nothing counted: tick the PC or a plug.</p>}
             {!hasPlugs && !detail.wall && <p class="caption">No wall plug assigned. Set one under Computers in Hierarchy.</p>}
-            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)} table />}
-            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} table />
           </div>
 
           {liveNow && <PcLiveCard live={liveNow} />}
@@ -207,6 +202,11 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
               </p>
             </section>
           )}
+
+          <div class="kpi-notes">
+            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh)} table title="Carbon footprint" />}
+            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} table title="Electricity price" />
+          </div>
         </>
       )}
     </>

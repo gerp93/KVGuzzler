@@ -1,32 +1,6 @@
 /* The look of the live page: figure tiles, panels and bands. One surface style for tiles and panels, one spacing scale, text in the text colours (the
    colour is carried by the small marks: a tile's edge and icon). Everything is drawn from the theme's custom properties, so every theme works. */
 
-/* The favorites switcher is one segmented control, not a row of loose buttons */
-main > .chips[role='group'] {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-}
-
-main > .chips[role='group'] button {
-  padding: 6px 16px;
-  color: var(--muted);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-}
-
-main > .chips[role='group'] button[aria-pressed='true'] {
-  color: var(--on-primary, var(--color-text));
-  background: var(--color-primary-action);
-}
-
 /* Page head: what this page is, and the period it is about */
 .page-head {
   display: flex;
@@ -107,6 +81,25 @@ main > .kpi-notes {
   --kpi-accent: var(--color-accent-muted);
 }
 
+.kpi-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.kpi-corner {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+.kpi-corner a {
+  color: var(--color-text);
+}
+
 .kpi-label {
   display: flex;
   align-items: center;
@@ -180,19 +173,6 @@ main > .kpi-notes {
   .kpi-now,
   .kpi-now ~ .kpi:last-child:nth-child(even) {
     grid-column: 1 / -1;
-  }
-
-  /* The switcher scrolls sideways rather than wrapping into a blob */
-  main > .chips[role='group'] {
-    flex-wrap: nowrap;
-    width: auto;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  main > .chips[role='group'] button {
-    flex: none;
-    white-space: nowrap;
   }
 }
 

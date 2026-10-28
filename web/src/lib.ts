@@ -758,15 +758,12 @@ export const ISSUES_URL = 'https://github.com/gerp93/KVGuzzler/issues';
 /** The viewer's installers are pre-releases tagged viewer-vX.Y.Z (see .github/workflows/release-viewer.yml). */
 export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases?q=viewer-v';
 
-/** What a looked-up price comes to over a period, in words: the rate, what the period averaged to per kWh and what is left out. With no
- * energy to average over the line says only which rate it is and what is left out. */
-export function tariffFacts(t: Pick<TariffInfo, 'utility' | 'name' | 'tiers' | 'fixed_charge' | 'varies_by_time'>, kwh: number, cost: string | null): Fact[] {
+/** What a looked-up price comes to over a period, in words: the rate and what the period averaged to per kWh. With no energy to average over it says
+ * only which rate it is. */
+export function tariffFacts(t: Pick<TariffInfo, 'utility' | 'name' | 'varies_by_time'>, kwh: number, cost: string | null): Fact[] {
   const avg = cost != null && kwh > 0 ? Number(cost) / kwh : null;
   const facts: Fact[] = [{ label: 'Rate', value: `${t.utility} · ${t.name}` }];
   if (avg != null && Number.isFinite(avg)) facts.push({ label: 'Average price', value: `${symbol}${avg.toFixed(4)} per kWh${t.varies_by_time ? ', time-weighted' : ''}` });
-  const left = [...(t.fixed_charge ? [`fixed charge ${t.fixed_charge}`] : []), ...(t.tiers > 1 ? ['tiers above the first'] : [])];
-  facts.push({ label: 'Basis', value: 'Energy charge only' });
-  if (left.length > 0) facts.push({ label: 'Not included', value: left.join(', ') });
   return facts;
 }
 
@@ -778,16 +775,11 @@ export function formatCarbon(grams: number): string {
   return `≈ ${(grams / 1_000_000).toFixed(1)} t CO₂e`;
 }
 
-/** The carbon figures under a page's tiles: the amount, the energy-weighted grid average it came to, and how much was valued at an average
- * for want of its own hour's figure. Empty when there is no carbon to show. */
-export function carbonFacts(carbonG: number | null | undefined, kwh: number | null | undefined, estimatedKwh: number): Fact[] {
+/** The carbon figures of a page: the amount and the energy-weighted grid average it came to. Empty when there is no carbon to show. */
+export function carbonFacts(carbonG: number | null | undefined, kwh: number | null | undefined): Fact[] {
   if (carbonG == null || kwh == null) return [];
   const facts: Fact[] = [{ label: 'Carbon', value: formatCarbon(carbonG) }];
-  if (kwh > 0) {
-    facts.push({ label: 'Grid average', value: `${Math.round(carbonG / kwh)} g/kWh` });
-    const share = Math.round(Math.min(1, Math.max(0, estimatedKwh / kwh)) * 100);
-    if (share > 0) facts.push({ label: 'Hours without data', value: `${share}% of energy` });
-  }
+  if (kwh > 0) facts.push({ label: 'Grid average', value: `${Math.round(carbonG / kwh)} g/kWh` });
   return facts;
 }
 

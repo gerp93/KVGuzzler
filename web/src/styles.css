@@ -499,10 +499,6 @@ button.twisty[aria-expanded='true'] span {
   transform: rotate(90deg);
 }
 
-button.star[aria-pressed='true'] {
-  color: var(--color-primary-action);
-}
-
 button.icon:disabled {
   opacity: 0.35;
   cursor: not-allowed;

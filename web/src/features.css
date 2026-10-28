@@ -462,6 +462,16 @@ button.link {
   font-size: 0.7rem;
 }
 
+/* A headed table: the heading above the table's frame */
+.facts-card h3 {
+  margin: 0 0 6px 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* An unusual day: its figures in columns, the cause under them */
 .anomalies li {
   grid-template-columns: 6rem minmax(0, 1fr) auto;
