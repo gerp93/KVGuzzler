@@ -541,7 +541,24 @@ select {
 }
 
 .hier-watts {
+  padding-inline: 6px;
   font-weight: 600;
+  border-radius: 6px;
+}
+
+/* The figure says whether the meter is working or resting right now, as the Live page's does: a tint behind it, the text keeps the theme's colours */
+.hier-row.s-working .hier-watts {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--color-accent-red) 32%, transparent);
+}
+
+.hier-row.s-resting .hier-watts {
+  background: color-mix(in srgb, var(--color-accent-green) 14%, transparent);
+}
+
+/* The title above it has the same padding, so the two still end together */
+.hier-head .num:nth-child(2) {
+  padding-inline: 6px;
 }
 
 .hier-amps,
