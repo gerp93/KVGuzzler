@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, panelChoices, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -587,6 +587,20 @@ describe('the moves in the hierarchy tab', () => {
     expect(canHold(plug, a2, all)).toBe(false); // a plug holds nothing
     expect(canHold(b1, a2, all)).toBe(false); // hidden
     expect(canHold(a4, ch('mains', 'mains'), all)).toBe(false);
+  });
+
+  it('a circuit is offered the sub-panels (by their type) and the one it is in, a plug every circuit; never its own name or id', () => {
+    const panel = { ...rf('panel', 5), type: 'sub_panel' } as typeof a1;
+    const other = { ...rf('other', 6), type: 'circuit' } as typeof a1;
+    const inOther = { ...rf('inother', 7, { parent_id: 'other' }), type: 'circuit' } as typeof a1;
+    const aPlug = ch('aplug', 'plug');
+    const list = [panel, other, inOther, aPlug];
+    expect(panelChoices(other, list).map((m) => m.id)).toEqual(['panel']);
+    expect(panelChoices(inOther, list).map((m) => m.id)).toEqual(['panel', 'other']); // the panel it is in now stays in the list
+    expect(panelChoices(panel, list).map((m) => m.id)).toEqual([]); // not itself
+    expect(panelChoices(aPlug, list).map((m) => m.id)).toEqual(['panel', 'other', 'inother']);
+    // renaming changes nothing: the type is what decides
+    expect(panelChoices(other, list.map((m) => (m.id === 'panel' ? { ...m, label: 'Anything' } : m))).map((m) => m.id)).toEqual(['panel']);
   });
 
   it('the arrows: into the row above at the same level, out to the grandparent', () => {

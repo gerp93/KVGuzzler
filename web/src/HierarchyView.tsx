@@ -26,7 +26,7 @@ import { HierarchyDiagram } from './HierarchyDiagram';
 import { planTree, type LumpEntry } from './treePlan';
 import { restRows } from './treeRest';
 import {
-  arrangeByPanel, canHold, clampName, formatMoney, indentTarget, outdentTarget, periodRange, periodWords, shownMeters, underHouse, usualPartner,
+  arrangeByPanel, canHold, clampName, panelChoices, formatMoney, indentTarget, outdentTarget, periodRange, periodWords, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
 } from './lib';
 
@@ -103,8 +103,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
   const free = all.filter((c) => c.device_id === meter.device_id && c.id !== meter.id && !c.pair_with && (!taken.has(c.id) || c.id === meter.pair_with));
   const usual = usualPartner(meter, free);
   const options = [...(usual ? [usual] : []), ...free.filter((c) => c !== usual)];
-  // A circuit's panel is the main panel or a sub-panel (a circuit whose type says so, set below); a plug is plugged into any circuit. The one it is in now stays in the list.
-  const holders = all.filter((c) => canHold(c, meter, all) && (meter.scope !== 'circuit' || c.type === 'sub_panel' || c.id === meter.parent_id));
+  const holders = panelChoices(meter, all);
   const inPanel = meter.scope === 'circuit';
   const placeable = meter.scope !== 'mains';
 
@@ -319,7 +318,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
               <span class="pg-title">Electric vehicle</span>
               <label class="check">
                 <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
-                Charges my EV
+                EV charger
               </label>
               {meter.ev && (
                 <p class="block">

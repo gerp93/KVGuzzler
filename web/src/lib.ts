@@ -320,6 +320,13 @@ export function canHold(parent: Meter, child: Meter, all: Meter[]): boolean {
   return parent.scope === 'circuit' && parent.enabled && child.scope !== 'mains' && !withDescendants(child.id, all).has(parent.id);
 }
 
+/** The meters to offer in a meter's "Panel" (a circuit) or "Circuit" (a plug) list, besides the main panel: for a circuit, the circuits that are sub-panels, by their
+ * `type` (the user's choice, or what the server settles from a circuit holding circuits: no name or id is looked at), and the one it is in now so the list can
+ * show it; for a plug, any circuit. Nothing that is the meter itself or inside it (`canHold`). */
+export function panelChoices(meter: Meter, all: Meter[]): Meter[] {
+  return all.filter((c) => canHold(c, meter, all) && (meter.scope !== 'circuit' || c.type === 'sub_panel' || c.id === meter.parent_id));
+}
+
 /** Where the "move into the meter above" arrow goes: the row just above at the same level, when it can hold this one. */
 export function indentTarget(rows: { meter: Meter; depth: number }[], at: number, all: Meter[]): Meter | undefined {
   const me = rows[at];
