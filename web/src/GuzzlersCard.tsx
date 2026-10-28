@@ -82,6 +82,14 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
         </p>
       ) : (
         <ol class={`guzzler-list${mode === 'rest' ? ' rest' : ''}`} aria-label={mode === 'rest' ? 'The biggest always-on draws, biggest first' : 'The hardest workers, biggest first'}>
+          <li class="head" aria-hidden="true">
+            <span />
+            <span>Meter</span>
+            <span class="bar-head peak" />
+            <span class="num peak">{mode === 'rest' ? 'Always on' : 'Peak'}</span>
+            <span class="num">Energy</span>
+            <span class="num">Cost · share</span>
+          </li>
           {shown.map((g, i) => (
             <li key={g.meter.id}>
               <span class="rank" aria-hidden="true">
