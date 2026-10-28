@@ -68,9 +68,9 @@ export function Bars({ rows, of, summary, baseKwh, period, levels }: { rows: Bar
       </ul>
       {tinted && (
         <p class="state-key caption">
-          <span class="swatch working" aria-hidden="true" /> Working: drawing above its usual resting level
-          <span class="swatch resting" aria-hidden="true" /> Resting: at or near what it always draws (often 0 W)
-          <span class="hintnote">Learned from each meter's last 30 days; hover a figure for its usual level.</span>
+          <span class="swatch working" aria-hidden="true" /> Working: above resting draw
+          <span class="swatch resting" aria-hidden="true" /> Resting: at or near resting draw
+          <span class="hintnote">Learned from each meter's last 30 days. Hover a figure for its resting draw.</span>
         </p>
       )}
     </>

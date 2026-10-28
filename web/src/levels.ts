@@ -16,8 +16,8 @@ export function meterState(level: MeterLevels | undefined, watts: number | null 
 
 /** The words for the cell's tooltip, so the colour is never the only thing saying it. */
 export function stateTitle(state: MeterState, level: MeterLevels): string {
-  if (state === 'working') return `Working: above its resting level (it usually rests around ${formatWatts(level.rest_watts)})`;
-  return level.working_above_watts == null ? `Resting: it barely changes, around ${formatWatts(level.rest_watts)}` : `Resting: around its usual ${formatWatts(level.rest_watts)}`;
+  if (state === 'working') return `Working: above resting draw (about ${formatWatts(level.rest_watts)})`;
+  return level.working_above_watts == null ? `Resting: draw barely changes, about ${formatWatts(level.rest_watts)}` : `Resting: at resting draw (about ${formatWatts(level.rest_watts)})`;
 }
 
 /** The levels by meter id, for looking one up per row. */
