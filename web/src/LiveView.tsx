@@ -219,7 +219,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <div class="panel-head">
             <h2>Circuits</h2>
           </div>
-          {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} />}
+          {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />}
           {rest !== null && (
             <p class="derived">
               <span>Other (not metered)</span>
@@ -227,7 +227,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
             </p>
           )}
           {summary?.unmetered_kwh != null && (
-            <p class="caption">Over the period, <Kwh k={summary.unmetered_kwh} /> of the house's energy went through no circuit clamp.</p>
+            <p class="caption">Over {span}, <Kwh k={summary.unmetered_kwh} /> of the house's energy went through no circuit clamp.</p>
           )}
         </section>
       </div>
@@ -249,7 +249,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           {pc.length > 0 && (
             <section class="card">
               <h2>Also measured</h2>
-              <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} />
+              <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />
               <p class="caption">Plugged into circuits nothing clamps, so they sit beside the circuits above, never inside them or added to them.</p>
             </section>
           )}

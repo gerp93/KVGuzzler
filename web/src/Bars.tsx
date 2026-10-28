@@ -1,10 +1,10 @@
 // A list of meters as bars in a table: name, live watts, and (over a period) energy, cost and share, each in a column of its own under a heading. A meter that holds others is followed by the ones
 // inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
 import { Kwh, Watts } from './Watts';
-import { formatMoney, houseShare, type MeterSummary, type Row, type Summary } from './lib';
+import { formatMoney, houseShare, periodWords, type MeterSummary, type PeriodKey, type Row, type Summary } from './lib';
 import { routePath } from './route';
 
-export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; summary?: Summary; baseKwh: number | null }) {
+export function Bars({ rows, of, summary, baseKwh, period }: { rows: Row[]; of: number; summary?: Summary; baseKwh: number | null; period?: PeriodKey }) {
   const find = (id: string): MeterSummary | undefined => summary?.meters.find((c) => c.meter_id === id);
   return (
     <ul class="bars cols">
@@ -12,7 +12,7 @@ export function Bars({ rows, of, summary, baseKwh }: { rows: Row[]; of: number; 
       <li class="head group" aria-hidden="true">
         <span />
         <span class="num">Right now</span>
-        <span class="num">Over the period</span>
+        <span class="num">Over {period ? periodWords(period) : 'the period'}</span>
       </li>
       <li class="head" aria-hidden="true">
         <span />
