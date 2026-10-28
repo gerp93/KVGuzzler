@@ -11,19 +11,20 @@ import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
-import { Kwh, Watts } from './Watts';
+import { Watts } from './Watts';
 import { Estimator } from './Estimator';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { measuredTotals, topLevelMeters } from './measured';
+import { notMeteredRows, unclamped, type BarRow } from './notMetered';
 import { Skeleton } from './Skeleton';
 import { Spark, useTrail } from './Spark';
 import { routePath } from './route';
 import { RateNote } from './RateNote';
 import {
-  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, periodWords, pcSlices, sumByTime, unmetered,
+  carbonNote, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, periodWords, pcSlices, sumByTime,
   type Meter, type Live, type PeriodKey, type Summary,
 } from './lib';
 
@@ -123,9 +124,15 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   // The mains' volts and amps, when one meter is the whole house (several mains are different feeds: their currents are never added).
   const feed = whole && mains.length === 1 ? live.readings.find((r) => r.meter_id === mains[0]!.id) : undefined;
   const feedNow = feed && (feed.volts != null || feed.amps != null) ? `${formatVolts(feed.volts)} · ${formatAmps(feed.amps)}` : undefined;
-  const rest = unmetered(house, circuits);
   // Bars are shares of the house when there is a house figure, else of the biggest load shown.
   const pc = slices.filter((r) => !placed.includes(r));
+  // With a house figure, the plugs and computers on circuits nothing clamps are listed inside "Other (not metered)", where they are; without one that line
+  // does not exist, so they are rows of the table like the circuits.
+  const plugs = unclamped(circuits, pc);
+  const tableRows: BarRow[] =
+    house != null && mains[0]
+      ? [...circuits.filter((r) => !plugs.includes(r)), ...notMeteredRows({ house, clamped: circuits, plugs, summary: figures?.summary, host: mains[0] })]
+      : [...circuits, ...pc];
   const scale = house ?? Math.max(0, ...circuits.map((r) => r.watts), ...pc.map((r) => r.watts));
 
   const summary = figures?.summary;
@@ -219,15 +226,9 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <div class="panel-head">
             <h2>Circuits</h2>
           </div>
-          {circuits.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={circuits} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />}
-          {rest !== null && (
-            <p class="derived">
-              <span>Other (not metered)</span>
-              <span class="num"><Watts w={rest} /></span>
-            </p>
-          )}
-          {summary?.unmetered_kwh != null && (
-            <p class="caption">Over {span}, <Kwh k={summary.unmetered_kwh} /> of the house's energy went through no circuit clamp.</p>
+          {tableRows.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={tableRows} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />}
+          {house != null && plugs.length > 0 && (
+            <p class="caption">Plugs and computers on circuits nothing clamps are inside Other (not metered), never added to it.</p>
           )}
         </section>
       </div>
@@ -246,13 +247,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         <section class="panel panel-insights">
           <GuzzlersCard meters={meters} summary={summary} houseKwh={kwh} period={period as PeriodKey} />
           {whole && <AnomalyCard />}
-          {pc.length > 0 && (
-            <section class="card">
-              <h2>Also measured</h2>
-              <Bars rows={pc} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />
-              <p class="caption">Plugged into circuits nothing clamps, so they sit beside the circuits above, never inside them or added to them.</p>
-            </section>
-          )}
         </section>
       </div>
 
