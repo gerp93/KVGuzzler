@@ -81,6 +81,10 @@ main > .kpi-notes {
   --kpi-accent: var(--color-accent-muted);
 }
 
+.kpi-carbon {
+  --kpi-accent: var(--color-accent-muted);
+}
+
 .kpi-head {
   display: flex;
   flex-wrap: wrap;
@@ -283,6 +287,21 @@ main > .kpi-notes {
     padding-top: 0;
     border-top: 0;
     border-left: 1px solid var(--color-border);
+  }
+}
+
+/* The carbon page: the tiles and then its panels, each across the whole width */
+main.page-carbon {
+  gap: 16px;
+}
+
+@media (min-width: 720px) {
+  main.page-carbon {
+    gap: 20px;
+  }
+
+  main.page-carbon > * {
+    grid-column: 1 / -1;
   }
 }
 

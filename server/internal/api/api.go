@@ -132,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/computers/{computerId}/series", s.computerSeries)
 	mux.HandleFunc("POST /api/v1/ingest/pc", s.ingestPc)
 	mux.HandleFunc("GET /api/v1/carbon", s.getCarbon)
+	mux.HandleFunc("GET /api/v1/carbon/series", s.carbonSeries)
 	mux.HandleFunc("PUT /api/v1/carbon", s.putCarbon)
 	mux.HandleFunc("DELETE /api/v1/carbon", s.deleteCarbon)
 	return withVersion(mux)

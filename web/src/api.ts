@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, CarbonSeries, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { MeterRuns } from './runs';
@@ -125,6 +125,7 @@ export const api = {
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
   carbon: () => request<CarbonConfig>('api/v1/carbon'),
+  carbonSeries: (from: string, to: string) => request<CarbonSeries>(`api/v1/carbon/series?${q({ from, to })}`),
   /** Saves the source, place and (when given) a new key; the server takes a reading first and only keeps a setup that got one. */
   setCarbon: (body: { place: string; key?: string }) =>
     request<CarbonConfig>('api/v1/carbon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),

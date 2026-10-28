@@ -218,3 +218,63 @@ func carbonResult(known map[int64]float64, ever float64, byHour map[int64]float6
 	r := carbon.Value(known, ever, hours)
 	return &r
 }
+
+// carbonSeries is the house's footprint over time: for each hour (a day, over a long period) the mains' energy at that hour's grid intensity, and the
+// intensity itself. Without a whole-house meter, or before any intensity was ever saved, there are no points.
+func (s *Server) carbonSeries(w http.ResponseWriter, r *http.Request) {
+	from, to, err := parsePeriod(r)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_period", err.Error())
+		return
+	}
+	bucket := model.BucketHour
+	if s.defaultBucketFor(r.Context(), from, to) == model.BucketDay {
+		bucket = model.BucketDay
+	}
+	out := model.CarbonSeries{Bucket: bucket, Points: []model.CarbonPoint{}}
+	on, _, err := s.enabledMeters(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	var mains []string
+	for _, ch := range on {
+		if ch.Scope == model.ScopeMains {
+			mains = append(mains, ch.ID)
+		}
+	}
+	ever, ok, err := s.Store.AverageCarbonEver(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if len(mains) == 0 || !ok {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	known, err := s.Store.QueryCarbon(r.Context(), from, to)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	byHour, err := s.Store.HourlyKWh(r.Context(), mains, from, to)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	hours := make([]carbon.HourKWh, 0, len(byHour))
+	for h, k := range byHour {
+		hours = append(hours, carbon.HourKWh{Hour: h, KWh: k})
+	}
+	startOf := func(hour int64) int64 { return hour }
+	if bucket == model.BucketDay {
+		startOf = func(hour int64) int64 {
+			l := time.Unix(hour, 0).In(s.Loc)
+			return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, s.Loc).Unix()
+		}
+	}
+	for _, st := range carbon.Bucketed(known, ever, hours, startOf) {
+		out.Points = append(out.Points, model.CarbonPoint{T: time.Unix(st.Start, 0).UTC(), KWh: st.KWh, CarbonG: st.Kg * 1000, EstimatedKWh: st.EstimatedKWh, GridGramsPerKWh: st.GridGrams})
+	}
+	writeJSON(w, http.StatusOK, out)
+}

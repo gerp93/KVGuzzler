@@ -232,3 +232,42 @@ func TestThePcSummaryAndTheCsvCarryCarbonOnceThereIsIntensityData(t *testing.T) 
 		t.Errorf("row = %q", rows[1])
 	}
 }
+
+func TestTheCarbonSeriesIsTheHousesEnergyAtEachHoursIntensityAndAddsUpToTheSummary(t *testing.T) {
+	srv, st := houseServer(t) // the mains used 0.8 kW for two hours from 12:00 on 22 Oct 2026; the dryer is a circuit, no part of the house
+	_ = st.AddCarbon(t.Context(), time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC), 400, false)
+	_ = st.AddCarbon(t.Context(), time.Date(2026, 10, 22, 14, 0, 0, 0, time.UTC), 300, false) // an hour with a figure and no energy
+	var s model.CarbonSeries
+	get(t, srv.URL+"/api/v1/carbon/series"+period, &s)
+	if s.Bucket != model.BucketHour || len(s.Points) != 3 {
+		t.Fatalf("bucket %q with %d points, want hour with 3: %+v", s.Bucket, len(s.Points), s.Points)
+	}
+	p := s.Points[0]
+	if p.GridGramsPerKWh == nil || *p.GridGramsPerKWh != 400 || math.Abs(p.KWh-0.8) > 1e-9 || math.Abs(p.CarbonG-320) > 1e-6 || p.EstimatedKWh != 0 {
+		t.Errorf("12:00: %+v", p)
+	}
+	if q := s.Points[1]; math.Abs(q.EstimatedKWh-0.8) > 1e-9 || q.GridGramsPerKWh != nil { // 13:00 has none of its own: valued at the average (350)
+		t.Errorf("13:00: %+v", q)
+	}
+	if q := s.Points[2]; q.KWh != 0 || q.GridGramsPerKWh == nil || *q.GridGramsPerKWh != 300 {
+		t.Errorf("14:00 (grid only): %+v", q)
+	}
+	var sum model.Summary
+	get(t, srv.URL+"/api/v1/summary"+period, &sum)
+	var total float64
+	for _, q := range s.Points {
+		total += q.CarbonG
+	}
+	if sum.HouseCarbonG == nil || math.Abs(total-*sum.HouseCarbonG) > 1e-6 {
+		t.Errorf("the points add up to %v g, the summary says %v", total, sum.HouseCarbonG)
+	}
+}
+
+func TestTheCarbonSeriesIsEmptyBeforeAnyIntensityWasSaved(t *testing.T) {
+	srv, _ := houseServer(t)
+	var s model.CarbonSeries
+	get(t, srv.URL+"/api/v1/carbon/series"+period, &s)
+	if s.Points == nil || len(s.Points) != 0 {
+		t.Errorf("points = %v, want an empty list", s.Points)
+	}
+}

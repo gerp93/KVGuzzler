@@ -77,7 +77,13 @@ export function wideChartHeight(): number {
 // re-renders every couple of seconds (the live page) would tear the chart down and build it again each time, shrinking the page for a moment under the reader.
 const NO_SHADES: Shade[] = [];
 
-export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeight() }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number }) {
+/** The vertical axis of a power chart: "800 W", "1.5 kW". */
+export function wattsAxis(w: number): string {
+  return w >= 1000 ? `${w / 1000} kW` : `${w} W`;
+}
+
+// `format` writes a value on the vertical axis (a chart of something other than power says its own unit) and must be one function, not a new one on each render, for the same reason as `shades`.
+export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeight(), format = wattsAxis, label = 'Power over time' }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number; format?: (v: number) => string; label?: string }) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -105,7 +111,7 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
             font: axisFont,
             grid: { stroke: grid, width: 0.5 },
             ticks: { stroke: grid },
-            values: (_u, v) => v.map((w) => (w >= 1000 ? `${w / 1000} kW` : `${w} W`)),
+            values: (_u, v) => v.map(format),
             size: Math.round((el.clientWidth < 420 ? 52 : 64) * uiScale()),
           },
         ],
@@ -145,7 +151,7 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
       resize.disconnect();
       plot.destroy();
     };
-  }, [lines, domain, shades, height]);
+  }, [lines, domain, shades, height, format]);
 
-  return <div ref={box} class="chart" role="img" aria-label="Power over time" />;
+  return <div ref={box} class="chart" role="img" aria-label={label} />;
 }

@@ -722,6 +722,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/carbon/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The house's carbon footprint over time, with the grid's carbon intensity.
+         * @description For each hour (each local day over a period of more than about 16 days) the mains' energy at that stretch's grid intensity; an hour with no
+         *     saved intensity is valued at the average of the hours that have one and counted in `estimated_kwh`. A stretch with an intensity and no energy is
+         *     still listed, so the grid's line has no holes. Empty when there is no whole-house meter or no intensity was ever saved. It is the grid's average
+         *     mix, never what one more kWh would cause.
+         */
+        get: operations["getCarbonSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ingest/pc": {
         parameters: {
             query?: never;
@@ -979,6 +1002,25 @@ export interface components {
             kwh: number;
             /** @description The highest current in the bucket (a 240 V pair's is the larger leg's); null for a meter that reports none. */
             max_amps?: number | null;
+        };
+        CarbonPoint: {
+            /**
+             * Format: date-time
+             * @description Start of the stretch.
+             */
+            t: string;
+            kwh: number;
+            /** @description Grams of CO2e (an average-grid estimate). */
+            carbon_g: number;
+            /** @description The part of the energy valued at an average because its own hour had no saved intensity. */
+            estimated_kwh: number;
+            /** @description The average of the intensities saved for the stretch's hours; null when none was saved. */
+            grid_g_per_kwh: number | null;
+        };
+        CarbonSeries: {
+            /** @enum {string} */
+            bucket: "hour" | "day";
+            points: components["schemas"]["CarbonPoint"][];
         };
         Series: {
             meter_id: string;
@@ -2841,6 +2883,32 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    getCarbonSeries: {
+        parameters: {
+            query: {
+                /** @description Start of the period (inclusive), RFC 3339. */
+                from: components["parameters"]["From"];
+                /** @description End of the period (exclusive), RFC 3339. */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarbonSeries"];
+                };
+            };
+            400: components["responses"]["Problem"];
         };
     };
     ingestPc: {

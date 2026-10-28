@@ -1055,6 +1055,28 @@ paths:
       responses:
         '204':
           description: Removed.
+  /api/v1/carbon/series:
+    get:
+      tags: [Read]
+      operationId: getCarbonSeries
+      summary: The house's carbon footprint over time, with the grid's carbon intensity.
+      description: |
+        For each hour (each local day over a period of more than about 16 days) the mains' energy at that stretch's grid intensity; an hour with no
+        saved intensity is valued at the average of the hours that have one and counted in `estimated_kwh`. A stretch with an intensity and no energy is
+        still listed, so the grid's line has no holes. Empty when there is no whole-house meter or no intensity was ever saved. It is the grid's average
+        mix, never what one more kWh would cause.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarbonSeries'
+        '400':
+          $ref: '#/components/responses/Problem'
   /api/v1/ingest/pc:
     post:
       tags: [Ingest]
@@ -1501,6 +1523,36 @@ components:
         max_amps:
           type: [number, 'null']
           description: The highest current in the bucket (a 240 V pair's is the larger leg's); null for a meter that reports none.
+    CarbonPoint:
+      type: object
+      required: [t, kwh, carbon_g, estimated_kwh, grid_g_per_kwh]
+      properties:
+        t:
+          type: string
+          format: date-time
+          description: Start of the stretch.
+        kwh:
+          type: number
+        carbon_g:
+          type: number
+          description: Grams of CO2e (an average-grid estimate).
+        estimated_kwh:
+          type: number
+          description: The part of the energy valued at an average because its own hour had no saved intensity.
+        grid_g_per_kwh:
+          type: [number, 'null']
+          description: The average of the intensities saved for the stretch's hours; null when none was saved.
+    CarbonSeries:
+      type: object
+      required: [bucket, points]
+      properties:
+        bucket:
+          type: string
+          enum: [hour, day]
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/CarbonPoint'
     Series:
       type: object
       required: [meter_id, bucket, points]

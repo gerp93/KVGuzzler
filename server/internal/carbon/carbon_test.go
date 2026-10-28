@@ -411,3 +411,27 @@ func TestRemovingTheKeyIsSaidOnceAndStopsTheAsking(t *testing.T) {
 		t.Error("it said 'Not set up.' again")
 	}
 }
+
+func TestStretchesAddUpToWhatValueGivesAndKeepTheGridWhereNothingWasUsed(t *testing.T) {
+	known := map[int64]float64{0: 400, 3600: 200, 7200: 300, 86400: 100} // the last is on the next day, with no energy
+	hours := []HourKWh{{Hour: 0, KWh: 1}, {Hour: 3600, KWh: 2}, {Hour: 10800, KWh: 1}} // 10800 has no intensity of its own
+	day := func(h int64) int64 { return h / 86400 * 86400 }
+	got := Bucketed(known, 0, hours, day)
+	if len(got) != 2 || got[0].Start != 0 || got[1].Start != 86400 {
+		t.Fatalf("stretches: %+v", got)
+	}
+	// (1*400 + 2*200 + 1*average of 400,200,300,100 = 250) / 1000
+	if !near(got[0].Kg, 1.05) || !near(got[0].KWh, 4) || !near(got[0].EstimatedKWh, 1) {
+		t.Errorf("first day: %+v", got[0])
+	}
+	if got[0].GridGrams == nil || !near(*got[0].GridGrams, 300) {
+		t.Errorf("first day's grid average: %v, want 300", got[0].GridGrams)
+	}
+	if got[1].KWh != 0 || got[1].GridGrams == nil || !near(*got[1].GridGrams, 100) {
+		t.Errorf("a day with a grid figure and no energy: %+v", got[1])
+	}
+	whole := Value(known, 0, hours)
+	if !near(got[0].Kg+got[1].Kg, whole.Kg) || !near(got[0].EstimatedKWh+got[1].EstimatedKWh, whole.EstimatedKWh) {
+		t.Errorf("the stretches (%v kg) do not add up to Value (%v kg)", got[0].Kg+got[1].Kg, whole.Kg)
+	}
+}

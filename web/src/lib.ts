@@ -33,6 +33,7 @@ export type HouseHistory = S['HouseHistory'];
 export type HouseHistoryPeriod = S['HouseHistoryPeriod'];
 export type TariffInfo = S['TariffInfo'];
 export type CarbonConfig = S['CarbonConfig'];
+export type CarbonSeries = S['CarbonSeries'];
 export type TariffCandidate = S['TariffCandidate'];
 export type OpenEiStatus = S['OpenEiStatus'];
 export type AverageUse = S['AverageUse'];
