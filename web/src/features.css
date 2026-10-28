@@ -462,6 +462,29 @@ button.link {
   font-size: 0.7rem;
 }
 
+/* The foot of a figure tile (the price a cost was worked out at): under a line at the bottom of the tile, each label above its value */
+.facts.foot {
+  display: grid;
+  gap: 6px;
+  margin: auto 0 0;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+/* Auto pushes the foot to the bottom of a tile that is taller than its content (the row's tiles are as tall as the tallest); this is the least gap above it */
+.kpi > .kpi-hint:has(+ .facts.foot) {
+  margin-bottom: 10px;
+}
+
+.facts.foot dt {
+  font-size: 0.66rem;
+}
+
+.facts.foot dd {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 /* A headed table: the heading above the table's frame */
 .facts-card h3 {
   margin: 0 0 6px 2px;
