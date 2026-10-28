@@ -2113,7 +2113,8 @@ main > * {
   /* The chart of a page is the one card that takes the whole width: half a screen this wide would leave it short and squeezed beside the cards that are not charts */
   main.page-hierarchy-meter > .card.wide,
   main.page-hierarchy-computer > .card.wide,
-  main.page-hierarchy-group > .card.wide {
+  main.page-hierarchy-group > .card.wide,
+  main.page-hierarchy-meter > .card.ev {
     column-span: all;
   }
 

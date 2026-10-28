@@ -102,6 +102,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />peak reading</>} />
           </KpiRow>
+          {meter.ev && <EvCard meter={meter} />}
         </>
       )}
 
@@ -116,7 +117,6 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
 
       {meter && <CurrentCard meter={meter} now={live?.readings.find((r) => r.meter_id === id) ?? { volts: null, amps: null }} peakAmps={mine?.peak_amps} runs={showRuns(data?.runs) ? data!.runs!.runs : null} />}
 
-      {meter?.ev && <EvCard meter={meter} />}
       {meter && onChanged && <EvPrompt meter={meter} onChanged={onChanged} />}
 
       {meter && showRuns(data?.runs) && <RunsCard runs={data!.runs!} breaker={meter.breaker_amps ?? null} />}
