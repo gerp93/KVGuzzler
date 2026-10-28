@@ -1,0 +1,16 @@
+{
+  "configured": true,
+  "linked": true,
+  "needs_link": false,
+  "client_id": "00000000-0000-0000-0000-000000000000",
+  "authorize_url": "https://login.example.com/authorize?client_id=00000000-0000-0000-0000-000000000000&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fcallback&state=placeholder",
+  "token_url": "https://login.example.com/token",
+  "odometer_unit": "km",
+  "meter_id": "refoss-192.168.1.20:em16:ch-05",
+  "last_check": "2026-10-28T12:00:00Z",
+  "last_outcome": "Odometer read.",
+  "last_raw": 20000,
+  "last_found": "metrics.odometer.value",
+  "last_miles": 12427.4,
+  "last_day": "2026-10-28"
+}

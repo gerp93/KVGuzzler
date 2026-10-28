@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, CarbonSeries, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
@@ -133,6 +133,17 @@ export const api = {
   setCarbon: (body: { place: string; key?: string }) =>
     request<CarbonConfig>('api/v1/carbon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   removeCarbon: () => request<void>('api/v1/carbon', { method: 'DELETE' }),
+  ford: () => request<FordLink>('api/v1/ford'),
+  /** Saves the Ford developer application the odometer is read through; the client secret is write-only (leave it out to keep the saved one). */
+  setFord: (body: Omit<FordUpdate, 'client_secret'> & { client_secret?: string }) =>
+    request<FordLink>('api/v1/ford', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  removeFord: () => request<void>('api/v1/ford', { method: 'DELETE' }),
+  /** The address to open to sign in at Ford and agree to share the vehicle. */
+  startFordLink: () => request<FordLinkStart>('api/v1/ford/link', { method: 'POST' }),
+  /** Finishes linking with the address the browser was sent to after agreeing. */
+  completeFordLink: (redirect: string) =>
+    request<FordLink>('api/v1/ford/link/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect }) }),
+  readFord: () => request<FordLink>('api/v1/ford/read', { method: 'POST' }),
   houseHistory: () => request<HouseHistory>('api/v1/history'),
   houseEstimate: (window: string) => request<ComputerEstimate>(`api/v1/estimate?${q({ window })}`),
   /** The days the house or a meter used far more than usual (the last `days` complete days). */

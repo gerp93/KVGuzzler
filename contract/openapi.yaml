@@ -1072,6 +1072,111 @@ paths:
       responses:
         '204':
           description: Removed.
+  /api/v1/ford:
+    get:
+      tags: [Settings]
+      operationId: getFord
+      summary: How the car's odometer is read from Ford, and what the last read said. Never returns the client secret or a token.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordLink'
+    put:
+      tags: [Settings]
+      operationId: setFord
+      summary: Save the Ford developer application the odometer is read through, and the meter that charges the car.
+      description: |
+        The client ID and secret are the owner's own, from a personal application registered at developer.ford.com, and the owner's Ford password is
+        never typed into this server. The secret is write-only and is kept in a private file on the server, not in the database; leave it out to keep
+        the saved one. A new client ID, secret or token address makes the saved permission useless (the vehicle has to be linked again); the
+        account-linking address, the unit and the meter keep it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FordUpdate'
+      responses:
+        '200':
+          description: The saved setup (without the secret).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordLink'
+        '400':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: removeFord
+      summary: Remove the setup and the saved permission. The odometer readings already saved are kept.
+      responses:
+        '204':
+          description: Removed.
+  /api/v1/ford/link:
+    post:
+      tags: [Settings]
+      operationId: startFordLink
+      summary: Make the address the owner opens to sign in at Ford and agree to share the vehicle.
+      description: |
+        The address carries a fresh unpredictable `state`. The owner signs in on Ford's own page, and Ford sends the browser to the registered redirect
+        address with a one-time `code` (valid 10 minutes). That address usually leads nowhere (a `localhost` redirect), and the owner pastes it into
+        `completeFordLink`.
+      responses:
+        '200':
+          description: The address to open.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordLinkStart'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/ford/link/complete:
+    post:
+      tags: [Settings]
+      operationId: completeFordLink
+      summary: Finish linking with the address the browser was sent to after the owner agreed, and read the odometer once.
+      description: |
+        The address's `state` has to be the one `startFordLink` gave out (409 when none is waiting or it is over 15 minutes old, 400 when it differs or
+        has no code). A code is single-use: after one was tried, the link has to be started again. 502 says what Ford refused.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FordLinkComplete'
+      responses:
+        '200':
+          description: The setup and the first read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordLink'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/ford/read:
+    post:
+      tags: [Settings]
+      operationId: readFord
+      summary: Read the odometer from Ford now (the server also reads it by itself four times a day).
+      description: |
+        The odometer is saved as the reading of today's local day for the charging meter, unless it has not moved since the latest reading. Ford's
+        own limit is one request per 30 seconds. Ford's complaints are in the answer's `last_outcome`, not an error status.
+      responses:
+        '200':
+          description: The setup and what the read said.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordLink'
+        '409':
+          $ref: '#/components/responses/Problem'
   /api/v1/carbon/series:
     get:
       tags: [Read]
@@ -2100,6 +2205,90 @@ components:
           type: string
           writeOnly: true
           description: Omit to keep the saved key.
+    FordLink:
+      type: object
+      required: [configured, linked, needs_link, last_check, last_outcome, last_raw, last_found, last_miles, last_day]
+      properties:
+        configured:
+          type: boolean
+          description: Whether a client ID, secret and the addresses are saved. The secret itself is never returned.
+        linked:
+          type: boolean
+          description: Whether the owner has agreed to share the vehicle (a refresh token is held).
+        needs_link:
+          type: boolean
+          description: The saved permission is gone (expired, revoked or never given), so the vehicle has to be linked again. Nothing is asked of Ford until then.
+        client_id:
+          type: string
+        authorize_url:
+          type: string
+          description: The account-linking address copied from the developer dashboard.
+        token_url:
+          type: string
+        odometer_unit:
+          type: string
+          enum: [km, miles]
+          description: What Ford's odometer is in, as the owner chose it.
+        meter_id:
+          type: string
+          description: The charging meter whose odometer readings are kept up to date.
+        last_check:
+          type: [string, 'null']
+          format: date-time
+        last_outcome:
+          type: [string, 'null']
+          description: What the last read said, in plain language.
+        last_raw:
+          type: [number, 'null']
+          description: The odometer as Ford gave it, in `odometer_unit`.
+        last_found:
+          type: [string, 'null']
+          description: Where in Ford's answer the odometer was found (like `metrics.odometer.value`), so it can be checked.
+        last_miles:
+          type: [number, 'null']
+          description: The odometer in miles, as saved.
+        last_day:
+          type: [string, 'null']
+          description: The local day the reading was saved for.
+    FordUpdate:
+      type: object
+      required: [client_id, authorize_url, token_url, odometer_unit, meter_id]
+      properties:
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          writeOnly: true
+          description: Required the first time; omit to keep the saved one.
+        authorize_url:
+          type: string
+          description: The account-linking address from the developer dashboard (View oAuth URLs). It has the client ID and the registered redirect address; its state is replaced.
+        token_url:
+          type: string
+          description: Where the code and the refresh token are exchanged (the B2C code exchange of Ford's Postman collection). https, a name rather than an IP address.
+        odometer_unit:
+          type: string
+          enum: [km, miles]
+        meter_id:
+          type: string
+          description: A meter marked as charging an electric vehicle.
+    FordLinkStart:
+      type: object
+      required: [url, redirect_uri]
+      properties:
+        url:
+          type: string
+          description: Open this to sign in at Ford and agree.
+        redirect_uri:
+          type: string
+          description: Where Ford sends the browser afterwards; the address to paste back starts with it.
+    FordLinkComplete:
+      type: object
+      required: [redirect]
+      properties:
+        redirect:
+          type: string
+          description: The whole address the browser went to after the owner agreed (or just its query), with `code` and `state`.
     IngestScope:
       type: string
       description: The PC collector's own reading scopes, kept as they are in its code.
