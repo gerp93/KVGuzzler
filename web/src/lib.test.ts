@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -262,7 +262,7 @@ describe('programs over a period', () => {
     expect(rows.map((r) => r.name)).toEqual(['python.exe (ComfyUI)', 'chrome.exe', '2 smaller programs', BASELINE, UNATTRIBUTED]);
     expect(rows.map((r) => r.kind)).toEqual(['program', 'program', 'rollup', 'baseline', 'unattributed']);
     expect(rows[0]!.note).toBe('GPU 0.40 kWh · CPU 0.10 kWh · active 1 h');
-    expect(rows[2]!.cost).toBe('0.00'); // 0.00000 + 0.00001, shown as the sum of the two
+    expect(formatMoney(rows[2]!.cost)).toBe('<$0.01'); // 0.00000 + 0.00001: a sliver of a cent, never shown as $0.00
   });
 
   it('shares the yardstick: the whole PC when it is known, else what the CPU and GPU used', () => {
@@ -599,5 +599,14 @@ describe('the moves in the hierarchy tab', () => {
     expect(outdentTarget(a2, all)).toEqual({ parent: null });
     expect(outdentTarget(a4, all)).toBeUndefined();
     expect(outdentTarget({ ...a3, parent_id: 'a2' }, [...all, { ...a2, parent_id: 'a1' }])).toEqual({ parent: 'a1' });
+  });
+});
+
+describe('moneyText', () => {
+  it('keeps cents, keeps a sliver of a cent as a sliver, and drops float dust', () => {
+    expect(moneyText(1.5)).toBe('1.50');
+    expect(moneyText(0)).toBe('0.00');
+    expect(formatMoney(moneyText(0.0034))).toBe('<$0.01');
+    expect(formatMoney(moneyText(1e-17))).toBe('$0.00');
   });
 });

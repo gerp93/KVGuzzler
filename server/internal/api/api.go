@@ -54,6 +54,11 @@ type Server struct {
 	firstMu      sync.Mutex
 	firstData    time.Time
 	firstChecked time.Time
+
+	// levelsAnswer caches the meters' resting and working levels (see levels.go) for a few minutes: learning them reads a month of minutes per meter.
+	levelsMu     sync.Mutex
+	levelsAnswer *levelsAnswer
+	levelsAt     time.Time
 }
 
 // dataSince is when anything was first recorded, for the dashboard to hide the periods longer than the history; false when nothing is recorded yet.
@@ -98,6 +103,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/odometer/{day}", s.deleteOdometer)
 	mux.HandleFunc("GET /api/v1/tree.csv", s.treeExport)
 	mux.HandleFunc("GET /api/v1/anomalies", s.anomalies)
+	mux.HandleFunc("GET /api/v1/levels", s.levels)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/baseload", s.meterBaseLoad)
 	mux.HandleFunc("GET /api/v1/baseload", s.houseBaseLoad)
 	mux.HandleFunc("GET /api/v1/live", s.live)

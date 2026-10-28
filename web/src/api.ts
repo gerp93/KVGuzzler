@@ -2,6 +2,7 @@
 import type { ApplianceGroup, CarbonConfig, CarbonSeries, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
+import type { Levels } from './levels';
 import type { MeterRuns } from './runs';
 import type { MeterEv } from './ev';
 
@@ -51,6 +52,8 @@ export const api = {
   /** The power a meter (or the house) hardly ever goes below; undefined when under an hour was recorded. */
   meterBaseLoad: (meterId: string, from: string, to: string) => request<BaseLoad | undefined>(`api/v1/meters/${encodeURIComponent(meterId)}/baseload?${q({ from, to })}`),
   houseBaseLoad: (from: string, to: string) => request<BaseLoad | undefined>(`api/v1/baseload?${q({ from, to })}`),
+  /** What each meter draws at rest and the level above which it is working (learned from its last 30 days). */
+  levels: () => request<Levels>('api/v1/levels'),
   /** The times a meter was working over a period (a car charging, a dryer drying). */
   meterRuns: (meterId: string, from: string, to: string) => request<MeterRuns>(`api/v1/meters/${encodeURIComponent(meterId)}/runs?${q({ from, to })}`),
   /** A charging meter's odometer readings with the miles, energy and cost per mile of each stretch between them. */

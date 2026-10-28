@@ -1,7 +1,7 @@
 // The energy flow chart's data and layout, with no drawing in it. A flow chart is a tree laid out left to right: the whole on the left, its
 // parts to the right, each band as wide as the energy that went through it. The same rule as everywhere else holds: a parent's own reading
 // already contains its children, so what is left over is its own band ("Other (not metered)"); nothing is added twice.
-import { formatKwh, formatMoney, shownMeters, sumMoney, type Meter, type Summary } from './lib';
+import { formatKwh, formatMoney, moneyText, shownMeters, sumMoney, type Meter, type Summary } from './lib';
 import { topLevelMeters } from './measured';
 
 export interface FlowNode {
@@ -14,6 +14,9 @@ export interface FlowNode {
   meterId: string | null;
   /** The line for what a parent's own reading carries beyond its parts ("Other (not metered)"). */
   rest?: boolean;
+  /** "Everything else" under the whole house: the house less its circuits, holding the plugs and computers that sit on no clamped circuit. Its own figure already
+   * contains them. */
+  group?: boolean;
   children: FlowNode[];
 }
 
@@ -28,16 +31,17 @@ const rest = (id: string, label: string, kwh: number, cost: string | null): Flow
 /** The money left after taking some of it away; null unless every figure is known. */
 function moneyLeft(whole: string | null | undefined, parts: (string | null)[]): string | null {
   if (whole == null || parts.some((p) => p === null)) return null;
-  return Math.max(0, Number(whole) - parts.reduce((t, p) => t + Number(p), 0)).toFixed(2);
+  return moneyText(Math.max(0, Number(whole) - parts.reduce((t, p) => t + Number(p), 0)));
 }
 
 /** The tree to draw over a period. With a `rootId`, that meter and everything inside it. Without one, the house: the whole-house clamps as the
  * whole, the top-level circuits as its parts and what no circuit accounts for as the remainder; with no whole-house clamp at all, everything measured at the
  * top level added up stands in for it ("Everything measured": it is not claimed to be every circuit in the house).
  *
- * A plug or a computer's wall plug that says no circuit it is on ("parent not metered") is plugged into a circuit nothing clamps. It is a part of the
- * house beside the metered circuits, not inside any of them, so it is drawn at the top level too and what it takes comes off what no circuit
- * accounts for (never added a second time). Undefined when there is nothing recorded to draw. */
+ * A plug or a computer's wall plug that says no circuit it is on ("parent not metered") is plugged into a circuit nothing clamps. Under a whole-house clamp
+ * it is drawn as the Live page's circuits table lists it: inside "Everything else" (the house less its circuits), with what none of them explains as that
+ * group's last line, "Not individually metered" (never added a second time). Without a whole-house clamp it stands beside the circuits at the top level.
+ * Undefined when there is nothing recorded to draw. */
 export function flowTree(meters: Meter[], summary: Summary, rootId?: string, virtual?: VirtualParts): FlowNode | undefined {
   const shown = shownMeters(meters);
   const byId = new Map(shown.map((m) => [m.id, m]));
@@ -73,9 +77,23 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
   if (top.length === 0) return undefined;
   const inside = top.reduce((t, c) => t + c.kwh, 0);
   if (summary.house_kwh != null) {
-    const left = summary.house_kwh - inside;
-    const children = left > 0 ? [...top, rest('house', 'Other (not metered)', left, moneyLeft(summary.house_cost, top.map((c) => c.cost)))] : top;
-    return { id: 'house', label: 'House', kwh: summary.house_kwh, cost: summary.house_cost ?? null, meterId: null, children };
+    const house = (children: FlowNode[]): FlowNode => ({ id: 'house', label: 'House', kwh: summary.house_kwh!, cost: summary.house_cost ?? null, meterId: null, children });
+    const circuits = top.filter((c) => byId.get(c.meterId ?? '')?.scope === 'circuit');
+    const loose = top.filter((c) => !circuits.includes(c));
+    const left = summary.house_kwh - circuits.reduce((t, c) => t + c.kwh, 0);
+    // The circuits used more than the house did (the house clamps were not recording the whole time): what is left of the house is not known, so nothing is
+    // claimed of it; the group then says only what the plugs in it add up to, and has no "Not individually metered" line.
+    if (!(left > 0)) {
+      if (loose.length === 0) return house(circuits);
+      const plugs: FlowNode = { id: 'everything-else', label: 'Everything else', kwh: loose.reduce((t, c) => t + c.kwh, 0), cost: sumMoney(loose.map((c) => c.cost)), meterId: null, rest: true, group: true, children: loose };
+      return house([...circuits, plugs]);
+    }
+    const cost = moneyLeft(summary.house_cost, circuits.map((c) => c.cost));
+    const parts = [...loose];
+    const none = left - loose.reduce((t, c) => t + c.kwh, 0);
+    if (loose.length > 0 && none > 0) parts.push(rest('everything-else', 'Not individually metered', none, moneyLeft(cost, loose.map((c) => c.cost))));
+    const group: FlowNode = { id: 'everything-else', label: 'Everything else', kwh: left, cost, meterId: null, rest: true, group: true, children: parts };
+    return house([...circuits, group]);
   }
   return { id: 'all', label: 'Everything measured', kwh: inside, cost: sumMoney(top.map((c) => c.cost)), meterId: null, children: top };
 }

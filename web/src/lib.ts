@@ -442,10 +442,17 @@ export function formatDuration(seconds: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** A cost worked out from other figures, as text in cents. A sliver of a cent keeps its extra places (six) instead of rounding to "0.00": `formatMoney` shows
+ * that as "<$0.01", but would show a rounded "0.00" as no cost at all. Float dust (1e-17 left over from a subtraction) is still nothing. */
+export function moneyText(n: number): string {
+  const cents = n.toFixed(2);
+  return n !== 0 && Number(cents) === 0 ? n.toFixed(6) : cents;
+}
+
 /** Adds money strings for display. Null if any is missing (a partly priced total would mislead). */
 export function sumMoney(parts: (string | null | undefined)[]): string | null {
   if (parts.length === 0 || parts.some((p) => p === null || p === undefined)) return null;
-  return parts.reduce((t, p) => t + Number(p), 0).toFixed(2);
+  return moneyText(parts.reduce((t, p) => t + Number(p), 0));
 }
 
 /** A PC look older than this is shown as "not answering" rather than as live. */

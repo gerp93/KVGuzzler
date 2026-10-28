@@ -1,0 +1,8 @@
+{
+  "meters": [
+    { "meter_id": "refoss-em16p-1:ch-03", "rest_watts": 3.1, "working_above_watts": 48.5, "minutes": 43200 },
+    { "meter_id": "refoss-em16p-1:ch-06", "rest_watts": 92.4, "working_above_watts": null, "minutes": 43200 }
+  ],
+  "from": "2026-09-28T05:00:00Z",
+  "to": "2026-10-28T05:00:00Z"
+}

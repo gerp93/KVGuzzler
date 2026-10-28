@@ -2,7 +2,7 @@
 // that sit on circuits nothing clamps listed inside it (that is where they are: in the house, on none of the clamped circuits). The group's own line is the
 // house's figure less the circuits' (the server's `unmetered_kwh`), so the plugs under it are already in it and are never added to it; what no plug explains is
 // its last line. This is the same tree the Hierarchy tab draws, with the house as the parent.
-import type { Meter, Row, Summary } from './lib';
+import { moneyText, type Meter, type Row, type Summary } from './lib';
 
 /** A line of the table that stands for no meter of its own: a figure worked out from others. */
 export interface Lump {
@@ -16,7 +16,7 @@ export type BarRow = Row & { lump?: Lump };
 /** The money left after taking some of it away; null unless every figure is known. */
 function moneyLeft(whole: string | null | undefined, parts: (string | null | undefined)[]): string | null {
   if (whole == null || parts.some((p) => p == null)) return null;
-  return Math.max(0, Number(whole) - parts.reduce((t, p) => t + Number(p), 0)).toFixed(2);
+  return moneyText(Math.max(0, Number(whole) - parts.reduce((t, p) => t + Number(p), 0)));
 }
 
 /** Plugs and computers that name no circuit they are on, as the rows to list inside the group: the top-level plugs of `circuits` (nestCircuits' output) and

@@ -285,6 +285,17 @@ main {
   transition: width 0.5s ease;
 }
 
+/* The live reading's cell says whether the meter is working or resting right now (its own learned levels): a tint behind the figure, the text keeps the theme's colours */
+.bars .num.now.working {
+  background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-accent-green);
+  font-weight: 700;
+}
+
+.bars .num.now.resting {
+  background: color-mix(in srgb, var(--color-accent-blue) 9%, transparent);
+}
+
 /* What a sub-panel's feed carries beyond its own circuits: derived, so quieter than a measured row */
 .bars li.rest {
   color: var(--muted);

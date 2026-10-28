@@ -199,3 +199,35 @@ func TestARunKnowsItsAverageAndPeakCurrentWhenTheMeterReportsOne(t *testing.T) {
 		t.Errorf("fridge runs = %+v: no current was ever reported", b.Runs)
 	}
 }
+
+func TestLevelsSayWhatEachMeterRestsAtAndWhereWorkingBegins(t *testing.T) {
+	srv, _ := runsServer(t)
+	var b struct {
+		Meters []struct {
+			MeterID           string   `json:"meter_id"`
+			RestWatts         float64  `json:"rest_watts"`
+			WorkingAboveWatts *float64 `json:"working_above_watts"`
+		} `json:"meters"`
+	}
+	if r := get(t, srv.URL+"/api/v1/levels", &b); r.StatusCode != 200 {
+		t.Fatalf("status %d", r.StatusCode)
+	}
+	got := map[string]int{}
+	for i, m := range b.Meters {
+		got[m.MeterID] = i
+	}
+	c, ok := got["charger"]
+	if !ok {
+		t.Fatalf("no levels for the charger: %+v", b)
+	}
+	if b.Meters[c].RestWatts != 3 || b.Meters[c].WorkingAboveWatts == nil || *b.Meters[c].WorkingAboveWatts < 100 || *b.Meters[c].WorkingAboveWatts > 3000 {
+		t.Errorf("charger = %+v, want rest 3 W and a working level between 100 W and 3 kW", b.Meters[c])
+	}
+	f, ok := got["fridge"]
+	if !ok {
+		t.Fatalf("no levels for the fridge: %+v", b)
+	}
+	if b.Meters[f].WorkingAboveWatts != nil || b.Meters[f].RestWatts < 90 || b.Meters[f].RestWatts > 92 {
+		t.Errorf("fridge = %+v, want a steady draw near 91 W and no working level", b.Meters[f])
+	}
+}

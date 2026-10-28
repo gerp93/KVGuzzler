@@ -22,6 +22,7 @@ const examples = {
   'meter-runs.json': 'MeterRuns',
   'meter-ev.json': 'MeterEv',
   'baseload.json': 'BaseLoad',
+  'levels.json': 'Levels',
   'anomalies.json': 'Anomalies',
 };
 
