@@ -413,8 +413,9 @@ func TestRemovingTheKeyIsSaidOnceAndStopsTheAsking(t *testing.T) {
 }
 
 func TestStretchesAddUpToWhatValueGivesAndKeepTheGridWhereNothingWasUsed(t *testing.T) {
-	known := map[int64]float64{0: 400, 3600: 200, 7200: 300, 86400: 100} // the last is on the next day, with no energy
-	hours := []HourKWh{{Hour: 0, KWh: 1}, {Hour: 3600, KWh: 2}, {Hour: 10800, KWh: 1}} // 10800 has no intensity of its own
+	// The hour at 86400 is on the next day, with no energy; the one at 10800 has no intensity of its own.
+	known := map[int64]float64{0: 400, 3600: 200, 7200: 300, 86400: 100}
+	hours := []HourKWh{{Hour: 0, KWh: 1}, {Hour: 3600, KWh: 2}, {Hour: 10800, KWh: 1}}
 	day := func(h int64) int64 { return h / 86400 * 86400 }
 	got := Bucketed(known, 0, hours, day)
 	if len(got) != 2 || got[0].Start != 0 || got[1].Start != 86400 {
