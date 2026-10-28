@@ -56,7 +56,7 @@ export function ComputersCard({
         <>
           <div class="hier-head" aria-hidden="true">
             <span class="hier-tag" />
-            <span class="num">Now</span>
+            <span class="num">Power</span>
             <span class="num">Amps</span>
             <span class="num">Volts</span>
             <span class="num">Energy</span>
