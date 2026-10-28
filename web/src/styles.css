@@ -439,7 +439,7 @@ select {
 }
 
 .hier-row {
-  --kind: var(--color-accent-blue);
+  --kind: var(--muted);
   display: grid;
   gap: 6px;
   padding-left: 0;
@@ -450,9 +450,9 @@ select {
   border-top-color: transparent;
 }
 
-.hier-row.k-house { --kind: var(--color-accent-green); }
-.hier-row.k-circuit { --kind: var(--color-accent-blue); }
-.hier-row.k-device { --kind: var(--color-accent-red); }
+/* Working or resting right now, by the meter's own learned levels: the hot colour for working, the calm one for resting, quiet when it is not known */
+.hier-row.s-working { --kind: var(--color-accent-red); }
+.hier-row.s-resting { --kind: var(--color-accent-green); }
 
 .hier-row.drop {
   background: var(--color-bg-hover);
@@ -1205,9 +1205,9 @@ a.button {
   stroke-width: 3px;
 }
 
-.hier-diagram rect.house { stroke: var(--color-accent-green); stroke-width: 2.5px; }
-.hier-diagram rect.circuit { stroke: var(--color-accent-blue); }
-.hier-diagram rect.device { stroke: var(--color-accent-red); }
+.hier-diagram rect.plain { stroke: var(--color-border); }
+.hier-diagram rect.working { stroke: var(--color-accent-red); stroke-width: 2.5px; }
+.hier-diagram rect.resting { stroke: var(--color-accent-green); }
 .hier-diagram rect.part { stroke: var(--muted); stroke-dasharray: 2 3; }
 .hier-diagram rect.lump { stroke: var(--muted); stroke-dasharray: 5 3; }
 
@@ -1228,6 +1228,26 @@ a.button {
 .hier-diagram a:hover text.name {
   text-decoration: underline;
 }
+
+/* The key under the tree for the two colours */
+.hier-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 12px 8px 0;
+}
+
+.key-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.key-dot.working { background: var(--color-accent-red); }
+.key-dot.resting { background: var(--color-accent-green); }
 
 /* Lines worked out from others (a computer's parts, "Everything else", "Other (not metered)"): read-only, quieter than a meter, and nothing to drag */
 .hier-row.virtual .part-name {

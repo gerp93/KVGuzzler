@@ -17,6 +17,7 @@ import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
+import { levelsById, meterState, stateTitle, type MeterLevels } from './levels';
 import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
@@ -42,11 +43,6 @@ function EyeIcon({ off }: { off?: boolean }) {
   );
 }
 
-/** What a row is, for its colour (the diagram uses the same): the whole house, a clamped circuit or sub-panel, or a plug or computer. */
-function kindOf(m: Meter): 'house' | 'circuit' | 'device' {
-  return m.scope === 'mains' ? 'house' : m.scope === 'circuit' ? 'circuit' : 'device';
-}
-
 /** How much of the house's power a draw is, in percent, for the bar behind a row; nothing without both figures. */
 function shareOf(watts: number | null | undefined, house: number | null | undefined): number {
   return watts != null && house != null && house > 0 ? Math.min(100, Math.max(0, (watts / house) * 100)) : 0;
@@ -65,6 +61,8 @@ interface Shared {
   watts: Map<string, number>;
   /** The house's power now, for the share of it each row draws as a bar behind it. */
   houseWatts: number | null | undefined;
+  /** Each meter's learned resting and working levels, to say whether it is working or resting right now. */
+  levels: Map<string, MeterLevels>;
   /** Each meter's live volts and amps, when it reports them. */
   currents: Map<string, { volts: number | null | undefined; amps: number | null | undefined }>;
   dragging: string | null;
@@ -113,6 +111,9 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
   const nearBreaker = livePct !== null && breakerLevel(livePct) !== 'ok' ? livePct : null;
   const used = figures.get(meter.id);
   const share = meter.scope === 'mains' ? 0 : shareOf(watt, shared.houseWatts);
+  // Working or resting right now, by the meter's own learned levels (the Live page's); none when too little is known.
+  const level = shared.levels.get(meter.id);
+  const state = meterState(level, watt);
   // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
   const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
   const owner = meter.type === 'computer' ? ofComputer : meter.scope === 'plug' && ofComputer ? `peripheral of ${ofComputer}` : '';
@@ -122,7 +123,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
 
   return (
     <li
-      class={`hier-row k-${kindOf(meter)}${over && dropOk ? ' drop' : ''}${hot ? ' hot' : ''}${open ? ' open' : ''}`}
+      class={`hier-row s-${state ?? 'none'}${over && dropOk ? ' drop' : ''}${hot ? ' hot' : ''}${open ? ' open' : ''}`}
       data-entry={`row:${meter.id}`}
       style={depth > 0 ? { marginLeft: `${depth * 1.25}rem` } : undefined}
       onDragOver={(e) => {
@@ -163,7 +164,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
         >
           ⠿
         </span>
-        <span class="kind-dot" aria-hidden="true" />
+        <span class="kind-dot" title={state && level ? stateTitle(state, level) : undefined} />
         {isOnlyMeterOfDevice(meter.device_id) ? (
           <span class="grow meter-name" title="Rename it under Devices: a plug has one name">
             {meter.label}
@@ -333,7 +334,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
  * a meter, so it has no wiring and cannot be moved. */
 function PartRow({ id, part, depth, href, hot, share }: { id: string; part: PcPart; depth: number; href: string; hot: boolean; share: number }) {
   return (
-    <li class={`hier-row virtual k-device${hot ? ' hot' : ''}`} data-entry={id} style={{ marginLeft: `${depth * 1.25}rem` }}>
+    <li class={`hier-row virtual${hot ? ' hot' : ''}`} data-entry={id} style={{ marginLeft: `${depth * 1.25}rem` }}>
       <div class="hier-main" style={`--share: ${share}%`}>
         <span />
         <span />
@@ -413,6 +414,9 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const { data: devices } = usePoll<Device[]>(api.devices, 30_000, [meters.length]);
   const { data: computers } = usePoll<Computer[]>(api.computers, 30_000, [meters.length]);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
+  // Each meter's resting and working levels change over weeks: read them every few minutes.
+  const { data: levelData } = usePoll(api.levels, 5 * 60_000, []);
+  const levels = levelsById(levelData);
   const [dragging, setDragging] = useState<string | null>(null);
   // The line under the pointer, in the tree or in the diagram (an entry id of treePlan): both draw it highlighted.
   const [hover, setHover] = useState<string | null>(null);
@@ -458,7 +462,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   });
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, houseWatts: live?.house_watts, currents, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, houseWatts: live?.house_watts, levels, currents, dragging, setDragging, onChanged };
 
   return (
     <>
@@ -537,6 +541,12 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
                 ),
               )}
             </ul>
+            {levels.size > 0 && (
+              <p class="hier-key caption">
+                <span class="key-dot working" aria-hidden="true" /> Working: drawing above its usual resting level
+                <span class="key-dot resting" aria-hidden="true" /> Resting: at or near what it always draws (often 0 W)
+              </p>
+            )}
           </>
         )}
         {hidden.length > 0 && (
@@ -555,7 +565,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
       <div class="tree-extra">
         <section class="card wide diagram-card">
           <h2>Diagram</h2>
-          <HierarchyDiagram entries={entries} watts={watts} figures={figures} hover={hover} onHover={setHover} />
+          <HierarchyDiagram entries={entries} watts={watts} figures={figures} stateOf={(id) => meterState(levels.get(id), watts.get(id))} hover={hover} onHover={setHover} />
         </section>
         <DevicesCard meters={meters} onChanged={onChanged} />
         <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />

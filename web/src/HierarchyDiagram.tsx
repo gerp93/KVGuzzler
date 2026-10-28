@@ -3,6 +3,7 @@
 // a meter's box opens its page. A box is that meter's own reading: a parent's already contains what is inside it, nothing here is added.
 import { meterPath } from './Bars';
 import { formatKwh, formatWatts, type MeterSummary } from './lib';
+import type { MeterState } from './levels';
 import { uiScale } from './uiscale';
 import { layoutDiagram } from './treeDiagram';
 import type { Entry } from './treePlan';
@@ -18,21 +19,21 @@ interface Box {
   cls: string;
 }
 
-function boxOf(e: Entry, watts: Map<string, number>, figures: Map<string, MeterSummary>): Box {
+function boxOf(e: Entry, watts: Map<string, number>, figures: Map<string, MeterSummary>, stateOf: (id: string) => MeterState | undefined): Box {
   const join = (w: number | null | undefined, k: number | null | undefined) => [w != null ? formatWatts(w) : '', k != null ? formatKwh(k) : ''].filter(Boolean).join(' · ');
   if (e.kind === 'lump') return { id: e.id, label: e.label, figure: join(e.watts, e.kwh), title: e.title, cls: 'lump' };
   if (e.kind === 'part') return { id: e.id, label: e.part.label, figure: join(e.part.watts, e.part.kwh), title: e.part.remainder ? 'Wall plug less the parts above' : 'As its collector reports it', href: e.href, cls: 'part' };
   const m = e.meter;
-  const cls = m.scope === 'mains' ? 'house' : m.scope === 'circuit' ? 'circuit' : 'device';
+  const cls = stateOf(m.id) ?? 'plain';
   return { id: e.id, label: m.label, figure: join(watts.get(m.id), figures.get(m.id)?.kwh), title: m.label, href: meterPath(m), cls };
 }
 
-export function HierarchyDiagram({ entries, watts, figures, hover, onHover }: { entries: Entry[]; watts: Map<string, number>; figures: Map<string, MeterSummary>; hover: string | null; onHover: (id: string | null) => void }) {
+export function HierarchyDiagram({ entries, watts, figures, stateOf, hover, onHover }: { entries: Entry[]; watts: Map<string, number>; figures: Map<string, MeterSummary>; stateOf: (id: string) => MeterState | undefined; hover: string | null; onHover: (id: string | null) => void }) {
   if (entries.length === 0) return <p class="note">No meters shown.</p>;
   const s = uiScale();
   const sizes = { boxW: 132 * s, boxH: 38 * s, gapX: 18 * s, slot: 44 * s, pad: 6 * s };
   const layout = layoutDiagram(entries.map((e) => ({ id: e.id, depth: e.depth })), sizes);
-  const boxes = new Map(entries.map((e) => [e.id, boxOf(e, watts, figures)]));
+  const boxes = new Map(entries.map((e) => [e.id, boxOf(e, watts, figures, stateOf)]));
   const short = (t: string) => (t.length > MAX_CHARS ? `${t.slice(0, MAX_CHARS - 1)}…` : t);
 
   return (
