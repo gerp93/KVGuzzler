@@ -799,9 +799,12 @@ export function houseUsageBasis(use: AverageUse, windowKey: string): string {
   return `${covered}: ${formatKwh(use.kwh)}, ${formatKwh(use.kwh_per_day)} a day, avg ${formatWatts(use.average_watts)} · mains clamps`;
 }
 
-/** The share of the house a part of it used, as a whole-number percent; null when the house figure is missing or zero. */
+/** The share of the house a part of it used, as a whole-number percent; null when the house figure is missing or zero, or when the part is more than
+ * the whole (the house was not recorded for all the time the part was, as over "all time" with a monitor added later: no share is true then). */
 export function houseShare(kwh: number, houseKwh: number | null | undefined): number | null {
-  return houseKwh != null && houseKwh > 0 ? Math.round((kwh / houseKwh) * 100) : null;
+  if (houseKwh == null || houseKwh <= 0) return null;
+  const share = Math.round((kwh / houseKwh) * 100);
+  return share > 100 ? null : share;
 }
 
 /** A price per kWh in the saved currency, four decimals: "$0.1558". */

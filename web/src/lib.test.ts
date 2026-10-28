@@ -484,6 +484,8 @@ describe('the house figures', () => {
     expect(houseShare(5, 20)).toBe(25);
     expect(houseShare(5, 0)).toBeNull();
     expect(houseShare(5, null)).toBeNull();
+    expect(houseShare(20, 20)).toBe(100);
+    expect(houseShare(50, 20)).toBeNull(); // more than the house: its clamps were not recording for all that time
   });
 
   it('says where a house usage estimate comes from', () => {
