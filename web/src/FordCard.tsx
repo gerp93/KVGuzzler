@@ -127,7 +127,7 @@ export function FordCard({ meter, onRead }: { meter: Meter; onRead: () => void }
       </label>
       <label class="field">
         <span>Token URL (the code exchange request of Ford's Postman collection)</span>
-        <input value={tokenUrl} autocomplete="off" placeholder="https://" onInput={(e) => setTokenUrl((e.target as HTMLInputElement).value)} />
+        <input value={tokenUrl} autocomplete="off" placeholder="https://api.vehicle.ford.com/dah2vb2cprod.onmicrosoft.com/oauth2/v2.0/token?p=B2C_1A_FCON_AUTHORIZE" onInput={(e) => setTokenUrl((e.target as HTMLInputElement).value)} />
       </label>
       <label class="field">
         <span>Ford's odometer is in</span>

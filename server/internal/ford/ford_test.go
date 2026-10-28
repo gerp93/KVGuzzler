@@ -175,6 +175,9 @@ func TestTheCodeAndTheRefreshTokenAreTradedWithTheClientsOwnCredentials(t *testi
 	}
 
 	_, err = c.Refresh(context.Background(), cfg, "OLD")
+	if f := forms[1]; f.Get("grant_type") != "refresh_token" || f.Get("refresh_token") != "OLD" || f.Get("redirect_uri") != "http://localhost:8000/callback" || f.Get("client_secret") != "s3cret" {
+		t.Errorf("refresh form = %v", f)
+	}
 	var fe *Error
 	if !errors.As(err, &fe) || !fe.Relink {
 		t.Fatalf("a refused refresh token = %v, want a relink error", err)

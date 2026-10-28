@@ -215,9 +215,9 @@ func (c *Client) Exchange(ctx context.Context, cfg Config, code string) (Tokens,
 	return c.token(ctx, cfg, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {RedirectURI(cfg)}})
 }
 
-// Refresh trades a refresh token for a new pair of tokens.
+// Refresh trades a refresh token for a new pair of tokens. Ford's own Postman collection sends the redirect address here too, so it is sent.
 func (c *Client) Refresh(ctx context.Context, cfg Config, refresh string) (Tokens, error) {
-	return c.token(ctx, cfg, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}})
+	return c.token(ctx, cfg, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "redirect_uri": {RedirectURI(cfg)}})
 }
 
 func (c *Client) token(ctx context.Context, cfg Config, form url.Values) (Tokens, error) {
