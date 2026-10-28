@@ -799,6 +799,14 @@ export function houseShare(kwh: number, houseKwh: number | null | undefined): nu
   return share > 100 ? null : share;
 }
 
+/** The share as the table writes it: "17%", "<1%" for a part that used something but under half a percent (a plain "0%" would say it used nothing), "0%" only for
+ * a part that used nothing, and nothing when houseShare has none. */
+export function formatShare(kwh: number, houseKwh: number | null | undefined): string {
+  const share = houseShare(kwh, houseKwh);
+  if (share == null) return '';
+  return share === 0 && kwh > 0 ? '<1%' : `${share}%`;
+}
+
 /** A price per kWh in the saved currency, four decimals: "$0.1558". */
 export function formatRate(perKwh: number): string {
   return `${symbol}${perKwh.toFixed(4)}`;
