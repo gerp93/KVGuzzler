@@ -1,7 +1,7 @@
 // A list of meters as bars in a table: name, live watts, and (over a period) energy, cost and share, each in a column of its own under a heading. A meter that holds others is followed by the ones
 // inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
 import { Kwh, Watts } from './Watts';
-import { formatMoney, houseShare, periodWords, type MeterSummary, type PeriodKey, type Summary } from './lib';
+import { formatMoney, formatShare, periodWords, type MeterSummary, type PeriodKey, type Summary } from './lib';
 import type { BarRow } from './notMetered';
 import { routePath } from './route';
 
@@ -35,7 +35,7 @@ export function Bars({ rows, of, summary, baseKwh, period }: { rows: BarRow[]; o
             cost: costs.every((c) => c != null) ? Math.max(0, Number(mine.cost) - inside.reduce((t, c) => t + Number(c?.cost), 0)).toFixed(2) : null,
           };
         }
-        const share = mine ? houseShare(mine.kwh, baseKwh) : null;
+        const share = mine ? formatShare(mine.kwh, baseKwh) : '';
         const title = r.lump ? r.lump.label : r.remainder ? `Other (not metered) on ${r.meter.label}` : r.meter.label;
         const derived = !!(r.lump || r.remainder);
         return (
@@ -50,7 +50,7 @@ export function Bars({ rows, of, summary, baseKwh, period }: { rows: BarRow[]; o
             <span class="figs">
               <span class="num energy">{mine && <Kwh k={mine.kwh} />}</span>
               <span class="num cost">{mine && mine.cost != null ? formatMoney(mine.cost, summary?.cost_estimated) : ''}</span>
-              <span class="num share">{share != null ? `${share}%` : ''}</span>
+              <span class="num share">{share}</span>
             </span>
           </li>
         );

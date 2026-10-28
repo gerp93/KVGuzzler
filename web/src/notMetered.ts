@@ -33,8 +33,12 @@ export function notMeteredRows(args: { house: number; clamped: Row[]; plugs: Row
   const top = clamped.filter((r) => r.meter.scope === 'circuit' && !r.remainder && (r.depth ?? 0) === 0);
   const watts = Math.max(0, house - top.reduce((t, r) => t + r.watts, 0));
   const figures = new Map((summary?.meters ?? []).map((f) => [f.meter_id, f]));
-  const kwh = summary?.unmetered_kwh ?? null;
-  const cost = moneyLeft(summary?.house_cost, top.map((r) => figures.get(r.meter.id)?.cost));
+  // The house less its circuits cannot be negative: when the circuits used more than the house did, the house clamps were not recording for all the time the circuits were
+  // (as over "all time" with a monitor added later), and what is left is not known. Saying 0.00 kWh for something drawing power now would be untrue, so it says nothing.
+  const circuitsKwh = top.reduce((t, r) => t + (figures.get(r.meter.id)?.kwh ?? 0), 0);
+  const known = summary?.house_kwh == null || circuitsKwh <= summary.house_kwh;
+  const kwh = known ? (summary?.unmetered_kwh ?? null) : null;
+  const cost = known ? moneyLeft(summary?.house_cost, top.map((r) => figures.get(r.meter.id)?.cost)) : null;
   const out: BarRow[] = [{ meter: host, watts, depth: 0, lump: { label: 'Everything else', kwh, cost } }];
   if (plugs.length === 0) return out;
   for (const p of plugs) out.push({ ...p, depth: 1 });

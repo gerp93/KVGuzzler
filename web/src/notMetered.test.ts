@@ -48,4 +48,12 @@ describe('the Everything else group of the circuits table', () => {
     expect(none).toHaveLength(1);
     expect(none[0]!.lump!.cost).toBeNull();
   });
+
+  it('says nothing about what is left when the circuits used more than the house did (the house was not recorded all that time)', () => {
+    const short = { ...summary, house_kwh: 5, unmetered_kwh: 0 } as unknown as Summary; // the range alone used 6
+    const rows = notMeteredRows({ house: 1000, clamped: circuits, plugs, summary: short, host: meters[0]! });
+    expect(rows[0]!.lump).toMatchObject({ kwh: null, cost: null });
+    expect(rows[3]!.lump).toMatchObject({ kwh: null, cost: null });
+    expect(Math.round(rows[0]!.watts)).toBe(400); // what it draws now is still known
+  });
 });
