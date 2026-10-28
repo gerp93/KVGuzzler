@@ -5,6 +5,9 @@
 /** The usual breaker sizes of a US panel, offered when one is set. */
 export const BREAKER_SIZES = [15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125, 150, 200];
 
+/** The sizes a whole house's main breaker comes in, beyond a circuit's. */
+export const MAIN_SIZES = [225, 250, 300, 400];
+
 /** The share of a breaker a current is, as a whole percent; null when either is missing or the breaker is not a real size. */
 export function breakerPercent(amps: number | null | undefined, breaker: number | null | undefined): number | null {
   if (amps == null || breaker == null || !(breaker > 0)) return null;
@@ -26,6 +29,12 @@ export function formatAmps(a: number | null | undefined): string {
   return `${Math.abs(a) >= 100 ? Math.round(a) : a.toFixed(1)} A`;
 }
 
+/** "3.7 / 50 A": the current out of what its breaker allows, when the breaker's size is set; otherwise just the current. */
+export function formatAmpsOf(a: number | null | undefined, breaker: number | null | undefined): string {
+  if (a == null || breaker == null || !(breaker > 0)) return formatAmps(a);
+  return `${Math.abs(a) >= 100 ? Math.round(a) : a.toFixed(1)} / ${breaker} A`;
+}
+
 export function formatVolts(v: number | null | undefined): string {
   return v == null ? '—' : `${Math.round(v)} V`;
 }
@@ -42,9 +51,10 @@ export function breakerAdvice(peak: number | null, breaker: number | null | unde
   return null;
 }
 
-/** The sizes to choose from: the usual ones, and the one already set if it is not among them. */
-export function breakerOptions(current: number | null | undefined): number[] {
-  const sizes = current != null && !BREAKER_SIZES.includes(current) ? [...BREAKER_SIZES, current] : BREAKER_SIZES;
+/** The sizes to choose from: the usual ones (with the bigger ones of a main breaker when `main`), and the one already set if it is not among them. */
+export function breakerOptions(current: number | null | undefined, main = false): number[] {
+  const usual = main ? [...BREAKER_SIZES, ...MAIN_SIZES] : BREAKER_SIZES;
+  const sizes = current != null && !usual.includes(current) ? [...usual, current] : usual;
   return [...sizes].sort((a, b) => a - b);
 }
 
