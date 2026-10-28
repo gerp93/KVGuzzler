@@ -386,7 +386,7 @@ func TestAFailureWaitsAnHourAndAnOdometerThatWouldGoDownIsSaidNotSaved(t *testin
 }
 
 func TestChangingTheSetupLooksAtOnce(t *testing.T) {
-	f, sink, _, _ := feedFor(t)
+	f, sink, _, now := feedFor(t)
 	ctx := context.Background()
 	_, _ = f.Step(ctx)
 	if did, _ := f.Step(ctx); did {
@@ -395,8 +395,36 @@ func TestChangingTheSetupLooksAtOnce(t *testing.T) {
 	c := *sink.cfg
 	c.OdometerUnit = Miles
 	sink.cfg = &c
+	if did, _ := f.Step(ctx); did {
+		t.Error("a changed setup was looked at within a minute of the last look: Ford would say to slow down")
+	}
+	*now = now.Add(MinGap + time.Second)
 	if did, _ := f.Step(ctx); !did {
-		t.Error("a changed setup was not looked at")
+		t.Error("a changed setup was not looked at once the gap had passed")
+	}
+}
+
+func TestLinkingReadsOnceAndTheFeedDoesNotReadAgainRightAfter(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	ctx := context.Background()
+	sink.refresh = ""
+	if did, _ := f.Step(ctx); did { // not linked: the feed notes that
+		t.Fatal("an unlinked vehicle was read")
+	}
+	if _, err := f.Complete(ctx, "CODE"); err != nil {
+		t.Fatal(err)
+	}
+	if fs.telemetry != 1 {
+		t.Fatalf("linking read telemetry %d times, want 1", fs.telemetry)
+	}
+	for _, wait := range []time.Duration{0, 10 * time.Second, 40 * time.Second, 2 * time.Minute} {
+		*now = now.Add(wait)
+		if did, _ := f.Step(ctx); did {
+			t.Fatalf("the feed read again %v after linking", wait)
+		}
+	}
+	if fs.telemetry != 1 {
+		t.Errorf("telemetry was asked for %d times after linking, want 1", fs.telemetry)
 	}
 }
 
