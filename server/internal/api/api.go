@@ -447,6 +447,18 @@ func parsePeriod(r *http.Request) (from, to time.Time, err error) {
 	return from, to, nil
 }
 
+// defaultBucketFor is defaultBucket over the part of [from, to) that has anything recorded: "all time" starts in the year 2000, which would draw a
+// day-sized bucket for a house recorded for a day and a half (two points, a straight line), so the period starts where the history does.
+func (s *Server) defaultBucketFor(ctx context.Context, from, to time.Time) model.Bucket {
+	if since, ok := s.dataSince(ctx); ok && since.After(from) {
+		from = since
+	}
+	if !to.After(from) {
+		return model.BucketMinute
+	}
+	return defaultBucket(to.Sub(from))
+}
+
 // defaultBucket is the coarsest bucket that keeps the period at about 400 points or fewer.
 func defaultBucket(span time.Duration) model.Bucket {
 	switch {
@@ -478,7 +490,7 @@ func (s *Server) series(w http.ResponseWriter, r *http.Request) {
 	bucket := model.Bucket(r.URL.Query().Get("bucket"))
 	switch bucket {
 	case "":
-		bucket = defaultBucket(to.Sub(from))
+		bucket = s.defaultBucketFor(r.Context(), from, to)
 	case model.BucketMinute, model.BucketHour, model.BucketDay:
 	default:
 		writeProblem(w, http.StatusBadRequest, "bad_bucket", "bucket is minute, hour or day")
@@ -1273,7 +1285,7 @@ func (s *Server) computerSeries(w http.ResponseWriter, r *http.Request) {
 	bucket := model.Bucket(r.URL.Query().Get("bucket"))
 	switch bucket {
 	case "":
-		bucket = defaultBucket(to.Sub(from))
+		bucket = s.defaultBucketFor(r.Context(), from, to)
 	case model.BucketMinute, model.BucketHour, model.BucketDay:
 	default:
 		writeProblem(w, http.StatusBadRequest, "bad_bucket", "bucket is minute, hour or day")
