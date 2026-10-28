@@ -3,7 +3,6 @@
 // meter, and moves in the tree by the arrows, by dragging onto another meter, or from its "which panel" list. Nothing here is sent to a device:
 // it only changes how this dashboard reads and shows them.
 import { useState } from 'preact/hooks';
-import { Hint } from './Hint';
 import { Kwh, Watts } from './Watts';
 import { api } from './api';
 import { meterPath } from './Bars';
@@ -43,6 +42,16 @@ function EyeIcon({ off }: { off?: boolean }) {
   );
 }
 
+/** What a row is, for its colour (the diagram uses the same): the whole house, a clamped circuit or sub-panel, or a plug or computer. */
+function kindOf(m: Meter): 'house' | 'circuit' | 'device' {
+  return m.scope === 'mains' ? 'house' : m.scope === 'circuit' ? 'circuit' : 'device';
+}
+
+/** How much of the house's power a draw is, in percent, for the bar behind a row; nothing without both figures. */
+function shareOf(watts: number | null | undefined, house: number | null | undefined): number {
+  return watts != null && house != null && house > 0 ? Math.min(100, Math.max(0, (watts / house) * 100)) : 0;
+}
+
 interface Shared {
   all: Meter[];
   /** What each meter used and cost over the period picked at the top, by meter id. */
@@ -54,6 +63,8 @@ interface Shared {
   /** The name of a computer, by id: a plug that is its wall plug or one of its peripherals says so on its row. */
   computerName: (id: string) => string;
   watts: Map<string, number>;
+  /** The house's power now, for the share of it each row draws as a bar behind it. */
+  houseWatts: number | null | undefined;
   /** Each meter's live volts and amps, when it reports them. */
   currents: Map<string, { volts: number | null | undefined; amps: number | null | undefined }>;
   dragging: string | null;
@@ -101,6 +112,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
   const livePct = breakerPercent(currents.get(meter.id)?.amps, meter.breaker_amps);
   const nearBreaker = livePct !== null && breakerLevel(livePct) !== 'ok' ? livePct : null;
   const used = figures.get(meter.id);
+  const share = meter.scope === 'mains' ? 0 : shareOf(watt, shared.houseWatts);
   // A computer's wall plug and its peripherals (a monitor) are separate plugs, each on the circuit it is plugged into; the row says whose they are.
   const ofComputer = meter.computer_id ? computerName(meter.computer_id) : '';
   const owner = meter.type === 'computer' ? ofComputer : meter.scope === 'plug' && ofComputer ? `peripheral of ${ofComputer}` : '';
@@ -110,7 +122,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
 
   return (
     <li
-      class={`hier-row${over && dropOk ? ' drop' : ''}${hot ? ' hot' : ''}`}
+      class={`hier-row k-${kindOf(meter)}${over && dropOk ? ' drop' : ''}${hot ? ' hot' : ''}${open ? ' open' : ''}`}
       data-entry={`row:${meter.id}`}
       style={depth > 0 ? { marginLeft: `${depth * 1.25}rem` } : undefined}
       onDragOver={(e) => {
@@ -128,7 +140,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
         void api.updateMeter(dragged.id, { parent_id: meter.id }).then(onChanged, (err: Error) => setError(err.message));
       }}
     >
-      <div class="hier-main">
+      <div class="hier-main" style={`--share: ${share}%`}>
         <button type="button" class="twisty" aria-expanded={open} aria-label={`Settings for ${legs}`} onClick={() => setOpen(!open)}>
           <span aria-hidden="true">▸</span>
         </button>
@@ -151,6 +163,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
         >
           ⠿
         </span>
+        <span class="kind-dot" aria-hidden="true" />
         {isOnlyMeterOfDevice(meter.device_id) ? (
           <span class="grow meter-name" title="Rename it under Devices: a plug has one name">
             {meter.label}
@@ -187,26 +200,117 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
         <span class="num hier-energy">{used ? <Kwh k={used.kwh} /> : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
         <div class="hier-actions">
-          <a class="button icon" href={meterPath(meter)} title="Open this meter's page" aria-label={`Open ${legs}`}>
-            ›
-          </a>
-          <button type="button" class="icon" disabled={!out} title={parent ? `Move out of ${parent.label}` : 'Already at the top'} aria-label={`Move ${legs} out of its panel`} onClick={() => out && void run(meter.id, { parent_id: out.parent })}>
-            ←
-          </button>
-          <button type="button" class="icon" disabled={!into} title={into ? `Move into ${into.label}` : 'Nothing above it can hold it'} aria-label={`Move ${legs} into the meter above`} onClick={() => into && void run(meter.id, { parent_id: into.id })}>
-            →
-          </button>
+          {out && (
+            <button type="button" class="icon" title={parent ? `Move out of ${parent.label}` : 'Move out'} aria-label={`Move ${legs} out of its panel`} onClick={() => void run(meter.id, { parent_id: out.parent })}>
+              ←
+            </button>
+          )}
+          {into && (
+            <button type="button" class="icon" title={`Move into ${into.label}`} aria-label={`Move ${legs} into the meter above`} onClick={() => void run(meter.id, { parent_id: into.id })}>
+              →
+            </button>
+          )}
           <button type="button" class="icon" title="Hide" aria-label={`Hide ${legs}`} onClick={() => void run(meter.id, { enabled: false })}>
             <EyeIcon />
           </button>
+          <a class="button icon" href={meterPath(meter)} title="Open this meter's page" aria-label={`Open ${legs}`}>
+            ›
+          </a>
         </div>
       </div>
 
       {open && (
         <div class="hier-panel">
+          {(placeable || refoss) && (
+            <div class="pg">
+              <span class="pg-title">Placement</span>
+              {placeable && (
+                <label class="field">
+                  <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
+                  <select value={meter.parent_id ?? ''} onChange={(e) => void run(meter.id, { parent_id: (e.target as HTMLSelectElement).value || null })}>
+                    <option value="">{inPanel ? 'The main panel' : 'Parent not metered'}</option>
+                    {holders.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {inPanel ? `The sub-panel fed by ${c.label}` : c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {refoss && (
+                <label class="field">
+                  <span>Type</span>
+                  <select value={meter.type} onChange={(e) => void run(meter.id, { type: (e.target as HTMLSelectElement).value as 'house' | 'sub_panel' | 'circuit' })}>
+                    <option value="house">Whole house (a monitor on the main panel)</option>
+                    <option value="sub_panel">Sub-panel (feeds other circuits)</option>
+                    <option value="circuit">Circuit (one breaker)</option>
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
+          {refoss && (
+            <div class="pg">
+              <span class="pg-title">Wiring</span>
+              <div class="field">
+                <span>Breaker voltage</span>
+                <div class="segmented" role="radiogroup" aria-label="Breaker voltage">
+                  <label class={volts === 120 ? 'on' : ''}>
+                    <input
+                      type="radio"
+                      name={`volts-${meter.id}`}
+                      checked={volts === 120}
+                      onChange={() => {
+                        setChosen(120);
+                        if (meter.pair_with) void run(meter.id, { pair_with: null });
+                      }}
+                    />
+                    120 V · one wire
+                  </label>
+                  <label class={volts === 240 ? 'on' : ''}>
+                    <input type="radio" name={`volts-${meter.id}`} checked={volts === 240} onChange={() => setChosen(240)} />
+                    240 V · two wires
+                  </label>
+                </div>
+              </div>
+              {volts === 240 && (
+                <label class="field">
+                  <span>The other clamp of this breaker</span>
+                  <select value={meter.pair_with ?? ''} onChange={(e) => void run(meter.id, { pair_with: (e.target as HTMLSelectElement).value || null })}>
+                    <option value="" disabled={!!meter.pair_with}>
+                      Choose the other clamp…
+                    </option>
+                    {options.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {clampName(c)}
+                        {c === usual ? ' (the usual match)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <div class="field">
+                <span>Clamp direction (a load should read positive)</span>
+                <div class="toggles">
+                  {[meter, ...(second ? [second] : [])].map((c) => (
+                    <label key={c.id} class="check">
+                      <input type="checkbox" checked={c.invert === true} onChange={(e) => void run(c.id, { invert: (e.target as HTMLInputElement).checked })} />
+                      Flip {clampName(c)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {inPanel && (
+            <div class="pg">
+              <span class="pg-title">Breaker</span>
+              <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />
+            </div>
+          )}
           {(meter.scope === 'circuit' || meter.scope === 'plug') && (
-            <fieldset>
-              <legend>Electric vehicle charger</legend>
+            <div class="pg">
+              <span class="pg-title">Electric vehicle</span>
               <label class="check">
                 <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
                 This meter charges my electric vehicle
@@ -216,78 +320,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
                   Odometer: <OdometerNow meterId={meter.id} />
                 </p>
               )}
-            </fieldset>
-          )}
-          {refoss && (
-            <>
-              <fieldset>
-                <legend>Clamp direction</legend>
-                {[meter, ...(second ? [second] : [])].map((c) => (
-                  <label key={c.id} class="check">
-                    <input type="checkbox" checked={c.invert === true} onChange={(e) => void run(c.id, { invert: (e.target as HTMLInputElement).checked })} />
-                    Flip {clampName(c)}
-                  </label>
-                ))}
-                <p class="caption block">A load should read positive.</p>
-              </fieldset>
-              <fieldset>
-                <legend>Breaker</legend>
-                <label class="check">
-                  <input
-                    type="radio"
-                    name={`volts-${meter.id}`}
-                    checked={volts === 120}
-                    onChange={() => {
-                      setChosen(120);
-                      if (meter.pair_with) void run(meter.id, { pair_with: null });
-                    }}
-                  />
-                  120 V, one wire
-                </label>
-                <label class="check">
-                  <input type="radio" name={`volts-${meter.id}`} checked={volts === 240} onChange={() => setChosen(240)} />
-                  240 V, two wires
-                </label>
-                {volts === 240 && (
-                  <label class="field">
-                    <span>The other clamp of this breaker</span>
-                    <select value={meter.pair_with ?? ''} onChange={(e) => void run(meter.id, { pair_with: (e.target as HTMLSelectElement).value || null })}>
-                      <option value="" disabled={!!meter.pair_with}>
-                        Choose the other clamp…
-                      </option>
-                      {options.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {clampName(c)}
-                          {c === usual ? ' (the usual match)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </fieldset>
-              <label class="field">
-                <span>Type</span>
-                <select value={meter.type} onChange={(e) => void run(meter.id, { type: (e.target as HTMLSelectElement).value as 'house' | 'sub_panel' | 'circuit' })}>
-                  <option value="house">Whole house (a monitor on the main panel)</option>
-                  <option value="sub_panel">Sub-panel (feeds other circuits)</option>
-                  <option value="circuit">Circuit (one breaker)</option>
-                </select>
-              </label>
-            </>
-          )}
-          {inPanel && <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />}
-          {placeable && (
-            <label class="field">
-              <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
-              <select value={meter.parent_id ?? ''} onChange={(e) => void run(meter.id, { parent_id: (e.target as HTMLSelectElement).value || null })}>
-                <option value="">{inPanel ? 'The main panel' : 'Parent not metered'}</option>
-                {holders.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {inPanel ? `The sub-panel fed by ${c.label}` : c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            </div>
           )}
         </div>
       )}
@@ -298,10 +331,11 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
 
 /** A part of a computer (its CPU, GPU, memory, and what they leave out): read-only, from its collector, and it opens the computer's page. It is not
  * a meter, so it has no wiring and cannot be moved. */
-function PartRow({ id, part, depth, href, hot }: { id: string; part: PcPart; depth: number; href: string; hot: boolean }) {
+function PartRow({ id, part, depth, href, hot, share }: { id: string; part: PcPart; depth: number; href: string; hot: boolean; share: number }) {
   return (
-    <li class={`hier-row virtual${hot ? ' hot' : ''}`} data-entry={id} style={{ marginLeft: `${depth * 1.25}rem` }}>
-      <div class="hier-main">
+    <li class={`hier-row virtual k-device${hot ? ' hot' : ''}`} data-entry={id} style={{ marginLeft: `${depth * 1.25}rem` }}>
+      <div class="hier-main" style={`--share: ${share}%`}>
+        <span />
         <span />
         <span />
         <span class="grow part-name" title={part.remainder ? 'Wall plug less the parts above: fans, drives, motherboard, power-supply loss' : 'As its collector reports it'}>
@@ -325,13 +359,14 @@ function PartRow({ id, part, depth, href, hot }: { id: string; part: PcPart; dep
 
 /** A line worked out from others, not a meter: "Everything else" (the house less its circuits), "Not individually metered" inside it, and "Other (not metered)"
  * under a meter that holds others (what its own reading carries beyond what is listed inside it). Read-only, and never added to anything. */
-function LumpLine({ line, hot }: { line: LumpEntry; hot: boolean }) {
+function LumpLine({ line, hot, share }: { line: LumpEntry; hot: boolean; share: number }) {
   // "Everything else" holds the rows under it, so its name starts at the row's edge (where a meter's arrow is), not in the name column: what is inside it
   // is then drawn further in than it is.
   const parent = line.id === 'else';
   return (
-    <li class={`hier-row virtual${hot ? ' hot' : ''}`} data-entry={line.id} style={{ marginLeft: `${line.depth * 1.25}rem` }}>
-      <div class="hier-main">
+    <li class={`hier-row virtual lump${parent ? ' lump-head' : ''}${hot ? ' hot' : ''}`} data-entry={line.id} style={{ marginLeft: `${line.depth * 1.25}rem` }}>
+      <div class="hier-main" style={`--share: ${share}%`}>
+        {!parent && <span />}
         {!parent && <span />}
         {!parent && <span />}
         <span class={`grow part-name${parent ? ' lump-parent' : ''}`} title={line.title}>
@@ -423,15 +458,20 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   });
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
-  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged };
+  const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, houseWatts: live?.house_watts, currents, dragging, setDragging, onChanged };
 
   return (
     <>
       <div class="tree-layout">
         <div class="tree-stack">
       <section class="card wide">
-        <div class="row">
-          <h2>Hierarchy</h2>
+        <div class="row hier-title">
+          <div>
+            <h2>Hierarchy</h2>
+            <p class="hier-sub">
+              {rows.length} {rows.length === 1 ? 'meter' : 'meters'} · energy and cost for {periodWords(period as PeriodKey)}
+            </p>
+          </div>
           <div class="inline-actions">
             {summary && (
               <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked on Live">
@@ -452,10 +492,6 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
             onCancel={() => setAdding(false)}
           />
         )}
-        <Hint>
-          A parent's reading already includes what is inside it. Open a row for its wiring; move it with the arrows or drag it onto its parent. Energy and Cost
-          cover {periodWords(period as PeriodKey)}. Nothing here is sent to a device.
-        </Hint>
         {error && <p class="note error">{error}</p>}
         {dragging && (
           <div
@@ -495,9 +531,9 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
                 e.kind === 'row' ? (
                   <Row key={e.id} meter={e.meter} rows={rows} at={e.at} depth={e.depth} hot={hover === e.id} shared={shared} />
                 ) : e.kind === 'part' ? (
-                  <PartRow key={e.id} id={e.id} part={e.part} depth={e.depth} href={e.href} hot={hover === e.id} />
+                  <PartRow key={e.id} id={e.id} part={e.part} depth={e.depth} href={e.href} hot={hover === e.id} share={shareOf(e.part.watts, live?.house_watts)} />
                 ) : (
-                  <LumpLine key={e.id} line={e} hot={hover === e.id} />
+                  <LumpLine key={e.id} line={e} hot={hover === e.id} share={e.id === 'else' ? 0 : shareOf(e.watts, live?.house_watts)} />
                 ),
               )}
             </ul>

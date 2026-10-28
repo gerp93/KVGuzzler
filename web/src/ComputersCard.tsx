@@ -2,7 +2,6 @@
 // columns as the tree. The arrow opens what it is made of: its name, its wall plug, its peripherals. The wall plug and a peripheral stay where they
 // are plugged in in the tree; this is only the grouping, like a group.
 import { useState } from 'preact/hooks';
-import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import { Kwh, Watts } from './Watts';
@@ -51,10 +50,6 @@ export function ComputersCard({
   return (
     <section class="card wide">
       <h2>Computers</h2>
-      <Hint>
-        A wall plug (the whole PC) plus its peripheral plugs, totalled in one row. Plugs stay where they are plugged in in the tree. A PC running the collector
-        adds itself.
-      </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.computers.length === 0 && <p class="note">No computers yet.</p>}
       {data && data.computers.length > 0 && (
@@ -121,6 +116,7 @@ function ComputerRow({
         <button type="button" class="twisty" aria-expanded={open} aria-label={`Plugs of ${computer.name}`} onClick={() => setOpen(!open)}>
           <span aria-hidden="true">▸</span>
         </button>
+        <span />
         <span />
         <label class="grow">
           <span class="visually-hidden">Name of the computer</span>

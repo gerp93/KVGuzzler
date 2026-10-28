@@ -2,7 +2,6 @@
 // members stay where they are in the tree. A member that another member already contains (a plug on a circuit that is in the same group) is
 // listed but not added a second time. A row opens (the arrow) to choose the members.
 import { useState } from 'preact/hooks';
-import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import { Kwh, Watts } from './Watts';
@@ -52,9 +51,6 @@ export function GroupsCard({
   return (
     <section class="card wide">
       <h2>Groups</h2>
-      <Hint>
-        Any meters shown as one total. Meters stay where they are in the tree; one inside another member is listed but not added again.
-      </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.groups.length === 0 && <p class="note">No groups yet.</p>}
       {data && data.groups.length > 0 && (
@@ -115,6 +111,7 @@ function GroupRow({
         <button type="button" class="twisty" aria-expanded={open} aria-label={`Members of ${group.name}`} onClick={() => setOpen(!open)}>
           <span aria-hidden="true">▸</span>
         </button>
+        <span />
         <span />
         <label class="grow">
           <span class="visually-hidden">Name of the group</span>
