@@ -60,7 +60,7 @@ export function BreakerField({ meter, now, onChange }: { meter: Meter; now: Now;
   const pct = breakerPercent(now.amps, breaker);
   return (
     <label class="field">
-      <span>{meter.scope === 'mains' ? 'Main breaker size' : 'Breaker size'}</span>
+      <span>Size</span>
       <select
         value={breaker == null ? '' : String(breaker)}
         onChange={(e) => {
@@ -79,7 +79,7 @@ export function BreakerField({ meter, now, onChange }: { meter: Meter; now: Now;
         <span class="caption">
           Now {formatAmps(now.amps)}
           {now.volts != null ? ` · ${formatVolts(now.volts)}` : ''}
-          {pct != null ? ` · ${pct}% of it` : ''}
+          {pct != null ? ` · ${pct}%` : ''}
         </span>
       )}
     </label>
