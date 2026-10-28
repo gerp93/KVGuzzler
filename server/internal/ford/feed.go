@@ -47,6 +47,9 @@ const (
 	RetryAfterError = time.Hour
 	// CheckEvery is how often the setup and the clock are looked at.
 	CheckEvery = 30 * time.Second
+	// MinGap is the shortest time between two looks the feed starts by itself: Ford answers one request per 30 seconds per endpoint, so a look
+	// started right after another (linking, then the feed noticing the link) would only be told to slow down.
+	MinGap = time.Minute
 )
 
 // Feed keeps the odometer of an electric vehicle's charging meter up to date from Ford. It follows the saved setup, so linking, changing or
@@ -62,6 +65,7 @@ type Feed struct {
 	last    *Config
 	nextAt  time.Time
 	hadLink bool
+	readAt  time.Time
 }
 
 func (f *Feed) now() time.Time {
@@ -92,6 +96,10 @@ func (f *Feed) Step(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	changed := f.last == nil || *f.last != *cfg || linked != f.hadLink
+	// Too soon after the last look: nothing is noted as seen, so a changed setup is still looked at once the gap has passed.
+	if linked && f.now().Sub(f.readAt) < MinGap {
+		return false, nil
+	}
 	c := *cfg
 	f.last, f.hadLink = &c, linked
 	if !linked || (!changed && f.now().Before(f.nextAt)) {
@@ -152,6 +160,9 @@ func (f *Feed) Complete(ctx context.Context, code string) (Status, error) {
 	if err := f.Sink.SaveRefresh(ctx, tok.Refresh); err != nil {
 		return Status{}, err
 	}
+	// The link was just made and is read below: the feed must not take it for news and read again at once.
+	c := *cfg
+	f.last, f.hadLink = &c, true
 	st, err := f.readWith(ctx, *cfg, tok.Access)
 	if err == nil {
 		f.nextAt = f.now().Add(Interval)
@@ -172,6 +183,7 @@ func (f *Feed) read(ctx context.Context, cfg Config) (Status, error) {
 	if !ok {
 		return f.fail(ctx, &Error{Message: "The vehicle is not linked yet.", Relink: true})
 	}
+	f.readAt = f.now()
 	tok, err := f.Client.Refresh(ctx, cfg, refresh)
 	if err != nil {
 		return f.fail(ctx, err)
@@ -186,6 +198,7 @@ func (f *Feed) read(ctx context.Context, cfg Config) (Status, error) {
 }
 
 func (f *Feed) readWith(ctx context.Context, cfg Config, access string) (Status, error) {
+	f.readAt = f.now()
 	body, err := f.Client.Telemetry(ctx, access)
 	if err != nil {
 		return f.fail(ctx, err)
