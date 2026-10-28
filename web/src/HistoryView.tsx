@@ -1,6 +1,7 @@
 import { api } from './api';
 import { Chart, lineFrom, tallChartHeight, type Line } from './Chart';
 import { usePoll, useStored } from './hooks';
+import { HouseHistoryCard } from './HouseHistoryCard';
 import { PeriodPicker } from './Periods';
 import { periodRange, sumByTime, type Meter, type PeriodKey } from './lib';
 
@@ -67,6 +68,8 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
           })}
         </div>
       </section>
+
+      <HouseHistoryCard period={period as PeriodKey} />
     </>
   );
 }

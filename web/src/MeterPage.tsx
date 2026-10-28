@@ -102,8 +102,8 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />peak reading</>} />
           </KpiRow>
           <div class="kpi-notes">
-            <Facts items={carbon} />
-            <RateNote kwh={kwh} cost={mine?.cost ?? null} />
+            <Facts items={carbon} table />
+            <RateNote kwh={kwh} cost={mine?.cost ?? null} table />
           </div>
         </>
       )}
@@ -133,7 +133,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
 
       {meter && data && (meters.some((m) => m.parent_id === id && m.enabled)) && (
         <section class="card">
-          <h2>Where it goes</h2>
+          <h2>Energy distribution</h2>
           <FlowChart meters={meters} summary={data.summary} root={id} />
         </section>
       )}

@@ -12,9 +12,7 @@ import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
 import { Lowest, Watts } from './Watts';
-import { Estimator } from './Estimator';
 import { Facts } from './Facts';
-import { HouseHistoryCard } from './HouseHistoryCard';
 import { MeterPage } from './MeterPage';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
@@ -25,7 +23,7 @@ import { Spark, useTrail } from './Spark';
 import { routePath } from './route';
 import { RateNote } from './RateNote';
 import {
-  carbonFacts, circuitsByWatts, formatKwh, formatMoney, formatWatts, houseUsageBasis, nestCircuits, periodRange, periodWords, pcSlices, sumByTime,
+  carbonFacts, circuitsByWatts, formatKwh, formatMoney, formatWatts, nestCircuits, periodRange, periodWords, pcSlices, sumByTime,
   type Meter, type Live, type PeriodKey, type Summary,
 } from './lib';
 
@@ -142,6 +140,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const cost = whole ? (summary?.house_cost ?? null) : measured.cost;
   const peak = whole ? (summary?.house_peak_watts ?? null) : measured.peakWatts;
   // The most current the one whole-house meter carried in the period (a 240 V pair's is the larger leg: never the legs added).
+  // One whole-house meter (a 240 V pair is one) has its own exact highest reading; with several, or none (the top-level meters added), the peaks need not coincide: an upper bound.
+  const peakIsBound = !(whole && mains.length === 1);
   const peakAmps = whole && mains.length === 1 ? summary?.meters.find((m) => m.meter_id === mains[0]!.id)?.peak_amps : undefined;
   const carbon = whole ? carbonFacts(summary?.house_carbon_g, kwh, summary?.house_carbon_estimated_kwh ?? 0) : [];
   const span = periodWords(period as PeriodKey);
@@ -197,19 +197,23 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         <Kpi
           tone="peak"
           label="Highest draw"
-          value={peak != null ? `≤ ${formatWatts(peak)}` : '—'}
+          value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'}
           hint={
             <>
               {whole && <Lowest w={summary?.house_min_watts} />}
-              {peakAmps != null && <span class="now-current">{formatAmps(peakAmps)} at most</span>}
-              upper bound
+              {peakAmps != null && (
+                <span class="now-current" title="The highest current in the period. Amps run higher than watts ÷ volts when the load has a power factor under 1: motors and electronics draw current that does no work.">
+                  {formatAmps(peakAmps)} peak
+                </span>
+              )}
+              {peakIsBound ? 'upper bound' : 'peak reading'}
             </>
           }
         />
       </KpiRow>
       <div class="kpi-notes">
-        <Facts items={carbon} />
-        <RateNote kwh={kwh} cost={cost} />
+        <Facts items={carbon} table />
+        <RateNote kwh={kwh} cost={cost} table />
       </div>
 
       <div class="band band-main">
@@ -237,7 +241,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         {summary && circuits.length > 0 && (
           <section class="panel panel-flow">
             <div class="panel-head">
-              <h2>Where it goes</h2>
+              <h2>Energy distribution</h2>
             </div>
             <FlowChart meters={meters} summary={summary} />
           </section>
@@ -249,14 +253,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
         </section>
       </div>
 
-      {whole && (
-        <section class="panel panel-tools">
-          <div class="panel-cols">
-            <Estimator load={api.houseEstimate} deps={[]} basisOf={houseUsageBasis} nowWatts={house} nowWhat="the mains clamps" />
-            <HouseHistoryCard period={period as PeriodKey} />
-          </div>
-        </section>
-      )}
     </>
   );
 }

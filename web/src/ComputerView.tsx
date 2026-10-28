@@ -138,8 +138,8 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             )}
             {hasPlugs && counted && counted.parts.length === 0 && <p class="caption">Nothing counted: tick the PC or a plug.</p>}
             {!hasPlugs && !detail.wall && <p class="caption">No wall plug assigned. Set one under Computers in Hierarchy.</p>}
-            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)} />}
-            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
+            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)} table />}
+            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} table />
           </div>
 
           {liveNow && <PcLiveCard live={liveNow} />}
