@@ -35,6 +35,11 @@ const ICONS = {
       <path d="M12 8v4M6 16v-4h12v4" />
     </Svg>
   ),
+  carbon: (
+    <Svg>
+      <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-5 6-8 10-10" />
+    </Svg>
+  ),
   settings: (
     <Svg>
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
@@ -70,6 +75,7 @@ const FIGURES = {
     </>
   ),
   peak: <path d="M3 17 9 11l4 4 8-9M15 6h6v6" />,
+  carbon: <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-5 6-8 10-10" />,
 };
 
 export function FigureIcon({ name }: { name: keyof typeof FIGURES }) {

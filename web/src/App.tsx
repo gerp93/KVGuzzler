@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
+import { CarbonView } from './CarbonView';
 import { EstimatorView } from './EstimatorView';
 import { HistoryView } from './HistoryView';
 import { HouseNow } from './HouseNow';
@@ -16,6 +17,7 @@ import { SettingsView } from './SettingsView';
 const TABS = [
   { id: 'live', label: 'Live' },
   { id: 'history', label: 'History' },
+  { id: 'carbon', label: 'Carbon' },
   { id: 'estimator', label: 'Estimator' },
   { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'settings', label: 'Settings' },
@@ -113,6 +115,8 @@ export function App() {
           <LiveView meters={meters} onAddDevice={() => (window.location.hash = routePath('hierarchy'))} />
         ) : active === 'history' ? (
           <HistoryView meters={meters} />
+        ) : active === 'carbon' ? (
+          <CarbonView meters={meters} />
         ) : active === 'estimator' ? (
           <EstimatorView meters={meters} />
         ) : active === 'hierarchy' ? (

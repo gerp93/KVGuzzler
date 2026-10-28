@@ -1,4 +1,4 @@
-// The main dashboard: the whole house, with the same kinds of figure a computer's page has (energy, cost, right now, highest draw, carbon,
+// The main dashboard: the whole house, with the same kinds of figure a computer's page has (energy, cost, right now, highest draw,
 // an estimator, a history list, a CSV and a chart), then each circuit. The house is the mains clamps alone: circuits and plugs are parts of
 // it and are never added to it.
 import { useMemo } from 'preact/hooks';
@@ -11,17 +11,17 @@ import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
 import { Lowest, Watts } from './Watts';
-import { Facts } from './Facts';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { measuredTotals, topLevelMeters } from './measured';
+import { PeriodLoading } from './Loading';
 import { notMeteredRows, unclamped, type BarRow } from './notMetered';
 import { Skeleton } from './Skeleton';
 import { Spark, useTrail } from './Spark';
 import { routePath } from './route';
 import { RateNote } from './RateNote';
 import {
-  carbonFacts, circuitsByWatts, formatKwh, formatMoney, formatWatts, nestCircuits, periodRange, periodWords, pcSlices, sumByTime,
+  circuitsByWatts, formatKwh, formatMoney, formatWatts, nestCircuits, periodRange, periodWords, pcSlices, sumByTime,
   type Meter, type Live, type PeriodKey, type Summary,
 } from './lib';
 
@@ -119,7 +119,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   // One whole-house meter (a 240 V pair is one) has its own exact highest reading; with several, or none (the top-level meters added), the peaks need not coincide: an upper bound.
   const peakIsBound = !(whole && mains.length === 1);
   const peakAmps = whole && mains.length === 1 ? summary?.meters.find((m) => m.meter_id === mains[0]!.id)?.peak_amps : undefined;
-  const carbon = whole ? carbonFacts(summary?.house_carbon_g, kwh) : [];
   const span = periodWords(period as PeriodKey);
   // The headings change the moment a period is picked but the figures come from the server a moment later (a long period reads more): until they arrive the
   // ones on the page are the last period's, so say so instead of letting them pass for the new ones.
@@ -128,12 +127,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   return (
     <>
       <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
-      {loading && (
-        <div class="period-loading" role="status">
-          <span class="spinner" aria-hidden="true" />
-          <span>Loading {span}…</span>
-        </div>
-      )}
+      {loading && <PeriodLoading span={span} />}
       {!whole && <p class="caption">Top-level meters only: there is no whole-house clamp, so this is not the whole house.</p>}
 
       {live.notes.length > 0 && (
@@ -231,12 +225,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <GuzzlersCard meters={meters} summary={summary} houseKwh={kwh} period={period as PeriodKey} />
           {whole && <AnomalyCard />}
         </section>
-      </div>
-
-
-      {/* What the figures above rest on: slower facts, below what happens now */}
-      <div class="kpi-notes">
-        <Facts items={carbon} table title="Carbon footprint" />
       </div>
     </>
   );

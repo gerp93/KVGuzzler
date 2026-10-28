@@ -114,6 +114,22 @@ type Series struct {
 	Points  []Point `json:"points"`
 }
 
+// CarbonPoint is one stretch (an hour or a day) of the house's carbon footprint.
+type CarbonPoint struct {
+	T            time.Time `json:"t"`
+	KWh          float64   `json:"kwh"`
+	CarbonG      float64   `json:"carbon_g"`
+	EstimatedKWh float64   `json:"estimated_kwh"`
+	// GridGramsPerKWh is the average grid intensity saved for the stretch's hours; nil when none was saved.
+	GridGramsPerKWh *float64 `json:"grid_g_per_kwh"`
+}
+
+// CarbonSeries is the house's carbon footprint over time: the mains' energy of each stretch at that stretch's grid intensity.
+type CarbonSeries struct {
+	Bucket Bucket        `json:"bucket"`
+	Points []CarbonPoint `json:"points"`
+}
+
 type MeterSummary struct {
 	MeterID    string   `json:"meter_id"`
 	ComputerID *string  `json:"computer_id"`

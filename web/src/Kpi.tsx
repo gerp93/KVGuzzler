@@ -4,7 +4,7 @@ import type { ComponentChildren } from 'preact';
 import { FigureIcon } from './Icons';
 import { splitFigure } from './figure';
 
-export type KpiTone = 'now' | 'energy' | 'cost' | 'peak';
+export type KpiTone = 'now' | 'energy' | 'cost' | 'peak' | 'carbon';
 
 /** `corner`: a small line at the tile's upper right, level with the label (what is biggest in it, say). */
 export function Kpi({ label, value, tone, hint, corner, children }: { label: string; value: string; tone: KpiTone; hint?: ComponentChildren; corner?: ComponentChildren; children?: ComponentChildren }) {
