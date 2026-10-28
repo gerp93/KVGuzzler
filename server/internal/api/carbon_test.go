@@ -249,6 +249,9 @@ func TestTheCarbonSeriesIsTheHousesEnergyAtEachHoursIntensityAndAddsUpToTheSumma
 	if q := s.Points[1]; math.Abs(q.EstimatedKWh-0.8) > 1e-9 || q.GridGramsPerKWh != nil { // 13:00 has none of its own: valued at the average (350)
 		t.Errorf("13:00: %+v", q)
 	}
+	if s.GridAverageGramsPerKWh == nil || *s.GridAverageGramsPerKWh != 350 { // the average of the two saved hours, 400 and 300
+		t.Errorf("grid average = %v, want 350", s.GridAverageGramsPerKWh)
+	}
 	if q := s.Points[2]; q.KWh != 0 || q.GridGramsPerKWh == nil || *q.GridGramsPerKWh != 300 {
 		t.Errorf("14:00 (grid only): %+v", q)
 	}
@@ -269,5 +272,16 @@ func TestTheCarbonSeriesIsEmptyBeforeAnyIntensityWasSaved(t *testing.T) {
 	get(t, srv.URL+"/api/v1/carbon/series"+period, &s)
 	if s.Points == nil || len(s.Points) != 0 {
 		t.Errorf("points = %v, want an empty list", s.Points)
+	}
+}
+
+func TestTheCarbonSeriesStartsWhereTheHousesRecordDoes(t *testing.T) {
+	srv, st := houseServer(t) // the mains' first minute is 12:00 on 22 Oct 2026
+	_ = st.AddCarbon(t.Context(), time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC), 500, false)
+	_ = st.AddCarbon(t.Context(), time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC), 400, false)
+	var s model.CarbonSeries
+	get(t, srv.URL+"/api/v1/carbon/series?from=2026-10-20T00:00:00Z&to=2026-10-23T00:00:00Z", &s)
+	if len(s.Points) == 0 || !s.Points[0].T.Equal(time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)) {
+		t.Errorf("the series should begin at 12:00 on the 22nd, not with the grid hour on the 21st: %+v", s.Points)
 	}
 }

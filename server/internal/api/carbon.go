@@ -273,7 +273,22 @@ func (s *Server) carbonSeries(w http.ResponseWriter, r *http.Request) {
 			return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, s.Loc).Unix()
 		}
 	}
+	// The series starts where the house's own record does: grid hours saved before the first mains minute (history that was cut away, say) would only draw a flat line.
+	var first time.Time
+	for _, id := range mains {
+		if t, ok, err := s.Store.FirstMinute(r.Context(), id); err != nil {
+			serverError(w, err)
+			return
+		} else if ok && (first.IsZero() || t.Before(first)) {
+			first = t
+		}
+	}
+	avg := carbon.PeriodAverage(known, ever)
+	out.GridAverageGramsPerKWh = &avg
 	for _, st := range carbon.Bucketed(known, ever, hours, startOf) {
+		if !first.IsZero() && st.Start < startOf(first.Unix()/3600*3600) {
+			continue
+		}
 		out.Points = append(out.Points, model.CarbonPoint{T: time.Unix(st.Start, 0).UTC(), KWh: st.KWh, CarbonG: st.Kg * 1000, EstimatedKWh: st.EstimatedKWh, GridGramsPerKWh: st.GridGrams})
 	}
 	writeJSON(w, http.StatusOK, out)

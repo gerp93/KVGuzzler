@@ -485,6 +485,27 @@ button.link {
   overflow-wrap: anywhere;
 }
 
+/* A value that is an abbreviation: dotted under, the full text in a tooltip and, tapped, under it */
+.fact-short {
+  all: unset;
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.fact-short:focus-visible {
+  outline: 2px solid var(--color-primary-action);
+  outline-offset: 2px;
+}
+
+.fact-full {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 /* A headed table: the heading above the table's frame */
 .facts-card h3 {
   margin: 0 0 6px 2px;

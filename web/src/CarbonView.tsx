@@ -52,11 +52,20 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
   // One array while the figures are the same ones, so the charts are not rebuilt by every re-render.
   const lines = useMemo(() => {
     const points = figures?.series.points ?? [];
-    const emitted: Line = { name: 'Carbon', colorVar: '--color-text', x: points.map((p) => Date.parse(p.t) / 1000), y: points.map((p) => p.carbon_g) };
+    const avg = figures?.series.grid_average_g_per_kwh;
+    const xs = points.map((p) => Date.parse(p.t) / 1000);
+    const emitted: Line[] = [{ name: 'Carbon', colorVar: '--color-text', x: xs, y: points.map((p) => p.carbon_g) }];
+    // The same energy at the grid's average intensity: where the carbon line is above it, power was used when the grid was dirtier than usual.
+    if (avg != null) emitted.push({ name: "At the grid's average", colorVar: '--color-accent-blue', x: xs, y: points.map((p) => p.kwh * avg), dashed: true });
     // Only the stretches with a saved intensity: a stretch without one is not a reading, so no point is drawn for it.
     const known = points.filter((p) => p.grid_g_per_kwh != null);
-    const intensity: Line = { name: 'Grid intensity', colorVar: '--color-accent-blue', x: known.map((p) => Date.parse(p.t) / 1000), y: known.map((p) => Math.round(p.grid_g_per_kwh!)) };
-    return { emitted: [emitted], intensity: [intensity] };
+    const intensity: Line[] = [{ name: 'Grid intensity', colorVar: '--color-accent-blue', x: known.map((p) => Date.parse(p.t) / 1000), y: known.map((p) => Math.round(p.grid_g_per_kwh!)) }];
+    if (avg != null) intensity.push({ name: 'Grid average', colorVar: '--color-text', x: xs, y: xs.map(() => Math.round(avg)), dashed: true });
+    // What the house's own power came to per kWh: below the grid's average when it was used at the cleaner hours.
+    const house = figures?.summary;
+    const own = house?.house_carbon_g != null && house.house_kwh ? house.house_carbon_g / house.house_kwh : null;
+    if (own != null) intensity.push({ name: 'Your average', colorVar: '--color-accent-green', x: xs, y: xs.map(() => Math.round(own)), dashed: true });
+    return { emitted, intensity };
   }, [figures]);
 
   const summary = figures?.summary;
@@ -106,14 +115,14 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
                   <h2>{`Carbon per ${per}`}</h2>
                 </div>
                 <Chart lines={lines.emitted} domain={figures!.domain} format={gramsAxis} label={`Carbon per ${per}`} />
-                <p class="caption">{`Grams of CO₂e per ${per}: the house's energy at that ${per}'s grid intensity. ≈, the grid's average mix.`}</p>
+                <p class="caption">{`Grams of CO₂e per ${per}: the house's energy at that ${per}'s grid intensity (≈, the grid's average mix). Dashed: the same energy at the period's average intensity, so above it means power was used when the grid was dirtier than usual.`}</p>
               </section>
               <section class="panel panel-chart">
                 <div class="panel-head">
                   <h2>Grid carbon intensity (g/kWh)</h2>
                 </div>
                 <Chart lines={lines.intensity} domain={figures!.domain} format={plain} label="Grid carbon intensity" />
-                <p class="caption">How carbon-heavy the grid's power was, by hour: coal weighs most, wind, solar and nuclear least.</p>
+                <p class="caption">How carbon-heavy the grid's power was, by hour: coal weighs most, wind, solar and nuclear least. Dashed: the grid's average over the period, and yours, weighted by when you used power (below the grid's means you used it at the cleaner hours).</p>
               </section>
             </>
           )}

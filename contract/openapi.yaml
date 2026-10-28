@@ -1544,11 +1544,14 @@ components:
           description: The average of the intensities saved for the stretch's hours; null when none was saved.
     CarbonSeries:
       type: object
-      required: [bucket, points]
+      required: [bucket, points, grid_average_g_per_kwh]
       properties:
         bucket:
           type: string
           enum: [hour, day]
+        grid_average_g_per_kwh:
+          type: [number, 'null']
+          description: The grid's average intensity over the period, the figure an hour with none of its own is valued at; null when the series is empty because there is no whole-house meter or no intensity was ever saved.
         points:
           type: array
           items:

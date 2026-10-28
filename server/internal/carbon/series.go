@@ -16,14 +16,7 @@ type Stretch struct {
 // hour in the period has one), added up under startOf(hour), the start of the stretch the hour belongs to. An hour that has an intensity but used no energy
 // still makes its stretch, so the grid's line is drawn where nothing was recorded. The stretches add up to exactly what Value gives for the same hours.
 func Bucketed(known map[int64]float64, everAverage float64, hours []HourKWh, startOf func(hour int64) int64) []Stretch {
-	periodAverage := everAverage
-	if len(known) > 0 {
-		var sum float64
-		for _, g := range known {
-			sum += g
-		}
-		periodAverage = sum / float64(len(known))
-	}
+	periodAverage := PeriodAverage(known, everAverage)
 	type acc struct {
 		Stretch
 		gSum float64

@@ -40,19 +40,25 @@ func (r Result) EstimatedShare() float64 {
 	return 0
 }
 
+// PeriodAverage is the grid intensity an hour with none of its own is valued at: the average of the hours in the period that have one, or everAverage
+// (the average of every hour ever saved) when none of them does.
+func PeriodAverage(known map[int64]float64, everAverage float64) float64 {
+	if len(known) == 0 {
+		return everAverage
+	}
+	var sum float64
+	for _, g := range known {
+		sum += g
+	}
+	return sum / float64(len(known))
+}
+
 // Value turns hourly energy into carbon: each hour's kWh times that hour's grid intensity (known: hour to grams per kWh). Energy in an hour with
 // no intensity of its own (the free key gives no history, so anything from before the feed was set up or while the server was off) is valued at
 // the average of the hours that do have one, or at everAverage (the average of every hour ever saved) when none in the period does, so a
 // period never shows zero just for missing data, and the result says how much was valued that way.
 func Value(known map[int64]float64, everAverage float64, hours []HourKWh) Result {
-	periodAverage := everAverage
-	if len(known) > 0 {
-		var sum float64
-		for _, g := range known {
-			sum += g
-		}
-		periodAverage = sum / float64(len(known))
-	}
+	periodAverage := PeriodAverage(known, everAverage)
 	var r Result
 	for _, h := range hours {
 		grams, own := known[h.Hour]

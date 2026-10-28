@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -444,6 +444,18 @@ describe('currency and the looked-up price note', () => {
       { label: 'Average price', value: '$0.1500 per kWh, time-weighted' },
     ]);
     expect(tariffFacts({ ...tariff, varies_by_time: false }, 0, null)).toEqual([{ label: 'Rate', value: 'Example Electric · Residential Time of Use' }]);
+  });
+
+  it('shortens a long utility and rate name and keeps the full one to show on request', () => {
+    expect(shortUtility('Northern States Power Co - Minnesota')).toBe('NSP');
+    expect(shortUtility('Example Electric')).toBe('Example Electric');
+    expect(shortUtility('Pacific Gas and Electric Company')).toBe('PGE');
+    expect(shortRateName('Residential Service - Overhead Standard (A01)')).toBe('Residential (A01)');
+    expect(shortRateName('Residential Time of Use')).toBe('Residential Time of Use');
+    const long = { utility: 'Northern States Power Co - Minnesota', name: 'Residential Service - Overhead Standard (A01)', tiers: 1, fixed_charge: null, varies_by_time: false };
+    expect(tariffFacts(long, 0, null)).toEqual([
+      { label: 'Rate', value: 'NSP · Residential (A01)', full: 'Northern States Power Co - Minnesota · Residential Service - Overhead Standard (A01)' },
+    ]);
   });
 });
 
