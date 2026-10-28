@@ -15,6 +15,7 @@ import { EvCard, EvPrompt } from './EvCard';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
+import { Lowest } from './Watts';
 import { carbonNote, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
 
 interface Loaded {
@@ -97,7 +98,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             <Kpi tone="now" label="Right now" value={formatWatts(watts)} />
             <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
-            <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint="the most in one reading" />
+            <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />the most in one reading</>} />
           </KpiRow>
           <div class="kpi-notes">
             <p class="caption">Its own reading already counts everything inside it.</p>

@@ -125,6 +125,8 @@ type MeterSummary struct {
 	// CarbonEstimatedKWh is the part of KWh whose carbon was worked out at an average because its own hour had no saved grid intensity.
 	CarbonEstimatedKWh *float64 `json:"carbon_estimated_kwh"`
 	PeakWatts          *float64 `json:"peak_watts"`
+	// MinWatts is the lowest average of a whole minute in the period; nil when no whole minute was recorded.
+	MinWatts *float64 `json:"min_watts"`
 	// PeakAmps is the highest current in the period; nil when the meter reports none. For a 240 V pair it is the larger leg, never the two added.
 	PeakAmps       *float64 `json:"peak_amps"`
 	MonitoredHours float64  `json:"monitored_hours"`
@@ -140,6 +142,8 @@ type Summary struct {
 	UnmeteredKWh  *float64       `json:"unmetered_kwh"`
 	// HousePeakWatts is the mains' highest draws added: an upper bound, as the two legs need not peak in the same second.
 	HousePeakWatts *float64 `json:"house_peak_watts"`
+	// HouseMinWatts is the lowest the mains drew together in any whole minute (the legs added minute by minute, never their lowest minutes added).
+	HouseMinWatts *float64 `json:"house_min_watts"`
 	// HouseCarbonG and HouseCarbonEstimatedKWh are the mains' carbon figures added (see MeterSummary).
 	HouseCarbonG            *float64 `json:"house_carbon_g"`
 	HouseCarbonEstimatedKWh *float64 `json:"house_carbon_estimated_kwh"`

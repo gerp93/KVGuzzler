@@ -573,6 +573,16 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		if havePeak {
 			sum.HousePeakWatts = &housePeak
 		}
+		var mainsIDs []string
+		for _, ch := range on {
+			if ch.Scope == model.ScopeMains {
+				mainsIDs = append(mainsIDs, ch.ID)
+			}
+		}
+		if sum.HouseMinWatts, err = s.Store.LowestMinuteWatts(r.Context(), mainsIDs, from, to); err != nil {
+			serverError(w, err)
+			return
+		}
 		if haveCarbon {
 			sum.HouseCarbonG, sum.HouseCarbonEstimatedKWh = &houseCarbon, &houseCarbonEst
 		}
@@ -592,6 +602,7 @@ func (s *Server) meterSummary(ctx context.Context, ch model.Meter, from, to time
 		peak := t.PeakWatts
 		cs.PeakWatts = &peak
 	}
+	cs.MinWatts = t.MinWatts
 	cs.PeakAmps = t.PeakAmps
 	var readErr error
 	priced := schedule.Cost(func(f, end time.Time) float64 {

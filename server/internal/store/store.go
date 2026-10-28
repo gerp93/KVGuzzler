@@ -491,6 +491,8 @@ type Totals struct {
 	MonitoredHours float64
 	// PeakAmps is the highest current in the period; nil when the meter reported none.
 	PeakAmps *float64
+	// MinWatts is the lowest average of a whole minute in the period (a minute with under half of it recorded does not count); nil when there is none.
+	MinWatts *float64
 }
 
 // FirstMinute is the first minute a meter has any energy recorded, or false when it has none.
@@ -520,17 +522,20 @@ func (s *Store) FirstData(ctx context.Context) (time.Time, bool, error) {
 // Totals is a meter's energy, highest reading and covered time in [from, to).
 func (s *Store) Totals(ctx context.Context, meterID string, from, to time.Time) (Totals, error) {
 	var ws, peak, secs float64
-	var amps sql.NullFloat64
+	var amps, low sql.NullFloat64
 	err := s.db.QueryRowContext(ctx, `
-SELECT COALESCE(SUM(avg_w * seconds), 0), COALESCE(MAX(max_w), 0), COALESCE(SUM(seconds), 0), MAX(max_a)
+SELECT COALESCE(SUM(avg_w * seconds), 0), COALESCE(MAX(max_w), 0), COALESCE(SUM(seconds), 0), MAX(max_a), MIN(CASE WHEN seconds >= 30 THEN avg_w END)
 FROM minutes WHERE meter_id = ? AND minute >= ? AND minute < ?`,
-		meterID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs, &amps)
+		meterID, from.Unix(), to.Unix()).Scan(&ws, &peak, &secs, &amps, &low)
 	if err != nil {
 		return Totals{}, err
 	}
 	t := Totals{KWh: ws / joulesPerKWh, PeakWatts: peak, MonitoredHours: secs / 3600}
 	if amps.Valid {
 		t.PeakAmps = &amps.Float64
+	}
+	if low.Valid {
+		t.MinWatts = &low.Float64
 	}
 	return t, nil
 }

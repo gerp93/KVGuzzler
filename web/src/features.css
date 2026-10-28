@@ -259,6 +259,13 @@ button.link {
   color: var(--color-text);
 }
 
+/* The lowest draw under the highest in the same tile: one quiet line, in the text colour */
+.kpi-hint .kpi-low {
+  display: block;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 /* The top guzzlers: a ranked list, the bars against the biggest */
 .guzzler-list {
   display: grid;

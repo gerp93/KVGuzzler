@@ -1749,6 +1749,9 @@ components:
           description: The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity.
         peak_watts:
           type: [number, 'null']
+        min_watts:
+          type: [number, 'null']
+          description: The lowest average of a whole minute in the period (a minute with under half of it recorded does not count); null when there is none.
         peak_amps:
           type: [number, 'null']
           description: The highest current in the period; null when the meter reports none. For a 240 V pair it is the larger leg's, never the two added.
@@ -1793,6 +1796,9 @@ components:
         house_peak_watts:
           type: [number, 'null']
           description: "The mains meters' highest draws added. An upper bound: the legs need not peak in the same second."
+        house_min_watts:
+          type: [number, 'null']
+          description: The least the mains meters drew together in any whole minute (the legs added minute by minute, never their lowest minutes added); null when there is none.
         house_carbon_g:
           type: [number, 'null']
           description: The mains meters' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved.
