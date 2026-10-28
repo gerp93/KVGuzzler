@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayLabel, formatEfficiency, formatMiles, lowCoverage, parseMiles, stretchLabel, today } from './ev';
+import { dayLabel, formatDistance, formatEfficiency, formatMiles, inUnit, lowCoverage, parseMiles, stretchLabel, toMiles, today } from './ev';
 import { formatPerMile } from './lib';
 
 describe('a charging meter\'s odometer', () => {
@@ -43,3 +43,28 @@ describe('a charging meter\'s odometer', () => {
     expect(lowCoverage(0.8)).toBe(true);
   });
 });
+
+describe('the distance unit', () => {
+  it('shows miles as they are and converts kilometers from the stored miles', () => {
+    expect(formatDistance(58205, 'miles')).toMatch(/^58[,.   ]?205 mi$/);
+    expect(formatDistance(58205.08, 'km')).toMatch(/^93[,.   ]?672 km$/);
+    expect(formatDistance(10, 'km')).toBe('16.1 km');
+    expect(formatMiles(335)).toBe('335 mi');
+  });
+
+  it('converts what is typed back to miles', () => {
+    expect(toMiles(93672, 'km')).toBeCloseTo(58205.08, 1);
+    expect(toMiles(1200, 'miles')).toBe(1200);
+    expect(inUnit(toMiles(500, 'km'), 'km')).toBeCloseTo(500, 9);
+  });
+
+  it('words efficiency and cost per distance in the unit', () => {
+    expect(formatEfficiency(3.5)).toBe('3.5 mi/kWh');
+    expect(formatEfficiency(3.5, 'km')).toBe('5.6 km/kWh');
+    expect(formatEfficiency(null, 'km')).toBe('—');
+    expect(formatPerMile('0.0500')).toBe('$0.050/mi');
+    expect(formatPerMile('0.0500', false, 'km')).toBe('$0.031/km');
+    expect(formatPerMile('0.0500', true, 'km')).toBe('≈ $0.031/km');
+  });
+});
+

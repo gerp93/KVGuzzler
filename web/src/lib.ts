@@ -4,6 +4,7 @@
 // alone; circuits and plugs are parts of it; the PC's wall plug (`pc`) is a slice of some circuit and is added to nothing.
 import type { components } from './api-types';
 import type { Fact } from './Facts';
+import { KM_PER_MILE, type DistanceUnit } from './ev';
 
 type S = components['schemas'];
 export type Meter = S['Meter'];
@@ -184,12 +185,12 @@ export function formatMoney(m: string | null | undefined, estimated = false): st
   return `${estimated ? '≈ ' : ''}${sign}${symbol}${shown}`;
 }
 
-/** A cost per mile: three decimals, because a mile of electricity costs a few cents. */
-export function formatPerMile(m: string | null | undefined, estimated = false): string {
+/** A cost per mile (or per kilometer): three decimals, because a mile of electricity costs a few cents. The server's figure is per mile. */
+export function formatPerMile(m: string | null | undefined, estimated = false, unit: DistanceUnit = 'miles'): string {
   if (m === null || m === undefined) return '—';
   const n = Number(m);
   if (!Number.isFinite(n)) return '—';
-  return `${estimated ? '≈ ' : ''}${symbol}${Math.abs(n).toFixed(3)}/mi`;
+  return `${estimated ? '≈ ' : ''}${symbol}${Math.abs(unit === 'km' ? n / KM_PER_MILE : n).toFixed(3)}/${unit === 'km' ? 'km' : 'mi'}`;
 }
 
 /** Above this per kWh a rate is almost certainly cents typed as dollars. */

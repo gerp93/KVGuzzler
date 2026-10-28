@@ -33,10 +33,28 @@ export function parseMiles(text: string): number | null {
   return text.trim() !== '' && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-/** Miles with thousands separators and no decimals above 1000, one decimal below. */
-export function formatMiles(m: number): string {
-  return `${Math.abs(m) >= 1000 ? Math.round(m).toLocaleString() : (Math.round(m * 10) / 10).toString()} mi`;
+/** The unit distances are shown in. The server keeps and sums miles; this only changes how they are worded and typed. */
+export type DistanceUnit = 'miles' | 'km';
+
+export const KM_PER_MILE = 1.609344;
+
+/** A distance in miles as the number to show in the unit. */
+export const inUnit = (miles: number, unit: DistanceUnit): number => (unit === 'km' ? miles * KM_PER_MILE : miles);
+
+/** A distance typed in the unit, as miles. */
+export const toMiles = (typed: number, unit: DistanceUnit): number => (unit === 'km' ? typed / KM_PER_MILE : typed);
+
+export const unitAbbreviation = (unit: DistanceUnit): string => (unit === 'km' ? 'km' : 'mi');
+
+/** A distance (given in miles) with thousands separators and no decimals above 1000, one decimal below. */
+export function formatDistance(miles: number, unit: DistanceUnit = 'miles'): string {
+  const d = inUnit(miles, unit);
+  return `${Math.abs(d) >= 1000 ? Math.round(d).toLocaleString() : (Math.round(d * 10) / 10).toString()} ${unitAbbreviation(unit)}`;
 }
 
-/** Miles per kWh, one decimal. */
-export const formatEfficiency = (v: number | null | undefined): string => (v == null ? '—' : `${v.toFixed(1)} mi/kWh`);
+/** Miles with thousands separators and no decimals above 1000, one decimal below. */
+export const formatMiles = (m: number): string => formatDistance(m, 'miles');
+
+/** Energy per distance (given as miles per kWh), one decimal. */
+export const formatEfficiency = (v: number | null | undefined, unit: DistanceUnit = 'miles'): string =>
+  v == null ? '—' : `${inUnit(v, unit).toFixed(1)} ${unitAbbreviation(unit)}/kWh`;

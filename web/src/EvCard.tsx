@@ -2,14 +2,15 @@
 // price that can be set beside a gas car's. The odometer is the user's own figure; nothing is read from the car. The sums are the server's.
 import { useState } from 'preact/hooks';
 import { api } from './api';
-import { dayLabel, formatEfficiency, formatMiles, lowCoverage, parseMiles, stretchLabel, today, type MeterEv } from './ev';
+import { dayLabel, formatDistance, formatEfficiency, lowCoverage, parseMiles, stretchLabel, toMiles, today, type DistanceUnit, type MeterEv } from './ev';
 import { FordCard } from './FordCard';
-import { usePoll } from './hooks';
+import { useDistanceUnit, usePoll } from './hooks';
 import { formatKwh, formatMoney, formatPerMile, type Meter } from './lib';
 import { Kwh } from './Watts';
 
-/** A cost per mile without its unit, for the big figure (the unit is in the caption under it). */
-const perMile = (m: string | null | undefined, estimated?: boolean): string => formatPerMile(m, estimated).replace('/mi', '');
+/** A cost per distance without its unit, for the big figure (the unit is in the caption under it). */
+const perMile = (m: string | null | undefined, estimated: boolean | undefined, unit: DistanceUnit): string =>
+  formatPerMile(m, estimated, unit).replace(/\/(mi|km)$/, '');
 
 /** A meter that is probably the car's charger by its name. */
 const LOOKS_LIKE_CHARGER = /\b(ev|tesla|car|charger|charging|vehicle)\b/i;
@@ -33,12 +34,13 @@ export function EvPrompt({ meter, onChanged }: { meter: Meter; onChanged: () => 
 /** The newest odometer reading typed in for a charging meter, wherever the meter is shown: "18,240 mi" with its day, or a plain "no odometer reading yet". */
 export function OdometerNow({ meterId, brief }: { meterId: string; brief?: boolean }) {
   const { data } = usePoll<MeterEv>(() => api.meterEv(meterId), 60_000, [meterId]);
+  const [unit] = useDistanceUnit();
   if (!data) return null;
   const latest = data.readings[data.readings.length - 1];
   if (!latest) return <span class="odometer none">{brief ? 'no odometer yet' : 'No odometer reading yet'}</span>;
   return (
     <span class="odometer" title={`Odometer as typed on ${dayLabel(latest.day)}`}>
-      <strong class="num">{formatMiles(latest.miles)}</strong>
+      <strong class="num">{formatDistance(latest.miles, unit)}</strong>
       {!brief && <span class="caption"> as of {dayLabel(latest.day)}</span>}
     </span>
   );
@@ -47,6 +49,7 @@ export function OdometerNow({ meterId, brief }: { meterId: string; brief?: boole
 export function EvCard({ meter }: { meter: Meter }) {
   const [version, setVersion] = useState(0);
   const { data, error } = usePoll<MeterEv>(() => api.meterEv(meter.id), 60_000, [meter.id, version]);
+  const [unit, setUnit] = useDistanceUnit();
   const [day, setDay] = useState(today());
   const [miles, setMiles] = useState('');
   const [problem, setProblem] = useState('');
@@ -54,11 +57,12 @@ export function EvCard({ meter }: { meter: Meter }) {
 
   const save = async (e: Event) => {
     e.preventDefault();
-    const value = parseMiles(miles);
-    if (value === null) {
-      setProblem('Enter the odometer in miles, like 18,240.');
+    const typed = parseMiles(miles);
+    if (typed === null) {
+      setProblem(`Enter the odometer in ${unit === 'km' ? 'kilometers' : 'miles'}, like 18,240.`);
       return;
     }
+    const value = toMiles(typed, unit);
     setSaving(true);
     try {
       await api.putOdometer(meter.id, day, value);
@@ -89,11 +93,18 @@ export function EvCard({ meter }: { meter: Meter }) {
   return (
     <section class="card ev">
       <h2>Electric vehicle</h2>
+      <label class="field ev-unit">
+        <span>Show distances in</span>
+        <select value={unit} onChange={(e) => setUnit((e.target as HTMLSelectElement).value === 'km' ? 'km' : 'miles')}>
+          <option value="miles">Miles</option>
+          <option value="km">Kilometers</option>
+        </select>
+      </label>
       {error && !data && <p class="note error">{error.message}</p>}
       {data && (
         <div class="stat ev-odometer">
           <span class="caption">Odometer</span>
-          <p class="big ev-figure">{latest ? formatMiles(latest.miles) : '—'}</p>
+          <p class="big ev-figure">{latest ? formatDistance(latest.miles, unit) : '—'}</p>
           <span class="caption">{latest ? `last reading, ${dayLabel(latest.day)}` : 'no reading yet: type one below'}</span>
         </div>
       )}
@@ -101,13 +112,13 @@ export function EvCard({ meter }: { meter: Meter }) {
         <div class="stats three">
           <div class="stat">
             <span class="caption">Cost per mile</span>
-            <p class="big small ev-figure">{perMile(totals.cost_per_mile, data?.cost_estimated)}</p>
-            <span class="caption">over {formatMiles(totals.miles)}</span>
+            <p class="big small ev-figure">{perMile(totals.cost_per_mile, data?.cost_estimated, unit)}</p>
+            <span class="caption">over {formatDistance(totals.miles, unit)}</span>
           </div>
           <div class="stat">
             <span class="caption">Efficiency</span>
-            <p class="big small ev-figure">{totals.miles_per_kwh != null ? totals.miles_per_kwh.toFixed(1) : '—'}</p>
-            <span class="caption">miles per kWh at the wall</span>
+            <p class="big small ev-figure">{totals.miles_per_kwh != null ? formatEfficiency(totals.miles_per_kwh, unit).replace(/ .*$/, '') : '—'}</p>
+            <span class="caption">{unit === 'km' ? 'kilometers' : 'miles'} per kWh at the wall</span>
           </div>
           <div class="stat">
             <span class="caption">Energy</span>
@@ -124,11 +135,11 @@ export function EvCard({ meter }: { meter: Meter }) {
           {stretches.map((s) => (
             <li key={s.from_day}>
               <span class="when">{stretchLabel(s)}</span>
-              <strong class="num">{formatPerMile(s.cost_per_mile, s.cost_estimated)}</strong>
+              <strong class="num">{formatPerMile(s.cost_per_mile, s.cost_estimated, unit)}</strong>
               <span class="caption">
-                {formatMiles(s.miles)} · <Kwh k={s.kwh} />
+                {formatDistance(s.miles, unit)} · <Kwh k={s.kwh} />
                 {s.cost != null ? ` · ${formatMoney(s.cost, s.cost_estimated)}` : ''}
-                {s.miles_per_kwh != null ? ` · ${formatEfficiency(s.miles_per_kwh)}` : ''}
+                {s.miles_per_kwh != null ? ` · ${formatEfficiency(s.miles_per_kwh, unit)}` : ''}
               </span>
               {lowCoverage(s.coverage) ? (
                 <span class="badge" title={`Measured ${Math.round(s.coverage * 100)}% of these days: energy and cost per mile are understated`}>
@@ -154,7 +165,7 @@ export function EvCard({ meter }: { meter: Meter }) {
           <input type="date" value={day} max={today()} onInput={(e) => setDay((e.target as HTMLInputElement).value)} required />
         </label>
         <label class="field">
-          <span>Odometer (miles)</span>
+          <span>Odometer ({unit === 'km' ? 'kilometers' : 'miles'})</span>
           <input type="text" inputMode="decimal" value={miles} placeholder="18,240" onInput={(e) => setMiles((e.target as HTMLInputElement).value)} required />
         </label>
         <button type="submit" disabled={saving}>
@@ -174,7 +185,7 @@ export function EvCard({ meter }: { meter: Meter }) {
             {[...readings].reverse().map((r) => (
               <li key={r.day}>
                 <span>{dayLabel(r.day)}</span>
-                <span class="num">{formatMiles(r.miles)}</span>
+                <span class="num">{formatDistance(r.miles, unit)}</span>
                 <button type="button" class="icon" title="Remove this reading" aria-label={`Remove the reading of ${dayLabel(r.day)}`} onClick={() => void remove(r.day)}>
                   ✕
                 </button>
