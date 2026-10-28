@@ -31,3 +31,24 @@ func TestAnAllTimeSeriesIsBucketedByTheTimeThatIsRecordedNotByTheYear2000(t *tes
 		t.Errorf("two hours: bucket %q, want minute", short.Bucket)
 	}
 }
+
+func TestAnAllTimeSummaryCostsTheSameAsTheRecordedStretchAndDoesNotPriceTwentyFiveYears(t *testing.T) {
+	srv, _ := houseServer(t) // two hours recorded on 22 Oct 2026, at a flat 0.20
+	var recorded, all model.Summary
+	get(t, srv.URL+"/api/v1/summary?from=2026-10-22T00:00:00Z&to=2026-10-23T00:00:00Z", &recorded)
+	get(t, srv.URL+"/api/v1/summary?from=2001-10-23T00:00:00Z&to=2026-10-23T00:00:00Z", &all)
+	if recorded.HouseCost == nil || all.HouseCost == nil || *recorded.HouseCost != *all.HouseCost {
+		t.Fatalf("house cost: recorded stretch %v, all time %v", recorded.HouseCost, all.HouseCost)
+	}
+	for i, m := range all.Meters {
+		if m.KWh != recorded.Meters[i].KWh || (m.Cost == nil) != (recorded.Meters[i].Cost == nil) || (m.Cost != nil && *m.Cost != *recorded.Meters[i].Cost) {
+			t.Errorf("%s: all time %v kWh %v, recorded stretch %v kWh %v", m.MeterID, m.KWh, m.Cost, recorded.Meters[i].KWh, recorded.Meters[i].Cost)
+		}
+	}
+	// A period before anything was recorded is still priced (nothing used, so nothing owed), not left without a price.
+	var before model.Summary
+	get(t, srv.URL+"/api/v1/summary?from=2001-01-01T00:00:00Z&to=2001-02-01T00:00:00Z", &before)
+	if before.HouseCost == nil || *before.HouseCost != "0.00" {
+		t.Errorf("before the first minute: house cost %v, want 0.00", before.HouseCost)
+	}
+}

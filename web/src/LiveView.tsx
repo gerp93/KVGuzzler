@@ -26,6 +26,8 @@ import {
 } from './lib';
 
 interface Period {
+  /** The period these figures are for, so the page can tell when what it holds is for the one picked before. */
+  key: string;
   summary: Summary;
   line: Line | undefined;
   domain: [number, number];
@@ -55,6 +57,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       const [summary, series] = await Promise.all([api.summary(from, to), Promise.all(subjects.map((m) => api.series(m.id, from, to)))]);
       const points = series.length > 0 ? sumByTime(series) : [];
       return {
+        key: period,
         summary,
         // The line is the mains legs added together (or, without them, the top-level meters added together): the sums that are sound. Every other
         // meter keeps to its own row.
@@ -118,10 +121,19 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const peakAmps = whole && mains.length === 1 ? summary?.meters.find((m) => m.meter_id === mains[0]!.id)?.peak_amps : undefined;
   const carbon = whole ? carbonFacts(summary?.house_carbon_g, kwh) : [];
   const span = periodWords(period as PeriodKey);
+  // The headings change the moment a period is picked but the figures come from the server a moment later (a long period reads more): until they arrive the
+  // ones on the page are the last period's, so say so instead of letting them pass for the new ones.
+  const loading = figures?.key !== period;
 
   return (
     <>
       <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
+      {loading && (
+        <div class="period-loading" role="status">
+          <span class="spinner" aria-hidden="true" />
+          <span>Loading {span}…</span>
+        </div>
+      )}
       {!whole && <p class="caption">Top-level meters only: there is no whole-house clamp, so this is not the whole house.</p>}
 
       {live.notes.length > 0 && (
