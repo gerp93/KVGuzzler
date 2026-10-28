@@ -127,7 +127,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
       {meter && list.length > 0 && (
         <section class="card">
           <h2>Inside it</h2>
-          <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} />
+          <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} period={period as PeriodKey} />
           <p class="caption">Shares are of this meter. "Other (not metered)" is its own reading less the meters listed, so nothing is added twice.</p>
         </section>
       )}
