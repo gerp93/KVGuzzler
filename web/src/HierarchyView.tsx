@@ -62,7 +62,7 @@ interface Shared {
 }
 
 /** `rows` and `at` are the rows the move arrows read; `depth` is how far in the row is drawn (the plan may put it deeper, as under "Everything else"). */
-function Row({ meter, rows, at, depth, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; depth: number; shared: Shared }) {
+function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; depth: number; hot: boolean; shared: Shared }) {
   const { all, figures, estimated, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged } = shared;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
@@ -110,7 +110,8 @@ function Row({ meter, rows, at, depth, shared }: { meter: Meter; rows: { meter: 
 
   return (
     <li
-      class={`hier-row${over && dropOk ? ' drop' : ''}`}
+      class={`hier-row${over && dropOk ? ' drop' : ''}${hot ? ' hot' : ''}`}
+      data-entry={`row:${meter.id}`}
       style={depth > 0 ? { marginLeft: `${depth * 1.25}rem` } : undefined}
       onDragOver={(e) => {
         if (!dropOk) return;
@@ -297,9 +298,9 @@ function Row({ meter, rows, at, depth, shared }: { meter: Meter; rows: { meter: 
 
 /** A part of a computer (its CPU, GPU, memory, and what they leave out): read-only, from its collector, and it opens the computer's page. It is not
  * a meter, so it has no wiring and cannot be moved. */
-function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: string }) {
+function PartRow({ id, part, depth, href, hot }: { id: string; part: PcPart; depth: number; href: string; hot: boolean }) {
   return (
-    <li class="hier-row virtual" style={{ marginLeft: `${depth * 1.25}rem` }}>
+    <li class={`hier-row virtual${hot ? ' hot' : ''}`} data-entry={id} style={{ marginLeft: `${depth * 1.25}rem` }}>
       <div class="hier-main">
         <span />
         <span />
@@ -324,13 +325,16 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
 
 /** A line worked out from others, not a meter: "Everything else" (the house less its circuits), "Not individually metered" inside it, and "Other (not metered)"
  * under a meter that holds others (what its own reading carries beyond what is listed inside it). Read-only, and never added to anything. */
-function LumpLine({ line }: { line: LumpEntry }) {
+function LumpLine({ line, hot }: { line: LumpEntry; hot: boolean }) {
+  // "Everything else" holds the rows under it, so its name starts at the row's edge (where a meter's arrow is), not in the name column: what is inside it
+  // is then drawn further in than it is.
+  const parent = line.id === 'else';
   return (
-    <li class="hier-row virtual" style={{ marginLeft: `${line.depth * 1.25}rem` }}>
+    <li class={`hier-row virtual${hot ? ' hot' : ''}`} data-entry={line.id} style={{ marginLeft: `${line.depth * 1.25}rem` }}>
       <div class="hier-main">
-        <span />
-        <span />
-        <span class="grow part-name" title={line.title}>
+        {!parent && <span />}
+        {!parent && <span />}
+        <span class={`grow part-name${parent ? ' lump-parent' : ''}`} title={line.title}>
           {line.label}
         </span>
         <span class="caption hier-tag">{line.tag}</span>
@@ -375,6 +379,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const { data: computers } = usePoll<Computer[]>(api.computers, 30_000, [meters.length]);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
   const [dragging, setDragging] = useState<string | null>(null);
+  // The line under the pointer, in the tree or in the diagram (an entry id of treePlan): both draw it highlighted.
+  const [hover, setHover] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   // The same period as the Live page (they share the saved choice, made there): this is a setup page, so it has no picker of its own; only the energy and cost columns follow it.
@@ -480,14 +486,18 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
               <span class="num">Energy</span>
               <span class="num">Cost</span>
             </div>
-            <ul class="hier">
+            <ul
+              class="hier"
+              onMouseOver={(e) => setHover((e.target as HTMLElement).closest('[data-entry]')?.getAttribute('data-entry') ?? null)}
+              onMouseLeave={() => setHover(null)}
+            >
               {entries.map((e) =>
                 e.kind === 'row' ? (
-                  <Row key={e.id} meter={e.meter} rows={rows} at={e.at} depth={e.depth} shared={shared} />
+                  <Row key={e.id} meter={e.meter} rows={rows} at={e.at} depth={e.depth} hot={hover === e.id} shared={shared} />
                 ) : e.kind === 'part' ? (
-                  <PartRow key={e.id} part={e.part} depth={e.depth} href={e.href} />
+                  <PartRow key={e.id} id={e.id} part={e.part} depth={e.depth} href={e.href} hot={hover === e.id} />
                 ) : (
-                  <LumpLine key={e.id} line={e} />
+                  <LumpLine key={e.id} line={e} hot={hover === e.id} />
                 ),
               )}
             </ul>
@@ -510,10 +520,10 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         <DevicesCard meters={meters} onChanged={onChanged} />
         <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
         <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
-        <section class="card wide">
+        <section class="card wide diagram-card">
           <h2>Diagram</h2>
           <Hint>The tree on the left drawn as boxes: each box is one line of it, with what it draws now and what it used over the period. It follows every change you make to the tree. A box opens that meter's page.</Hint>
-          <HierarchyDiagram entries={entries} watts={watts} figures={figures} />
+          <HierarchyDiagram entries={entries} watts={watts} figures={figures} hover={hover} onHover={setHover} />
         </section>
       </div>
         </div>
