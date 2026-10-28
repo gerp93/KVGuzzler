@@ -10,7 +10,7 @@ import { Kwh } from './Watts';
 const MODES: { key: EstimateMode; label: string }[] = [
   { key: 'constant', label: 'Constant load' },
   { key: 'now', label: 'Right now' },
-  { key: 'usage', label: 'My usage' },
+  { key: 'usage', label: 'Recorded usage' },
 ];
 
 export function Estimator({ load, deps, basisOf, nowWatts, nowWhat }: {

@@ -76,7 +76,7 @@ export function AddPanel({ onAdded, onCancel }: { onAdded: () => void; onCancel:
         <>
           <label class="check">
             <input type="checkbox" checked={isPc} onChange={(e) => setIsPc((e.target as HTMLInputElement).checked)} />
-            This is my PC's plug
+            PC plug
           </label>
           {isPc && <p class="caption">Measures the whole PC. Set its circuit in the tree afterwards.</p>}
         </>
