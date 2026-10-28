@@ -464,16 +464,16 @@ describe('the compare list of the History tab', () => {
   const summary = { from: 'a', to: 'b', meters: [sum('dryer', 8, 4, '1.26'), sum('ev', 66, 11, '10.28'), sum('idle', 0, 5, '0.00'), sum('ghost', 0, 0, null)] } as unknown as Summary;
   const list = [ch('dryer', 'circuit'), ch('ghost', 'circuit'), ch('ev', 'circuit'), ch('idle', 'circuit'), ch('unlisted', 'circuit')];
 
-  it('puts the biggest user first and the meters with nothing recorded last, greyed out', () => {
+  it('puts the biggest user first and the meters that drew nothing last, greyed out', () => {
     const order = compareOrder(list, summary);
-    expect(order.map((o) => [o.meter.id, o.usable])).toEqual([['ev', true], ['dryer', true], ['idle', true], ['ghost', false], ['unlisted', false]]);
+    expect(order.map((o) => [o.meter.id, o.usable])).toEqual([['ev', true], ['dryer', true], ['ghost', false], ['idle', false], ['unlisted', false]]);
   });
 
   it('says what each one drew on average while it was recorded, and what it cost', () => {
-    const [ev, dryer, idle] = compareOrder(list, summary);
+    const [ev, dryer, , idle] = compareOrder(list, summary);
     expect([ev!.avgWatts, ev!.cost]).toEqual([6000, '10.28']);
     expect([dryer!.avgWatts, dryer!.cost]).toEqual([2000, '1.26']);
-    expect(idle!.avgWatts).toBe(0); // recorded, and drew nothing: still something to compare
+    expect(idle!.avgWatts).toBe(0); // recorded, and drew nothing: shown as 0 W, but nothing to compare, so greyed out
   });
 
   it('keeps every meter selectable, in the order it came, until the figures for the period are read', () => {
