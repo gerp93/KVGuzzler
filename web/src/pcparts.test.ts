@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pcParts } from './pcparts';
-import type { ComputerDetail } from './lib';
+import { formatMoney, type ComputerDetail } from './lib';
 
 const detail = (extra: Partial<ComputerDetail> = {}, live = true): ComputerDetail => ({
   computer: { id: 'c1', name: 'Desk PC', peripheral_meter_ids: [], wall_meter_id: 'wall' },
@@ -60,5 +60,20 @@ describe('the parts of a computer under its wall plug', () => {
     none.pc!.components = [];
     expect(pcParts(none, null)).toEqual([]);
     expect(pcParts(detail({ pc: null }), null)).toEqual([]);
+  });
+});
+
+describe('a part whose cost is a sliver of a cent', () => {
+  it('says so instead of rounding to nothing', () => {
+    // The wall plug used 10 kWh for $1.50; a sensor that used 0.03 kWh cost under half a cent.
+    const parts = pcParts(
+      detail({
+        wall: { meter_id: 'wall', scope: 'pc', kwh: 10, cost: '1.50', monitored_hours: 24 },
+        pc: { source_id: 's', programs: [], gaps: [], components: [{ name: 'GPU', scope: 'component', kind: 'gpu', kwh: 0.03 }], live: null },
+      }),
+      null,
+    );
+    expect(formatMoney(parts[0]!.cost)).toBe('<$0.01');
+    expect(formatMoney('0.00')).toBe('$0.00');
   });
 });

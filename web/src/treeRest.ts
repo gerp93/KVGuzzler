@@ -25,7 +25,11 @@ export interface RestRow {
 function flowNodes(flow: FlowNode | undefined): Map<string, { node: FlowNode; left: FlowNode | undefined }> {
   const out = new Map<string, { node: FlowNode; left: FlowNode | undefined }>();
   const walk = (n: FlowNode) => {
-    out.set(n.meterId ?? n.id, { node: n, left: n.children.find((c) => c.rest) });
+    // Under the whole house the Hierarchy tree lists the plugs beside the circuits, so what it leaves over is the chart's "Not individually metered" line (or the
+    // whole "Everything else" line when no plug is listed inside it).
+    const group = n.children.find((c) => c.group);
+    const left = group ? (group.children.find((c) => c.rest) ?? (group.children.length === 0 ? group : undefined)) : n.children.find((c) => c.rest);
+    out.set(n.meterId ?? n.id, { node: n, left });
     n.children.forEach(walk);
   };
   if (flow) walk(flow);

@@ -76,6 +76,50 @@ func Threshold(points []Point) float64 {
 	return math.Max(10, base+0.25*(peak-base))
 }
 
+// Levels is what a meter does at rest and the level above which it is working, for showing at a glance whether it is working right now.
+type Levels struct {
+	// RestWatts is the middle of what it draws while resting: the median of its minutes below the working level (all of its minutes when it has none).
+	RestWatts float64
+	// WorkingAboveWatts is the working level (Threshold); only meaningful when HasWorking.
+	WorkingAboveWatts float64
+	// HasWorking is false for a meter that barely changes: it is on, it never works, so it is always resting.
+	HasWorking bool
+	// Minutes is how many recorded minutes the levels were learned from.
+	Minutes int
+}
+
+// MinLevelMinutes is the least history that says what a meter's resting is: under it, no level is claimed.
+const MinLevelMinutes = 120
+
+// LevelsOf learns a meter's levels from its minutes. False when there are too few recorded minutes to say.
+func LevelsOf(points []Point) (Levels, bool) {
+	var vals []float64
+	for _, p := range points {
+		if p.Seconds > 0 {
+			vals = append(vals, p.AvgW)
+		}
+	}
+	if len(vals) < MinLevelMinutes {
+		return Levels{}, false
+	}
+	l := Levels{Minutes: len(vals)}
+	threshold := Threshold(points)
+	var resting []float64
+	if math.IsInf(threshold, 1) {
+		resting = vals
+	} else {
+		l.HasWorking, l.WorkingAboveWatts = true, threshold
+		for _, v := range vals {
+			if v < threshold {
+				resting = append(resting, v)
+			}
+		}
+	}
+	sort.Float64s(resting)
+	l.RestWatts = percentile(resting, 0.5)
+	return l, true
+}
+
 // Detect finds the runs in points (in time order): stretches whose minutes reach threshold, joined across dips of up to gapMinutes, and at least
 // minMinutes long. Each run's energy is every recorded minute from its first to its last working minute, the dips inside it included.
 func Detect(points []Point, threshold float64, gapMinutes, minMinutes int) []Run {

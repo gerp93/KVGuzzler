@@ -122,6 +122,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What each meter draws at rest and the level above which it is working, so a table of live readings can show which are working now.
+         * @description Learned from each meter's last 30 days of recorded minutes, with the same working level the runs use (a quarter of the way from its
+         *     10th to its 99th percentile, never below 10 W). `rest_watts` is the middle of what it draws below that level. A meter that barely changes
+         *     has no working level (`working_above_watts` is null): it is on, it never works, so it is always resting. A meter with under two hours
+         *     recorded is left out. The answer is kept for a few minutes. Each meter's own, never added to anything.
+         */
+        get: operations["getLevels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/ev": {
         parameters: {
             query?: never;
@@ -1029,6 +1052,21 @@ export interface components {
             bucket: components["schemas"]["Bucket"];
             points: components["schemas"]["SeriesPoint"][];
         };
+        Levels: {
+            meters: {
+                meter_id: string;
+                /** @description The middle of what the meter draws while resting. */
+                rest_watts: number;
+                /** @description A minute at or above this counts as working; null for a meter that barely changes (always resting). */
+                working_above_watts: number | null;
+                /** @description How many recorded minutes the levels were learned from. */
+                minutes: number;
+            }[];
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+        };
         BaseLoad: {
             /** @enum {string} */
             scope: "house" | "meter";
@@ -1884,6 +1922,26 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getLevels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Levels"];
+                };
+            };
         };
     };
     getMeterEv: {

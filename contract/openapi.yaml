@@ -230,6 +230,23 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/levels:
+    get:
+      tags: [Read]
+      operationId: getLevels
+      summary: What each meter draws at rest and the level above which it is working, so a table of live readings can show which are working now.
+      description: |
+        Learned from each meter's last 30 days of recorded minutes, with the same working level the runs use (a quarter of the way from its
+        10th to its 99th percentile, never below 10 W). `rest_watts` is the middle of what it draws below that level. A meter that barely changes
+        has no working level (`working_above_watts` is null): it is on, it never works, so it is always resting. A meter with under two hours
+        recorded is left out. The answer is kept for a few minutes. Each meter's own, never added to anything.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Levels'
   /api/v1/meters/{meterId}/ev:
     get:
       tags: [Read]
@@ -1568,6 +1585,33 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SeriesPoint'
+    Levels:
+      type: object
+      required: [meters, from, to]
+      properties:
+        meters:
+          type: array
+          items:
+            type: object
+            required: [meter_id, rest_watts, working_above_watts, minutes]
+            properties:
+              meter_id:
+                type: string
+              rest_watts:
+                type: number
+                description: The middle of what the meter draws while resting.
+              working_above_watts:
+                type: [number, 'null']
+                description: A minute at or above this counts as working; null for a meter that barely changes (always resting).
+              minutes:
+                type: integer
+                description: How many recorded minutes the levels were learned from.
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
     BaseLoad:
       type: object
       required: [scope, watts, avg_watts, share, minutes, kwh_per_year, cost_per_year, rate, rate_estimated, from, to]

@@ -1,7 +1,7 @@
 // What the PC's own collector reported about its insides: its sensors, the programs it blames, and the times it was not
 // recording. Shown inside a computer's detail; none of it is added to the house or circuit figures.
 import {
-  formatDuration, formatKwh, formatMoney, gapLabel, groupComponents, programRows, programSplit, runDuration, runKwh,
+  formatDuration, formatKwh, formatMoney, gapLabel, groupComponents, moneyText, programRows, programSplit, runDuration, runKwh,
   type PcComponent, type PcSource,
 } from './lib';
 import { Facts } from './Facts';
@@ -68,7 +68,7 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
           <Facts
             items={[
               { label: 'CPU + GPU', value: formatKwh(programsKwh) },
-              ...(pc.programs.every((p) => p.cost != null) ? [{ label: 'Cost', value: formatMoney(pc.programs.reduce((t, p) => t + Number(p.cost), 0).toFixed(2), true) }] : []),
+              ...(pc.programs.every((p) => p.cost != null) ? [{ label: 'Cost', value: formatMoney(moneyText(pc.programs.reduce((t, p) => t + Number(p.cost), 0)), true) }] : []),
             ]}
           />
           {splitTotal > 0 && (

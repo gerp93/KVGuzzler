@@ -131,3 +131,52 @@ func TestAMeterThatWorksOnlyAFewPercentOfTheTimeStillHasARunLevel(t *testing.T) 
 		t.Errorf("runs = %+v, want the one half-hour heating, 2.2 kWh", got)
 	}
 }
+
+func TestLevelsOfAMeterThatWorksAndRests(t *testing.T) {
+	// A fridge-like meter: 3 W at rest most of the time, 120 W while it works.
+	var pts []Point
+	start := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	for m := 0; m < 600; m++ {
+		w := 3.0
+		if m%100 < 20 {
+			w = 120
+		}
+		pts = append(pts, Point{Minute: start.Add(time.Duration(m) * time.Minute), AvgW: w, MaxW: w, Seconds: 60})
+	}
+	l, ok := LevelsOf(pts)
+	if !ok || !l.HasWorking {
+		t.Fatalf("levels = %+v ok=%v, want a working level", l, ok)
+	}
+	if l.RestWatts != 3 {
+		t.Errorf("rest = %v, want 3", l.RestWatts)
+	}
+	if l.WorkingAboveWatts <= 3 || l.WorkingAboveWatts >= 120 {
+		t.Errorf("working level = %v, want between rest and working", l.WorkingAboveWatts)
+	}
+}
+
+func TestLevelsOfASteadyMeterIsAlwaysResting(t *testing.T) {
+	var pts []Point
+	start := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	for m := 0; m < 300; m++ {
+		pts = append(pts, Point{Minute: start.Add(time.Duration(m) * time.Minute), AvgW: 90 + float64(m%3), MaxW: 95, Seconds: 60})
+	}
+	l, ok := LevelsOf(pts)
+	if !ok || l.HasWorking {
+		t.Fatalf("levels = %+v ok=%v, want resting only", l, ok)
+	}
+	if l.RestWatts < 90 || l.RestWatts > 92 {
+		t.Errorf("rest = %v, want about 91", l.RestWatts)
+	}
+}
+
+func TestLevelsNeedEnoughHistory(t *testing.T) {
+	var pts []Point
+	start := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	for m := 0; m < MinLevelMinutes-1; m++ {
+		pts = append(pts, Point{Minute: start.Add(time.Duration(m) * time.Minute), AvgW: 5, Seconds: 60})
+	}
+	if _, ok := LevelsOf(pts); ok {
+		t.Error("a short history must not claim a level")
+	}
+}

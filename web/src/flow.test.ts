@@ -16,12 +16,12 @@ const summary: Summary = {
 const flat = (n: FlowNode): FlowNode[] => [n, ...n.children.flatMap(flat)];
 
 describe('the flow chart tree', () => {
-  it('is the house, its top-level circuits and what no circuit accounts for, with each parent holding its own children', () => {
+  it('is the house, its top-level circuits and "Everything else" (what no circuit accounts for), with each parent holding its own children', () => {
     const tree = flowTree(meters, summary)!;
     expect(tree).toMatchObject({ id: 'house', kwh: 20, cost: '3.00' });
-    expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['rest-house', 3]]);
+    expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['everything-else', 3]]);
     expect(tree.children[0]!.children.map((c) => [c.id, c.kwh])).toEqual([['ev', 8], ['lights', 1], ['rest-garage', 1]]);
-    expect(tree.children[2]).toMatchObject({ meterId: null, label: 'Other (not metered)', cost: '0.45' });
+    expect(tree.children[2]).toMatchObject({ meterId: null, label: 'Everything else', cost: '0.45', group: true, children: [] });
     expect(tree.children[1]!.children.map((c) => c.id)).toEqual(['fridge', 'rest-dryer']); // a plug on a circuit
   });
 
@@ -107,12 +107,27 @@ describe('a plug or a computer on a circuit nothing clamps', () => {
   const loose = [...meters, m('wall', 'pc', { type: 'computer', computer_id: 'c1' }), m('monitor', 'plug')];
   const sum: Summary = { ...summary, meters: [...summary.meters, f('wall', 'pc', 2, '0.30'), f('monitor', 'plug', 0.5, '0.08')] };
 
-  it('is drawn beside the circuits, and what it takes comes off what no circuit accounts for', () => {
+  it('is listed inside "Everything else" as the circuits table has it, with what none of them explains as its last line', () => {
     const tree = flowTree(loose, sum)!;
-    expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['wall', 2], ['monitor', 0.5], ['rest-house', 0.5]]);
-    // 20 kWh house less 10 + 7 + 2 + 0.5: nothing is counted twice.
+    expect(tree.children.map((c) => [c.id, c.kwh])).toEqual([['garage', 10], ['dryer', 7], ['everything-else', 3]]);
+    const group = tree.children[2]!;
+    expect(group).toMatchObject({ label: 'Everything else', cost: '0.45' });
+    expect(group.children.map((c) => [c.label, c.kwh])).toEqual([['wall', 2], ['monitor', 0.5], ['Not individually metered', 0.5]]);
+    // 20 kWh house less 10 + 7 is the group's 3; the plugs and the last line are inside it, not added to it: nothing is counted twice.
     expect(tree.children.reduce((t, c) => t + c.kwh, 0)).toBeCloseTo(20, 9);
-    expect(tree.children.find((c) => c.id === 'rest-house')!.cost).toBe('0.07');
+    expect(group.children.reduce((t, c) => t + c.kwh, 0)).toBeCloseTo(group.kwh, 9);
+    expect(group.children[2]).toMatchObject({ rest: true, cost: '0.07' });
+  });
+
+  it('still groups them when the circuits used more than the house did, saying only what they add up to', () => {
+    const over = { ...sum, house_kwh: 15, meters: sum.meters.map((x) => (x.meter_id === 'mains' ? { ...x, kwh: 15 } : x)) };
+    const tree = flowTree(loose, over)!;
+    expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer', 'everything-else']);
+    const group = tree.children[2]!;
+    expect(group).toMatchObject({ kwh: 2.5, cost: '0.38' });
+    expect(group.children.map((c) => c.id)).toEqual(['wall', 'monitor']); // no "Not individually metered": what is left of the house is not known
+    // With no plug either, there is nothing to say about what is left, and no group.
+    expect(flowTree(meters, { ...over, house_kwh: 15 })!.children.map((c) => c.id)).toEqual(['garage', 'dryer']);
   });
 
   it('stands in the all-circuits whole when there is no whole-house clamp, which is the sum of everything at the top', () => {
@@ -161,7 +176,7 @@ describe('a meter that used nothing', () => {
 
   it('has no band, inside a panel or at the top, though it is measured', () => {
     const tree = flowTree(zero, sum)!;
-    expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer', 'rest-house']);
+    expect(tree.children.map((c) => c.id)).toEqual(['garage', 'dryer', 'everything-else']);
     expect(tree.children[0]!.children.map((c) => c.id)).toEqual(['ev', 'lights', 'rest-garage']);
   });
 

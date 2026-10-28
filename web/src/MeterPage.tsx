@@ -33,6 +33,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
   const [period, setPeriod] = useStored('period', '24h');
   const meter = meters.find((m) => m.id === id);
   const { data: live } = usePoll<Live>(api.live, 2000, []);
+  const { data: levels } = usePoll(api.levels, 5 * 60_000, []);
   const direct = meters.filter((m) => m.parent_id === id && m.enabled).slice(0, 4);
 
   const { data, error } = usePoll<Loaded>(
@@ -123,7 +124,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
       {meter && list.length > 0 && (
         <section class="card">
           <h2>Inside it</h2>
-          <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} period={period as PeriodKey} />
+          <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} period={period as PeriodKey} levels={levels} />
         </section>
       )}
 

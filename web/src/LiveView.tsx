@@ -47,6 +47,8 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const whole = mains.length > 0;
   const subjects = whole ? mains : topLevelMeters(meters);
   const nowWatts = whole ? live?.house_watts : measuredTotals(meters, undefined, live?.readings ?? []).watts;
+  // Each meter's resting and working levels change over weeks: read them every few minutes.
+  const { data: levels } = usePoll(api.levels, 5 * 60_000, []);
   const trail = useTrail(nowWatts, live?.time);
   const title = whole ? 'House' : 'Everything measured';
 
@@ -207,7 +209,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           <div class="panel-head">
             <h2>Circuits</h2>
           </div>
-          {tableRows.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={tableRows} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} />}
+          {tableRows.length === 0 ? <p class="note">No circuits are reporting.</p> : <Bars rows={tableRows} of={scale} summary={summary} baseKwh={kwh} period={period as PeriodKey} levels={levels} />}
         </section>
       </div>
 
