@@ -175,6 +175,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
             <span class="visually-hidden">Name for {legs}</span>
             <input
               value={label}
+              title={meter.label}
               maxLength={60}
               onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
               onBlur={() => label !== meter.label && void run(meter.id, { label })}
@@ -578,9 +579,11 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <h2>Diagram</h2>
           <HierarchyDiagram entries={entries} watts={watts} figures={figures} stateOf={(id) => meterState(levels.get(id), watts.get(id))} hover={hover} onHover={setHover} />
         </section>
-        <DevicesCard meters={meters} onChanged={onChanged} />
-        <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
-        <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
+        <div class="tree-side">
+          <DevicesCard meters={meters} onChanged={onChanged} />
+          <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
+          <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
+        </div>
       </div>
         </div>
       </div>

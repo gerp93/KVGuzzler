@@ -588,7 +588,7 @@ select {
 @container (min-width: 52rem) {
   .hier-row > .hier-main {
     display: grid;
-    grid-template-columns: 1.75rem 0.9rem 0.5rem minmax(8rem, 1fr) minmax(0, 12rem) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
+    grid-template-columns: 1.75rem 0.9rem 0.5rem minmax(8rem, 1fr) minmax(0, 9rem) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 6.25rem;
     gap: 8px;
   }
 
@@ -599,7 +599,7 @@ select {
   .hier-head,
   .hier-groups {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 6.25rem;
     gap: 8px;
   }
 
@@ -645,7 +645,7 @@ select {
     position: absolute;
     top: 0;
     bottom: 0;
-    right: calc(8px + 18rem + 3px);
+    right: calc(8px + 17rem + 3px);
     width: 1px;
     background: color-mix(in srgb, var(--color-border) 70%, transparent);
     pointer-events: none;
@@ -1374,7 +1374,7 @@ a.button {
 }
 
 .device-main .grow {
-  flex: 1 1 14rem;
+  flex: 1 1 8rem;
   font-weight: 600;
 }
 
@@ -1955,7 +1955,8 @@ main > * {
 
 .tree-layout,
 .tree-stack,
-.tree-extra {
+.tree-extra,
+.tree-side {
   display: contents;
 }
 
@@ -2223,6 +2224,48 @@ main > * {
 
   .tree-stack > :not(:first-child) {
     grid-column: 2;
+  }
+}
+
+/* A really wide screen: the hierarchy in three columns, the tree, the diagram, and a slim column of devices, computers and groups. Narrower, the diagram and
+   those cards share the one column beside the tree. */
+@media (min-width: 2100px) {
+  .tree-layout {
+    grid-template-columns: minmax(0, 60rem) minmax(0, 1fr) minmax(19rem, 21rem);
+  }
+
+  .tree-extra {
+    display: contents;
+  }
+
+  .tree-layout .tree-extra > .wide.diagram-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tree-side {
+    display: grid;
+    grid-column: 3;
+    grid-row: 1;
+    align-content: start;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .tree-layout .tree-side > .wide {
+    grid-column: auto;
+  }
+}
+
+/* Wider still, the one grid is the tree stack's (see above), so it takes the three columns */
+@media (min-width: 3800px) {
+  .tree-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .tree-stack {
+    grid-template-columns: minmax(0, 60rem) minmax(0, 1fr) minmax(19rem, 21rem);
   }
 }
 
