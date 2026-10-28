@@ -130,11 +130,11 @@ export function FordCard({ meter, onRead }: { meter: Meter; onRead: () => void }
         <input value={tokenUrl} autocomplete="off" placeholder="https://api.vehicle.ford.com/dah2vb2cprod.onmicrosoft.com/oauth2/v2.0/token?p=B2C_1A_FCON_AUTHORIZE" onInput={(e) => setTokenUrl((e.target as HTMLInputElement).value)} />
       </label>
       <label class="field">
-        <span>Unit of the odometer in Ford's response (saved as miles either way)</span>
+        <span>Unit of the odometer in Ford's response</span>
         <select value={unit} onChange={(e) => setUnit((e.target as HTMLSelectElement).value)}>
           <option value="">Choose (compare Ford's number with the car's display)</option>
-          <option value="km">Kilometers (converted to miles when saved)</option>
-          <option value="miles">Miles (saved as is)</option>
+          <option value="km">Kilometers</option>
+          <option value="miles">Miles</option>
         </select>
       </label>
       <div class="chips save">
