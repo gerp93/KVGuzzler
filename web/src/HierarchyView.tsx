@@ -555,8 +555,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
             </ul>
             {levels.size > 0 && (
               <p class="hier-key caption">
-                <span class="key-dot working" aria-hidden="true" /> Working: drawing above its usual resting level
-                <span class="key-dot resting" aria-hidden="true" /> Resting: at or near what it always draws (often 0 W)
+                <span class="key-dot working" aria-hidden="true" /> Working: above resting draw
+                <span class="key-dot resting" aria-hidden="true" /> Resting: at or near resting draw
               </p>
             )}
           </>
