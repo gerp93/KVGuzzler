@@ -193,27 +193,43 @@ button.link {
   color: var(--color-accent-blue);
 }
 
-/* A charging meter's odometer card */
-.ev-stretches {
-  display: grid;
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
+/* The trips between odometer readings, newest first: one row each, the figures in columns */
+.ev-trips-wrap {
+  margin-top: 4px;
+  overflow-x: auto;
 }
 
-.ev-stretches li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 2px 8px;
-  padding: 6px 0;
+.ev-trips {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.9rem;
-  border-top: 1px solid var(--color-border);
 }
 
-.ev-stretches .caption {
-  margin: 0;
+.ev-trips th,
+.ev-trips td {
+  padding: 6px 12px 6px 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ev-trips th:first-child,
+.ev-trips td:first-child {
+  text-align: left;
+}
+
+.ev-trips th {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.ev-trips td {
+  border-top: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-trips .badge {
+  margin-left: 8px;
 }
 
 /* The three figures of the card sit in a narrow column: a size that fits the longest of them (a thousand kWh) */
@@ -234,14 +250,134 @@ button.link {
   margin-top: 0;
 }
 
-/* Reading the odometer from Ford: a collapsed section under the form, its fields stacked and the linking steps set apart */
-.ford {
-  margin-top: 16px;
+/* On a charging meter's own page the vehicle card is the point of the page: it takes the whole width under the figures, in the two-column grid as in the wide layout (styles.css) */
+main.page-hierarchy-meter > .card.ev {
+  grid-column: 1 / -1;
 }
 
-.ford > summary {
-  cursor: pointer;
+/* The vehicle card: a header with its Settings button, the everyday figures, the latest trips; what is set once is in a drawer under them */
+.ev-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ev-head h2 {
+  margin-bottom: 2px;
+}
+
+.ev-sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.ev-sync.bad,
+.caption.bad {
+  color: var(--color-accent-red);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.ev-sync.ok .dot,
+.ford-state.ok .dot {
+  background: var(--color-accent-green);
+}
+
+.ev-sync.bad .dot,
+.ford-state.warn .dot {
+  background: var(--color-accent-red);
+}
+
+.ev-toggle[aria-expanded='true'] {
+  background: var(--color-bg-hover);
+}
+
+.ev-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 12px 24px;
+  margin-top: 12px;
+}
+
+.ev-figures .stat .caption {
+  margin: 0;
+}
+
+.ev-wait {
+  align-self: center;
+  margin: 0;
+}
+
+.ev-since {
+  margin: 12px 0 0;
+}
+
+.ev-sub {
+  margin: 16px 0 0;
+  font-size: 0.85rem;
   font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.ev-empty {
+  margin-top: 12px;
+}
+
+.ev-empty p {
+  margin: 0 0 4px;
+}
+
+.ev-more {
+  margin-top: 8px;
+}
+
+/* The drawer behind Settings: the display choice and typed readings on one side, the Ford connection on the other */
+.ev-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 16px 32px;
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.ev-set h3 {
+  margin: 12px 0 0;
+}
+
+.ev-set h3:first-child {
+  margin-top: 4px;
+}
+
+.ford-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.ford .caption {
+  margin: 4px 0 0;
+}
+
+.ford-app {
+  margin-top: 12px;
+}
+
+.ford-app > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .ford .field {
@@ -263,8 +399,10 @@ button.link {
 .ev-readings {
   display: grid;
   gap: 4px;
+  max-height: 14rem;
   margin: 8px 0 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
