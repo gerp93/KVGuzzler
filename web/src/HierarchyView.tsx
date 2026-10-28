@@ -2,7 +2,6 @@
 // it; there can be several top-level entries, and none of it needs a main monitor. Each row opens (the arrow at its left) to the wiring of that
 // meter, and moves in the tree by the arrows, by dragging onto another meter, or from its "which panel" list. Nothing here is sent to a device:
 // it only changes how this dashboard reads and shows them.
-import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { Hint } from './Hint';
 import { Kwh, Watts } from './Watts';
@@ -22,7 +21,9 @@ import { usePoll, useStored } from './hooks';
 import { MeterPage } from './MeterPage';
 import { pcParts, usePcDetails, type PcPart } from './pcparts';
 import { routePath } from './route';
-import { restRows, type RestRow } from './treeRest';
+import { HierarchyDiagram } from './HierarchyDiagram';
+import { planTree, type LumpEntry } from './treePlan';
+import { restRows } from './treeRest';
 import {
   arrangeByPanel, canHold, clampName, formatMoney, indentTarget, outdentTarget, periodRange, periodWords, shownMeters, underHouse, usualPartner,
   type Computer, type Device, type Live, type Meter, type MeterSummary, type PeriodKey, type Summary,
@@ -60,9 +61,9 @@ interface Shared {
   onChanged: () => void;
 }
 
-function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; shared: Shared }) {
+/** `rows` and `at` are the rows the move arrows read; `depth` is how far in the row is drawn (the plan may put it deeper, as under "Everything else"). */
+function Row({ meter, rows, at, depth, shared }: { meter: Meter; rows: { meter: Meter; depth: number }[]; at: number; depth: number; shared: Shared }) {
   const { all, figures, estimated, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged } = shared;
-  const depth = rows[at]!.depth;
   const [label, setLabel] = useState(meter.label);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -321,26 +322,23 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
   );
 }
 
-/** "Other (not metered)" under a meter that holds others: what its own reading carries beyond the meters listed inside it. Read-only, and never added to anything. */
-function RestLine({ rest }: { rest: RestRow }) {
-  const house = rest.parent.scope === 'mains';
-  const title = house
-    ? 'What the whole house used that none of the circuits and plugs listed under it accounts for'
-    : `What ${rest.parent.label} carried beyond the meters listed inside it`;
+/** A line worked out from others, not a meter: "Everything else" (the house less its circuits), "Not individually metered" inside it, and "Other (not metered)"
+ * under a meter that holds others (what its own reading carries beyond what is listed inside it). Read-only, and never added to anything. */
+function LumpLine({ line }: { line: LumpEntry }) {
   return (
-    <li class="hier-row virtual" style={{ marginLeft: `${rest.depth * 1.25}rem` }}>
+    <li class="hier-row virtual" style={{ marginLeft: `${line.depth * 1.25}rem` }}>
       <div class="hier-main">
         <span />
         <span />
-        <span class="grow part-name" title={title}>
-          Other (not metered)
+        <span class="grow part-name" title={line.title}>
+          {line.label}
         </span>
-        <span class="caption hier-tag">remainder</span>
-        <span class="num hier-watts">{rest.watts != null ? <Watts w={rest.watts} /> : ''}</span>
+        <span class="caption hier-tag">{line.tag}</span>
+        <span class="num hier-watts">{line.watts != null ? <Watts w={line.watts} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
-        <span class="num hier-energy"><Kwh k={rest.kwh} /></span>
-        <span class="num hier-cost">{rest.cost != null ? formatMoney(rest.cost) : '—'}</span>
+        <span class="num hier-energy">{line.kwh != null ? <Kwh k={line.kwh} /> : '—'}</span>
+        <span class="num hier-cost">{line.cost != null ? formatMoney(line.cost) : '—'}</span>
         <div class="hier-actions" />
       </div>
     </li>
@@ -404,8 +402,19 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const currents = new Map((live?.readings ?? []).map((r) => [r.meter_id, { volts: r.volts, amps: r.amps }]));
   const rows = underHouse(arrangeByPanel(shownMeters(meters)));
   // What each meter that holds others carries beyond them, drawn after the last row inside it, from the flow chart's own figures for the period.
-  const rests = new Map<number, RestRow[]>();
-  for (const r of summary ? restRows(rows, flowTree(meters, summary), watts, live?.house_watts) : []) rests.set(r.after, [...(rests.get(r.after) ?? []), r]);
+  const rests = summary ? restRows(rows, flowTree(meters, summary), watts, live?.house_watts) : [];
+  // The lines in the order they are drawn, read by the tree below and by the diagram: the same list.
+  const entries = planTree({
+    rows,
+    watts,
+    houseWatts: live?.house_watts,
+    summary,
+    rests,
+    partsOf: (m) => {
+      const detail = pcDetails.get(m.id);
+      return detail ? { parts: pcParts(detail, watts.get(m.id) ?? null), href: routePath('hierarchy', 'computer', detail.computer.id) } : undefined;
+    },
+  });
   const secondLegs = new Set(meters.flatMap((m) => (m.pair_with ? [m.pair_with] : [])));
   const hidden = meters.filter((m) => !m.enabled && !secondLegs.has(m.id));
   const shared: Shared = { all: meters, figures, estimated: summary?.cost_estimated ?? false, deviceName, isOnlyMeterOfDevice, computerName, watts, currents, dragging, setDragging, onChanged };
@@ -472,22 +481,15 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
               <span class="num">Cost</span>
             </div>
             <ul class="hier">
-              {rows.map(({ meter, depth }, at) => {
-                const detail = pcDetails.get(meter.id);
-                const parts = detail ? pcParts(detail, watts.get(meter.id) ?? null) : [];
-                const page = detail ? routePath('hierarchy', 'computer', detail.computer.id) : '';
-                return (
-                  <Fragment key={meter.id}>
-                    <Row meter={meter} rows={rows} at={at} shared={shared} />
-                    {parts.map((p) => (
-                      <PartRow key={`${meter.id}:${p.key}`} part={p} depth={depth + 1} href={page} />
-                    ))}
-                    {(rests.get(at) ?? []).map((r) => (
-                      <RestLine key={`rest-${r.parent.id}`} rest={r} />
-                    ))}
-                  </Fragment>
-                );
-              })}
+              {entries.map((e) =>
+                e.kind === 'row' ? (
+                  <Row key={e.id} meter={e.meter} rows={rows} at={e.at} depth={e.depth} shared={shared} />
+                ) : e.kind === 'part' ? (
+                  <PartRow key={e.id} part={e.part} depth={e.depth} href={e.href} />
+                ) : (
+                  <LumpLine key={e.id} line={e} />
+                ),
+              )}
             </ul>
           </>
         )}
@@ -508,6 +510,11 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
         <DevicesCard meters={meters} onChanged={onChanged} />
         <ComputersCard meters={meters} onChanged={onChanged} watts={watts} from={summary?.from} to={summary?.to} />
         <GroupsCard meters={meters} onChanged={onChanged} watts={watts} deviceName={deviceName} from={summary?.from} to={summary?.to} />
+        <section class="card wide">
+          <h2>Diagram</h2>
+          <Hint>The tree on the left drawn as boxes: each box is one line of it, with what it draws now and what it used over the period. It follows every change you make to the tree. A box opens that meter's page.</Hint>
+          <HierarchyDiagram entries={entries} watts={watts} figures={figures} />
+        </section>
       </div>
         </div>
       </div>
