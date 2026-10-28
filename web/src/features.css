@@ -270,7 +270,7 @@ button.link {
 
 .guzzler-list li {
   display: grid;
-  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 1.4rem minmax(0, 9rem) minmax(0, 1fr) 6.5rem 5rem 6.5rem;
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
@@ -310,17 +310,36 @@ button.link {
   font-size: 0.85rem;
 }
 
+.guzzler-list .num {
+  text-align: right;
+}
+
+/* The column headings: the same grid as a row, so each heading sits over its figures */
+.guzzler-list li.head {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.guzzler-list li.head > * {
+  font-size: inherit;
+}
+
 .seg.small {
   margin: 4px 0 0;
 }
 
 @media (max-width: 480px) {
   .guzzler-list li {
-    grid-template-columns: 1.4rem minmax(0, 1fr) auto auto;
+    grid-template-columns: 1.4rem minmax(0, 1fr) 4.5rem 6rem;
   }
 
   .guzzler-list .bar,
-  .guzzler-list .peak {
+  .guzzler-list .peak,
+  .guzzler-list li.head .bar-head {
     display: none;
   }
 }
