@@ -224,7 +224,6 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
                   Odometer: <OdometerNow meterId={meter.id} />
                 </p>
               )}
-              <p class="caption block">Its page then takes the car's odometer now and then (once a month is plenty) and works out what a mile costs, to set beside a gas car's.</p>
             </fieldset>
           )}
           {refoss && (
@@ -237,7 +236,7 @@ function Row({ meter, rows, at, shared }: { meter: Meter; rows: { meter: Meter; 
                     Flip {clampName(c)}
                   </label>
                 ))}
-                <p class="caption block">A load reads positive. Flip a clamp that reads backwards here, or turn the clamp round in the panel, not both.</p>
+                <p class="caption block">A load should read positive.</p>
               </fieldset>
               <fieldset>
                 <legend>Breaker</legend>
@@ -313,10 +312,10 @@ function PartRow({ part, depth, href }: { part: PcPart; depth: number; href: str
       <div class="hier-main">
         <span />
         <span />
-        <span class="grow part-name" title={part.remainder ? 'The wall plug less the parts above: fans, drives, the motherboard, power-supply losses' : 'As its collector reports it'}>
+        <span class="grow part-name" title={part.remainder ? 'Wall plug less the parts above: fans, drives, motherboard, power-supply loss' : 'As its collector reports it'}>
           {part.label}
         </span>
-        <span class="caption hier-tag">{part.remainder ? 'wall plug less the parts' : 'from its collector'}</span>
+        <span class="caption hier-tag">{part.remainder ? 'remainder' : 'collector'}</span>
         <span class="num hier-watts">{part.watts != null ? <Watts w={part.watts} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
@@ -346,7 +345,7 @@ function RestLine({ rest }: { rest: RestRow }) {
         <span class="grow part-name" title={title}>
           Other (not metered)
         </span>
-        <span class="caption hier-tag">{house ? `${rest.parent.label} less what is listed below` : `${rest.parent.label} less what is listed inside`}</span>
+        <span class="caption hier-tag">remainder</span>
         <span class="num hier-watts">{rest.watts != null ? <Watts w={rest.watts} /> : ''}</span>
         <span class="hier-amps" />
         <span class="hier-volts" />
@@ -430,7 +429,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <h2>Hierarchy</h2>
           <div class="inline-actions">
             {summary && (
-              <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked on the Live page, in this order, as a spreadsheet file">
+              <a class="button" href={api.treeExportUrl(summary.from, summary.to)} download title="Every meter over the period picked on Live">
                 Download as CSV
               </a>
             )}
@@ -449,9 +448,8 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           />
         )}
         <Hint>
-          Every meter, laid out as the house is wired: the whole house on top, with the main panel's circuits beneath it. A sub-panel holds the circuits inside it, and a circuit holds the plugs on it. A parent's own reading already
-          counts what is inside it, so nothing is added twice. Open a row (the arrow) for its wiring; move it with the arrows, or drag it onto the meter it is inside.
-          Nothing here is sent to a device. The Energy and Cost columns are over {periodWords(period as PeriodKey)}, the period picked on the other pages.
+          A parent's reading already includes what is inside it. Open a row for its wiring; move it with the arrows or drag it onto its parent. Energy and Cost
+          cover {periodWords(period as PeriodKey)}. Nothing here is sent to a device.
         </Hint>
         {error && <p class="note error">{error}</p>}
         {dragging && (
@@ -472,7 +470,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           </div>
         )}
         {rows.length === 0 ? (
-          <p class="note">No meters are shown. Use ＋ Add to add a device, or show a hidden one below.</p>
+          <p class="note">No meters shown. Use ＋ Add.</p>
         ) : (
           <>
             <div class="hier-head" aria-hidden="true">

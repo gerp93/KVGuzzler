@@ -12,16 +12,19 @@ export function dayLabel(date: string): string {
   return `${when.toLocaleDateString([], { weekday: 'short' })} ${when.getDate()} ${when.toLocaleDateString([], { month: 'short' })}`;
 }
 
-/** "50 kWh instead of the usual 20: 30 kWh more, about $6.00". */
-export function dayLine(day: Pick<AnomalyDay, 'kwh' | 'usual_kwh' | 'extra_kwh' | 'extra_cost'>): string {
-  const cost = day.extra_cost != null ? `, about ${formatMoney(day.extra_cost)}` : '';
-  return `${formatKwh(day.kwh)} instead of the usual ${formatKwh(day.usual_kwh)}: ${formatKwh(day.extra_kwh)} more${cost}`;
+/** An unusual day's figures: the day's energy, what the same kind of day usually is, how much more that is and what it cost (empty without a price). */
+export function dayFigures(day: Pick<AnomalyDay, 'kwh' | 'usual_kwh' | 'extra_kwh' | 'extra_cost'>): { kwh: string; usual: string; extra: string; cost: string } {
+  return {
+    kwh: formatKwh(day.kwh),
+    usual: formatKwh(day.usual_kwh),
+    extra: `+${formatKwh(day.extra_kwh)}`,
+    cost: day.extra_cost != null ? `+${formatMoney(day.extra_cost)}` : '',
+  };
 }
 
-/** "Mostly EV charger (+30 kWh), Workshop (+3.1 kWh)"; empty when nothing inside it was unusual itself. */
+/** "EV charger +30 kWh, Workshop +3.1 kWh"; empty when nothing inside it was unusual itself. */
 export function causesLine(causes: AnomalyDay['causes']): string {
-  if (causes.length === 0) return '';
-  return `Mostly ${causes.map((c) => `${c.label} (+${formatKwh(c.extra_kwh)})`).join(', ')}`;
+  return causes.map((c) => `${c.label} +${formatKwh(c.extra_kwh)}`).join(', ');
 }
 
 /** The days to show first, and how many are held back behind "Show all". */

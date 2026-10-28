@@ -1,7 +1,7 @@
 // "Always on": the power the house (or one meter) hardly ever goes below, a year of it in energy and money, and its share of what is used.
 // Not shown until an hour of minutes has been recorded. A view of one reading: never added to anything.
 import { api } from './api';
-import { baseLoadSentence, lookedAt, shareText, yearKwh, type BaseLoad } from './baseload';
+import { lookedAt, shareText, yearKwh, type BaseLoad } from './baseload';
 import { usePoll } from './hooks';
 import { formatMoney, periodRange, type PeriodKey } from './lib';
 import { Watts } from './Watts';
@@ -24,13 +24,13 @@ export function BaseLoadCard({ meterId, period }: { meterId?: string; period: Pe
   return (
     <section class="card">
       <h2>Always on</h2>
-      <BaseLoadStats data={data} what="this meter" />
+      <BaseLoadStats data={data} />
     </section>
   );
 }
 
-/** The figures and the sentence of an always-on reading: shared by a meter's own card and the house's, which sits in the Top guzzlers card under "At rest". */
-export function BaseLoadStats({ data, what, span = 'the period' }: { data: BaseLoad; what: string; span?: string }) {
+/** The figures of an always-on reading: shared by a meter's own card and the house's, which sits in the Top guzzlers card under "At rest". */
+export function BaseLoadStats({ data }: { data: BaseLoad }) {
   return (
     <>
       <div class="stats three">
@@ -48,10 +48,7 @@ export function BaseLoadStats({ data, what, span = 'the period' }: { data: BaseL
           <p class="big small">{shareText(data.share)}</p>
         </div>
       </div>
-      <p class="caption">
-        {baseLoadSentence(data, what)} Worked out as the level it is above 95% of the time, from {lookedAt(data.minutes)} of readings in {span}
-        {data.cost_per_year != null ? ", priced at today's rate" : ''}.
-      </p>
+      <p class="caption">Based on {lookedAt(data.minutes)} of readings</p>
     </>
   );
 }

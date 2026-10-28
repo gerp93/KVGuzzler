@@ -34,10 +34,10 @@ export function formatVolts(v: number | null | undefined): string {
 export function breakerAdvice(peak: number | null, breaker: number | null | undefined): string | null {
   const level = breakerLevel(peak);
   if (level === 'high') {
-    return `It reached ${peak}% of its ${breaker} A breaker. A load that runs for 3 hours or more should stay at or below 80% of the breaker.`;
+    return `Reached ${peak}% of the ${breaker} A breaker. A load running 3 h or more should stay at or below 80%.`;
   }
   if (level === 'over') {
-    return `It reached ${peak}% of its ${breaker} A breaker, which would trip if that lasted. Check that the breaker size is right and that the clamp reads this breaker alone.`;
+    return `Reached ${peak}% of the ${breaker} A breaker, which would trip if that lasted. Check the breaker size and that the clamp reads this breaker alone.`;
   }
   return null;
 }
@@ -85,11 +85,11 @@ export function breakerVerdict(peakPct: number | null, runs: RunCurrent[] | null
     const hours = Math.round((long.run.minutes / 60) * 10) / 10;
     return {
       level: 'sustained',
-      text: `Its run of ${hours} hours averaged ${long.percent}% of its ${breaker} A breaker. A load that runs for 3 hours or more should stay at or below 80% of the breaker.`,
+      text: `A ${hours} h run averaged ${long.percent}% of the ${breaker} A breaker. A load running 3 h or more should stay at or below 80%.`,
     };
   }
   if (peakPct >= 80) {
-    return { level: 'brief', text: `It reached ${peakPct}% of its ${breaker} A breaker, but no run of 3 hours or more averaged above 80%: only a load that lasts that long has to stay under it.` };
+    return { level: 'brief', text: `Peaked at ${peakPct}% of the ${breaker} A breaker; no run of 3 h or more averaged above 80%.` };
   }
   return { level: 'ok', text: null };
 }

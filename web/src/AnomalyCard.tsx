@@ -3,7 +3,7 @@
 // left out when there is nothing to say.
 import { useState } from 'preact/hooks';
 import { api } from './api';
-import { causesLine, dayLabel, dayLine, firstDays } from './anomalies';
+import { causesLine, dayFigures, dayLabel, firstDays } from './anomalies';
 import { usePoll } from './hooks';
 
 const SHOWN = 5;
@@ -17,7 +17,7 @@ export function AnomalyCard({ meterId, quiet }: { meterId?: string; quiet?: bool
     return quiet ? null : (
       <section class="card">
         <h2>Unusual days</h2>
-        <p class="note">Nothing unusual in the last {DAYS} days: every day was close to what that kind of day usually is.</p>
+        <p class="note">None in the last {DAYS} days.</p>
       </section>
     );
   }
@@ -26,25 +26,29 @@ export function AnomalyCard({ meterId, quiet }: { meterId?: string; quiet?: bool
     <section class="card">
       <h2>Unusual days</h2>
       <ul class="anomalies">
-        {list.map((d) => (
-          <li key={`${d.date}:${d.meter_id ?? 'house'}`}>
-            <span class="when">{dayLabel(d.date)}</span>
-            <span class="what">
-              <strong>{d.label}</strong>: {dayLine(d)}
-              {d.causes.length > 0 && <span class="caption block">{causesLine(d.causes)}</span>}
-            </span>
-          </li>
-        ))}
+        {list.map((d) => {
+          const f = dayFigures(d);
+          return (
+            <li key={`${d.date}:${d.meter_id ?? 'house'}`}>
+              <span class="when">{dayLabel(d.date)}</span>
+              <strong>{d.label}</strong>
+              <span class="figs">
+                <span>{f.kwh}</span>
+                <span class="caption">usual {f.usual}</span>
+                <span class="extra">{f.extra}</span>
+                {f.cost && <span class="cost">{f.cost}</span>}
+              </span>
+              {d.causes.length > 0 && <span class="caption cause">{causesLine(d.causes)}</span>}
+            </li>
+          );
+        })}
       </ul>
       {data.days.length > SHOWN && (
         <button type="button" class="link" onClick={() => setAll(!all)}>
           {all ? 'Show fewer' : `Show all ${data.days.length}`}
         </button>
       )}
-      <p class="caption">
-        A day is listed when it used at least half as much again as the same kind of day (weekday or weekend) over the four weeks before it, and well
-        beyond how much that meter's days normally vary. A meter inside something that was unusual the same day is named as its cause, not listed again.
-      </p>
+      <p class="caption">Against the same kind of day (weekday or weekend) over the previous 4 weeks</p>
     </section>
   );
 }

@@ -30,6 +30,7 @@ export function CurrentCard({ meter, now, peakAmps, runs }: { meter: Meter; now:
         <div class="stat">
           <span class="caption">Highest in the period</span>
           <p class="big small">{formatAmps(peakAmps)}</p>
+          {meter.pair_with && <span class="caption">larger leg</span>}
         </div>
         <div class="stat">
           <span class="caption">Of its breaker</span>
@@ -46,12 +47,9 @@ export function CurrentCard({ meter, now, peakAmps, runs }: { meter: Meter; now:
       {verdict.text && <p class={level === 'brief' ? 'caption' : 'breaker-warning'}>{verdict.text}</p>}
       {breaker == null && settable && (
         <p class="caption">
-          Say how big its breaker is (open its row in the <a href={routePath('hierarchy')}>Hierarchy tab</a>, then Breaker size) to see how much of it is used.
+          <a href={routePath('hierarchy')}>Set the breaker size</a> in Hierarchy
         </p>
       )}
-      <p class="caption">
-        The highest of each minute's readings.{meter.pair_with ? ' A 240 V breaker carries the same current in both of its legs, so this is the larger leg, not the two added.' : ''}
-      </p>
     </section>
   );
 }
@@ -77,10 +75,13 @@ export function BreakerField({ meter, now, onChange }: { meter: Meter; now: Now;
           </option>
         ))}
       </select>
-      <span class="caption">
-        {now.amps != null ? `Now ${formatAmps(now.amps)}${now.volts != null ? ` at ${formatVolts(now.volts)}` : ''}${pct != null ? `, ${pct}% of it` : ''}. ` : ''}
-        Only used to say how much of it a current is.
-      </span>
+      {now.amps != null && (
+        <span class="caption">
+          Now {formatAmps(now.amps)}
+          {now.volts != null ? ` · ${formatVolts(now.volts)}` : ''}
+          {pct != null ? ` · ${pct}% of it` : ''}
+        </span>
+      )}
     </label>
   );
 }

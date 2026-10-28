@@ -90,17 +90,14 @@ function DeviceRow({ device, onChanged }: { device: Device; onChanged: () => voi
       {editing && (
         <div class="device-edit">
           <label class="field">
-            <span>Name (a plug's meter is named the same)</span>
+            <span>Name</span>
             <input value={name} maxLength={60} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
           </label>
           <label class="field">
-            <span>Address (a plain host name or IP address)</span>
+            <span>Address (host name or IP)</span>
             <input value={host} onInput={(e) => setHost((e.target as HTMLInputElement).value)} />
           </label>
-          <p class="caption">
-            If the device got a new address from the router, put it here. Its meters keep their names, settings and history. A new address is read once first: if nothing
-            answers there like this device, nothing changes.
-          </p>
+          <p class="caption">Meters keep their names, settings and history. A new address is checked before it is saved.</p>
           <div class="chips">
             <button type="button" onClick={save} disabled={busy || !changed || host.trim() === '' || name.trim() === ''}>
               {busy ? (changedHost ? 'Checking the new address…' : 'Saving…') : 'Save'}
@@ -131,10 +128,7 @@ export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged:
   return (
     <section class="card wide">
       <h2>Devices</h2>
-      <Hint>
-        What the server reads. Add one with the + Add button at the top; change a device's name or address, or stop polling it, here. The server only ever reads a
-        device: it cannot switch a plug or change a monitor.
-      </Hint>
+      <Hint>Read-only: the server never switches a plug or changes a monitor.</Hint>
       {error && <p class="note">{error.message}</p>}
       {devices && devices.length === 0 && <p class="note">No devices yet.</p>}
       {devices && devices.length > 0 && (

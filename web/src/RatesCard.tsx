@@ -21,7 +21,7 @@ export function RatesCard() {
     api.rates().then(setCfg, (e: Error) => setMessage(e.message));
     api.tariff().then(setTariff, () => undefined);
   }, []);
-  if (!cfg) return <section class="card"><h2>Electricity price</h2><p class="note">{message || 'Loading…'}</p></section>;
+  if (!cfg) return <section class="card page-narrow"><h2>Electricity price</h2><p class="note">{message || 'Loading…'}</p></section>;
 
   const change = (next: RateConfig) => {
     setCfg(next);
@@ -65,7 +65,7 @@ export function RatesCard() {
   );
 
   return (
-    <section class="card">
+    <section class="card page-narrow">
       <h2>Electricity price</h2>
       <label class="field">
         <span>Price from</span>
@@ -99,7 +99,7 @@ export function RatesCard() {
           }}
         />
       </label>
-      {looksLikeCents && <p class="note">That is more than $1 per kWh. Did you type cents? 15¢ is 0.15.</p>}
+      {looksLikeCents && <p class="note">Over 1.00 per kWh. Did you enter cents? 15¢ is 0.15.</p>}
 
       {cfg.mode === 'lookup' && (
         <TariffPicker current={tariff} label={cfg.tariff_label} onChoose={(l) => change({ ...cfg, tariff_label: l })} />
@@ -109,7 +109,7 @@ export function RatesCard() {
         <>
           <h3>Bills</h3>
           {bills.length === 0 ? (
-            <p class="note">No bills yet. Each bill's price (its total minus flat fees, over its kWh) applies to the dates it covers.</p>
+            <p class="note">No bills added.</p>
           ) : (
             <ul class="settings">
               {bills.map((b, i) => (
