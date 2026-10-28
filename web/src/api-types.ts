@@ -1020,7 +1020,7 @@ export interface components {
         CarbonSeries: {
             /** @enum {string} */
             bucket: "hour" | "day";
-            /** @description The grid's average intensity over the period, the figure an hour with none of its own is valued at; null when there are no points. */
+            /** @description The grid's average intensity over the period, the figure an hour with none of its own is valued at; null when the series is empty because there is no whole-house meter or no intensity was ever saved. */
             grid_average_g_per_kwh: number | null;
             points: components["schemas"]["CarbonPoint"][];
         };
