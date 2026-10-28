@@ -519,7 +519,6 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
       <div class="tree-extra">
         <section class="card wide diagram-card">
           <h2>Diagram</h2>
-          <Hint>The tree on the left drawn as boxes: each box is one line of it, with what it draws now and what it used over the period. It follows every change you make to the tree. A box opens that meter's page.</Hint>
           <HierarchyDiagram entries={entries} watts={watts} figures={figures} hover={hover} onHover={setHover} />
         </section>
         <DevicesCard meters={meters} onChanged={onChanged} />
