@@ -413,31 +413,50 @@ select {
   flex: 1 1 10rem;
 }
 
-/* Hierarchy: one tree of every meter, a row each, the wiring behind the arrow at its left */
+/* Hierarchy: one tree of every meter. Rows are plain lines with a hairline between them, the name reads as text (it is an input, shown only when you
+   point at it), a faint bar behind the row is its share of the house, and the buttons appear on the row you point at. The wiring opens under the row. */
+.hier-title {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hier-title h2 {
+  margin: 0;
+}
+
+.hier-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .hier {
   display: grid;
-  gap: 8px;
-  margin: 12px 0 0;
+  gap: 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .hier-row {
+  --kind: var(--color-accent-blue);
   display: grid;
-  gap: 8px;
-  padding-left: 8px;
-  border-left: 2px solid var(--color-border);
-  border-radius: 2px;
+  gap: 6px;
+  padding-left: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
 }
 
-.hier-row.hot {
-  background: var(--color-bg-hover);
-  border-left-color: var(--color-primary-action);
+.hier > .hier-row:first-child {
+  border-top-color: transparent;
 }
+
+.hier-row.k-house { --kind: var(--color-accent-green); }
+.hier-row.k-circuit { --kind: var(--color-accent-blue); }
+.hier-row.k-device { --kind: var(--color-accent-red); }
 
 .hier-row.drop {
   background: var(--color-bg-hover);
-  border-left-color: var(--color-primary-action);
+  box-shadow: inset 3px 0 0 var(--color-primary-action);
 }
 
 .hier-main {
@@ -445,10 +464,64 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-height: 2.5rem;
+  padding: 3px 8px;
+  border-radius: 8px;
+  /* a thin line along the bottom: how much of the house's power this row draws right now */
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--kind) 75%, transparent) var(--share, 0%), transparent var(--share, 0%));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 2px;
+  transition: background-color 0.1s;
+}
+
+.hier-row:hover > .hier-main,
+.hier-row.hot > .hier-main,
+.hier-row.open > .hier-main {
+  background-color: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.hier-row.k-house > .hier-main {
+  min-height: 2.9rem;
+  font-weight: 600;
 }
 
 .hier-main .grow {
   flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.kind-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--kind);
+  border-radius: 50%;
+}
+
+.meter-name {
+  padding-inline: 8px;
+}
+
+/* The name is an input so it can be renamed, but it reads as text until you point at it or click it */
+.hier-main label.grow input {
+  width: 100%;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.hier-main label.grow input:hover {
+  border-color: var(--color-border);
+}
+
+.hier-main label.grow input:focus {
+  background: var(--color-bg);
+  border-color: var(--color-accent-blue);
 }
 
 .hier-tag {
@@ -465,34 +538,47 @@ select {
 .hier-energy,
 .hier-cost {
   min-width: 4.5rem;
-  color: var(--muted);
 }
 
+.hier-watts {
+  font-weight: 600;
+}
+
+.hier-amps,
+.hier-volts,
 .hier-energy,
 .hier-cost {
-  color: var(--color-text);
+  font-size: 0.92rem;
 }
 
 .hier-head {
   display: none;
-  margin-top: 12px;
-  font-size: 0.85rem;
+  margin-top: 14px;
+  padding-inline: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
-/* Wide enough (the card, not the window: the card may be a narrow column), the columns line up down the list: name, what it is, now, amps, volts, energy and cost over the period, then the buttons. */
+/* Wide enough (the card, not the window: the card may be a narrow column), the columns line up down the list: the arrow, the grip, the dot, the name, what it is,
+   then now, amps, volts, energy and cost over the period, and the buttons, which show only on the row you point at. */
 @container (min-width: 52rem) {
   .hier-row > .hier-main {
     display: grid;
-    grid-template-columns: 2rem 1rem minmax(8rem, 1fr) minmax(0, 13rem) 4.5rem 4rem 3.5rem 5.5rem 4.5rem 12.5rem;
+    grid-template-columns: 1.75rem 0.9rem 0.5rem minmax(8rem, 1fr) minmax(0, 12rem) 4.5rem 3.5rem 3.5rem 5rem 4.25rem 7.25rem;
     gap: 8px;
+  }
+
+  .hier-row > .hier-main > span:empty:not(.kind-dot) {
+    display: block;
   }
 
   .hier-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem 4rem 3.5rem 5.5rem 4.5rem 12.5rem;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 3.5rem 3.5rem 5rem 4.25rem 7.25rem;
     gap: 8px;
-    padding-right: 0;
   }
 
   .hier-head .hier-tag {
@@ -504,11 +590,30 @@ select {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .hier-row .hier-actions {
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  .hier-row:hover .hier-actions,
+  .hier-row:focus-within .hier-actions,
+  .hier-row.hot .hier-actions,
+  .hier-row.open .hier-actions {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .hier-row .hier-actions {
+    opacity: 1;
+  }
 }
 
 .hier-actions {
   display: flex;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 2px;
 }
 
 button.icon,
@@ -524,9 +629,27 @@ button.show-btn {
   padding: 4px 8px;
 }
 
+.hier-actions button.icon,
+.hier-actions a.button.icon {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: 2px 6px;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.hier-actions button.icon:hover,
+.hier-actions a.button.icon:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
 button.twisty {
-  min-width: 2rem;
-  padding: 4px;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 2px;
+  color: var(--muted);
   border-color: transparent;
   background: transparent;
 }
@@ -546,9 +669,14 @@ button.icon:disabled {
 }
 
 .drag {
-  cursor: grab;
   color: var(--muted);
+  cursor: grab;
+  opacity: 0.35;
   user-select: none;
+}
+
+.hier-row:hover .drag {
+  opacity: 1;
 }
 
 .hier-top-drop {
@@ -565,30 +693,86 @@ button.icon:disabled {
   border-radius: var(--radius);
 }
 
+/* The wiring of a meter, opened under its row: groups of related settings side by side, not one tall stack */
 .hier-panel {
   display: grid;
-  gap: 12px;
-  margin-left: 2.5rem;
-  padding: 10px 12px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 18px 24px;
+  margin: 2px 8px 10px 2.75rem;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  border-radius: 10px;
+}
+
+.hier-panel .pg {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.hier-panel .pg-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .hier-panel .field {
   margin-top: 0;
 }
 
-.hier-panel fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.hier-panel .field > span {
+  font-size: 0.85rem;
 }
 
-.hier-panel fieldset .field {
-  flex: 1 1 100%;
+.hier-panel .toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.hier-panel p {
+  margin: 0;
+}
+
+/* Two or three choices in one control, the chosen one filled */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.segmented label {
+  position: relative;
+  flex: 1 1 0;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented label + label {
+  border-left: 1px solid var(--color-border);
+}
+
+.segmented label.on {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-accent-blue) 28%, transparent);
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: -2px;
 }
 
 input[type='radio'] {
@@ -596,13 +780,6 @@ input[type='radio'] {
   padding: 0;
   background: none;
   border: 0;
-}
-
-.hier-panel legend {
-  padding: 0;
-  margin-bottom: 4px;
-  font-size: 0.85rem;
-  color: var(--muted);
 }
 
 .check {
@@ -1052,22 +1229,28 @@ a.button {
   text-decoration: underline;
 }
 
-/* A part of a computer in the tree: read-only, quieter than a meter */
-.hier-row.virtual {
-  border-left-style: dotted;
-}
-
+/* Lines worked out from others (a computer's parts, "Everything else", "Other (not metered)"): read-only, quieter than a meter, and nothing to drag */
 .hier-row.virtual .part-name {
   color: var(--muted);
   font-style: italic;
 }
 
-.hier-row.virtual .part-name.lump-parent {
-  grid-column: 1 / 4;
-}
-
 .hier-row.virtual .part-name a {
   color: inherit;
+}
+
+/* "Everything else" is a heading of the rows inside it: it starts at the row's edge and is not italic */
+.hier-row.lump-head {
+  margin-top: 6px;
+}
+
+.hier-row.lump-head .part-name.lump-parent {
+  grid-column: 1 / 5;
+  padding-left: 4px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
 }
 
 /* Devices: a row each, the name and address behind an Edit button */
@@ -1085,6 +1268,44 @@ a.button {
 
 .device-main .grow {
   flex: 1 1 14rem;
+  font-weight: 600;
+}
+
+/* A device: its name, then what it is and where it answers in quiet type beneath, and small buttons that stay out of the way */
+.device-main .grow .caption {
+  display: block;
+  margin-left: 16px;
+  font-weight: 400;
+}
+
+.settings.devices {
+  gap: 0;
+}
+
+.settings.devices .device-row {
+  padding: 8px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+.settings.devices .device-row:first-child {
+  border-top-color: transparent;
+}
+
+.device-main button {
+  min-height: 0;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.device-main button:hover {
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+
+/* The spacers that keep the columns of the tree line up are only wanted when there are columns */
+.hier-main > span:empty:not(.kind-dot) {
+  display: none;
 }
 
 .device-edit {
@@ -1405,20 +1626,16 @@ summary:focus-visible {
   container-type: inline-size;
 }
 
-/* Hierarchy in a narrow card (a phone, or a column beside another): name and watts on the first line, then what it is, then its energy and cost, then the buttons. */
+/* Hierarchy in a narrow card (a phone, or a column beside another): name and watts on the first line, then what it is, then its energy and cost with the
+   buttons at the end of that line. Plain lines with a hairline between them, as when wide. */
 @container (max-width: 51.99rem) {
-  .hier {
-    gap: 12px;
-  }
-
   .hier-row {
-    padding: 8px 8px 8px 10px;
-    background: color-mix(in srgb, var(--color-text) 4%, transparent);
-    border-radius: var(--radius);
+    padding: 4px 0;
   }
 
   .hier-main {
-    gap: 4px 8px;
+    gap: 2px 8px;
+    padding-block: 6px;
   }
 
   .hier-main .grow {
@@ -1435,9 +1652,9 @@ summary:focus-visible {
 
   .hier-amps,
   .hier-volts {
-    order: 1;
+    order: 4;
     min-width: 0;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
 
   .hier-amps:empty,
@@ -1448,13 +1665,13 @@ summary:focus-visible {
   .hier-tag {
     flex: 1 0 100%;
     order: 2;
-    padding-left: 2.25rem;
+    padding-left: 3.75rem;
   }
 
   /* Empty, it still keeps the line break that separates the name's line from the figures. */
   .hier-tag:empty {
     height: 0;
-    margin: -4px 0 0;
+    margin: -2px 0 0;
     padding: 0;
   }
 
@@ -1462,18 +1679,17 @@ summary:focus-visible {
   .hier-cost {
     order: 3;
     min-width: 0;
-    padding-left: 2.25rem;
     text-align: left;
     font-size: 0.9rem;
   }
 
-  .hier-cost {
-    padding-left: 0;
+  .hier-energy {
+    padding-left: 3.75rem;
   }
 
   .hier-actions {
-    flex: 1 0 100%;
-    order: 4;
+    flex: 1 0 auto;
+    order: 5;
     justify-content: flex-end;
     gap: 6px;
   }

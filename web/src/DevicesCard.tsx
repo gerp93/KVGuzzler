@@ -1,5 +1,4 @@
 import { useState } from 'preact/hooks';
-import { Hint } from './Hint';
 import { api } from './api';
 import { usePoll } from './hooks';
 import type { Device, Meter } from './lib';
@@ -128,7 +127,6 @@ export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged:
   return (
     <section class="card wide">
       <h2>Devices</h2>
-      <Hint>Read-only: the server never switches a plug or changes a monitor.</Hint>
       {error && <p class="note">{error.message}</p>}
       {devices && devices.length === 0 && <p class="note">No devices yet.</p>}
       {devices && devices.length > 0 && (
