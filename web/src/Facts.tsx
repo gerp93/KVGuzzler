@@ -5,11 +5,12 @@ export interface Fact {
   value: string;
 }
 
-/** `table`: a two-column table, the label on the left and its value on the right, for the details of a page. With a `title` it is headed. */
-export function Facts({ items, table, title }: { items: Fact[]; table?: boolean; title?: string }) {
+/** `table`: a two-column table, the label on the left and its value on the right, for the details of a page. With a `title` it is headed.
+ *  `footer`: the foot of a figure tile, under a line, each label above its value. */
+export function Facts({ items, table, title, footer }: { items: Fact[]; table?: boolean; title?: string; footer?: boolean }) {
   if (items.length === 0) return null;
   const list = (
-    <dl class={table ? 'facts table' : 'facts'}>
+    <dl class={footer ? 'facts foot' : table ? 'facts table' : 'facts'}>
       {items.map((f) => (
         <div key={f.label}>
           <dt>{f.label}</dt>

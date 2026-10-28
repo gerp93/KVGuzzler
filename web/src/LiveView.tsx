@@ -175,7 +175,9 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
               span
             )
           }
-        />
+        >
+          <RateNote kwh={kwh} cost={cost} footer />
+        </Kpi>
         <Kpi
           tone="peak"
           label="Highest draw"
@@ -235,7 +237,6 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
       {/* What the figures above rest on: slower facts, below what happens now */}
       <div class="kpi-notes">
         <Facts items={carbon} table title="Carbon footprint" />
-        <RateNote kwh={kwh} cost={cost} table title="Electricity price" />
       </div>
     </>
   );
