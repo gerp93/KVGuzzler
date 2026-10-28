@@ -11,7 +11,7 @@ import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { formatAmps, formatVolts } from './amps';
 import { GuzzlersCard } from './GuzzlersCard';
 import { Kpi, KpiRow } from './Kpi';
-import { Watts } from './Watts';
+import { Lowest, Watts } from './Watts';
 import { Estimator } from './Estimator';
 import { Facts } from './Facts';
 import { HouseHistoryCard } from './HouseHistoryCard';
@@ -200,6 +200,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           value={peak != null ? `≤ ${formatWatts(peak)}` : '—'}
           hint={
             <>
+              {whole && <Lowest w={summary?.house_min_watts} />}
               {peakAmps != null && <span class="now-current">{formatAmps(peakAmps)} at most</span>}
               upper bound
             </>

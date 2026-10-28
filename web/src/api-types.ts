@@ -1121,6 +1121,8 @@ export interface components {
             /** @description The part of the energy whose carbon was worked out at an average because its own hour had no saved intensity. */
             carbon_estimated_kwh?: number | null;
             peak_watts?: number | null;
+            /** @description The lowest average of a whole minute in the period (a minute with under half of it recorded does not count); null when there is none. */
+            min_watts?: number | null;
             /** @description The highest current in the period; null when the meter reports none. For a 240 V pair it is the larger leg's, never the two added. */
             peak_amps?: number | null;
             /** @description Hours inside the period in which this meter actually reported. */
@@ -1150,6 +1152,8 @@ export interface components {
             carbon_estimated_share?: number | null;
             /** @description The mains meters' highest draws added. An upper bound: the legs need not peak in the same second. */
             house_peak_watts?: number | null;
+            /** @description The least the mains meters drew together in any whole minute (the legs added minute by minute, never their lowest minutes added); null when there is none. */
+            house_min_watts?: number | null;
             /** @description The mains meters' carbon added (grams of CO2e, an average-grid estimate); null when no intensity has ever been saved. */
             house_carbon_g?: number | null;
             /** @description The part of the house's energy whose carbon was worked out at an average because its own hour had no saved intensity. */

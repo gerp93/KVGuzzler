@@ -68,3 +68,25 @@ GROUP BY minute HAVING COUNT(*) = ? ORDER BY minute`, args...)
 	}
 	return out, rows.Err()
 }
+
+// LowestMinuteWatts is the lowest of MinuteWatts: the least the given meters drew together in any whole minute of [from, to), or nil when no minute has
+// every one of them. For the two mains legs it is the house's own lowest minute, not the legs' lowest minutes added.
+func (s *Store) LowestMinuteWatts(ctx context.Context, meterIDs []string, from, to time.Time) (*float64, error) {
+	if len(meterIDs) == 0 {
+		return nil, nil
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(meterIDs)), ",")
+	args := make([]any, 0, len(meterIDs)+3)
+	for _, id := range meterIDs {
+		args = append(args, id)
+	}
+	args = append(args, from.Unix(), to.Unix(), len(meterIDs))
+	var low sql.NullFloat64
+	err := s.db.QueryRowContext(ctx, `SELECT MIN(w) FROM (SELECT SUM(avg_w) AS w FROM minutes
+WHERE meter_id IN (`+marks+`) AND minute >= ? AND minute < ? AND seconds >= 30
+GROUP BY minute HAVING COUNT(*) = ?)`, args...).Scan(&low)
+	if err != nil || !low.Valid {
+		return nil, err
+	}
+	return &low.Float64, nil
+}
