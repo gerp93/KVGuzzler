@@ -815,6 +815,31 @@ export function houseUsageBasis(use: AverageUse, windowKey: string): string {
   return `${covered}: ${formatKwh(use.kwh)}, ${formatKwh(use.kwh_per_day)} a day, avg ${formatWatts(use.average_watts)} · mains clamps`;
 }
 
+/** One meter's button in the History tab's compare list. */
+export interface CompareEntry {
+  meter: Meter;
+  /** False when nothing was recorded for the meter in the period: it has no line to draw. */
+  usable: boolean;
+  kwh: number;
+  /** The average draw while it was recorded, in watts; null while the period's figures are still being read. */
+  avgWatts: number | null;
+  cost: string | null;
+  costEstimated: boolean;
+}
+
+/** The meters to compare with the house, as the list shows them: the ones with something recorded in the period first, the biggest user first, then the ones
+ * with nothing recorded (greyed out), by name. Until the period's figures arrive every meter is usable and keeps the order it came in. */
+export function compareOrder(meters: Meter[], summary: Summary | undefined): CompareEntry[] {
+  if (!summary) return meters.map((meter) => ({ meter, usable: true, kwh: 0, avgWatts: null, cost: null, costEstimated: false }));
+  const figures = new Map(summary.meters.map((f) => [f.meter_id, f]));
+  const entries = meters.map((meter): CompareEntry => {
+    const f = figures.get(meter.id);
+    const hours = f?.monitored_hours ?? 0;
+    return { meter, usable: hours > 0, kwh: f?.kwh ?? 0, avgWatts: hours > 0 ? ((f?.kwh ?? 0) * 1000) / hours : null, cost: f?.cost ?? null, costEstimated: summary.cost_estimated ?? false };
+  });
+  return entries.sort((a, b) => Number(b.usable) - Number(a.usable) || b.kwh - a.kwh || a.meter.label.localeCompare(b.meter.label));
+}
+
 /** The share of the house a part of it used, as a whole-number percent; null when the house figure is missing or zero, or when the part is more than
  * the whole (the house was not recorded for all the time the part was, as over "all time" with a monitor added later: no share is true then). */
 export function houseShare(kwh: number, houseKwh: number | null | undefined): number | null {

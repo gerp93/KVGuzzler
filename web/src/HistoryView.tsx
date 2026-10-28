@@ -1,11 +1,14 @@
 import { api } from './api';
 import { Chart, lineFrom, tallChartHeight, type Line } from './Chart';
+import { EstimatorView } from './EstimatorView';
 import { usePoll, useStored } from './hooks';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { PeriodPicker } from './Periods';
-import { periodRange, sumByTime, type Meter, type PeriodKey } from './lib';
+import { compareOrder, formatMoney, formatWatts, periodRange, sumByTime, type Meter, type PeriodKey, type Summary } from './lib';
 
-const COLORS = ['--color-accent-blue', '--color-accent-green', '--color-accent-red'];
+/** The colours of the compared lines, in the order they were picked (`--series-N`, one per hue, defined in features.css): more than a few can be shown at once. */
+const SERIES = 10;
+const seriesColor = (i: number) => `--series-${(i % SERIES) + 1}`;
 
 export function HistoryView({ meters }: { meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
@@ -13,23 +16,38 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
   const others = meters.filter((c) => c.enabled && c.scope !== 'mains');
   const ids = picked.split(',').filter(Boolean);
-  const chosen = others.filter((c) => ids.includes(c.id)).slice(0, 3);
+
+  // What each meter did over the period: who has any reading at all, and what to say on its button. Read for the period, so the list follows the picker.
+  const { data: sums } = usePoll<{ key: string; summary: Summary }>(
+    async () => {
+      const { from, to } = periodRange(period as PeriodKey, new Date());
+      return { key: period, summary: await api.summary(from, to) };
+    },
+    60_000,
+    [period],
+  );
+  const figures = sums?.key === period ? sums.summary : undefined;
+  const order = compareOrder(others, figures);
+  // A meter with nothing recorded in the period has no line to draw, picked or not.
+  const chosen = order.filter((o) => o.usable && ids.includes(o.meter.id)).map((o) => o.meter);
+  // The same meters in the order they were picked, so a line keeps its colour as others are added.
+  const picks = ids.map((id) => chosen.find((c) => c.id === id)).filter((c): c is Meter => c != null);
 
   const { data, error } = usePoll<{ lines: Line[]; domain: [number, number] }>(
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
       const [house, rest] = await Promise.all([
         Promise.all(mains.map((m) => api.series(m.id, from, to))),
-        Promise.all(chosen.map((c) => api.series(c.id, from, to))),
+        Promise.all(picks.map((c) => api.series(c.id, from, to))),
       ]);
       const out: Line[] = [];
       // The house line is the mains legs added together; every other line is drawn on its own, never added to it.
       if (house.length > 0) out.push(lineFrom('House', '--color-text', sumByTime(house)));
-      rest.forEach((s, i) => out.push(lineFrom(chosen[i]?.label ?? s.meter_id, COLORS[i % COLORS.length]!, s.points)));
+      rest.forEach((s, i) => out.push(lineFrom(picks[i]?.label ?? s.meter_id, seriesColor(i), s.points)));
       return { lines: out, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] };
     },
     60_000,
-    [period, picked, meters],
+    [period, picks.map((c) => c.id).join(','), meters],
   );
 
   const toggle = (id: string) => {
@@ -55,21 +73,36 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
       </section>
 
       <section class="card wide aside-card">
-        <h2>Compare with the house (up to 3)</h2>
+        <h2>Compare with the house</h2>
+        <p class="caption">Any of them, biggest user in the period first. Each shows its average draw and cost over the period; one with nothing recorded then is greyed out.</p>
         <div class="chips">
-          {others.map((c) => {
-            const at = chosen.findIndex((x) => x.id === c.id);
+          {order.map(({ meter: c, usable, avgWatts, cost, costEstimated, kwh }) => {
+            const at = picks.findIndex((x) => x.id === c.id);
             return (
-              <button key={c.id} type="button" aria-pressed={at >= 0} disabled={at < 0 && chosen.length >= 3} onClick={() => toggle(c.id)}>
-                {at >= 0 && <i class="swatch" style={{ background: `var(${COLORS[at % COLORS.length]})` }} aria-hidden="true" />}
-                {c.label}
+              <button
+                key={c.id}
+                type="button"
+                class="compare"
+                aria-pressed={at >= 0}
+                disabled={!usable}
+                title={usable ? `${kwh.toFixed(2)} kWh used` : 'Nothing was recorded for this meter in the period'}
+                onClick={() => toggle(c.id)}
+              >
+                <span class="compare-name">
+                  {at >= 0 && <i class="swatch" style={{ background: `var(${seriesColor(at)})` }} aria-hidden="true" />}
+                  {c.label}
+                </span>
+                <span class="compare-figs">{usable ? `${avgWatts != null ? formatWatts(avgWatts) : '…'}${cost != null ? ` · ${formatMoney(cost, costEstimated)}` : ''}` : 'nothing recorded'}</span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <HouseHistoryCard period={period as PeriodKey} />
+      <div class="history-pair">
+        <HouseHistoryCard period={period as PeriodKey} />
+        <EstimatorView meters={meters} />
+      </div>
     </>
   );
 }

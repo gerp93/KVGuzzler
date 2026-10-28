@@ -3,7 +3,6 @@ import { api, VersionMismatch } from './api';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
 import { CarbonView } from './CarbonView';
-import { EstimatorView } from './EstimatorView';
 import { HistoryView } from './HistoryView';
 import { HouseNow } from './HouseNow';
 import { TabIcon } from './Icons';
@@ -18,7 +17,6 @@ const TABS = [
   { id: 'live', label: 'Live' },
   { id: 'history', label: 'History' },
   { id: 'carbon', label: 'Carbon' },
-  { id: 'estimator', label: 'Estimator' },
   { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'settings', label: 'Settings' },
   { id: 'help', label: 'Help' },
@@ -63,8 +61,9 @@ export function App() {
   }, [stale]);
 
   const mismatch = [status.error, loaded.error].find((e): e is VersionMismatch => e instanceof VersionMismatch);
-  // The old Appliances tab became the hierarchy: its links open the same things there.
-  const active: TabId = TABS.find((t) => t.id === (route.tab === 'appliances' ? 'hierarchy' : route.tab))?.id ?? 'live';
+  // The old Appliances tab became the hierarchy and the Estimator tab part of History: their links open the same things there.
+  const renamed: Record<string, string> = { appliances: 'hierarchy', estimator: 'history' };
+  const active: TabId = TABS.find((t) => t.id === (renamed[route.tab] ?? route.tab))?.id ?? 'live';
   const meters = loaded.data ?? [];
   // A new tab starts at its top, and the tab's name is in the browser tab so several open pages can be told apart.
   useEffect(() => {
@@ -117,8 +116,6 @@ export function App() {
           <HistoryView meters={meters} />
         ) : active === 'carbon' ? (
           <CarbonView meters={meters} />
-        ) : active === 'estimator' ? (
-          <EstimatorView meters={meters} />
         ) : active === 'hierarchy' ? (
           <HierarchyView meters={meters} open={route.rest} onChanged={() => setRev((n) => n + 1)} />
         ) : active === 'help' ? (
