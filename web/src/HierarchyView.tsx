@@ -4,6 +4,7 @@
 // it only changes how this dashboard reads and shows them.
 import { useState } from 'preact/hooks';
 import { Kwh, Watts } from './Watts';
+import { PeriodPicker } from './Periods';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
@@ -423,7 +424,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   // The same period as the Live page (they share the saved choice, made there): this is a setup page, so it has no picker of its own; only the energy and cost columns follow it.
-  const [period] = useStored('period', '24h');
+  const [period, setPeriod] = useStored('period', '24h');
   const { data: summary } = usePoll<Summary>(
     () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
@@ -466,6 +467,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
 
   return (
     <>
+      <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
       <div class="tree-layout">
         <div class="tree-stack">
       <section class="card wide">
@@ -473,7 +475,7 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <div>
             <h2>Hierarchy</h2>
             <p class="hier-sub">
-              {rows.length} {rows.length === 1 ? 'meter' : 'meters'} · energy and cost for {periodWords(period as PeriodKey)}
+              {rows.length} {rows.length === 1 ? 'meter' : 'meters'}
             </p>
           </div>
           <div class="inline-actions">
@@ -518,6 +520,13 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <p class="note">No meters shown. Use ＋ Add.</p>
         ) : (
           <>
+            <div class="hier-groups" aria-hidden="true">
+              <span />
+              <span class="hier-grp">Right now</span>
+              <span class="hier-grp" title={`Energy and cost for ${periodWords(period as PeriodKey)}`}>
+                {periodWords(period as PeriodKey).replace(/^the /, '')}
+              </span>
+            </div>
             <div class="hier-head" aria-hidden="true">
               <span class="hier-tag" />
               <span class="num">Now</span>
