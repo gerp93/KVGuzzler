@@ -74,7 +74,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
 
       <section class="card wide aside-card">
         <h2>Compare with the house</h2>
-        <p class="caption">Any of them, biggest user in the period first. Each shows its average draw and cost over the period; one with nothing recorded then is greyed out.</p>
+        <p class="caption">Any of them, biggest user in the period first. Each shows its average draw and cost over the period; one that drew nothing then (0 W) is greyed out.</p>
         <div class="chips">
           {order.map(({ meter: c, usable, avgWatts, cost, costEstimated, kwh }) => {
             const at = picks.findIndex((x) => x.id === c.id);
@@ -85,14 +85,14 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
                 class="compare"
                 aria-pressed={at >= 0}
                 disabled={!usable}
-                title={usable ? `${kwh.toFixed(2)} kWh used` : 'Nothing was recorded for this meter in the period'}
+                title={usable ? `${kwh.toFixed(2)} kWh used` : 'This meter drew nothing in the period'}
                 onClick={() => toggle(c.id)}
               >
                 <span class="compare-name">
                   {at >= 0 && <i class="swatch" style={{ background: `var(${seriesColor(at)})` }} aria-hidden="true" />}
                   {c.label}
                 </span>
-                <span class="compare-figs">{usable ? `${avgWatts != null ? formatWatts(avgWatts) : '…'}${cost != null ? ` · ${formatMoney(cost, costEstimated)}` : ''}` : 'nothing recorded'}</span>
+                <span class="compare-figs">{avgWatts != null || usable ? `${avgWatts != null ? formatWatts(avgWatts) : '…'}${cost != null ? ` · ${formatMoney(cost, costEstimated)}` : ''}` : 'nothing recorded'}</span>
               </button>
             );
           })}
