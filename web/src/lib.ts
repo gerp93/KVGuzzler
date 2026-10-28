@@ -761,9 +761,32 @@ export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases
 
 /** What a looked-up price comes to over a period, in words: the rate and what the period averaged to per kWh. With no energy to average over it says
  * only which rate it is. */
+const COMPANY_WORDS = new Set(['co', 'co.', 'company', 'corp', 'corp.', 'corporation', 'inc', 'inc.', 'llc', 'lp']);
+const SMALL_WORDS = new Set(['of', 'the', 'and', '&']);
+
+/** A utility's name short enough for a tile: what follows " - " (its state or region) and a closing "Company" are dropped, and three words or more become their
+ * initials ("Northern States Power Co - Minnesota" gives "NSP"); a short name stays as it is. */
+export function shortUtility(name: string): string {
+  const words = name.split(' - ')[0]!.trim().split(/\s+/).filter(Boolean);
+  while (words.length > 1 && COMPANY_WORDS.has(words[words.length - 1]!.toLowerCase())) words.pop();
+  if (words.length < 3) return words.join(' ');
+  return words.filter((w) => !SMALL_WORDS.has(w.toLowerCase())).map((w) => w[0]!.toUpperCase()).join('');
+}
+
+/** A rate's name short enough for a tile: what follows " - " is dropped and a closing "Service" or "Rate" too, but its code in brackets stays
+ * ("Residential Service - Overhead Standard (A01)" gives "Residential (A01)"). */
+export function shortRateName(name: string): string {
+  const code = /\(([^()]+)\)\s*$/.exec(name)?.[0];
+  const words = name.split(' - ')[0]!.replace(/\([^()]*\)\s*$/, '').trim().split(/\s+/).filter(Boolean);
+  while (words.length > 1 && ['service', 'rate'].includes(words[words.length - 1]!.toLowerCase())) words.pop();
+  return [words.join(' '), code].filter(Boolean).join(' ');
+}
+
 export function tariffFacts(t: Pick<TariffInfo, 'utility' | 'name' | 'varies_by_time'>, kwh: number, cost: string | null): Fact[] {
   const avg = cost != null && kwh > 0 ? Number(cost) / kwh : null;
-  const facts: Fact[] = [{ label: 'Rate', value: `${t.utility} · ${t.name}` }];
+  const full = `${t.utility} · ${t.name}`;
+  const short = `${shortUtility(t.utility)} · ${shortRateName(t.name)}`;
+  const facts: Fact[] = [short === full ? { label: 'Rate', value: full } : { label: 'Rate', value: short, full }];
   if (avg != null && Number.isFinite(avg)) facts.push({ label: 'Average price', value: `${symbol}${avg.toFixed(4)} per kWh${t.varies_by_time ? ', time-weighted' : ''}` });
   return facts;
 }

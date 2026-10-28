@@ -128,6 +128,8 @@ type CarbonPoint struct {
 type CarbonSeries struct {
 	Bucket Bucket        `json:"bucket"`
 	Points []CarbonPoint `json:"points"`
+	// GridAverageGramsPerKWh is the grid's average intensity over the period (what an hour with no figure of its own is valued at); nil when there are no points.
+	GridAverageGramsPerKWh *float64 `json:"grid_average_g_per_kwh"`
 }
 
 type MeterSummary struct {
