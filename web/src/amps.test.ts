@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BREAKER_SIZES, SUSTAINED_MINUTES, breakerAdvice, breakerLevel, breakerOptions, breakerPercent, breakerVerdict, formatAmps, formatVolts, sustainedHigh, typicalAmps } from './amps';
+import { BREAKER_SIZES, SUSTAINED_MINUTES, breakerAdvice, breakerLevel, breakerOptions, breakerPercent, breakerVerdict, formatAmps, formatAmpsOf, formatVolts, MAIN_SIZES, sustainedHigh, typicalAmps } from './amps';
 
 describe('share of a breaker', () => {
   it('is the current over the size, in whole percent', () => {
@@ -44,6 +44,18 @@ describe('words', () => {
     expect(breakerOptions(35)).toContain(35);
     expect(breakerOptions(35)).toEqual([...breakerOptions(35)].sort((a, b) => a - b));
     expect(breakerOptions(50).filter((s) => s === 50)).toHaveLength(1);
+  });
+  it('offers the bigger sizes of a main breaker only for a main', () => {
+    expect(breakerOptions(null)).not.toContain(400);
+    expect(breakerOptions(null, true)).toEqual([...BREAKER_SIZES, ...MAIN_SIZES]);
+    expect(breakerOptions(175, true)).toContain(175);
+  });
+  it('writes the current out of the breaker when its size is set', () => {
+    expect(formatAmpsOf(3.7, 50)).toBe('3.7 / 50 A');
+    expect(formatAmpsOf(125.4, 200)).toBe('125 / 200 A');
+    expect(formatAmpsOf(3.7, null)).toBe('3.7 A');
+    expect(formatAmpsOf(null, 50)).toBe('—');
+    expect(formatAmpsOf(3.7, 0)).toBe('3.7 A');
   });
 });
 

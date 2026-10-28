@@ -571,7 +571,7 @@ select {
 @container (min-width: 52rem) {
   .hier-row > .hier-main {
     display: grid;
-    grid-template-columns: 1.75rem 0.9rem 0.5rem minmax(8rem, 1fr) minmax(0, 12rem) 4.5rem 3.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
+    grid-template-columns: 1.75rem 0.9rem 0.5rem minmax(8rem, 1fr) minmax(0, 12rem) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
     gap: 8px;
   }
 
@@ -582,7 +582,7 @@ select {
   .hier-head,
   .hier-groups {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem 3.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem 3.5rem 6.25rem 4.5rem 7.25rem;
     gap: 8px;
   }
 

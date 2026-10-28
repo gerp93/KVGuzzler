@@ -17,7 +17,7 @@ export function CurrentCard({ meter, now, peakAmps, runs }: { meter: Meter; now:
   const peakPct = breakerPercent(peakAmps, breaker);
   const verdict = breakerVerdict(peakPct, runs, breaker);
   const level = verdict.level;
-  const settable = meter.scope === 'circuit';
+  const settable = meter.scope === 'circuit' || meter.scope === 'mains';
   return (
     <section class={`card${level === 'sustained' || level === 'over' ? ' warn' : ''}`}>
       <h2>Current</h2>
@@ -60,7 +60,7 @@ export function BreakerField({ meter, now, onChange }: { meter: Meter; now: Now;
   const pct = breakerPercent(now.amps, breaker);
   return (
     <label class="field">
-      <span>Breaker size</span>
+      <span>{meter.scope === 'mains' ? 'Main breaker size' : 'Breaker size'}</span>
       <select
         value={breaker == null ? '' : String(breaker)}
         onChange={(e) => {
@@ -69,7 +69,7 @@ export function BreakerField({ meter, now, onChange }: { meter: Meter; now: Now;
         }}
       >
         <option value="">Not set</option>
-        {breakerOptions(breaker).map((a) => (
+        {breakerOptions(breaker, meter.scope === 'mains').map((a) => (
           <option key={a} value={a}>
             {a} A
           </option>

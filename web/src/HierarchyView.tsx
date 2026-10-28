@@ -8,7 +8,7 @@ import { PeriodPicker } from './Periods';
 import { api } from './api';
 import { meterPath } from './Bars';
 import { AddPanel } from './AddPanel';
-import { breakerLevel, breakerPercent, formatAmps, formatVolts } from './amps';
+import { breakerLevel, breakerPercent, formatAmpsOf, formatVolts } from './amps';
 import { BreakerField } from './Breaker';
 import { ComputersCard } from './ComputersCard';
 import { DevicesCard } from './DevicesCard';
@@ -197,7 +197,9 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
           {tag}
         </span>
         <span class="num hier-watts">{watt !== undefined ? <Watts w={watt} /> : ''}</span>
-        <span class="num hier-amps">{watt !== undefined ? formatAmps(currents.get(meter.id)?.amps) : ''}</span>
+        <span class="num hier-amps" title={livePct !== null ? `${livePct}% of its ${meter.breaker_amps} A breaker` : undefined}>
+          {watt !== undefined ? formatAmpsOf(currents.get(meter.id)?.amps, meter.breaker_amps) : ''}
+        </span>
         <span class="num hier-volts">{watt !== undefined ? formatVolts(currents.get(meter.id)?.volts) : ''}</span>
         <span class="num hier-energy">{used ? <Kwh k={used.kwh} /> : ''}</span>
         <span class="num hier-cost">{used?.cost != null ? formatMoney(used.cost, estimated) : used ? '—' : ''}</span>
@@ -304,9 +306,9 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
               </div>
             </div>
           )}
-          {inPanel && (
+          {(inPanel || meter.scope === 'mains') && (
             <div class="pg">
-              <span class="pg-title">Breaker</span>
+              <span class="pg-title">{meter.scope === 'mains' ? 'Main breaker' : 'Breaker'}</span>
               <BreakerField meter={meter} now={currents.get(meter.id) ?? { volts: null, amps: null }} onChange={(amps) => void run(meter.id, { breaker_amps: amps })} />
             </div>
           )}
