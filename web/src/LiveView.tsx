@@ -127,7 +127,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
   const feedNow = feed && (feed.volts != null || feed.amps != null) ? `${formatVolts(feed.volts)} · ${formatAmps(feed.amps)}` : undefined;
   // Bars are shares of the house when there is a house figure, else of the biggest load shown.
   const pc = slices.filter((r) => !placed.includes(r));
-  // With a house figure, the plugs and computers on circuits nothing clamps are listed inside "Other (not metered)", where they are; without one that line
+  // With a house figure, the plugs and computers on circuits nothing clamps are listed inside "Everything else", where they are; without one that line
   // does not exist, so they are rows of the table like the circuits.
   const plugs = unclamped(circuits, pc);
   const tableRows: BarRow[] =
