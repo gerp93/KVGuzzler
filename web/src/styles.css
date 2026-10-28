@@ -286,14 +286,39 @@ main {
 }
 
 /* The live reading's cell says whether the meter is working or resting right now (its own learned levels): a tint behind the figure, the text keeps the theme's colours */
-.bars .num.now.working {
+.bars .num.now.working,
+.state-key .swatch.working {
   background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
   box-shadow: inset 3px 0 0 var(--color-accent-green);
   font-weight: 700;
 }
 
-.bars .num.now.resting {
+.bars .num.now.resting,
+.state-key .swatch.resting {
   background: color-mix(in srgb, var(--color-accent-blue) 9%, transparent);
+}
+
+/* The key under the table for those two tints */
+.state-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+}
+
+.state-key .swatch {
+  display: inline-block;
+  width: 1.6rem;
+  height: 0.9rem;
+  margin-right: 5px;
+  vertical-align: -2px;
+  border-radius: 2px;
+}
+
+.state-key .hintnote {
+  flex-basis: 100%;
+  opacity: 0.8;
 }
 
 /* What a sub-panel's feed carries beyond its own circuits: derived, so quieter than a measured row */
