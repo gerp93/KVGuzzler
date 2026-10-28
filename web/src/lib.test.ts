@@ -437,18 +437,13 @@ describe('currency and the looked-up price note', () => {
     expect(formatMoney('12.3')).toBe('$12.30');
   });
 
-  it('names the utility and rate, what the period averaged to, and what is left out', () => {
+  it('names the utility and rate and what the period averaged to', () => {
     const tariff = { utility: 'Example Electric', name: 'Residential Time of Use', tiers: 2, fixed_charge: '6.75 $/month', varies_by_time: true };
     expect(tariffFacts(tariff, 10, '1.50')).toEqual([
       { label: 'Rate', value: 'Example Electric · Residential Time of Use' },
       { label: 'Average price', value: '$0.1500 per kWh, time-weighted' },
-      { label: 'Basis', value: 'Energy charge only' },
-      { label: 'Not included', value: 'fixed charge 6.75 $/month, tiers above the first' },
     ]);
-    expect(tariffFacts({ ...tariff, tiers: 1, fixed_charge: null, varies_by_time: false }, 0, null)).toEqual([
-      { label: 'Rate', value: 'Example Electric · Residential Time of Use' },
-      { label: 'Basis', value: 'Energy charge only' },
-    ]);
+    expect(tariffFacts({ ...tariff, varies_by_time: false }, 0, null)).toEqual([{ label: 'Rate', value: 'Example Electric · Residential Time of Use' }]);
   });
 });
 
@@ -467,15 +462,13 @@ describe('the carbon footprint', () => {
     expect([formatCarbon(412), formatCarbon(1240), formatCarbon(15_000), formatCarbon(2_100_000)]).toEqual(['≈ 412 g CO₂e', '≈ 1.24 kg CO₂e', '≈ 15.0 kg CO₂e', '≈ 2.1 t CO₂e']);
   });
 
-  it('says the average it came to and the share valued at an average, and nothing without carbon', () => {
-    expect(carbonFacts(480, 1.2, 0.3)).toEqual([
+  it('says the amount and the average it came to, and nothing without carbon', () => {
+    expect(carbonFacts(480, 1.2)).toEqual([
       { label: 'Carbon', value: '≈ 480 g CO₂e' },
       { label: 'Grid average', value: '400 g/kWh' },
-      { label: 'Hours without data', value: '25% of energy' },
     ]);
-    expect(carbonFacts(480, 1.2, 0).map((f) => f.label)).toEqual(['Carbon', 'Grid average']);
-    expect(carbonFacts(null, 1, 0)).toEqual([]);
-    expect(carbonFacts(5, null, 0)).toEqual([]);
+    expect(carbonFacts(null, 1)).toEqual([]);
+    expect(carbonFacts(5, null)).toEqual([]);
   });
 });
 

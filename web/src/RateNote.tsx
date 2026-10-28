@@ -4,11 +4,11 @@ import { Facts } from './Facts';
 import { usePoll } from './hooks';
 import { tariffFacts } from './lib';
 
-export function RateNote({ kwh, cost, table }: { kwh: number | null | undefined; cost: string | null | undefined; table?: boolean }) {
+export function RateNote({ kwh, cost, table, title }: { kwh: number | null | undefined; cost: string | null | undefined; table?: boolean; title?: string }) {
   const { data } = usePoll(async () => {
     const cfg = await api.rates();
     return cfg.mode === 'lookup' ? api.tariff() : undefined;
   }, 300_000, []);
   if (!data) return null;
-  return <Facts items={tariffFacts(data, kwh ?? 0, cost ?? null)} table={table} />;
+  return <Facts items={tariffFacts(data, kwh ?? 0, cost ?? null)} table={table} title={title} />;
 }
