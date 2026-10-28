@@ -103,7 +103,8 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
   const free = all.filter((c) => c.device_id === meter.device_id && c.id !== meter.id && !c.pair_with && (!taken.has(c.id) || c.id === meter.pair_with));
   const usual = usualPartner(meter, free);
   const options = [...(usual ? [usual] : []), ...free.filter((c) => c !== usual)];
-  const holders = all.filter((c) => canHold(c, meter, all));
+  // A circuit's panel is the main panel or a sub-panel (a circuit whose type says so, set below); a plug is plugged into any circuit. The one it is in now stays in the list.
+  const holders = all.filter((c) => canHold(c, meter, all) && (meter.scope !== 'circuit' || c.type === 'sub_panel' || c.id === meter.parent_id));
   const inPanel = meter.scope === 'circuit';
   const placeable = meter.scope !== 'mains';
 
@@ -231,12 +232,12 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
               <span class="pg-title">Placement</span>
               {placeable && (
                 <label class="field">
-                  <span>{inPanel ? 'Which panel it is in' : 'Which circuit it is plugged into'}</span>
+                  <span>{inPanel ? 'Panel' : 'Circuit'}</span>
                   <select value={meter.parent_id ?? ''} onChange={(e) => void run(meter.id, { parent_id: (e.target as HTMLSelectElement).value || null })}>
-                    <option value="">{inPanel ? 'The main panel' : 'Parent not metered'}</option>
+                    <option value="">{inPanel ? 'Main panel' : 'None'}</option>
                     {holders.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {inPanel ? `The sub-panel fed by ${c.label}` : c.label}
+                        {c.label}
                       </option>
                     ))}
                   </select>
@@ -246,9 +247,9 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
                 <label class="field">
                   <span>Type</span>
                   <select value={meter.type} onChange={(e) => void run(meter.id, { type: (e.target as HTMLSelectElement).value as 'house' | 'sub_panel' | 'circuit' })}>
-                    <option value="house">Whole house (a monitor on the main panel)</option>
-                    <option value="sub_panel">Sub-panel (feeds other circuits)</option>
-                    <option value="circuit">Circuit (one breaker)</option>
+                    <option value="house">Whole house</option>
+                    <option value="sub_panel">Sub-panel</option>
+                    <option value="circuit">Circuit</option>
                   </select>
                 </label>
               )}
@@ -258,8 +259,8 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
             <div class="pg">
               <span class="pg-title">Wiring</span>
               <div class="field">
-                <span>Breaker voltage</span>
-                <div class="segmented" role="radiogroup" aria-label="Breaker voltage">
+                <span>Voltage</span>
+                <div class="segmented" role="radiogroup" aria-label="Voltage">
                   <label class={volts === 120 ? 'on' : ''}>
                     <input
                       type="radio"
@@ -270,32 +271,32 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
                         if (meter.pair_with) void run(meter.id, { pair_with: null });
                       }}
                     />
-                    120 V · one wire
+                    120 V
                   </label>
                   <label class={volts === 240 ? 'on' : ''}>
                     <input type="radio" name={`volts-${meter.id}`} checked={volts === 240} onChange={() => setChosen(240)} />
-                    240 V · two wires
+                    240 V
                   </label>
                 </div>
               </div>
               {volts === 240 && (
                 <label class="field">
-                  <span>The other clamp of this breaker</span>
+                  <span>Pair</span>
                   <select value={meter.pair_with ?? ''} onChange={(e) => void run(meter.id, { pair_with: (e.target as HTMLSelectElement).value || null })}>
                     <option value="" disabled={!!meter.pair_with}>
-                      Choose the other clamp…
+                      Choose…
                     </option>
                     {options.map((c) => (
                       <option key={c.id} value={c.id}>
                         {clampName(c)}
-                        {c === usual ? ' (the usual match)' : ''}
+                        {c === usual ? ' · usual' : ''}
                       </option>
                     ))}
                   </select>
                 </label>
               )}
               <div class="field">
-                <span>Clamp direction (a load should read positive)</span>
+                <span>Polarity</span>
                 <div class="toggles">
                   {[meter, ...(second ? [second] : [])].map((c) => (
                     <label key={c.id} class="check">
@@ -318,7 +319,7 @@ function Row({ meter, rows, at, depth, hot, shared }: { meter: Meter; rows: { me
               <span class="pg-title">Electric vehicle</span>
               <label class="check">
                 <input type="checkbox" checked={meter.ev === true} onChange={(e) => void run(meter.id, { ev: (e.target as HTMLInputElement).checked })} />
-                This meter charges my electric vehicle
+                Charges my EV
               </label>
               {meter.ev && (
                 <p class="block">
