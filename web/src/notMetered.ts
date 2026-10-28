@@ -1,4 +1,4 @@
-// The "Other (not metered)" group of the Live page's circuits table: what the house carries beyond its clamped circuits, with the plugs and computers
+// The "Everything else" group of the Live page's circuits table: what the house carries beyond its clamped circuits, with the plugs and computers
 // that sit on circuits nothing clamps listed inside it (that is where they are: in the house, on none of the clamped circuits). The group's own line is the
 // house's figure less the circuits' (the server's `unmetered_kwh`), so the plugs under it are already in it and are never added to it; what no plug explains is
 // its last line. This is the same tree the Hierarchy tab draws, with the house as the parent.
@@ -35,7 +35,7 @@ export function notMeteredRows(args: { house: number; clamped: Row[]; plugs: Row
   const figures = new Map((summary?.meters ?? []).map((f) => [f.meter_id, f]));
   const kwh = summary?.unmetered_kwh ?? null;
   const cost = moneyLeft(summary?.house_cost, top.map((r) => figures.get(r.meter.id)?.cost));
-  const out: BarRow[] = [{ meter: host, watts, depth: 0, lump: { label: 'Other (not metered)', kwh, cost } }];
+  const out: BarRow[] = [{ meter: host, watts, depth: 0, lump: { label: 'Everything else', kwh, cost } }];
   if (plugs.length === 0) return out;
   for (const p of plugs) out.push({ ...p, depth: 1 });
   const inside = plugs.map((p) => figures.get(p.meter.id));
@@ -46,7 +46,7 @@ export function notMeteredRows(args: { house: number; clamped: Row[]; plugs: Row
       meter: host,
       watts: leftWatts,
       depth: 1,
-      lump: { label: 'Not measured at all', kwh: leftKwh, cost: kwh == null ? null : moneyLeft(cost, inside.map((f) => f?.cost)) },
+      lump: { label: 'Not individually metered', kwh: leftKwh, cost: kwh == null ? null : moneyLeft(cost, inside.map((f) => f?.cost)) },
     });
   }
   return out;

@@ -19,7 +19,7 @@ const summary = {
   ],
 } as unknown as Summary;
 
-describe('the Other (not metered) group of the circuits table', () => {
+describe('the Everything else group of the circuits table', () => {
   const meters = [m('house', 'mains'), m('range', 'circuit'), m('monitor', 'plug'), m('pc', 'pc'), m('fan', 'plug', 'range')];
   const reads = [rd('house', 1000), rd('range', 600), rd('monitor', 40), rd('pc', 160), rd('fan', 20)];
   const circuits = nestCircuits(circuitsByWatts(meters, reads));
@@ -33,10 +33,10 @@ describe('the Other (not metered) group of the circuits table', () => {
   it('is the house less the clamped circuits, with the plugs inside it and what none of them explains last', () => {
     const rows = notMeteredRows({ house: 1000, clamped: circuits, plugs, summary, host: meters[0]! });
     expect(rows.map((r) => [r.lump?.label ?? r.meter.id, r.depth, Math.round(r.watts)])).toEqual([
-      ['Other (not metered)', 0, 400], // 1000 less the range's 600: the plugs are not taken off again
+      ['Everything else', 0, 400], // 1000 less the range's 600: the plugs are not taken off again
       ['pc', 1, 160],
       ['monitor', 1, 40],
-      ['Not measured at all', 1, 200],
+      ['Not individually metered', 1, 200],
     ]);
     expect(rows[0]!.lump).toMatchObject({ kwh: 4, cost: '0.80' }); // 2.00 less the range's 1.20
     expect(rows[3]!.lump!.kwh).toBeCloseTo(2); // 4 less 1.5 and 0.5
