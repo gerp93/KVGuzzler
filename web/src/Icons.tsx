@@ -21,12 +21,6 @@ const ICONS = {
       <path d="m7 15 4-5 3 3 5-7" />
     </Svg>
   ),
-  estimator: (
-    <Svg>
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01" />
-    </Svg>
-  ),
   hierarchy: (
     <Svg>
       <rect x="9" y="3" width="6" height="5" rx="1" />

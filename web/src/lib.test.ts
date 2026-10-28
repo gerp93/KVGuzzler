@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -456,6 +456,28 @@ describe('currency and the looked-up price note', () => {
     expect(tariffFacts(long, 0, null)).toEqual([
       { label: 'Rate', value: 'NSP · Residential (A01)', full: 'Northern States Power Co - Minnesota · Residential Service - Overhead Standard (A01)' },
     ]);
+  });
+});
+
+describe('the compare list of the History tab', () => {
+  const sum = (id: string, kwh: number, hours: number, cost: string | null) => ({ meter_id: id, scope: 'circuit', kwh, cost, peak_watts: null, monitored_hours: hours }) as MeterSummary;
+  const summary = { from: 'a', to: 'b', meters: [sum('dryer', 8, 4, '1.26'), sum('ev', 66, 11, '10.28'), sum('idle', 0, 5, '0.00'), sum('ghost', 0, 0, null)] } as unknown as Summary;
+  const list = [ch('dryer', 'circuit'), ch('ghost', 'circuit'), ch('ev', 'circuit'), ch('idle', 'circuit'), ch('unlisted', 'circuit')];
+
+  it('puts the biggest user first and the meters with nothing recorded last, greyed out', () => {
+    const order = compareOrder(list, summary);
+    expect(order.map((o) => [o.meter.id, o.usable])).toEqual([['ev', true], ['dryer', true], ['idle', true], ['ghost', false], ['unlisted', false]]);
+  });
+
+  it('says what each one drew on average while it was recorded, and what it cost', () => {
+    const [ev, dryer, idle] = compareOrder(list, summary);
+    expect([ev!.avgWatts, ev!.cost]).toEqual([6000, '10.28']);
+    expect([dryer!.avgWatts, dryer!.cost]).toEqual([2000, '1.26']);
+    expect(idle!.avgWatts).toBe(0); // recorded, and drew nothing: still something to compare
+  });
+
+  it('keeps every meter selectable, in the order it came, until the figures for the period are read', () => {
+    expect(compareOrder(list, undefined).map((o) => [o.meter.id, o.usable, o.avgWatts])).toEqual(list.map((m) => [m.id, true, null]));
   });
 });
 
