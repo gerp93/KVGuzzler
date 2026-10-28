@@ -78,17 +78,14 @@ export function AddPanel({ onAdded, onCancel }: { onAdded: () => void; onCancel:
             <input type="checkbox" checked={isPc} onChange={(e) => setIsPc((e.target as HTMLInputElement).checked)} />
             This is my PC's plug
           </label>
-          {isPc && <p class="caption">It measures the whole PC at the wall. The PC is on one of your circuits already, so tell the tree which one afterwards and it is shown inside it, never added to it.</p>}
+          {isPc && <p class="caption">Measures the whole PC. Set its circuit in the tree afterwards.</p>}
         </>
       )}
       {kind === 'refoss' && (
-        <p class="caption">
-          Only the EM16P has been tried. Its local login must be off in the Refoss app. Every input is added; the ones with nothing clamped on them are hidden, and you
-          name, flip and pair the rest in the tree.
-        </p>
+        <p class="caption">Tested on the EM16P. Turn off local login in the Refoss app. Inputs with nothing clamped on them are hidden.</p>
       )}
-      {kind === 'computer' && <p class="caption">A computer ties its wall plug and its peripherals together. A PC that runs the KVGuzzler collector adds itself the first time it reports.</p>}
-      {kind === 'group' && <p class="caption">For something that runs through more than one plug, like an entertainment center on two power strips: it shows as one, with the energy and cost of its plugs added.</p>}
+      {kind === 'computer' && <p class="caption">Ties a wall plug and its peripherals together. A PC running the collector adds itself.</p>}
+      {kind === 'group' && <p class="caption">Several plugs shown as one total.</p>}
 
       <div class="chips">
         <button type="button" onClick={add} disabled={busy || !ready}>

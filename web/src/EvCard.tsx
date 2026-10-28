@@ -20,11 +20,9 @@ export function EvPrompt({ meter, onChanged }: { meter: Meter; onChanged: () => 
   return (
     <section class="card ev">
       <h2>Electric vehicle</h2>
-      <p>
-        Does {meter.label} charge your electric vehicle? Mark it and this page takes the car's odometer now and then (say, once a month) and works out what a mile costs, to set beside a gas car's.
-      </p>
+      <p>Track miles and cost per mile for {meter.label}.</p>
       <button type="button" onClick={() => void api.updateMeter(meter.id, { ev: true }).then(onChanged, (e: Error) => setProblem(e.message))}>
-        Yes, track its miles and cost per mile
+        Track miles
       </button>
       {problem && <p class="note error">{problem}</p>}
     </section>
@@ -57,7 +55,7 @@ export function EvCard({ meter }: { meter: Meter }) {
     e.preventDefault();
     const value = parseMiles(miles);
     if (value === null) {
-      setProblem("Type the odometer as a number of miles, like 18,240.");
+      setProblem('Enter the odometer in miles, like 18,240.');
       return;
     }
     setSaving(true);
@@ -103,22 +101,22 @@ export function EvCard({ meter }: { meter: Meter }) {
           <div class="stat">
             <span class="caption">Cost per mile</span>
             <p class="big small ev-figure">{perMile(totals.cost_per_mile, data?.cost_estimated)}</p>
-            <span class="caption">per mile, over {formatMiles(totals.miles)}</span>
+            <span class="caption">over {formatMiles(totals.miles)}</span>
           </div>
           <div class="stat">
             <span class="caption">Efficiency</span>
             <p class="big small ev-figure">{totals.miles_per_kwh != null ? totals.miles_per_kwh.toFixed(1) : '—'}</p>
-            <span class="caption">miles per kWh at the wall, charging losses included</span>
+            <span class="caption">miles per kWh at the wall</span>
           </div>
           <div class="stat">
-            <span class="caption">Energy for those miles</span>
+            <span class="caption">Energy</span>
             <p class="big small ev-figure">{formatKwh(totals.kwh).replace(' kWh', '')}</p>
-            <span class="caption">kWh for those miles{totals.cost != null ? `, ${formatMoney(totals.cost, data?.cost_estimated)}` : ''}</span>
+            {totals.cost != null && <span class="caption">{formatMoney(totals.cost, data?.cost_estimated)}</span>}
           </div>
         </div>
       )}
-      {data && readings.length === 0 && <p class="note">Type the car's odometer below, then again next month: the miles in between, over what this meter used, give the cost of a mile.</p>}
-      {data && readings.length === 1 && <p class="note">One reading so far. Add the next one (next month is fine) to see the miles and what each cost.</p>}
+      {data && readings.length === 0 && <p class="note">Add the first odometer reading below.</p>}
+      {data && readings.length === 1 && <p class="note">Add a second reading to see cost per mile.</p>}
 
       {stretches.length > 0 && (
         <ol class="ev-stretches" aria-label="Between readings, newest first">
@@ -132,7 +130,7 @@ export function EvCard({ meter }: { meter: Meter }) {
                 {s.miles_per_kwh != null ? ` · ${formatEfficiency(s.miles_per_kwh)}` : ''}
               </span>
               {lowCoverage(s.coverage) ? (
-                <span class="badge" title={`The meter was measured for ${Math.round(s.coverage * 100)}% of these days, so the energy and the cost per mile are too low.`}>
+                <span class="badge" title={`Measured ${Math.round(s.coverage * 100)}% of these days: energy and cost per mile are understated`}>
                   {Math.round(s.coverage * 100)}% measured
                 </span>
               ) : (
@@ -144,8 +142,8 @@ export function EvCard({ meter }: { meter: Meter }) {
       )}
       {data?.since_last && readings.length > 0 && (
         <p class="caption">
-          Since {dayLabel(data.since_last.from_day)} this meter has used <Kwh k={data.since_last.kwh} />
-          {data.since_last.cost != null ? ` (${formatMoney(data.since_last.cost, data.cost_estimated)})` : ''}; its miles come with the next reading.
+          Since {dayLabel(data.since_last.from_day)}: <Kwh k={data.since_last.kwh} />
+          {data.since_last.cost != null ? ` · ${formatMoney(data.since_last.cost, data.cost_estimated)}` : ''}
         </p>
       )}
 
@@ -182,10 +180,6 @@ export function EvCard({ meter }: { meter: Meter }) {
           </ul>
         </details>
       )}
-      <p class="caption">
-        A reading counts as taken at the start of its day, so a stretch runs from the start of one day to the start of the next. The cost is this meter's energy at the
-        price of each day; the meter keeps recording as before. An odometer only goes up.
-      </p>
     </section>
   );
 }

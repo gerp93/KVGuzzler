@@ -89,7 +89,7 @@ export function App() {
       </header>
       {offline && (
         <p class="banner" role="alert">
-          Can't reach the house server{status.error ? ` (${status.error.message})` : ''}. What is shown may be out of date; trying again every few seconds.
+          Server not answering{status.error ? ` (${status.error.message})` : ''}. Showing the last data; retrying.
         </p>
       )}
       {stale && (

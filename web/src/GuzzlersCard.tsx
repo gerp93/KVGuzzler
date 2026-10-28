@@ -7,7 +7,7 @@ import { BaseLoadStats } from './BaseLoadCard';
 import { meterPath } from './Bars';
 import { topGuzzlers, type GuzzlerBy, type GuzzlerMode } from './guzzlers';
 import { usePoll, useStored } from './hooks';
-import { formatMoney, periodRange, periodWords, type Meter, type PeriodKey, type Summary } from './lib';
+import { formatMoney, periodRange, type Meter, type PeriodKey, type Summary } from './lib';
 import { Kwh, Watts } from './Watts';
 
 const SHOWN = 5;
@@ -33,8 +33,6 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
     60_000,
     [period],
   );
-  const widened = periodRange(period, new Date());
-  const lookedFurther = Date.parse(widened.to) - Date.parse(widened.from) < MIN_LOOK_MS;
   const rests = new Map((base?.parts ?? []).map((p) => [p.meter_id, p.watts]));
   const priced = (summary?.meters ?? []).some((f) => f.cost != null && f.kwh > 0);
   const mode: GuzzlerMode = savedMode === 'rest' ? 'rest' : 'active';
@@ -60,12 +58,7 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
           </button>
         </div>
       </div>
-      <p class="caption">
-        {mode === 'rest'
-          ? `Always on, over ${periodWords(period)}: the steady draw each one hardly ever goes below, day or night.${lookedFurther ? ' The level is learned from the last 24 hours, so a short period still has one.' : ''}`
-          : `Working, over ${periodWords(period)}: the energy each one used above its idle level, with the most it pulled.`}
-      </p>
-      {mode === 'rest' && base && <BaseLoadStats data={base} what="this meter" span={lookedFurther ? 'the last 24 hours' : 'the period'} />}
+      {mode === 'rest' && base && <BaseLoadStats data={base} />}
       {mode === 'active' && priced && (
         <div class="seg small" role="group" aria-label="Rank by">
           <button type="button" aria-pressed={by === 'kwh'} onClick={() => setBy('kwh')}>
@@ -78,7 +71,7 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
       )}
       {list.length === 0 ? (
         <p class="note">
-          {mode === 'rest' ? 'Nothing is known to rest yet: what each one hardly ever goes below needs at least an hour recorded.' : 'Nothing worked over this period.'}
+          {mode === 'rest' ? 'Not enough history yet (needs an hour).' : 'Nothing worked in this period.'}
         </p>
       ) : (
         <ol class={`guzzler-list${mode === 'rest' ? ' rest' : ''}`} aria-label={mode === 'rest' ? 'The biggest always-on draws, biggest first' : 'The hardest workers, biggest first'}>
@@ -128,12 +121,6 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
           {all ? 'Show fewer' : `Show all ${list.length}`}
         </button>
       )}
-      <p class="caption">
-        {mode === 'rest'
-          ? "A meter's always-on level is the power it hardly ever goes below, from its recorded minutes. The energy and cost are what that level adds up to over the period, at the meter's own average price."
-          : "A meter's energy is split at its always-on level: what that level adds up to is its rest (the other view), the remainder is what it used while working."}{' '}
-        Only appliances are ranked, never the feeds and panels that hold them, so nothing is counted twice. The percent is of the house's energy.
-      </p>
     </section>
   );
 }

@@ -25,8 +25,8 @@ describe('breaker level (the continuous-load rule: 80%)', () => {
   it('warns only above what a steady load should draw', () => {
     expect(breakerAdvice(70, 50)).toBeNull();
     expect(breakerAdvice(null, 50)).toBeNull();
-    expect(breakerAdvice(85, 50)).toContain('85% of its 50 A breaker');
-    expect(breakerAdvice(85, 50)).toContain('3 hours');
+    expect(breakerAdvice(85, 50)).toContain('85% of the 50 A breaker');
+    expect(breakerAdvice(85, 50)).toContain('3 h');
     expect(breakerAdvice(120, 30)).toContain('would trip');
   });
 });
@@ -71,12 +71,12 @@ describe('what is said about a breaker', () => {
   it('warns when a long run averaged above 80%', () => {
     const v = breakerVerdict(90, [run(240, 45)], 50);
     expect(v.level).toBe('sustained');
-    expect(v.text).toContain('4 hours averaged 90%');
+    expect(v.text).toContain('4 h run averaged 90%');
   });
   it('only mentions a brief high minute when the runs show it did not last', () => {
     const v = breakerVerdict(92, [run(60, 46), run(200, 25)], 50);
     expect(v.level).toBe('brief');
-    expect(v.text).toContain('only a load that lasts that long');
+    expect(v.text).toContain('no run of 3 h or more');
   });
   it('always warns above the breaker, and falls back to the highest minute when it knows no runs', () => {
     expect(breakerVerdict(120, [run(30, 10)], 30).level).toBe('over');

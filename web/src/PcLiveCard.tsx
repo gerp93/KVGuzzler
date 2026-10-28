@@ -33,13 +33,8 @@ export function PcLiveCard({ live }: { live: PcLive }) {
           <h2>Right now</h2>
           <span class="caption">{stale ? `Not answering: last heard ${formatAge(live.age_seconds ?? 0)}` : `Updated ${formatAge(live.age_seconds ?? 0)}`}</span>
         </div>
-        {stale && <p class="note">The PC may be asleep, off, or its collector stopped. These are its last readings.</p>}
         <p class="big small"><Watts w={split.baseWatts} /></p>
-        <p class="caption">
-          {split.baseIsWall
-            ? 'The whole PC at the wall, as the PC itself reads its plug.'
-            : 'The sensors added together. The wall is not measured here, so the rest of the PC (fans, drives, power-supply loss) is not in this figure.'}
-        </p>
+        <p class="caption">{split.baseIsWall ? 'Whole PC at the wall' : 'Sensors only'}</p>
 
         {split.sensors.length > 0 && (
           <ul class="bars wide">
@@ -50,9 +45,6 @@ export function PcLiveCard({ live }: { live: PcLive }) {
               <Row name="Other (not metered)" watts={split.otherWatts} base={split.baseWatts} />
             )}
           </ul>
-        )}
-        {split.otherWatts != null && split.otherWatts > 0 && (
-          <p class="caption">Other (not metered) is the wall minus the sensors: fans, drives, motherboard and power-supply loss.</p>
         )}
 
         {split.inside.length > 0 && (
@@ -105,10 +97,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
               </li>
             ))}
           </ul>
-          <p class="caption">
-            Only the power above the PC's idle level is shared out, by how busy each program keeps the CPU and GPU. Idle level so far:{' '}
-            {idleText(live)}. An estimate, not a measurement.
-          </p>
+          <p class="caption">Idle baseline: {idleText(live)}</p>
         </section>
       )}
     </>

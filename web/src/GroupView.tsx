@@ -58,7 +58,8 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
             <div>
               <h2 class="page-title">{detail.group.name}</h2>
               <p class="page-sub">
-                {detail.members.length - detail.not_added.length} meter{detail.members.length - detail.not_added.length === 1 ? '' : 's'} added together
+                {detail.members.length - detail.not_added.length} meter{detail.members.length - detail.not_added.length === 1 ? '' : 's'}
+                {detail.not_added.length > 0 ? ` · ${detail.not_added.length} inside another` : ''}
               </p>
             </div>
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
@@ -67,17 +68,10 @@ export function GroupView({ id, meters }: { id: string; meters: Meter[] }) {
             <Kpi tone="energy" label="Energy" value={formatKwh(detail.total_kwh)} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={detail.total_cost != null ? formatMoney(detail.total_cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
           </KpiRow>
-          {detail.not_added.length > 0 && (
-            <div class="kpi-notes">
-              <p class="caption">
-                {detail.not_added.length} more {detail.not_added.length === 1 ? 'is' : 'are'} inside another member, so not added again.
-              </p>
-            </div>
-          )}
 
           <section class="card">
             <h2>By meter</h2>
-            {detail.members.length === 0 && <p class="note">No meters in this group are reporting. Put meters in it in the Hierarchy tab.</p>}
+            {detail.members.length === 0 && <p class="note">No meters in this group.</p>}
             <ul class="bars wide">
               {detail.members.map((m) => (
                 <li key={m.meter_id}>

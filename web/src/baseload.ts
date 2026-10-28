@@ -16,13 +16,6 @@ export function yearKwh(kwh: number): string {
   return kwh >= 100 ? `${Math.round(kwh).toLocaleString()} kWh` : `${kwh.toFixed(1)} kWh`;
 }
 
-/** The sentence under the figures. `who` is "the house" or "this meter". */
-export function baseLoadSentence(b: BaseLoad, who: string): string {
-  const what = b.scope === 'house' ? 'the house' : who;
-  const share = b.share > 0 ? ` That is ${shareText(b.share)} of what ${what} uses.` : '';
-  return `${what === 'the house' ? 'The house' : 'It'} hardly ever draws less than this, day or night: standby, always-on appliances, network gear.${share}`;
-}
-
 /** How long the figure has been looked at, so a reader knows how much to trust it ("1 day"). */
 export function lookedAt(minutes: number): string {
   if (minutes < 120) return `${minutes} min`;

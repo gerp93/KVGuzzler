@@ -1,6 +1,7 @@
 // About this server, how to read the numbers, and where to ask about problems. The dashboard is the server's own page, so it is always
 // the version the box is running; the box is updated by deploying from the repository, not from here.
 import { api } from './api';
+import { Facts } from './Facts';
 import { usePoll } from './hooks';
 import { ISSUES_URL, PROJECT_URL, VIEWER_RELEASES_URL } from './lib';
 
@@ -10,12 +11,16 @@ export function HelpView() {
     <>
       <section class="card page-narrow">
         <h2>KVGuzzler house server</h2>
-        <p>{status ? `Version ${status.server_version}` : 'Reading the version…'}</p>
-        {status && (
-          <p class="caption">
-            API version {status.api_version}
-            {status.time_zone ? `, days and bill dates in ${status.time_zone}` : ''}.
-          </p>
+        {status ? (
+          <Facts
+            items={[
+              { label: 'Version', value: status.server_version },
+              { label: 'API', value: String(status.api_version) },
+              ...(status.time_zone ? [{ label: 'Time zone', value: status.time_zone }] : []),
+            ]}
+          />
+        ) : (
+          <p class="note">Reading…</p>
         )}
         <p>
           <a class="button" href={PROJECT_URL} target="_blank" rel="noreferrer noopener">
@@ -28,20 +33,8 @@ export function HelpView() {
       </section>
 
       <section class="card">
-        <h2>Updates</h2>
-        <p class="note">
-          This page is served by the house server, so it is always the version the server is running (above). The server is updated by
-          running the deploy script from the repository on a PC that can reach the box; the Windows collector and the old window update
-          themselves from their own Help tab.
-        </p>
-      </section>
-
-      <section class="card">
         <h2>Desktop viewer</h2>
-        <p class="note">
-          An installed window for this dashboard (Windows). It loads this page from the server and keeps only the server's address. The installer is
-          unsigned, so Windows will warn about the publisher the first time.
-        </p>
+        <p class="caption">Windows app for this dashboard. The installer is unsigned.</p>
         <p>
           <a class="button" href={VIEWER_RELEASES_URL} target="_blank" rel="noreferrer noopener">
             Download the viewer
@@ -50,28 +43,25 @@ export function HelpView() {
       </section>
 
       <section class="card">
-        <h2>What do these numbers mean?</h2>
+        <h2>Reading the numbers</h2>
         <details open>
           <summary>The PC</summary>
-          <p class="note">
-            With a smart plug between the wall and the PC, the whole-PC figure is what the plug measures: it is the one that matches your
-            bill. The CPU, GPU and memory sensors only cover what those parts draw while the PC is on; they leave out fans, drives, the
-            motherboard, power-supply losses and any time it sleeps. The two are shown side by side and never added together.
+          <p class="caption">
+            The wall plug measures the whole PC and matches your bill. CPU, GPU and memory sensors cover those parts only, while the PC is on. Shown
+            side by side, never added.
           </p>
         </details>
         <details>
-          <summary>The hierarchy and the house</summary>
-          <p class="note">
-            The house figure is the mains clamps. Circuits and plugs are parts of it, and the PC's plug is a slice of one of the circuits. None
-            of them is added to another, so the house minus the circuits is what no clamp accounts for.
+          <summary>The house</summary>
+          <p class="caption">
+            The house is the mains clamps. Circuits and plugs are parts of it and are never added to each other; house minus circuits is what no clamp
+            accounts for.
           </p>
         </details>
         <details>
-          <summary>Programs, costs and estimates</summary>
-          <p class="note">
-            Which program used the power is an estimate: the power above the PC's idle level is shared out by how busy each program kept the
-            CPU and GPU. A cost marked ≈ rests on an estimate or on a stand-in price (a day outside any bill). A stretch where nothing was being
-            recorded is shown as a gap, not as zero.
+          <summary>Estimates</summary>
+          <p class="caption">
+            Per-program power is an estimate. ≈ marks a cost based on an estimate or a stand-in price. Time with no recording is a gap, not zero.
           </p>
         </details>
       </section>

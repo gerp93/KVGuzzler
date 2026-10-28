@@ -4,6 +4,7 @@ import {
   formatDuration, formatKwh, formatMoney, gapLabel, groupComponents, programRows, programSplit, runDuration, runKwh,
   type PcComponent, type PcSource,
 } from './lib';
+import { Facts } from './Facts';
 import { Kwh, Watts } from './Watts';
 
 function ComponentBars({ rows }: { rows: PcComponent[] }) {
@@ -41,10 +42,9 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
             <>
               <h3>Inside those</h3>
               <ComponentBars rows={g.inside} />
-              <p class="caption">Parts of a sensor above, shown for information and never added to it.</p>
             </>
           )}
-          {pc.total_peak_watts != null && <p class="caption">Highest the sensors reached together: <Watts w={pc.total_peak_watts} />.</p>}
+          {pc.total_peak_watts != null && <Facts items={[{ label: 'Peak, sensors together', value: `${Math.round(pc.total_peak_watts)} W` }]} />}
         </section>
       )}
 
@@ -52,7 +52,6 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
         <section class="card">
           <h2>As the PC itself measured the wall</h2>
           <ComponentBars rows={g.wall} />
-          <p class="caption">The PC's own reading of its plug, kept so the two can be compared.</p>
         </section>
       )}
 
@@ -60,17 +59,18 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
         <section class="card">
           <h2>Plugs the PC itself reads</h2>
           <ComponentBars rows={g.meters} />
-          <p class="caption">Separate devices, not part of the PC's figures.</p>
         </section>
       )}
 
       {pc.programs.length > 0 && (
         <section class="card">
           <h2>Who used the power (an estimate)</h2>
-          <p class="note">
-            CPU and GPU together: <Kwh k={programsKwh} />
-            {pc.programs.every((p) => p.cost != null) ? `, ${formatMoney(pc.programs.reduce((t, p) => t + Number(p.cost), 0).toFixed(2), true)}` : ''}
-          </p>
+          <Facts
+            items={[
+              { label: 'CPU + GPU', value: formatKwh(programsKwh) },
+              ...(pc.programs.every((p) => p.cost != null) ? [{ label: 'Cost', value: formatMoney(pc.programs.reduce((t, p) => t + Number(p.cost), 0).toFixed(2), true) }] : []),
+            ]}
+          />
           {splitTotal > 0 && (
             <>
               <div class="split" role="img" aria-label="Where the power went">
@@ -87,7 +87,6 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
               </ul>
             </>
           )}
-          <p class="caption">{wholeKwh != null && wholeKwh > 0 ? 'Percentages in the list are of the whole PC at the wall.' : 'Percentages in the list are of the energy the CPU and GPU used.'}</p>
           <ul class="bars wide">
             {rows.map((r) => (
               <li key={r.name}>
@@ -104,11 +103,10 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
             ))}
           </ul>
           <details>
-            <summary>How this is worked out</summary>
-            <p class="note">
-              The CPU and GPU only report their total power; Windows reports how much of the CPU and GPU each program used. The power above
-              idle is shared out in proportion to that. The idle power itself belongs to no program. Every program is tracked automatically,
-              grouped by executable name. It is an estimate, not a measurement, and it splits energy already counted above.
+            <summary>Method</summary>
+            <p class="caption">
+              Power above idle is shared out by each program's share of CPU and GPU busy time (grouped by executable). Idle belongs to no
+              program. Shares are of {wholeKwh != null && wholeKwh > 0 ? 'the whole PC at the wall' : 'CPU and GPU energy'}.
             </p>
           </details>
         </section>
@@ -133,10 +131,6 @@ export function PcInsides({ pc, wholeKwh = null }: { pc: PcSource; wholeKwh?: nu
               </li>
             ))}
           </ul>
-          <p class="caption">
-            What a program is estimated to have caused from when it started until its last process closed. A program with many
-            processes is one run.
-          </p>
         </section>
       )}
 

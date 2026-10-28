@@ -52,9 +52,8 @@ export function ComputersCard({
     <section class="card wide">
       <h2>Computers</h2>
       <Hint>
-        A computer is its wall plug (which measures the whole PC) plus its peripherals (each a separate plug: the monitor, the speakers). The row shows that setup's
-        total; each plug stays where it is plugged in in the tree. Open a row to choose its plugs. A PC that has the KVGuzzler collector adds itself the first time it
-        reports; add one by hand with + Add.
+        A wall plug (the whole PC) plus its peripheral plugs, totalled in one row. Plugs stay where they are plugged in in the tree. A PC running the collector
+        adds itself.
       </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.computers.length === 0 && <p class="note">No computers yet.</p>}
@@ -175,10 +174,10 @@ function ComputerRow({
               ))}
             </select>
           </label>
-          {wallChoices.length === 0 && <p class="caption block">Add a plug marked "my PC's plug" with + Add to choose it here.</p>}
+          {wallChoices.length === 0 && <p class="caption block">No PC plugs available.</p>}
 
           <p class="caption block">Peripherals (each is a separate plug)</p>
-          {peripheralChoices.length === 0 && <p class="caption block">No other plugs to tie. Add a plug with + Add first.</p>}
+          {peripheralChoices.length === 0 && <p class="caption block">No other plugs.</p>}
           <div class="chips">
             {peripheralChoices.map((c) => {
               const tied = c.computer_id === computer.id;

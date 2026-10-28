@@ -53,9 +53,7 @@ export function GroupsCard({
     <section class="card wide">
       <h2>Groups</h2>
       <Hint>
-        A group is a logical grouping, not a place in the wiring: put any meters in one (the plugs of an entertainment center, a desk and its computer) and it shows
-        their total as one line. Every meter stays where it is in the tree. If a meter is inside another in the same group (a plug on a circuit), it is listed but not
-        added again, because the one that holds it already counts it. Add a group with + Add.
+        Any meters shown as one total. Meters stay where they are in the tree; one inside another member is listed but not added again.
       </Hint>
       {error && <p class="note">{error.message}</p>}
       {data && data.groups.length === 0 && <p class="note">No groups yet.</p>}
@@ -160,13 +158,13 @@ function GroupRow({
       {open && (
         <div class="hier-panel">
           <p class="caption block">Meters in this group</p>
-          {members.length === 0 && <p class="caption block">None yet. Choose one below.</p>}
+          {members.length === 0 && <p class="caption block">None.</p>}
           <div class="chips">
             {members.map((m) => (
               <button
                 key={m.id}
                 type="button"
-                title={notAdded.has(m.id) ? 'Inside another meter of this group, so not added again. Click to take it out.' : 'Click to take it out of the group.'}
+                title={notAdded.has(m.id) ? 'Inside another member, so not added again. Click to remove.' : 'Click to remove from the group.'}
                 onClick={() => run(api.updateMeter(m.id, { group_id: null }))}
               >
                 {m.label}

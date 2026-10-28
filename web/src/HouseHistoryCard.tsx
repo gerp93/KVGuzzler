@@ -22,19 +22,13 @@ export function HouseHistoryCard({ period }: { period: PeriodKey }) {
               <span class="grow">
                 {p.label}
                 <span class="caption block">
-                  {p.peak_watts == null && p.carbon_g == null ? (
-                    'the mains clamps'
-                  ) : (
+                  {p.peak_watts != null && (
                     <>
-                      {p.peak_watts != null && (
-                        <>
-                          highest draw ≤ <Watts w={p.peak_watts} />
-                        </>
-                      )}
-                      {p.peak_watts != null && p.carbon_g != null && ' · '}
-                      {p.carbon_g != null && formatCarbon(p.carbon_g)}
+                      peak ≤ <Watts w={p.peak_watts} />
                     </>
                   )}
+                  {p.peak_watts != null && p.carbon_g != null && ' · '}
+                  {p.carbon_g != null && formatCarbon(p.carbon_g)}
                 </span>
               </span>
               <span class="num"><Kwh k={p.kwh} /></span>
@@ -43,12 +37,11 @@ export function HouseHistoryCard({ period }: { period: PeriodKey }) {
           ))}
         </ul>
       )}
-      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
+      {data && !anyPrice && <p class="caption">Set a price in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
       <p>
-        <a class="button" href={api.houseExportUrl(from, to)} download>
+        <a class="button" href={api.houseExportUrl(from, to)} download title="One row per day for the period picked: the house and each circuit, with cost">
           Export to CSV…
         </a>
-        <span class="caption"> One row per day for the period picked above: the house and each circuit, with the day's cost.</span>
       </p>
     </section>
   );
