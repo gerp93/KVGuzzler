@@ -7,7 +7,7 @@ import { uiScale } from './uiscale';
 import { layoutDiagram } from './treeDiagram';
 import type { Entry } from './treePlan';
 
-const MAX_CHARS = 21;
+const MAX_CHARS = 18;
 
 interface Box {
   id: string;
@@ -27,10 +27,10 @@ function boxOf(e: Entry, watts: Map<string, number>, figures: Map<string, MeterS
   return { id: e.id, label: m.label, figure: join(watts.get(m.id), figures.get(m.id)?.kwh), title: m.label, href: meterPath(m), cls };
 }
 
-export function HierarchyDiagram({ entries, watts, figures }: { entries: Entry[]; watts: Map<string, number>; figures: Map<string, MeterSummary> }) {
+export function HierarchyDiagram({ entries, watts, figures, hover, onHover }: { entries: Entry[]; watts: Map<string, number>; figures: Map<string, MeterSummary>; hover: string | null; onHover: (id: string | null) => void }) {
   if (entries.length === 0) return <p class="note">No meters shown.</p>;
   const s = uiScale();
-  const sizes = { boxW: 150 * s, boxH: 38 * s, gapX: 26 * s, slot: 44 * s, pad: 6 * s };
+  const sizes = { boxW: 132 * s, boxH: 38 * s, gapX: 18 * s, slot: 44 * s, pad: 6 * s };
   const layout = layoutDiagram(entries.map((e) => ({ id: e.id, depth: e.depth })), sizes);
   const boxes = new Map(entries.map((e) => [e.id, boxOf(e, watts, figures)]));
   const short = (t: string) => (t.length > MAX_CHARS ? `${t.slice(0, MAX_CHARS - 1)}…` : t);
@@ -46,7 +46,7 @@ export function HierarchyDiagram({ entries, watts, figures }: { entries: Entry[]
           const b = boxes.get(n.id)!;
           const body = (
             <>
-              <rect class={`box ${b.cls}`} x={n.x} y={n.y} width={sizes.boxW} height={sizes.boxH} rx={5 * s}>
+              <rect class={`box ${b.cls}${hover === n.id ? ' hot' : ''}`} x={n.x} y={n.y} width={sizes.boxW} height={sizes.boxH} rx={5 * s}>
                 <title>{b.figure ? `${b.title}: ${b.figure}` : b.title}</title>
               </rect>
               <text class="name" x={n.x + 8 * s} y={n.y + 15 * s}>
@@ -57,7 +57,11 @@ export function HierarchyDiagram({ entries, watts, figures }: { entries: Entry[]
               </text>
             </>
           );
-          return <g key={n.id}>{b.href ? <a href={b.href}>{body}</a> : body}</g>;
+          return (
+            <g key={n.id} onMouseEnter={() => onHover(n.id)} onMouseLeave={() => onHover(null)}>
+              {b.href ? <a href={b.href}>{body}</a> : body}
+            </g>
+          );
         })}
       </svg>
     </div>
