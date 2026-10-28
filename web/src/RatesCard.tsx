@@ -71,7 +71,7 @@ export function RatesCard() {
         <span>Price from</span>
         <select value={cfg.mode} onChange={(e) => change({ ...cfg, mode: (e.target as HTMLSelectElement).value as RateConfig['mode'] })}>
           <option value="one">One rate</option>
-          <option value="bills">My bills</option>
+          <option value="bills">Bills</option>
           <option value="lookup">A utility's published rate</option>
         </select>
       </label>
