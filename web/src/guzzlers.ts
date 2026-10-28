@@ -5,7 +5,7 @@
 // Two kinds of guzzler: one that works (it goes up and down, and pulls a lot while it runs: an EV charger, a dryer) and one that rests (it is always on at a
 // steady draw: a fridge, a network closet, a heated floor on a thermostat). The always-on power of a meter is the level it hardly ever goes below (the server's
 // "Always on" figure); a meter's energy over the period splits into what that level accounts for (at rest) and the rest (active).
-import { houseShare, shownMeters, type Meter, type MeterSummary, type Summary } from './lib';
+import { houseShare, moneyText, shownMeters, type Meter, type MeterSummary, type Summary } from './lib';
 
 export type GuzzlerBy = 'kwh' | 'cost';
 export type GuzzlerMode = 'active' | 'rest';
@@ -62,7 +62,7 @@ export function topGuzzlers(
     const kwh = mode === 'rest' ? restKwh : f.kwh - restKwh;
     if (!(kwh > 0) || (mode === 'rest' && !(restWatts > 0))) continue;
     // The same average price for both parts of the meter's energy.
-    const cost = f.cost == null ? null : ((Number(f.cost) * kwh) / f.kwh).toFixed(2);
+    const cost = f.cost == null ? null : moneyText((Number(f.cost) * kwh) / f.kwh);
     const share = houseShare(kwh, houseKwh);
     out.push({ meter, kwh, cost, share: share != null && share <= 100 ? share : null, peakWatts: f.peak_watts ?? null, restWatts });
   }

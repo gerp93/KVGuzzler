@@ -4,7 +4,7 @@
 // the wall plug less the parts, never the parts added to the wall plug.
 import { api } from './api';
 import { usePoll } from './hooks';
-import { isLiveStale, type ComputerDetail, type Meter } from './lib';
+import { isLiveStale, moneyText, type ComputerDetail, type Meter } from './lib';
 
 export interface PcPart {
   key: string;
@@ -18,7 +18,7 @@ export interface PcPart {
   remainder?: boolean;
 }
 
-const money = (kwh: number, rate: number | null) => (rate == null ? null : (kwh * rate).toFixed(2));
+const money = (kwh: number, rate: number | null) => (rate == null ? null : moneyText(kwh * rate));
 
 /** The parts to show under a computer's wall plug: each sensor (biggest first), then "Other (not metered)". Empty when the computer reports no sensors or has
  * no wall plug. `wallWatts` is the wall plug's reading right now, if known. */
