@@ -1917,6 +1917,37 @@ main > * {
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
+/* The figures of a period being read: the page's last figures dimmed behind a spinner, under the period island so another period can be picked meanwhile */
+.period-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  color: var(--color-text);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid color-mix(in srgb, var(--color-text) 25%, transparent);
+  border-top-color: var(--color-primary-action);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 body.has-period main {
   padding-bottom: 6rem;
 }

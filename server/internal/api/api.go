@@ -617,17 +617,23 @@ func (s *Server) meterSummary(ctx context.Context, ch model.Meter, from, to time
 	cs.MinWatts = t.MinWatts
 	cs.PeakAmps = t.PeakAmps
 	var readErr error
+	// Pricing walks the period a local day at a time (a tariff can change the price every day), and over "all time" that is 25 years of days for
+	// nothing: before a meter recorded anything it used nothing, so the walk starts at its first minute.
+	priceFrom, err := s.pricingStart(ctx, ch.ID, from, to)
+	if err != nil {
+		return model.MeterSummary{}, rates.RatedCost{}, err
+	}
 	priced := schedule.Cost(func(f, end time.Time) float64 {
 		tot, err := s.Store.Totals(ctx, ch.ID, f, end)
 		if err != nil && readErr == nil {
 			readErr = err
 		}
 		return tot.KWh
-	}, from, to)
+	}, priceFrom, to)
 	if readErr != nil {
 		return model.MeterSummary{}, rates.RatedCost{}, readErr
 	}
-	if !schedule.HasRate(from, to) {
+	if !schedule.HasRate(priceFrom, to) {
 		priced.Unpriced = true // no price known: a meter that used nothing has no cost either, not "$0.00"
 	}
 	if !priced.Unpriced {
@@ -643,6 +649,22 @@ func (s *Server) meterSummary(ctx context.Context, ch model.Meter, from, to time
 		cs.CarbonG, cs.CarbonEstimatedKWh = &g, &est
 	}
 	return cs, priced, nil
+}
+
+// pricingStart is where pricing a meter's period can begin: the period's start, or the meter's first recorded minute when that is later (what it used before
+// that is nothing, so the cost is the same). A meter with nothing recorded keeps only the last minute of the period, so a price (or no price) is still known.
+func (s *Server) pricingStart(ctx context.Context, meterID string, from, to time.Time) (time.Time, error) {
+	first, ok, err := s.Store.FirstMinute(ctx, meterID)
+	if err != nil {
+		return from, err
+	}
+	if !ok {
+		first = to.Add(-time.Minute)
+	}
+	if first.After(from) && first.Before(to) {
+		return first, nil
+	}
+	return from, nil
 }
 
 const maxIngestBody = 16 << 20
