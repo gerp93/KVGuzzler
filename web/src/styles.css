@@ -993,6 +993,54 @@ a.button {
   text-decoration: underline;
 }
 
+/* The Hierarchy diagram: the tree as boxes and lines, in the theme's colours; a box is a line of the tree, a dashed one is worked out from others */
+.hier-diagram {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.hier-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hier-diagram .link {
+  fill: none;
+  stroke: var(--color-accent-blue);
+  stroke-width: 1.5px;
+  opacity: 0.55;
+}
+
+.hier-diagram rect.box {
+  fill: var(--color-surface);
+  stroke-width: 1.5px;
+}
+
+.hier-diagram rect.house { stroke: var(--color-accent-green); stroke-width: 2.5px; }
+.hier-diagram rect.circuit { stroke: var(--color-accent-blue); }
+.hier-diagram rect.device { stroke: var(--color-accent-red); }
+.hier-diagram rect.part { stroke: var(--muted); stroke-dasharray: 2 3; }
+.hier-diagram rect.lump { stroke: var(--muted); stroke-dasharray: 5 3; }
+
+.hier-diagram text {
+  fill: var(--color-text);
+  font-size: calc(12px * var(--s, 1));
+}
+
+.hier-diagram text.small {
+  fill: var(--muted);
+  font-size: calc(11px * var(--s, 1));
+}
+
+.hier-diagram a text {
+  cursor: pointer;
+}
+
+.hier-diagram a:hover text.name {
+  text-decoration: underline;
+}
+
 /* A part of a computer in the tree: read-only, quieter than a meter */
 .hier-row.virtual {
   border-left-style: dotted;
