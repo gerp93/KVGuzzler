@@ -55,8 +55,9 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
     const avg = figures?.series.grid_average_g_per_kwh;
     const xs = points.map((p) => Date.parse(p.t) / 1000);
     const emitted: Line[] = [{ name: 'Carbon', colorVar: '--color-text', x: xs, y: points.map((p) => p.carbon_g) }];
-    // The same energy at the grid's average intensity: where the carbon line is above it, power was used when the grid was dirtier than usual.
-    if (avg != null) emitted.push({ name: "At the grid's average", colorVar: '--color-accent-blue', x: xs, y: points.map((p) => p.kwh * avg), dashed: true });
+    // The same energy at the grid's average intensity: where the carbon line is above it, power was used when the grid was dirtier than usual. With no hour of the
+    // period having a reading of its own every hour is valued at that average, so the two lines would be one: only the solid line is drawn then.
+    if (avg != null && points.some((p) => p.grid_g_per_kwh != null)) emitted.push({ name: "At the grid's average", colorVar: '--color-accent-blue', x: xs, y: points.map((p) => p.kwh * avg), dashed: true });
     // Only the stretches with a saved intensity: a stretch without one is not a reading, so no point is drawn for it.
     const known = points.filter((p) => p.grid_g_per_kwh != null);
     const intensity: Line[] = [{ name: 'Grid intensity', colorVar: '--color-accent-blue', x: known.map((p) => Date.parse(p.t) / 1000), y: known.map((p) => Math.round(p.grid_g_per_kwh!)) }];
@@ -75,6 +76,7 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
   const average = grams != null && kwh != null && kwh > 0 ? grams / kwh : null;
   const estimatedShare = kwh != null && kwh > 0 ? Math.round((estimated / kwh) * 100) : null;
   const hasPoints = (figures?.series.points.length ?? 0) > 0;
+  const hasGrid = figures?.series.points.some((p) => p.grid_g_per_kwh != null) ?? false;
   const per = figures?.series.bucket === 'day' ? 'day' : 'hour';
 
   return (
@@ -117,13 +119,19 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
                 <Chart lines={lines.emitted} domain={figures!.domain} format={gramsAxis} label={`Carbon per ${per}`} />
                 <p class="caption">{`Grams of CO₂e per ${per}: the house's energy at that ${per}'s grid intensity (≈, the grid's average mix). Dashed: the same energy at the period's average intensity, so above it means power was used when the grid was dirtier than usual.`}</p>
               </section>
-              <section class="panel panel-chart">
-                <div class="panel-head">
-                  <h2>Grid carbon intensity (g/kWh)</h2>
-                </div>
-                <Chart lines={lines.intensity} domain={figures!.domain} format={plain} label="Grid carbon intensity" />
-                <p class="caption">How carbon-heavy the grid's power was, by hour: coal weighs most, wind, solar and nuclear least. Dashed: the grid's average over the period, and yours, weighted by when you used power (below the grid's means you used it at the cleaner hours).</p>
-              </section>
+              {hasGrid ? (
+                <section class="panel panel-chart">
+                  <div class="panel-head">
+                    <h2>Grid carbon intensity (g/kWh)</h2>
+                  </div>
+                  <Chart lines={lines.intensity} domain={figures!.domain} format={plain} label="Grid carbon intensity" />
+                  <p class="caption">How carbon-heavy the grid's power was, by hour: coal weighs most, wind, solar and nuclear least. Dashed: the grid's average over the period, and yours, weighted by when you used power (below the grid's means you used it at the cleaner hours).</p>
+                </section>
+              ) : (
+                <p class="note">
+                  {`None of this period's hours has a grid reading saved yet (EIA reports about half a day late), so each is valued at the average of the hours saved${figures?.series.grid_average_g_per_kwh != null ? `, ${Math.round(figures.series.grid_average_g_per_kwh)} g/kWh` : ''}. The footprint above is an estimate until the readings arrive; the grid's chart and the comparison with its average appear then.`}
+                </p>
+              )}
             </>
           )}
           {figures && !hasPoints && grid?.configured && <p class="note">No grid data saved for this period yet.</p>}
