@@ -36,7 +36,10 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
   const rests = new Map((base?.parts ?? []).map((p) => [p.meter_id, p.watts]));
   const priced = (summary?.meters ?? []).some((f) => f.cost != null && f.kwh > 0);
   const mode: GuzzlerMode = savedMode === 'rest' ? 'rest' : 'active';
-  const by: GuzzlerBy = saved === 'cost' && priced ? 'cost' : 'kwh';
+  // Ranking by cost only differs from ranking by energy when the price changes (by the hour of the day, or from bill to bill): at one rate the order is the same, so there is nothing to choose.
+  const order = (b: GuzzlerBy) => topGuzzlers(meters, summary, b, houseKwh, 'active', rests).map((g) => g.meter.id).join();
+  const canRankByCost = priced && order('cost') !== order('kwh');
+  const by: GuzzlerBy = saved === 'cost' && canRankByCost ? 'cost' : 'kwh';
   const working = topGuzzlers(meters, summary, by, houseKwh, 'active', rests);
   const resting = topGuzzlers(meters, summary, by, houseKwh, 'rest', rests);
   if (working.length === 0 && resting.length === 0) return null;
@@ -59,7 +62,7 @@ export function GuzzlersCard({ meters, summary, houseKwh, period }: { meters: Me
         </div>
       </div>
       {mode === 'rest' && base && <BaseLoadStats data={base} />}
-      {mode === 'active' && priced && (
+      {mode === 'active' && canRankByCost && (
         <div class="seg small" role="group" aria-label="Rank by">
           <button type="button" aria-pressed={by === 'kwh'} onClick={() => setBy('kwh')}>
             Energy

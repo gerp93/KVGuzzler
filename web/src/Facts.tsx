@@ -5,10 +5,11 @@ export interface Fact {
   value: string;
 }
 
-export function Facts({ items }: { items: Fact[] }) {
+/** `table`: a two-column table, the label on the left and its value on the right, for the details under a page's tiles. */
+export function Facts({ items, table }: { items: Fact[]; table?: boolean }) {
   if (items.length === 0) return null;
   return (
-    <dl class="facts">
+    <dl class={table ? 'facts table' : 'facts'}>
       {items.map((f) => (
         <div key={f.label}>
           <dt>{f.label}</dt>
