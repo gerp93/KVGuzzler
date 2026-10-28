@@ -50,7 +50,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         ) : (
           <p class="note">{data ? 'Nothing recorded in this period yet.' : 'Loading…'}</p>
         )}
-        <p class="caption">Average watts per point. The house line is the mains clamps; the others are drawn separately.</p>
+        <p class="caption">Average watts per point</p>
       </section>
 
       <section class="card wide aside-card">

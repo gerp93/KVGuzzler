@@ -4,13 +4,14 @@ import { Chart, lineFrom, wideChartHeight, type Line, type Shade } from './Chart
 import { usePoll, useStored } from './hooks';
 import { EnergyHistory } from './EnergyHistory';
 import { Estimator } from './Estimator';
+import { Facts } from './Facts';
 import { Kpi, KpiRow } from './Kpi';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
 import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
-  COUNT_PC, carbonNote, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, periodWords, toggleCount,
+  COUNT_PC, carbonFacts, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, periodWords, toggleCount,
   type Meter, type MeterSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
@@ -117,7 +118,7 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             <Kpi tone="now" label="Right now" value={nowWatts != null ? formatWatts(nowWatts) : '—'} />
             <Kpi tone="energy" label="Energy" value={(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
-            <Kpi tone="peak" label="Highest draw" value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'} hint={peakIsBound ? 'an upper bound' : 'the most in one reading'} />
+            <Kpi tone="peak" label="Highest draw" value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'} hint={peakIsBound ? 'upper bound' : !hasPlugs && !detail.wall?.peak_watts && peak != null ? 'sensors only' : 'peak reading'} />
           </KpiRow>
           <div class="kpi-notes">
             {hasPlugs && (
@@ -135,19 +136,9 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
                 ))}
               </div>
             )}
-            <p class="caption">
-              {hasPlugs
-                ? counted && counted.parts.length > 0
-                  ? `Counting ${counted.parts.join(', ')}. Each is measured on its own plug; the PC's figure does not include the others.${peakIsBound ? ' The highest draw is an upper bound: the parts need not peak together.' : ''}`
-                  : 'Nothing is counted: tick the PC or a plug above.'
-                : detail.wall
-                  ? 'The whole PC at the wall.'
-                  : 'No plug is tied to this computer yet. Tie its wall plug to it under Computers in the Hierarchy tab.'}
-              {!hasPlugs && peak != null && !detail.wall?.peak_watts ? ' Max draw is the highest the sensors reached together; the wall is not measured.' : ''}
-            </p>
-            {counted && carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh) && (
-              <p class="caption">{carbonNote(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)}</p>
-            )}
+            {hasPlugs && counted && counted.parts.length === 0 && <p class="caption">Nothing counted: tick the PC or a plug.</p>}
+            {!hasPlugs && !detail.wall && <p class="caption">No wall plug assigned. Set one under Computers in Hierarchy.</p>}
+            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh, counted.carbonEstimatedKwh)} />}
             <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} />
           </div>
 
@@ -156,10 +147,9 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
           {detail.peripherals.length > 0 && detail.setup_kwh != null && (
             <section class="card">
               <h2>The whole desk</h2>
-              <p class="big small"><Kwh k={detail.setup_kwh} /></p>
-              <p class="caption">
-                The PC plus all of its peripherals{detail.setup_cost != null ? `, ${formatMoney(detail.setup_cost, detail.cost_estimated)}` : ''}, whatever is
-                ticked above.
+              <p class="big small">
+                <Kwh k={detail.setup_kwh} />
+                {detail.setup_cost != null && <span class="cost"> · {formatMoney(detail.setup_cost, detail.cost_estimated)}</span>}
               </p>
               <ul class="bars wide">
                 {detail.peripherals.map((p) => (
@@ -180,7 +170,6 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             <section class="card wide">
               <h2>Power over time</h2>
               <Chart lines={data.lines} domain={data.domain} height={wideChartHeight()} />
-              <p class="caption">Each plug on its own line. They are not added together.</p>
             </section>
           )}
 
@@ -190,7 +179,6 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             }
             deps={[id, detail.peripherals.map((p) => p.meter_id).filter((cid) => !off.has(cid)).join(','), off.has(COUNT_PC)]}
             basisOf={usageBasis}
-            who="the PC"
             nowWatts={nowWatts}
             nowWhat={nowWhat}
           />
@@ -201,26 +189,21 @@ export function ComputerView({ id, meters, embedded = false }: { id: string; met
             <section class="card wide">
               <h2>Inside the PC over time</h2>
               <Chart lines={data.inside} domain={data.domain} shades={data.shades} height={wideChartHeight()} />
-              <p class="caption">
-                What the PC's own collector recorded: the wall as it read it, each sensor, and the plugs it reads (dashed). The lines are not added
-                together. Shaded stretches are times nothing was being recorded.
-              </p>
+              <p class="caption">Shaded: not recording</p>
             </section>
           )}
 
           {detail.pc ? (
             <>
-              <p class="caption">
-                Inside the PC, reported by its collector (last heard from {ago(detail.pc.last_seen)}).
-              </p>
+              <p class="caption">Collector last heard {ago(detail.pc.last_seen)}</p>
               <PcInsides pc={detail.pc} wholeKwh={detail.wall?.kwh ?? null} />
             </>
           ) : (
             <section class="card">
               <p class="note">
                 {detail.computer.source_id
-                  ? 'The collector for this computer has not reported in this period.'
-                  : 'No collector reports for this computer yet, so there are no sensors or programs to show. What its plugs measure is above.'}
+                  ? 'The collector has not reported in this period.'
+                  : 'No collector reporting.'}
               </p>
             </section>
           )}

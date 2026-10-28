@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonNote, formatCarbon, currencySymbol, setCurrencyCode, tariffNote, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -285,7 +285,7 @@ describe('programs over a period', () => {
 
   it('names a program with the many-small-programs label', () => {
     const rows = programRows([prog(OTHERS, 0.01, 0, 90)], null);
-    expect(rows[0]!.note).toBe('many small programs together · active up to 2 min');
+    expect(rows[0]!.note).toBe('many small programs · active up to 2 min');
   });
 });
 
@@ -352,14 +352,14 @@ describe('the energy history row detail', () => {
   });
 
   it('says how much the sensors account for and every stretch nothing was recorded, by reason', () => {
-    expect(historyDetail(row({}))).toBe('of which CPU, GPU and memory 3.00 kWh (75% of the whole PC)');
+    expect(historyDetail(row({}))).toBe('CPU, GPU, memory 3.00 kWh (75%)');
     expect(historyDetail(row({ asleep_seconds: 13800, plug_gap_kwh: 0.06, off_seconds: 7200, lost_power_seconds: 600 }))).toBe(
-      'of which CPU, GPU and memory 3.00 kWh (75% of the whole PC) · asleep 3 h 50 min · off 2 h · lost power or crashed 10 min',
+      'CPU, GPU, memory 3.00 kWh (75%) · asleep 3 h 50 min · off 2 h · lost power 10 min',
     );
   });
 
   it('without a wall plug says the figure is the sensors, and leaves out the plug counter it does not have', () => {
-    expect(historyDetail(row({ basis: 'sensors', asleep_seconds: 600 }))).toBe('CPU, GPU and memory sensors only · asleep 10 min');
+    expect(historyDetail(row({ basis: 'sensors', asleep_seconds: 600 }))).toBe('Sensors only · asleep 10 min');
   });
 });
 
@@ -412,12 +412,10 @@ describe('the cost estimator', () => {
 
   it('says where a usage estimate comes from, and how much was really recorded', () => {
     const use: AverageUse = { kwh: 36.4, days: 7, kwh_per_day: 5.2, average_watts: 216.7, whole_pc: true, includes_pc: true, from: '', peripheral_count: 1 };
-    expect(usageBasis(use, '7d')).toBe(
-      'The PC used 36.4 kWh over the last 7 days: 5.20 kWh a day, an average of 217 W counting the time it was off or asleep. That is the whole PC at the wall, plus 1 peripheral meter.',
-    );
-    expect(usageBasis({ ...use, days: 0.125 }, '30d')).toContain('over the 3 h recorded so far');
-    expect(usageBasis({ ...use, includes_pc: false, peripheral_count: 2 }, '7d')).toContain('That is the 2 peripheral meters only, not the PC.');
-    expect(usageBasis({ ...use, whole_pc: false, peripheral_count: 0 }, '7d')).toContain('sensors only (a wall plug would show the whole PC).');
+    expect(usageBasis(use, '7d')).toBe('Last 7 days: 36.4 kWh, 5.20 kWh a day, avg 217 W · whole PC at the wall + 1 peripheral');
+    expect(usageBasis({ ...use, days: 0.125 }, '30d')).toContain('3 h recorded');
+    expect(usageBasis({ ...use, includes_pc: false, peripheral_count: 2 }, '7d')).toContain('· 2 peripherals');
+    expect(usageBasis({ ...use, whole_pc: false, peripheral_count: 0 }, '7d')).toContain('· sensors only');
   });
 });
 
@@ -441,10 +439,16 @@ describe('currency and the looked-up price note', () => {
 
   it('names the utility and rate, what the period averaged to, and what is left out', () => {
     const tariff = { utility: 'Example Electric', name: 'Residential Time of Use', tiers: 2, fixed_charge: '6.75 $/month', varies_by_time: true };
-    expect(tariffNote(tariff, 10, '1.50')).toBe(
-      'Priced at Example Electric: Residential Time of Use; this period averaged $0.1500 per kWh, weighted by when the power is used. The energy charge only; the fixed charge (6.75 $/month) is not in it; only the first usage tier is used.',
-    );
-    expect(tariffNote({ ...tariff, tiers: 1, fixed_charge: null, varies_by_time: false }, 0, null)).toBe('Priced at Example Electric: Residential Time of Use. The energy charge only.');
+    expect(tariffFacts(tariff, 10, '1.50')).toEqual([
+      { label: 'Rate', value: 'Example Electric · Residential Time of Use' },
+      { label: 'Average price', value: '$0.1500 per kWh, time-weighted' },
+      { label: 'Basis', value: 'Energy charge only' },
+      { label: 'Not included', value: 'fixed charge 6.75 $/month, tiers above the first' },
+    ]);
+    expect(tariffFacts({ ...tariff, tiers: 1, fixed_charge: null, varies_by_time: false }, 0, null)).toEqual([
+      { label: 'Rate', value: 'Example Electric · Residential Time of Use' },
+      { label: 'Basis', value: 'Energy charge only' },
+    ]);
   });
 });
 
@@ -464,12 +468,14 @@ describe('the carbon footprint', () => {
   });
 
   it('says the average it came to and the share valued at an average, and nothing without carbon', () => {
-    expect(carbonNote(480, 1.2, 0.3)).toBe(
-      "≈ 480 g CO₂e (the grid's average, not what one more kWh would cause); averaging 400 g per kWh; 25% of the energy valued at an average for want of its own hour's figure.",
-    );
-    expect(carbonNote(480, 1.2, 0)).not.toContain('valued at an average');
-    expect(carbonNote(null, 1, 0)).toBe('');
-    expect(carbonNote(5, null, 0)).toBe('');
+    expect(carbonFacts(480, 1.2, 0.3)).toEqual([
+      { label: 'Carbon', value: '≈ 480 g CO₂e' },
+      { label: 'Grid average', value: '400 g/kWh' },
+      { label: 'Hours without data', value: '25% of energy' },
+    ]);
+    expect(carbonFacts(480, 1.2, 0).map((f) => f.label)).toEqual(['Carbon', 'Grid average']);
+    expect(carbonFacts(null, 1, 0)).toEqual([]);
+    expect(carbonFacts(5, null, 0)).toEqual([]);
   });
 });
 
@@ -482,8 +488,8 @@ describe('the house figures', () => {
 
   it('says where a house usage estimate comes from', () => {
     const use = { kwh: 36.4, days: 7, kwh_per_day: 5.2, average_watts: 216.7, whole_pc: true, includes_pc: false, from: '', peripheral_count: 0 };
-    expect(houseUsageBasis(use, '7d')).toBe('The house used 36.4 kWh over the last 7 days: 5.20 kWh a day, an average of 217 W counting every hour. That is the mains clamps.');
-    expect(houseUsageBasis({ ...use, days: 0.125 }, '30d')).toContain('over the 3 h recorded so far');
+    expect(houseUsageBasis(use, '7d')).toBe('Last 7 days: 36.4 kWh, 5.20 kWh a day, avg 217 W · mains clamps');
+    expect(houseUsageBasis({ ...use, days: 0.125 }, '30d')).toContain('3 h recorded');
   });
 });
 

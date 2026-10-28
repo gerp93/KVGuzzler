@@ -29,15 +29,11 @@ export function EnergyHistory({ id, period }: { id: string; period: PeriodKey })
           ))}
         </ul>
       )}
-      {data?.periods.some((p) => p.basis === 'sensors') && (
-        <p class="caption">No wall plug is tied to this computer, so these figures are what its sensors measured. They leave out fans, drives and power-supply loss.</p>
-      )}
-      {data && !anyPrice && <p class="caption">Save your electricity rate (or a bill) in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
+      {data && !anyPrice && <p class="caption">Set a price in <a href={routePath('settings')}>Settings</a> to see costs.</p>}
       <p>
-        <a class="button" href={api.computerExportUrl(id, from, to)} download>
+        <a class="button" href={api.computerExportUrl(id, from, to)} download title="One row per day for the period picked, with each day's cost">
           Export to CSV…
         </a>
-        <span class="caption"> One row per day for the period picked above. The cost uses each day's price.</span>
       </p>
     </section>
   );

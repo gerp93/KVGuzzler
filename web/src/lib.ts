@@ -3,6 +3,7 @@
 // The rule that shapes most of them: scopes are never summed across each other. The house is the `mains` meters
 // alone; circuits and plugs are parts of it; the PC's wall plug (`pc`) is a slice of some circuit and is added to nothing.
 import type { components } from './api-types';
+import type { Fact } from './Facts';
 
 type S = components['schemas'];
 export type Meter = S['Meter'];
@@ -579,11 +580,11 @@ export function programRows(programs: PcProgramTotal[], wholeKwh: number | null 
   const row = (p: PcProgramTotal): ProgramRow => {
     const active = p.active_seconds ?? 0;
     if (p.name === BASELINE)
-      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: "the CPU's and GPU's idle power, not any program's doing", share: share(p.kwh), kind: 'baseline' };
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: 'CPU and GPU idle power', share: share(p.kwh), kind: 'baseline' };
     if (p.name === UNATTRIBUTED)
-      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: 'power above idle that no program reported using', share: share(p.kwh), kind: 'unattributed' };
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: 'above idle, no program reported', share: share(p.kwh), kind: 'unattributed' };
     if (p.name === OTHERS)
-      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: `many small programs together${active > 0 ? ` · active up to ${formatDuration(active)}` : ''}`, share: share(p.kwh), kind: 'program' };
+      return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: `many small programs${active > 0 ? ` · active up to ${formatDuration(active)}` : ''}`, share: share(p.kwh), kind: 'program' };
     return { name: p.name, kwh: p.kwh, cost: p.cost ?? null, note: both(p) + (active > 0 ? ` · active ${formatDuration(active)}` : ''), share: share(p.kwh), kind: 'program' };
   };
 
@@ -595,7 +596,7 @@ export function programRows(programs: PcProgramTotal[], wholeKwh: number | null 
     const kwh = sum(rest);
     rows.push({
       name: `${rest.length} smaller program${rest.length === 1 ? '' : 's'}`, kwh, cost: sumMoney(rest.map((p) => p.cost)),
-      note: 'none of them caused enough to list on its own', share: share(kwh), kind: 'rollup',
+      note: 'each too small to list', share: share(kwh), kind: 'rollup',
     });
   }
   rows.push(...programs.filter(isSpecial).map(row));
@@ -631,13 +632,13 @@ export function programSplit(programs: PcProgramTotal[], wholeKwh: number | null
 export function historyDetail(p: PcHistoryPeriod): string {
   const parts: string[] = [];
   if (p.basis === 'wall') {
-    parts.push(`of which CPU, GPU and memory ${formatKwh(p.sensors_kwh)}${p.kwh > 0 && p.sensors_kwh > 0 ? ` (${Math.round((p.sensors_kwh / p.kwh) * 100)}% of the whole PC)` : ''}`);
+    parts.push(`CPU, GPU, memory ${formatKwh(p.sensors_kwh)}${p.kwh > 0 && p.sensors_kwh > 0 ? ` (${Math.round((p.sensors_kwh / p.kwh) * 100)}%)` : ''}`);
   } else {
-    parts.push('CPU, GPU and memory sensors only');
+    parts.push('Sensors only');
   }
   if (p.asleep_seconds > 0) parts.push(`asleep ${formatDuration(p.asleep_seconds)}`);
   if (p.off_seconds > 0) parts.push(`off ${formatDuration(p.off_seconds)}`);
-  if (p.lost_power_seconds > 0) parts.push(`lost power or crashed ${formatDuration(p.lost_power_seconds)}`);
+  if (p.lost_power_seconds > 0) parts.push(`lost power ${formatDuration(p.lost_power_seconds)}`);
   return parts.join(' · ');
 }
 
@@ -704,10 +705,10 @@ export function countedWatts(pcWatts: number | null, plugs: { key: string; watts
 export type EstimateMode = 'constant' | 'now' | 'usage';
 
 export const ESTIMATE_WINDOWS: { key: '24h' | '7d' | '30d' | 'all'; label: string; days: number | null }[] = [
-  { key: '24h', label: 'the last 24 hours', days: 1 },
-  { key: '7d', label: 'the last 7 days', days: 7 },
-  { key: '30d', label: 'the last 30 days', days: 30 },
-  { key: 'all', label: 'all recorded time', days: null },
+  { key: '24h', label: 'Last 24 hours', days: 1 },
+  { key: '7d', label: 'Last 7 days', days: 7 },
+  { key: '30d', label: 'Last 30 days', days: 30 },
+  { key: 'all', label: 'All recorded time', days: null },
 ];
 
 export interface EstimateLine {
@@ -731,12 +732,12 @@ export function estimateLines(kwhPerDay: number, rate: string | null, perHour: b
 export function usageBasis(use: AverageUse, windowKey: string): string {
   const w = ESTIMATE_WINDOWS.find((x) => x.key === windowKey) ?? ESTIMATE_WINDOWS[1]!;
   const short = w.days == null || use.days < w.days * 0.95;
-  const covered = short ? `the ${formatDuration(use.days * 86400)} recorded so far` : w.label;
-  const plugs = `${use.peripheral_count} peripheral meter${use.peripheral_count === 1 ? '' : 's'}`;
+  const covered = short ? `${formatDuration(use.days * 86400)} recorded` : w.label;
+  const plugs = `${use.peripheral_count} peripheral${use.peripheral_count === 1 ? '' : 's'}`;
   const what = !use.includes_pc
-    ? `That is the ${plugs} only, not the PC.`
-    : `${use.whole_pc ? 'That is the whole PC at the wall' : 'That is the CPU, GPU and memory sensors only (a wall plug would show the whole PC)'}${use.peripheral_count > 0 ? `, plus ${plugs}.` : '.'}`;
-  return `The PC used ${formatKwh(use.kwh)} over ${covered}: ${formatKwh(use.kwh_per_day)} a day, an average of ${formatWatts(use.average_watts)} counting the time it was off or asleep. ${what}`;
+    ? plugs
+    : `${use.whole_pc ? 'whole PC at the wall' : 'sensors only'}${use.peripheral_count > 0 ? ` + ${plugs}` : ''}`;
+  return `${covered}: ${formatKwh(use.kwh)}, ${formatKwh(use.kwh_per_day)} a day, avg ${formatWatts(use.average_watts)} · ${what}`;
 }
 
 /** A file size in words: "812 B", "212 KB", "3.4 MB". */
@@ -759,14 +760,14 @@ export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases
 
 /** What a looked-up price comes to over a period, in words: the rate, what the period averaged to per kWh and what is left out. With no
  * energy to average over the line says only which rate it is and what is left out. */
-export function tariffNote(t: Pick<TariffInfo, 'utility' | 'name' | 'tiers' | 'fixed_charge' | 'varies_by_time'>, kwh: number, cost: string | null): string {
+export function tariffFacts(t: Pick<TariffInfo, 'utility' | 'name' | 'tiers' | 'fixed_charge' | 'varies_by_time'>, kwh: number, cost: string | null): Fact[] {
   const avg = cost != null && kwh > 0 ? Number(cost) / kwh : null;
-  const parts = [`Priced at ${t.utility}: ${t.name}`];
-  if (avg != null && Number.isFinite(avg)) parts.push(`this period averaged ${symbol}${avg.toFixed(4)} per kWh${t.varies_by_time ? ', weighted by when the power is used' : ''}`);
-  const left = ['The energy charge only'];
-  if (t.fixed_charge) left.push(`the fixed charge (${t.fixed_charge}) is not in it`);
-  if (t.tiers > 1) left.push('only the first usage tier is used');
-  return `${parts.join('; ')}. ${left.join('; ')}.`;
+  const facts: Fact[] = [{ label: 'Rate', value: `${t.utility} · ${t.name}` }];
+  if (avg != null && Number.isFinite(avg)) facts.push({ label: 'Average price', value: `${symbol}${avg.toFixed(4)} per kWh${t.varies_by_time ? ', time-weighted' : ''}` });
+  const left = [...(t.fixed_charge ? [`fixed charge ${t.fixed_charge}`] : []), ...(t.tiers > 1 ? ['tiers above the first'] : [])];
+  facts.push({ label: 'Basis', value: 'Energy charge only' });
+  if (left.length > 0) facts.push({ label: 'Not included', value: left.join(', ') });
+  return facts;
 }
 
 /** An amount of carbon in words, always approximate: "≈ 412 g CO₂e", "≈ 1.24 kg CO₂e", "≈ 2.1 t CO₂e". */
@@ -777,26 +778,25 @@ export function formatCarbon(grams: number): string {
   return `≈ ${(grams / 1_000_000).toFixed(1)} t CO₂e`;
 }
 
-/** The carbon line under a computer's figures: the amount, the energy-weighted grid average it came to, and how much was valued at an average
+/** The carbon figures under a page's tiles: the amount, the energy-weighted grid average it came to, and how much was valued at an average
  * for want of its own hour's figure. Empty when there is no carbon to show. */
-export function carbonNote(carbonG: number | null | undefined, kwh: number | null | undefined, estimatedKwh: number): string {
-  if (carbonG == null || kwh == null) return '';
-  const parts = [`${formatCarbon(carbonG)} (the grid's average, not what one more kWh would cause)`];
+export function carbonFacts(carbonG: number | null | undefined, kwh: number | null | undefined, estimatedKwh: number): Fact[] {
+  if (carbonG == null || kwh == null) return [];
+  const facts: Fact[] = [{ label: 'Carbon', value: formatCarbon(carbonG) }];
   if (kwh > 0) {
-    parts.push(`averaging ${Math.round((carbonG / kwh))} g per kWh`);
+    facts.push({ label: 'Grid average', value: `${Math.round(carbonG / kwh)} g/kWh` });
     const share = Math.round(Math.min(1, Math.max(0, estimatedKwh / kwh)) * 100);
-    if (share > 0) parts.push(`${share}% of the energy valued at an average for want of its own hour's figure`);
+    if (share > 0) facts.push({ label: 'Hours without data', value: `${share}% of energy` });
   }
-  return parts.join('; ') + '.';
+  return facts;
 }
-
 
 /** Where a house "my usage" estimate comes from, in words: the window and that every hour is in it. */
 export function houseUsageBasis(use: AverageUse, windowKey: string): string {
   const w = ESTIMATE_WINDOWS.find((x) => x.key === windowKey) ?? ESTIMATE_WINDOWS[1]!;
   const short = w.days == null || use.days < w.days * 0.95;
-  const covered = short ? `the ${formatDuration(use.days * 86400)} recorded so far` : w.label;
-  return `The house used ${formatKwh(use.kwh)} over ${covered}: ${formatKwh(use.kwh_per_day)} a day, an average of ${formatWatts(use.average_watts)} counting every hour. That is the mains clamps.`;
+  const covered = short ? `${formatDuration(use.days * 86400)} recorded` : w.label;
+  return `${covered}: ${formatKwh(use.kwh)}, ${formatKwh(use.kwh_per_day)} a day, avg ${formatWatts(use.average_watts)} · mains clamps`;
 }
 
 /** The share of the house a part of it used, as a whole-number percent; null when the house figure is missing or zero. */

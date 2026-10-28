@@ -50,11 +50,9 @@ export function CarbonCard() {
   return (
     <section class="card">
       <h2>Carbon footprint</h2>
-      <p class="caption">An estimate of the CO₂ the grid emitted to make the electricity you used (US only).</p>
       <Hint>
-        Each hour's energy times that hour's grid intensity, worked out from the US Energy Information Administration's hourly generation by fuel for your
-        balancing authority. It is the grid's average, not what one more kWh would cause. It needs a free EIA API key (eia.gov/opendata); the server keeps it
-        in a private file and sends it to EIA only.
+        Each hour's energy times that hour's grid intensity, from EIA hourly generation by fuel for your balancing authority (US only). Grid average, not
+        marginal. Needs a free EIA API key (eia.gov/opendata), stored on the server and sent to EIA only.
       </Hint>
       <label class="field">
         <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>

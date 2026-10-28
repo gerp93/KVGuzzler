@@ -55,7 +55,7 @@ export function TariffPicker({ current, label, onChoose }: {
       (list) => {
         setFound(list);
         setBusy(false);
-        if (list.length === 0) setMessage('OpenEI had no usable residential rate for that place. Try a ZIP code, or a nearby address.');
+        if (list.length === 0) setMessage('No residential rates found. Try a ZIP code.');
       },
       (e: Error) => {
         setBusy(false);
@@ -82,7 +82,7 @@ export function TariffPicker({ current, label, onChoose }: {
             </span>
             <Notes c={current} fixed />
           </p>
-          <p class="caption">Read from OpenEI on {new Date(current.fetched_at).toLocaleDateString()}, and read again when a week old.</p>
+          <p class="caption">Updated {new Date(current.fetched_at).toLocaleDateString()}</p>
           {!changing && (
             <button type="button" onClick={() => setChanging(true)}>
               Change rate
@@ -94,10 +94,7 @@ export function TariffPicker({ current, label, onChoose }: {
       {hasKey === false && (
         <>
           <h3>OpenEI key</h3>
-          <p class="caption">
-            Rates come from the free Utility Rate Database at openei.org. Sign up there for an API key and paste it here once. The server keeps it in a private
-            file and sends it to OpenEI only.
-          </p>
+          <p class="caption">Free key from openei.org (Utility Rate Database). Stored on the server and sent to OpenEI only.</p>
           <label class="field">
             <span>API key</span>
             <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
@@ -111,7 +108,6 @@ export function TariffPicker({ current, label, onChoose }: {
       {hasKey && searching && (
         <>
           <h3>{current ? 'Find a different rate' : 'Find your rate'}</h3>
-          <p class="caption">Type your address or ZIP code, then pick the rate your bill names (it is usually called something like "Residential Service").</p>
           <label class="field">
             <span>Address or ZIP code</span>
             <input value={address} onInput={(e) => setAddress((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && address.trim() && !busy && search()} />
@@ -123,8 +119,8 @@ export function TariffPicker({ current, label, onChoose }: {
           {found && found.length > 0 && (
             <>
               <p class="caption">
-                {utility ? `${utility}. ` : ''}
-                {found.length} rate{found.length === 1 ? '' : 's'} found; the likeliest first.
+                {utility ? `${utility} · ` : ''}
+                {found.length} rate{found.length === 1 ? '' : 's'}
               </p>
               {found.length > TARIFFS_SHOWN && (
                 <label class="field">
@@ -163,7 +159,7 @@ export function TariffPicker({ current, label, onChoose }: {
         </>
       )}
 
-      {chosenButNotSaved && <p class="note">Chosen. Press "Save price" below to use it.</p>}
+      {chosenButNotSaved && <p class="note">Selected. Save the price to apply it.</p>}
       {message && (
         <p class="note" role="status">
           {message}
@@ -172,16 +168,14 @@ export function TariffPicker({ current, label, onChoose }: {
 
       {hasKey && (
         <details>
-          <summary>How this works</summary>
-          <p class="note">
-            Only the energy charge is used: the rate's price per kWh. Fixed monthly charges and demand charges are left out, and where a rate has usage tiers
-            only the first applies. A rate that changes by time of day becomes one price per day, weighted by the hours the house really uses power (learned from
-            the last 60 days). Costs are estimates; your bill is the exact figure.
+          <summary>Method</summary>
+          <p class="caption">
+            Energy charge only (price per kWh): fixed and demand charges are left out, and only the first usage tier applies. A time-of-day rate becomes one
+            price per day, weighted by when the house uses power (last 60 days). Estimates; your bill is exact.
           </p>
           <p class="caption">
-            The OpenEI key is saved on the server, not shown again.{' '}
             <button type="button" onClick={() => void saveKey('')}>
-              Remove the key
+              Remove OpenEI key
             </button>
           </p>
         </details>

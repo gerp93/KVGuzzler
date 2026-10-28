@@ -13,15 +13,13 @@ const MODES: { key: EstimateMode; label: string }[] = [
   { key: 'usage', label: 'My usage' },
 ];
 
-export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
+export function Estimator({ load, deps, basisOf, nowWatts, nowWhat }: {
   /** Asks the server for today's price and the real usage over a window ("24h", "7d", "30d", "all"). */
   load: (window: string) => Promise<ComputerEstimate>;
   /** What the loaded estimate depends on besides the window (what is counted), so it is read again when that changes. */
   deps: unknown[];
   /** Where a real-usage figure comes from, in words. */
   basisOf: (use: AverageUse, window: string) => string;
-  /** What is being estimated: "the PC", "the house". */
-  who: string;
   /** What the counted parts draw right now, or null when unknown. */
   nowWatts: number | null;
   nowWhat: string;
@@ -39,21 +37,21 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
   let message = '';
   if (mode === 'constant') {
     const watts = Number(typed);
-    if (typed.trim() === '' || !Number.isFinite(watts) || watts < 0) message = 'Enter a number of watts, for example 400.';
+    if (typed.trim() === '' || !Number.isFinite(watts) || watts < 0) message = 'Enter a number of watts.';
     else {
       kwhPerDay = (watts * 24) / 1000;
-      basis = `If ${who} drew ${watts} W all day, every day.`;
+      basis = '';
     }
   } else if (mode === 'now') {
     if (nowWatts == null) message = 'Waiting for a power reading.';
     else {
       kwhPerDay = (nowWatts * 24) / 1000;
-      basis = `If it kept drawing what it draws right now (${formatWatts(nowWatts)}, ${nowWhat}) all day, every day.`;
+      basis = `Current draw ${formatWatts(nowWatts)} · ${nowWhat}`;
     }
   } else {
     perHour = false;
     if (!est) message = error ? error.message : 'Loading…';
-    else if (!est.usage) message = 'Not enough history yet: this needs at least an hour recorded, and something counted.';
+    else if (!est.usage) message = 'Not enough history yet (needs an hour).';
     else {
       kwhPerDay = est.usage.kwh_per_day;
       basis = basisOf(est.usage, window);
@@ -66,7 +64,6 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
   return (
     <section class="card">
       <h2>Cost estimator</h2>
-      <p class="caption">What running it would cost at the rate saved in Settings.</p>
       <div class="seg" role="group" aria-label="Estimate from">
         {MODES.map((m) => (
           <button key={m.key} type="button" aria-pressed={m.key === mode} onClick={() => setMode(m.key)}>
@@ -112,7 +109,7 @@ export function Estimator({ load, deps, basisOf, who, nowWatts, nowWhat }: {
           ))}
         </ul>
       )}
-      {lines.length > 0 && rate == null && <p class="caption">Save your electricity rate in <a href={routePath('settings')}>Settings</a> to see the cost.</p>}
+      {lines.length > 0 && rate == null && <p class="caption">Set a price in <a href={routePath('settings')}>Settings</a> to see cost.</p>}
     </section>
   );
 }

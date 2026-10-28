@@ -12,11 +12,12 @@ import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { CurrentCard } from './Breaker';
 import { EvCard, EvPrompt } from './EvCard';
+import { Facts } from './Facts';
 import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
 import { Lowest } from './Watts';
-import { carbonNote, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
+import { carbonFacts, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
 
 interface Loaded {
   summary: Summary;
@@ -59,7 +60,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
   const kwh = mine?.kwh ?? null;
   const houseKwh = data?.summary.house_kwh ?? null;
   const share = mine ? houseShare(mine.kwh, houseKwh) : null;
-  const carbon = carbonNote(mine?.carbon_g, kwh, mine?.carbon_estimated_kwh ?? 0);
+  const carbon = carbonFacts(mine?.carbon_g, kwh, mine?.carbon_estimated_kwh ?? 0);
   const watts = live?.readings.find((r) => r.meter_id === id)?.watts ?? null;
 
   // What is inside it right now, nested as wired, the meter itself dropped from the list.
@@ -98,11 +99,10 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             <Kpi tone="now" label="Right now" value={formatWatts(watts)} />
             <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
-            <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />the most in one reading</>} />
+            <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />peak reading</>} />
           </KpiRow>
           <div class="kpi-notes">
-            <p class="caption">Its own reading already counts everything inside it.</p>
-            {carbon && <p class="caption">{carbon}</p>}
+            <Facts items={carbon} />
             <RateNote kwh={kwh} cost={mine?.cost ?? null} />
           </div>
         </>
@@ -113,7 +113,6 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
         <section class="card wide">
           <h2>Power over time</h2>
           <Chart lines={data.lines} domain={data.domain} height={wideChartHeight()} />
-          {data.lines.length > 1 && <p class="caption">Each line is read on its own: the meters inside it are part of the first line, not added to it.</p>}
         </section>
       )}
       {data && data.lines.length === 0 && meter && <p class="note">Nothing recorded for this meter in this period.</p>}
@@ -129,7 +128,6 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
         <section class="card">
           <h2>Inside it</h2>
           <Bars rows={list} of={scale} summary={data?.summary} baseKwh={kwh} period={period as PeriodKey} />
-          <p class="caption">Shares are of this meter. "Other (not metered)" is its own reading less the meters listed, so nothing is added twice.</p>
         </section>
       )}
 

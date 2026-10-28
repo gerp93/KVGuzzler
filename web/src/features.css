@@ -399,3 +399,84 @@ button.link {
     font-size: 1.15rem;
   }
 }
+
+/* Labelled figures in place of a sentence (Facts.tsx) */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 10px 0 0;
+}
+
+.facts div {
+  min-width: 0;
+}
+
+.facts dt {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 32px;
+}
+
+.kpi-notes .facts {
+  margin: 0;
+}
+
+/* An unusual day: its figures in columns, the cause under them */
+.anomalies li {
+  grid-template-columns: 6rem minmax(0, 1fr) auto;
+  align-items: baseline;
+}
+
+.anomalies .figs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.anomalies .figs .extra {
+  color: var(--color-accent-red);
+}
+
+.anomalies .cause {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .anomalies li {
+    grid-template-columns: 1fr;
+  }
+
+  .anomalies .figs {
+    justify-content: flex-start;
+  }
+
+  .anomalies .cause {
+    grid-column: 1;
+  }
+}
+
+/* Four small figures in a narrow card */
+.stats.compact .big.small {
+  font-size: 1.35rem;
+}
+
+.stats.compact .stat {
+  min-width: 0;
+}
