@@ -5,6 +5,8 @@ import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, formatEfficiency, lowCoverage, stretchLabel, type DistanceUnit, type MeterEv } from './ev';
 import { EvSettings } from './EvSettings';
+import { FordSetup, type SetupStep } from './FordSetup';
+import { useFordWait } from './fordWait';
 import { useDistanceUnit, usePoll } from './hooks';
 import { formatKwh, formatMoney, formatPerMile, type FordLink, type Meter } from './lib';
 import { Kwh } from './Watts';
@@ -74,6 +76,9 @@ export function EvCard({ meter }: { meter: Meter }) {
   const [unit] = useDistanceUnit();
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  // The step of the connecting dialog to open at, or nothing while it is closed.
+  const [setup, setSetup] = useState<SetupStep | null>(null);
+  const { waitLeft, wait } = useFordWait(ford);
   const reload = () => setVersion((v) => v + 1);
 
   const totals = data?.totals ?? null;
@@ -104,11 +109,18 @@ export function EvCard({ meter }: { meter: Meter }) {
         <div class="ev-empty">
           <p>No odometer reading yet.</p>
           <p class="caption">Connect the car to Ford to keep it up to date, or type a reading, from Settings.</p>
-          {!open && (
-            <button type="button" onClick={() => setOpen(true)}>
-              Open settings
-            </button>
-          )}
+          <div class="chips">
+            {!ford?.configured && (
+              <button type="button" class="setup-primary" onClick={() => setSetup('register')}>
+                Connect Ford
+              </button>
+            )}
+            {!open && (
+              <button type="button" onClick={() => setOpen(true)}>
+                Open settings
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -200,7 +212,8 @@ export function EvCard({ meter }: { meter: Meter }) {
         </>
       )}
 
-      {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} />}
+      {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
+      {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}
     </section>
   );
 }
