@@ -1,11 +1,11 @@
 // The card on a charging meter's page: the car's odometer, set against what the meter used between readings, so a mile has a price that can be set
 // beside a gas car's. The odometer is kept up to date from Ford, or typed in by hand. What is everyday (the odometer, cost per mile, efficiency, the
 // latest trips) is the card; what is set once (the unit, typed readings, the Ford connection) is behind its Settings button. The sums are the server's.
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, formatEfficiency, lowCoverage, stretchLabel, type DistanceUnit, type MeterEv } from './ev';
 import { EvSettings } from './EvSettings';
-import { FordSetup, type SetupStep } from './FordSetup';
+import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
 import { useFordWait } from './fordWait';
 import { useDistanceUnit, usePoll } from './hooks';
 import { formatKwh, formatMoney, formatPerMile, type FordLink, type Meter } from './lib';
@@ -79,6 +79,7 @@ export function EvCard({ meter }: { meter: Meter }) {
   // The step of the connecting dialog to open at, or nothing while it is closed.
   const [setup, setSetup] = useState<SetupStep | null>(null);
   const { waitLeft, wait } = useFordWait(ford);
+  const draft = useRef<FordDraft>({});
   const reload = () => setVersion((v) => v + 1);
 
   const totals = data?.totals ?? null;
@@ -213,7 +214,7 @@ export function EvCard({ meter }: { meter: Meter }) {
       )}
 
       {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
-      {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}
+      {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}
     </section>
   );
 }
