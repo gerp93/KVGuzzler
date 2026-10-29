@@ -70,6 +70,8 @@ func newFakeFord(t *testing.T) *fakeFord {
 				return
 			}
 			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + f.odometer + `},"xevBatteryStateOfCharge":{"value":63,"updateTime":"2026-10-22T14:55:00Z"},"vin":"1FAKEVIN123","position":{"latitude":44.9}}}`))
+		case "/fcon-query/v1/garage":
+			_, _ = w.Write([]byte(`{"vin":"1FAKEVIN123","engineType":"BEV","modelYear":"2021"}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -373,5 +375,82 @@ func TestFordIsNeverAskedTwiceWithin30SecondsAndTheAnswerShowsWhatItHeld(t *test
 	*f.clock = f.clock.Add(21 * time.Second)
 	if r, body := send(t, http.MethodPost, base+"/read", ""); r.StatusCode != http.StatusOK {
 		t.Errorf("read 31 s after a look: %d %s", r.StatusCode, body)
+	}
+}
+
+func TestProbingFordShowsWhatEachEndpointSaidAndKeepsTheLastOne(t *testing.T) {
+	f := newFordTest(t)
+	base := f.srv.URL + "/api/v1/ford"
+	patch(t, f.srv.URL+"/api/v1/meters/"+f.meter, `{"ev":true}`)
+	send(t, http.MethodPut, base, f.setup("km"))
+
+	// Nothing kept before a probe is made.
+	var last struct {
+		CheckedAt *string `json:"checked_at"`
+		Results   []struct {
+			Endpoint string `json:"endpoint"`
+			Status   int    `json:"status"`
+			OK       bool   `json:"ok"`
+			Message  string `json:"message"`
+			Signals  []struct {
+				Path  string `json:"path"`
+				Value string `json:"value"`
+			} `json:"signals"`
+		} `json:"results"`
+	}
+	_, body := send(t, http.MethodGet, base+"/probe", "")
+	_ = json.Unmarshal([]byte(body), &last)
+	if last.CheckedAt != nil || last.Results == nil || len(last.Results) != 0 {
+		t.Errorf("probe before any = %s", body)
+	}
+
+	_, body = send(t, http.MethodPost, base+"/link", "")
+	var link struct{ URL string }
+	_ = json.Unmarshal([]byte(body), &link)
+	u, _ := url.Parse(link.URL)
+	if r, b := send(t, http.MethodPost, base+"/link/complete", `{"redirect":"?code=GOODCODE&state=`+u.Query().Get("state")+`"}`); r.StatusCode != http.StatusOK {
+		t.Fatalf("complete: %d %s", r.StatusCode, b)
+	}
+	// Too soon after linking: refused without asking Ford.
+	*f.clock = f.clock.Add(5 * time.Second)
+	if r, _ := send(t, http.MethodPost, base+"/probe", ""); r.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("probe 5 s after a look: %d, want 429", r.StatusCode)
+	}
+
+	*f.clock = f.clock.Add(time.Minute)
+	r, body := send(t, http.MethodPost, base+"/probe", "")
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("probe: %d %s", r.StatusCode, body)
+	}
+	for _, secret := range []string{fordSecret, "REFRESH-", "ACCESS-", "1FAKEVIN123"} {
+		if strings.Contains(body, secret) {
+			t.Errorf("the probe holds %q: %s", secret, body)
+		}
+	}
+	_ = json.Unmarshal([]byte(body), &last)
+	by := map[string]int{}
+	var engine string
+	for _, res := range last.Results {
+		by[res.Endpoint] = res.Status
+		for _, s := range res.Signals {
+			if res.Endpoint == "garage" && s.Path == "engineType" {
+				engine = s.Value
+			}
+		}
+	}
+	if len(last.Results) != 7 || by["garage"] != 200 || by["telemetry"] != 200 || by["wallbox"] != 404 || by["fccs"] != 0 || engine != "BEV" {
+		t.Errorf("results = %s", body)
+	}
+	// The last probe is kept, and removing the setup forgets it.
+	_, kept := send(t, http.MethodGet, base+"/probe", "")
+	if !strings.Contains(kept, `"engineType"`) {
+		t.Errorf("the last probe was not kept: %s", kept)
+	}
+	if r := del(t, base); r.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete: %d", r.StatusCode)
+	}
+	_, after := send(t, http.MethodGet, base+"/probe", "")
+	if strings.Contains(after, "engineType") {
+		t.Errorf("a removed setup left its probe: %s", after)
 	}
 }

@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordProbe, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
@@ -144,6 +144,8 @@ export const api = {
   completeFordLink: (redirect: string) =>
     request<FordLink>('api/v1/ford/link/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect }) }),
   readFord: () => request<FordLink>('api/v1/ford/read', { method: 'POST' }),
+  fordProbe: () => request<FordProbe>('api/v1/ford/probe'),
+  probeFord: () => request<FordProbe>('api/v1/ford/probe', { method: 'POST' }),
   houseHistory: () => request<HouseHistory>('api/v1/history'),
   houseEstimate: (window: string) => request<ComputerEstimate>(`api/v1/estimate?${q({ window })}`),
   /** The days the house or a meter used far more than usual (the last `days` complete days). */

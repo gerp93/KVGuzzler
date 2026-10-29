@@ -258,6 +258,14 @@ type fordServer struct {
 	odometer  string
 	telemetry int
 	order     *[]string
+	// extra answers other paths with a status and a body; fccs records what it was asked.
+	extra map[string]fakeAnswer
+	fccs  *http.Request
+}
+
+type fakeAnswer struct {
+	status int
+	body   string
 }
 
 func newFordServer(t *testing.T, sink *fakeSink) *fordServer {
@@ -282,6 +290,14 @@ func newFordServer(t *testing.T, sink *fakeSink) *fordServer {
 			*fs.order = append(*fs.order, "telemetry")
 			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + fs.odometer + `}}}`))
 		default:
+			if r.URL.Path == "/fcon-query/v1/fccs" {
+				fs.fccs = r.Clone(context.Background())
+			}
+			if a, ok := fs.extra[r.URL.Path]; ok {
+				w.WriteHeader(a.status)
+				_, _ = w.Write([]byte(a.body))
+				return
+			}
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -539,5 +555,86 @@ func TestDescribeNamesEverythingButOnlyShowsTheBatteryAndOdometerValues(t *testi
 	}
 	if Describe([]byte("nope")) != nil {
 		t.Error("an answer that is not JSON described something")
+	}
+}
+
+func TestAProbeAsksEveryEndpointOnceAndSaysWhatEachAnsweredWithoutCopyingWhoOrWhere(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	fs.extra = map[string]fakeAnswer{
+		"/fcon-query/v1/garage":                    {200, `{"vin":"1FAKEVIN123","nickName":"Mach","engineType":"BEV","modelYear":"2021","modelName":"Mustang Mach-E"}`},
+		"/fcon-query/v1/electric/charge-schedules": {200, `{"chargeSchedules":[{"vin":"1FAKEVIN123","location":{"name":"Home","latitude":44.9,"type":"SAVED"},"chargeProfile":{"chargeMode":"VALUE_CHARGE","targetSoc":90}}]}`},
+		"/fcon-query/v1/electric/departure-times":  {403, `{"error":403,"message":"insufficient_scope"}`},
+		"/fcon-query/v1/vehicle-health/alerts":     {404, `{"message":"no alerts"}`},
+		"/fcon-query/v1/wallbox":                   {200, `{"result":{"associatedChargingStationIds":["00000000-1111-2222-3333-444444444444"]}}`},
+		"/fcon-query/v1/fccs":                      {200, `{"result":{"totalActivities":0,"activity":[]}}`},
+	}
+	p, err := f.Probe(context.Background())
+	if err != nil {
+		t.Fatalf("probe: %v", err)
+	}
+	if got := sink.order; len(got) == 0 || got[0] != "save-refresh:R1" {
+		t.Errorf("order = %v: the rotated refresh token must be kept before anything else is read", got)
+	}
+	by := map[string]ProbeResult{}
+	for _, r := range p.Results {
+		by[r.Endpoint] = r
+	}
+	if len(p.Results) != 7 || p.CheckedAt == nil {
+		t.Fatalf("results = %+v", p.Results)
+	}
+	if r := by["electric/departure-times"]; r.OK || r.Status != 403 || r.Message != "insufficient_scope" {
+		t.Errorf("a refused endpoint = %+v", r)
+	}
+	if r := by["vehicle-health/alerts"]; r.OK || r.Status != 404 || r.Message != "no alerts" {
+		t.Errorf("an empty endpoint = %+v", r)
+	}
+	var kind, target, name, lat string
+	for _, s := range by["garage"].Signals {
+		if s.Path == "engineType" {
+			kind = s.Value
+		}
+		if s.Path == "nickName" || s.Path == "vin" {
+			name += s.Value
+		}
+	}
+	for _, s := range by["electric/charge-schedules"].Signals {
+		if s.Path == "chargeSchedules[0].chargeProfile.targetSoc" {
+			target = s.Value
+		}
+		if s.Path == "chargeSchedules[0].location.latitude" || s.Path == "chargeSchedules[0].location.name" {
+			lat += s.Value
+		}
+	}
+	if kind != "BEV" || target != "90" || name != "" || lat != "" {
+		t.Errorf("engine type %q, target %q (want BEV and 90); identity %q and place %q must not be copied", kind, target, name, lat)
+	}
+	// The charging-station call names the station and asks for the last week.
+	if fs.fccs == nil || fs.fccs.Header.Get("chargingStationId") != "00000000-1111-2222-3333-444444444444" || fs.fccs.URL.Query().Get("endDate") != "2026-10-22" || fs.fccs.URL.Query().Get("startDate") != "2026-10-15" {
+		t.Errorf("fccs request = %+v", fs.fccs)
+	}
+	if fs.telemetry != 1 {
+		t.Errorf("telemetry asked %d times", fs.telemetry)
+	}
+	// Probing again inside the wait asks nothing; later it works.
+	*now = now.Add(5 * time.Second)
+	var soon *TooSoon
+	if _, err := f.Probe(context.Background()); !errors.As(err, &soon) {
+		t.Errorf("a second probe 5 s later = %v", err)
+	}
+	if fs.telemetry != 1 {
+		t.Errorf("Ford was asked during the wait")
+	}
+}
+
+func TestAProbeSkipsTheStationCallWhenTheWallboxListsNone(t *testing.T) {
+	f, _, fs, _ := feedFor(t)
+	fs.extra = map[string]fakeAnswer{"/fcon-query/v1/wallbox": {200, `{"result":{"associatedChargingStationIds":[]}}`}}
+	p, err := f.Probe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := p.Results[len(p.Results)-1]
+	if last.Endpoint != "fccs" || last.Status != 0 || fs.fccs != nil {
+		t.Errorf("fccs = %+v, asked %v", last, fs.fccs)
 	}
 }

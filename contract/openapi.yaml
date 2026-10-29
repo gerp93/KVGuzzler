@@ -1180,6 +1180,40 @@ paths:
           $ref: '#/components/responses/Problem'
         '429':
           $ref: '#/components/responses/Problem'
+  /api/v1/ford/probe:
+    get:
+      tags: [Settings]
+      operationId: getFordProbe
+      summary: What the last probe of Ford's endpoints said.
+      responses:
+        '200':
+          description: The last probe, or an empty one (`checked_at` null, no results) when none was made.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordProbe'
+    post:
+      tags: [Settings]
+      operationId: probeFord
+      summary: Ask every read-only Ford endpoint once and say what each answered.
+      description: |
+        Telemetry, garage, vehicle health alerts, charge schedules, departure times and the wallbox, and the charging-station activity when the wallbox
+        lists a station. Only the names of the answers' fields are returned, and the values of those about the vehicle's kind, the battery, charging,
+        schedules and alerts: never who the vehicle is or where it is. Nothing is saved but the answer. It is a look like any other, so inside the 30-second
+        wait it is refused with 429 without asking Ford.
+      responses:
+        '200':
+          description: What each endpoint said.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FordProbe'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
   /api/v1/carbon/series:
     get:
       tags: [Read]
@@ -2271,6 +2305,43 @@ components:
                 enum: [number, string, boolean, 'null']
               value:
                 type: string
+    FordProbe:
+      type: object
+      required: [checked_at, results]
+      properties:
+        checked_at:
+          type: [string, 'null']
+          format: date-time
+        results:
+          type: array
+          items:
+            type: object
+            required: [endpoint, status, ok]
+            properties:
+              endpoint:
+                type: string
+                description: The endpoint's name, like `electric/charge-schedules`.
+              status:
+                type: integer
+                description: The HTTP status Ford answered; 0 when it was not asked or not reached (`message` says why).
+              ok:
+                type: boolean
+              message:
+                type: string
+                description: What Ford said when it did not answer with data.
+              signals:
+                type: array
+                items:
+                  type: object
+                  required: [path, kind]
+                  properties:
+                    path:
+                      type: string
+                    kind:
+                      type: string
+                      enum: [number, string, boolean, 'null']
+                    value:
+                      type: string
     FordUpdate:
       type: object
       required: [client_id, authorize_url, token_url, odometer_unit, meter_id]

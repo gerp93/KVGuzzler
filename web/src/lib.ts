@@ -38,6 +38,7 @@ export type CarbonSeries = S['CarbonSeries'];
 export type FordLink = S['FordLink'];
 export type FordUpdate = S['FordUpdate'];
 export type FordLinkStart = S['FordLinkStart'];
+export type FordProbe = S['FordProbe'];
 export type TariffCandidate = S['TariffCandidate'];
 export type OpenEiStatus = S['OpenEiStatus'];
 export type AverageUse = S['AverageUse'];

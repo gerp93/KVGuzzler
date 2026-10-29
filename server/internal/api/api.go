@@ -154,6 +154,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/ford/link", s.startFordLink)
 	mux.HandleFunc("POST /api/v1/ford/link/complete", s.finishFordLink)
 	mux.HandleFunc("POST /api/v1/ford/read", s.readFord)
+	mux.HandleFunc("GET /api/v1/ford/probe", s.lastFordProbe)
+	mux.HandleFunc("POST /api/v1/ford/probe", s.probeFord)
 	return withVersion(mux)
 }
 
