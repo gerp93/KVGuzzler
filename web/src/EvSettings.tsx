@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, parseMiles, toMiles, today, type DistanceUnit, type MeterEv } from './ev';
 import { FordConnection } from './FordConnection';
+import type { SetupStep } from './FordSetup';
 import { useDistanceUnit } from './hooks';
 import type { FordLink, Meter } from './lib';
 
@@ -12,7 +13,23 @@ const UNITS: { value: DistanceUnit; label: string }[] = [
   { value: 'km', label: 'Kilometers' },
 ];
 
-export function EvSettings({ meter, data, ford, reload }: { meter: Meter; data: MeterEv | undefined; ford: FordLink | undefined; reload: () => void }) {
+export function EvSettings({
+  meter,
+  data,
+  ford,
+  reload,
+  waitLeft,
+  wait,
+  onSetup,
+}: {
+  meter: Meter;
+  data: MeterEv | undefined;
+  ford: FordLink | undefined;
+  reload: () => void;
+  waitLeft: number;
+  wait: (seconds: number) => void;
+  onSetup: (step: SetupStep) => void;
+}) {
   const [unit, setUnit] = useDistanceUnit();
   const [day, setDay] = useState(today());
   const [typed, setTyped] = useState('');
@@ -97,7 +114,7 @@ export function EvSettings({ meter, data, ford, reload }: { meter: Meter; data: 
 
       <section class="ev-set">
         <h3>Ford connection</h3>
-        <FordConnection key={ford ? 'loaded' : 'loading'} meter={meter} cfg={ford} reload={reload} />
+        <FordConnection cfg={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={onSetup} />
       </section>
     </div>
   );
