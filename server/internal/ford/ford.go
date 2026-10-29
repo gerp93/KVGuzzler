@@ -19,6 +19,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -358,6 +360,80 @@ func ParseOdometer(body []byte) (Odometer, error) {
 		}
 	}
 	return first, nil
+}
+
+// Signal is one member of a telemetry answer, as the owner is shown it to find which one holds what.
+type Signal struct {
+	// Path is where it is (like "metrics.odometer.value"), Kind what JSON calls it (number, string, boolean, null).
+	Path string `json:"path"`
+	Kind string `json:"kind"`
+	// Value is only kept for the members about the battery, charging and the odometer, and short: the rest of the answer (where the vehicle is, its
+	// identity) is named but never copied.
+	Value string `json:"value,omitempty"`
+}
+
+const (
+	maxSignals     = 400
+	maxSignalValue = 40
+)
+
+// valueKept says which members have their value shown: by name, the battery, charging, plug, range, energy and odometer ones.
+var valueKept = regexp.MustCompile(`(?i)battery|charg|plug|range|energy|soc|odometer`)
+
+// Describe lists the members of a telemetry answer (names, kinds and, for the few about the battery and the odometer, values), so the field that
+// holds a figure can be found without the answer being kept whole. The answer's shape is not documented where this was written from.
+func Describe(body []byte) []Signal {
+	var root any
+	if json.Unmarshal(body, &root) != nil {
+		return nil
+	}
+	var out []Signal
+	var walk func(v any, path string, depth int)
+	walk = func(v any, path string, depth int) {
+		if len(out) >= maxSignals || depth > 12 {
+			return
+		}
+		switch t := v.(type) {
+		case map[string]any:
+			keys := make([]string, 0, len(t))
+			for k := range t {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				p := k
+				if path != "" {
+					p = path + "." + k
+				}
+				walk(t[k], p, depth+1)
+			}
+		case []any:
+			for i, child := range t {
+				walk(child, fmt.Sprintf("%s[%d]", path, i), depth+1)
+			}
+		default:
+			s := Signal{Path: path}
+			switch x := t.(type) {
+			case float64:
+				s.Kind = "number"
+				s.Value = strconv.FormatFloat(x, 'f', -1, 64)
+			case string:
+				s.Kind = "string"
+				s.Value = x
+			case bool:
+				s.Kind = "boolean"
+				s.Value = strconv.FormatBool(x)
+			default:
+				s.Kind = "null"
+			}
+			if !valueKept.MatchString(path) || len(s.Value) > maxSignalValue {
+				s.Value = ""
+			}
+			out = append(out, s)
+		}
+	}
+	walk(root, "", 0)
+	return out
 }
 
 // number reads a figure from a JSON value: a number, a numeric string, or an object whose "value" is one (sub names the member).

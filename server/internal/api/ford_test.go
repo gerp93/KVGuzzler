@@ -69,7 +69,7 @@ func newFakeFord(t *testing.T) *fakeFord {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + f.odometer + `}}}`))
+			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + f.odometer + `},"xevBatteryStateOfCharge":{"value":63,"updateTime":"2026-10-22T14:55:00Z"},"vin":"1FAKEVIN123","position":{"latitude":44.9}}}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -185,7 +185,8 @@ func TestLinkingAVehicleReadsItsOdometerIntoTheChargingMeterAndKeepsTheSecretsPr
 	if r, _ := send(t, http.MethodPost, base+"/link/complete", `{"redirect":"http://localhost:8000/callback?code=BADCODE&state=`+state+`"}`); r.StatusCode != http.StatusBadGateway {
 		t.Errorf("a code Ford refuses: %d, want 502", r.StatusCode)
 	}
-	// The attempt is over once a code was tried (a code is single-use): start again.
+	// The attempt is over once a code was tried (a code is single-use): start again, once Ford may be asked again.
+	*f.clock = f.clock.Add(time.Minute)
 	_, body = send(t, http.MethodPost, base+"/link", "")
 	_ = json.Unmarshal([]byte(body), &link)
 	u, _ = url.Parse(link.URL)
@@ -247,6 +248,7 @@ func TestLinkingAVehicleReadsItsOdometerIntoTheChargingMeterAndKeepsTheSecretsPr
 	}
 
 	// An odometer lower than one saved is said, not saved.
+	*f.clock = f.clock.Add(time.Minute)
 	f.ford.odometer = "100"
 	send(t, http.MethodPost, base+"/read", "")
 	get(t, base, &v)
@@ -259,6 +261,7 @@ func TestLinkingAVehicleReadsItsOdometerIntoTheChargingMeterAndKeepsTheSecretsPr
 	}
 
 	// Ford revoking the permission asks for linking again and stops trying.
+	*f.clock = f.clock.Add(time.Minute)
 	f.ford.latest = "SOMETHING-ELSE"
 	send(t, http.MethodPost, base+"/read", "")
 	get(t, base, &v)
@@ -313,5 +316,62 @@ func TestChangingTheClientDropsTheSavedPermissionButChangingTheUnitKeepsIt(t *te
 	}
 	if v.Linked {
 		t.Error("a new client ID kept the old permission")
+	}
+}
+
+func TestFordIsNeverAskedTwiceWithin30SecondsAndTheAnswerShowsWhatItHeld(t *testing.T) {
+	f := newFordTest(t)
+	base := f.srv.URL + "/api/v1/ford"
+	patch(t, f.srv.URL+"/api/v1/meters/"+f.meter, `{"ev":true}`)
+	send(t, http.MethodPut, base, f.setup("km"))
+	_, body := send(t, http.MethodPost, base+"/link", "")
+	var link struct{ URL string }
+	_ = json.Unmarshal([]byte(body), &link)
+	u, _ := url.Parse(link.URL)
+	if r, b := send(t, http.MethodPost, base+"/link/complete", `{"redirect":"?code=GOODCODE&state=`+u.Query().Get("state")+`"}`); r.StatusCode != http.StatusOK {
+		t.Fatalf("complete: %d %s", r.StatusCode, b)
+	}
+	asked := len(f.ford.forms)
+
+	// "Read now" right after linking is refused without asking Ford, and the setup says how long is left.
+	*f.clock = f.clock.Add(10 * time.Second)
+	r, body := send(t, http.MethodPost, base+"/read", "")
+	if r.StatusCode != http.StatusTooManyRequests || r.Header.Get("Retry-After") != "20" || !strings.Contains(body, "try again in 20") {
+		t.Errorf("read 10 s after a look: %d (Retry-After %q) %s", r.StatusCode, r.Header.Get("Retry-After"), body)
+	}
+	if len(f.ford.forms) != asked {
+		t.Errorf("Ford was asked during the wait: %d requests, want %d", len(f.ford.forms), asked)
+	}
+	var v struct {
+		Wait    int `json:"read_wait_seconds"`
+		Signals []struct {
+			Path  string `json:"path"`
+			Kind  string `json:"kind"`
+			Value string `json:"value"`
+		} `json:"last_signals"`
+	}
+	_, body = send(t, http.MethodGet, base, "")
+	_ = json.Unmarshal([]byte(body), &v)
+	if v.Wait != 20 {
+		t.Errorf("read_wait_seconds = %d, want 20", v.Wait)
+	}
+	// What the answer held is shown: the battery with its value, everything else named only.
+	var battery, vin bool
+	for _, s := range v.Signals {
+		if s.Path == "metrics.xevBatteryStateOfCharge.value" && s.Kind == "number" && s.Value == "63" {
+			battery = true
+		}
+		if s.Path == "metrics.vin" && s.Kind == "string" && s.Value == "" {
+			vin = true
+		}
+	}
+	if !battery || !vin || strings.Contains(body, "1FAKEVIN123") || strings.Contains(body, "44.9") {
+		t.Errorf("signals = %+v (the battery should have its value; the vehicle's identity and position must not): %s", v.Signals, body)
+	}
+
+	// Past the 30 seconds it goes through.
+	*f.clock = f.clock.Add(21 * time.Second)
+	if r, body := send(t, http.MethodPost, base+"/read", ""); r.StatusCode != http.StatusOK {
+		t.Errorf("read 31 s after a look: %d %s", r.StatusCode, body)
 	}
 }

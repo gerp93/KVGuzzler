@@ -2,9 +2,12 @@
 // follow from that, and (set once, rarely touched) the developer application it is read through. The client ID and secret are the owner's own and are
 // typed here once; the secret is write-only and kept in a private file on the server. The owner's Ford password is never typed here: signing in and
 // agreeing happen on Ford's own page, and only the address Ford sends the browser to afterwards is pasted back.
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
 import type { FordLink, Meter } from './lib';
+
+/** Ford answers one look every 30 seconds; the server refuses one inside that, and the buttons that make a look wait it out. */
+const MIN_CALL_GAP_S = 30;
 
 /** What the connection is, in a word, and how the card should colour it. */
 export function fordState(cfg: FordLink | undefined): { word: string; tone: 'ok' | 'warn' | 'off' } {
@@ -25,6 +28,23 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
   const [link, setLink] = useState<{ url: string; redirect_uri: string }>();
   const [pasted, setPasted] = useState('');
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // When Ford may be asked again (a millisecond time) and the clock that counts down to it: the server says how long is left, the page only counts.
+  const [until, setUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const left = cfg?.read_wait_seconds ?? 0;
+    if (left > 0) setUntil(Date.now() + left * 1000);
+  }, [cfg]);
+  useEffect(() => {
+    if (until <= Date.now()) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [until]);
+  const waitLeft = Math.max(0, Math.ceil((until - now) / 1000));
+  const wait = (seconds: number) => {
+    setNow(Date.now());
+    setUntil(Date.now() + seconds * 1000);
+  };
 
   const run = (work: () => Promise<unknown>, done?: () => string) => {
     setBusy(true);
@@ -38,8 +58,14 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
       (e: Error) => {
         setBusy(false);
         setMessage(e.message);
+        reload();
       },
     );
+  };
+
+  const readNow = () => {
+    wait(MIN_CALL_GAP_S);
+    run(() => api.readFord());
   };
 
   const save = () =>
@@ -75,7 +101,8 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
     );
   };
 
-  const finish = () =>
+  const finish = () => {
+    wait(MIN_CALL_GAP_S);
     run(
       () => api.completeFordLink(pasted.trim()),
       () => {
@@ -84,6 +111,7 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
         return 'Linked.';
       },
     );
+  };
 
   const remove = () =>
     run(
@@ -119,8 +147,8 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
       {cfg?.configured && (
         <div class="chips save">
           {cfg.linked && (
-            <button type="button" disabled={busy} onClick={() => run(() => api.readFord())}>
-              Read now
+            <button type="button" disabled={busy || waitLeft > 0} onClick={readNow}>
+              {waitLeft > 0 ? `Read now · wait ${waitLeft} s` : 'Read now'}
             </button>
           )}
           <button type="button" disabled={busy} onClick={start}>
@@ -162,13 +190,40 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
             <input value={pasted} autocomplete="off" placeholder={`${link.redirect_uri}?code=…&state=…`} onInput={(e) => setPasted((e.target as HTMLInputElement).value)} />
           </label>
           <div class="chips save">
-            <button type="button" disabled={busy || !pasted.trim()} onClick={finish}>
-              Finish linking
+            <button type="button" disabled={busy || !pasted.trim() || waitLeft > 0} onClick={finish}>
+              {waitLeft > 0 ? `Finish linking · wait ${waitLeft} s` : 'Finish linking'}
             </button>
           </div>
         </div>
       )}
       {message && <p class="note" role="status">{message}</p>}
+
+      {cfg?.last_signals && cfg.last_signals.length > 0 && (
+        <details class="ford-signals">
+          <summary>What Ford sent ({cfg.last_signals.length} fields)</summary>
+          <p class="caption">Every field of the last answer. Only the battery, charging, plug, range, energy and odometer fields show a value.</p>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Field</th>
+                <th scope="col">Kind</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cfg.last_signals.map((s) => (
+                <tr key={s.path}>
+                  <td>
+                    <code>{s.path}</code>
+                  </td>
+                  <td>{s.kind}</td>
+                  <td>{s.value ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
 
       <details class="ford-app" open={!cfg?.configured}>
         <summary>Developer application</summary>
