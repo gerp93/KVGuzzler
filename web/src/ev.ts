@@ -4,6 +4,8 @@ import type { components } from './api-types';
 
 export type MeterEv = components['schemas']['MeterEv'];
 export type EvInterval = MeterEv['intervals'][number];
+export type EvChargesAnswer = components['schemas']['EvCharges'];
+export type EvCharge = EvChargesAnswer['charges'][number];
 
 /** Below this share of a stretch measured, the energy (and so the cost per mile) is too low to trust. */
 export const LOW_COVERAGE = 0.95;
@@ -58,3 +60,40 @@ export const formatMiles = (m: number): string => formatDistance(m, 'miles');
 /** Energy per distance (given as miles per kWh), one decimal. */
 export const formatEfficiency = (v: number | null | undefined, unit: DistanceUnit = 'miles'): string =>
   v == null ? '—' : `${inUnit(v, unit).toFixed(1)} ${unitAbbreviation(unit)}/kWh`;
+
+/** A moment as a short phrase: the time when it was today, else the day and the time. */
+export function whenText(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === now.toDateString() ? time : `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+/** Energy per percent of battery: three places under 1 kWh (0.488), two above. */
+export const perPct = (kwhPerPct: number): string => (kwhPerPct < 1 ? kwhPerPct.toFixed(3) : kwhPerPct.toFixed(2));
+
+/** A charge's battery column: the car's reports at the start and the end ("61 to 85 %"), or a dash when the start was never read. */
+export function batteryText(c: Pick<EvCharge, 'start_pct' | 'end_pct'>): string {
+  const p = (n: number) => String(Math.round(n * 10) / 10);
+  if (c.start_pct == null) return '—';
+  if (c.end_pct == null) return `${p(c.start_pct)} %`;
+  return `${p(c.start_pct)} to ${p(c.end_pct)} %`;
+}
+
+/** What the energy-per-percent cell says when the charge has none: a word for the cell and the sentence behind it. Null when the charge has one. */
+export function pctNote(status: EvCharge['pct_status']): { short: string; long: string } | null {
+  switch (status) {
+    case 'ok':
+      return null;
+    case 'active':
+      return { short: 'Charging', long: 'Still charging: the battery gain is known once the charge has ended.' };
+    case 'waiting':
+      return { short: 'Waiting', long: "Waiting for the car to report its battery charge after the end of the charge." };
+    case 'early':
+      return { short: 'Not final', long: "The car's last report was from before the charge ended, so the gain is short by the last of it." };
+    case 'small_gain':
+      return { short: 'No gain', long: 'The battery gained under 2 %: preconditioning or a top-up, with nothing to divide by.' };
+    default:
+      return { short: '—', long: "The battery charge was not read when this charge began (the car is not linked, or did not answer)." };
+  }
+}

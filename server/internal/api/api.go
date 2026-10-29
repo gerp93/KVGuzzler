@@ -18,6 +18,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/carbon"
 	"github.com/gerp93/KVGuzzler/server/internal/collector"
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
+	"github.com/gerp93/KVGuzzler/server/internal/evcharge"
 	"github.com/gerp93/KVGuzzler/server/internal/ford"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 	"github.com/gerp93/KVGuzzler/server/internal/openei"
@@ -66,6 +67,10 @@ type Server struct {
 	// fordFeed is the one feed that reads the odometer from Ford (see ford.go), made on first use.
 	fordOnce sync.Once
 	fordFeed *ford.Feed
+
+	// evTracker finds the charges of the electric vehicle (see evcharges.go), made on first use.
+	evOnce    sync.Once
+	evTracker *evcharge.Tracker
 }
 
 // dataSince is when anything was first recorded, for the dashboard to hide the periods longer than the history; false when nothing is recorded yet.
@@ -108,6 +113,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev", s.meterEV)
 	mux.HandleFunc("PUT /api/v1/meters/{meterId}/ev/odometer/{day}", s.putOdometer)
 	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/odometer/{day}", s.deleteOdometer)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev/charges", s.evCharges)
+	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/charges/{chargeId}", s.deleteEvCharge)
 	mux.HandleFunc("GET /api/v1/tree.csv", s.treeExport)
 	mux.HandleFunc("GET /api/v1/anomalies", s.anomalies)
 	mux.HandleFunc("GET /api/v1/levels", s.levels)

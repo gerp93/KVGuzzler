@@ -169,6 +169,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/ev/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A charging meter's charges, newest first, each with its energy, cost and the battery's gain.
+         * @description A charge is a stretch in which the meter drew power: the server opens one when the meter goes from resting to drawing (over 200 W on two
+         *     looks in a row) and closes it when the meter has rested for two minutes, at the last moment it drew power. The energy and cost come from the
+         *     meter's own minutes (priced at each local day's rate, so a corrected price follows); only the battery's charge comes from the car.
+         *     `start_pct` is asked for when the charge begins, `end_pct` after it ends, until the car reports one made after the end (`end_pct_at`).
+         *     `pct_status` says how the battery figures stand: `ok` (energy per percent given), `small_gain` (the battery gained under 2 percent, so there is
+         *     nothing to divide by: preconditioning or a top-up), `waiting` (the car has not yet reported after the end), `early` (it only reported from
+         *     before the end and the server gave up: the gain is short by the last of the charge, so no energy per percent), `none` (the start was never read),
+         *     `active` (still charging). `consistency` covers the charges that are `ok`, null when there are none. The newest 200 are listed.
+         *     409 when the meter is not marked `ev`.
+         */
+        get: operations["getEvCharges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/meters/{meterId}/ev/charges/{chargeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a charge that should not be there.
+         * @description A charge still going is refused with 409, because the server would open it again. 404 when there is no such charge.
+         */
+        delete: operations["deleteEvCharge"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/ev/odometer/{day}": {
         parameters: {
             query?: never;
@@ -1034,6 +1082,58 @@ export interface components {
             /** Format: date */
             day: string;
             miles: number;
+        };
+        EvCharges: {
+            meter_id: string;
+            /** @description Whether the battery's charge can be read for this meter (Ford is set up for it and linked). Without it charges have energy and cost but no battery figures. */
+            car_linked: boolean;
+            /** @description Newest first. */
+            charges: {
+                id: number;
+                /** Format: date-time */
+                started_at: string;
+                /**
+                 * Format: date-time
+                 * @description The last moment the meter drew power; null while the charge goes on.
+                 */
+                ended_at: string | null;
+                active: boolean;
+                /** @description From the start to the end (to now while the charge goes on). */
+                duration_seconds: number;
+                /** @description What the meter used, counting the whole minutes the charge touched. */
+                kwh: number;
+                /** @description A decimal string; null when no price is known. */
+                cost: string | null;
+                cost_estimated: boolean;
+                peak_watts: number | null;
+                /** @description The share of the charge the meter was measured; a low figure means the energy is too low. */
+                coverage: number;
+                /** @description The traction battery's charge the car reported when the charge began. */
+                start_pct: number | null;
+                /**
+                 * Format: date-time
+                 * @description When the car reported it.
+                 */
+                start_pct_at: string | null;
+                end_pct: number | null;
+                /** Format: date-time */
+                end_pct_at: string | null;
+                /** @description The end report less the start report, whenever both exist (it may be short of the real gain; see `pct_status`). */
+                gain_pct: number | null;
+                /** @enum {string} */
+                pct_status: "active" | "none" | "waiting" | "early" | "small_gain" | "ok";
+                /** @description Energy at the wall for each percent the battery gained; given only when `pct_status` is `ok`. */
+                kwh_per_pct: number | null;
+            }[];
+            /** @description How steady the energy per percent is over the charges that are `ok`. */
+            consistency: {
+                charges: number;
+                /** @description Those charges' energy over their gain, so a big charge counts for more than a small one. */
+                kwh_per_pct: number;
+                lowest: number;
+                highest: number;
+            } | null;
+            cost_estimated: boolean;
         };
         MeterEv: {
             meter_id: string;
@@ -2159,6 +2259,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeterEv"];
                 };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getEvCharges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvCharges"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteEvCharge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+                chargeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];

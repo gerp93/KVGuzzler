@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSchema + computersSchema + groupsSchema + carbonSchema + evSchema)
+INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');` + pcSchema + computersSchema + groupsSchema + carbonSchema + evSchema + evChargeSchema)
 	if err != nil {
 		return fmt.Errorf("store: migrate: %w", err)
 	}

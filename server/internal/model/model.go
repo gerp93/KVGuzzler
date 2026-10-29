@@ -79,6 +79,23 @@ type Meter struct {
 	EV bool `json:"ev"`
 }
 
+// EvCharge is one stretch in which the meter that charges an electric vehicle drew power, with what the car said about its battery at each end.
+// Nothing here is energy or money: those are read from the meter's minutes over [StartedAt, EndedAt).
+type EvCharge struct {
+	ID      int64  `json:"id"`
+	MeterID string `json:"meter_id"`
+	// StartedAt is when the meter first drew power, LastAbove the last time it was seen drawing it, EndedAt when the charge was closed (nil while it
+	// goes on; it is LastAbove, the moment it stopped, not the moment it was noticed).
+	StartedAt time.Time  `json:"started_at"`
+	LastAbove time.Time  `json:"last_above"`
+	EndedAt   *time.Time `json:"ended_at"`
+	// StartPct and EndPct are the traction battery's charge the car reported (0 to 100), StartPctAt and EndPctAt when the car reported it.
+	StartPct   *float64   `json:"start_pct"`
+	StartPctAt *time.Time `json:"start_pct_at"`
+	EndPct     *float64   `json:"end_pct"`
+	EndPctAt   *time.Time `json:"end_pct_at"`
+}
+
 // OdometerReading is the car's odometer on a local calendar day, as the user typed it.
 type OdometerReading struct {
 	Day   string  `json:"day"`

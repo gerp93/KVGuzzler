@@ -271,6 +271,54 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/ev/charges:
+    get:
+      tags: [Read]
+      operationId: getEvCharges
+      summary: A charging meter's charges, newest first, each with its energy, cost and the battery's gain.
+      description: |
+        A charge is a stretch in which the meter drew power: the server opens one when the meter goes from resting to drawing (over 200 W on two
+        looks in a row) and closes it when the meter has rested for two minutes, at the last moment it drew power. The energy and cost come from the
+        meter's own minutes (priced at each local day's rate, so a corrected price follows); only the battery's charge comes from the car.
+        `start_pct` is asked for when the charge begins, `end_pct` after it ends, until the car reports one made after the end (`end_pct_at`).
+        `pct_status` says how the battery figures stand: `ok` (energy per percent given), `small_gain` (the battery gained under 2 percent, so there is
+        nothing to divide by: preconditioning or a top-up), `waiting` (the car has not yet reported after the end), `early` (it only reported from
+        before the end and the server gave up: the gain is short by the last of the charge, so no energy per percent), `none` (the start was never read),
+        `active` (still charging). `consistency` covers the charges that are `ok`, null when there are none. The newest 200 are listed.
+        409 when the meter is not marked `ev`.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvCharges'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/ev/charges/{chargeId}:
+    delete:
+      tags: [Settings]
+      operationId: deleteEvCharge
+      summary: Remove a charge that should not be there.
+      description: A charge still going is refused with 409, because the server would open it again. 404 when there is no such charge.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+        - name: chargeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
   /api/v1/meters/{meterId}/ev/odometer/{day}:
     put:
       tags: [Settings]
@@ -1510,6 +1558,88 @@ components:
           format: date
         miles:
           type: number
+    EvCharges:
+      type: object
+      required: [meter_id, car_linked, charges, consistency, cost_estimated]
+      properties:
+        meter_id:
+          type: string
+        car_linked:
+          type: boolean
+          description: Whether the battery's charge can be read for this meter (Ford is set up for it and linked). Without it charges have energy and cost but no battery figures.
+        charges:
+          type: array
+          description: Newest first.
+          items:
+            type: object
+            required: [id, started_at, ended_at, active, duration_seconds, kwh, cost, cost_estimated, peak_watts, coverage, start_pct, start_pct_at, end_pct, end_pct_at, gain_pct, pct_status, kwh_per_pct]
+            properties:
+              id:
+                type: integer
+              started_at:
+                type: string
+                format: date-time
+              ended_at:
+                type: [string, 'null']
+                format: date-time
+                description: The last moment the meter drew power; null while the charge goes on.
+              active:
+                type: boolean
+              duration_seconds:
+                type: integer
+                description: From the start to the end (to now while the charge goes on).
+              kwh:
+                type: number
+                description: What the meter used, counting the whole minutes the charge touched.
+              cost:
+                type: [string, 'null']
+                description: A decimal string; null when no price is known.
+              cost_estimated:
+                type: boolean
+              peak_watts:
+                type: [number, 'null']
+              coverage:
+                type: number
+                minimum: 0
+                maximum: 1
+                description: The share of the charge the meter was measured; a low figure means the energy is too low.
+              start_pct:
+                type: [number, 'null']
+                description: The traction battery's charge the car reported when the charge began.
+              start_pct_at:
+                type: [string, 'null']
+                format: date-time
+                description: When the car reported it.
+              end_pct:
+                type: [number, 'null']
+              end_pct_at:
+                type: [string, 'null']
+                format: date-time
+              gain_pct:
+                type: [number, 'null']
+                description: The end report less the start report, whenever both exist (it may be short of the real gain; see `pct_status`).
+              pct_status:
+                type: string
+                enum: [active, none, waiting, early, small_gain, ok]
+              kwh_per_pct:
+                type: [number, 'null']
+                description: Energy at the wall for each percent the battery gained; given only when `pct_status` is `ok`.
+        consistency:
+          type: [object, 'null']
+          description: How steady the energy per percent is over the charges that are `ok`.
+          required: [charges, kwh_per_pct, lowest, highest]
+          properties:
+            charges:
+              type: integer
+            kwh_per_pct:
+              type: number
+              description: Those charges' energy over their gain, so a big charge counts for more than a small one.
+            lowest:
+              type: number
+            highest:
+              type: number
+        cost_estimated:
+          type: boolean
     MeterEv:
       type: object
       required: [meter_id, readings, intervals, totals, since_last, cost_estimated]

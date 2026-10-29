@@ -31,7 +31,9 @@ type fakeFord struct {
 	latest   string
 	issued   int
 	odometer string
-	forms    []url.Values
+	// noBattery leaves the traction battery's charge out of the vehicle's answer, as for a link without the evData permission.
+	noBattery bool
+	forms     []url.Values
 }
 
 func newFakeFord(t *testing.T) *fakeFord {
@@ -69,7 +71,7 @@ func newFakeFord(t *testing.T) *fakeFord {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + f.odometer + `},"xevBatteryStateOfCharge":{"value":63,"updateTime":"2026-10-22T14:55:00Z"},"vin":"1FAKEVIN123","position":{"latitude":44.9}}}`))
+			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + f.odometer + `},"xevBatteryStateOfCharge":{"value":63,"updateTime":"2026-10-22T14:55:00Z"},"batteryStateOfCharge":{"value":91,"vehicleBattery":"PRIMARY_BATTERY"},` + f.tractionBattery() + `"vin":"1FAKEVIN123","position":{"latitude":44.9}}}`))
 		case "/fcon-query/v1/garage":
 			_, _ = w.Write([]byte(`{"vin":"1FAKEVIN123","engineType":"BEV","modelYear":"2021"}`))
 		default:
@@ -80,7 +82,15 @@ func newFakeFord(t *testing.T) *fakeFord {
 	return f
 }
 
+func (f *fakeFord) tractionBattery() string {
+	if f.noBattery {
+		return ""
+	}
+	return `"xevBatteryActualStateOfCharge":{"value":61.5,"updateTime":"2026-10-22T14:50:00Z"},`
+}
+
 type fordTest struct {
+	api   *Server
 	srv   *httptest.Server
 	st    *store.Store
 	ford  *fakeFord
@@ -105,7 +115,7 @@ func newFordTest(t *testing.T) *fordTest {
 	api := &Server{Store: st, Collector: c, Loc: time.UTC, Version: "test", Now: func() time.Time { return clock }, Ford: &ford.Client{Base: ff.URL}}
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
-	return &fordTest{srv: srv, st: st, ford: ff, clock: &clock, meter: "sim-em16p:ch-01"}
+	return &fordTest{api: api, srv: srv, st: st, ford: ff, clock: &clock, meter: "sim-em16p:ch-01"}
 }
 
 func (f *fordTest) setup(unit string) string {

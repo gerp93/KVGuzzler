@@ -232,6 +232,18 @@ button.link {
   margin-left: 8px;
 }
 
+/* A charge that is going on is green, not a warning like the other badge */
+.ev-trips .badge.live {
+  background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
+  border-color: var(--color-accent-green);
+}
+
+/* Why a charge has no energy per percent: quiet text with the sentence behind it on hover */
+.charge-note {
+  color: var(--color-text-muted);
+  cursor: help;
+}
+
 /* The three figures of the card sit in a narrow column: a size that fits the longest of them (a thousand kWh) */
 .ev-figure {
   font-size: clamp(1.4rem, 2.2vw, 2rem);
