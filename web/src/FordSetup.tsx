@@ -73,12 +73,23 @@ export function FordSetup({
     };
   }, []);
 
-  // The sign-in address is made once the step that shows it is reached, and kept while moving back and forth (a new one would void the old one).
-  useEffect(() => {
-    if (step !== 'signin' || link) return;
+  // The sign-in address is made when the button is pressed, never earlier: Ford's page only accepts it for 5 minutes, so one made on reaching the step
+  // would be dead by the time the owner is through registering or signing in. Making another voids the one before.
+  const openFord = () => {
+    setBusy(true);
     setMessage('');
-    api.startFordLink().then(setLink, (e: Error) => setMessage(e.message));
-  }, [step, link]);
+    api.startFordLink().then(
+      (l) => {
+        setBusy(false);
+        setLink(l);
+        window.open(l.url, '_blank', 'noopener,noreferrer');
+      },
+      (e: Error) => {
+        setBusy(false);
+        setMessage(e.message);
+      },
+    );
+  };
 
   const elsewhere = cfg?.configured && cfg.meter_id && cfg.meter_id !== meter.id;
   const ready = clientId.trim() && authorizeUrl.trim() && tokenUrl.trim() && unit && (secret.trim() || cfg?.configured);
@@ -259,12 +270,18 @@ export function FordSetup({
             <h3>Sign in at Ford</h3>
             <p>Ford's own page asks you to sign in, pick the vehicle and agree to share its data. Your Ford password is never typed here.</p>
             {cfg?.linked && <p class="note">This vehicle is already linked. Continue only if the application changed or Ford asks to agree again.</p>}
-            {link ? (
-              <a class="setup-open" href={link.url} target="_blank" rel="noopener noreferrer">
-                Open Ford's sign-in page
-              </a>
-            ) : (
-              !message && <p class="caption">Making the sign-in address…</p>
+            <button type="button" class="setup-open" disabled={busy} onClick={openFord}>
+              {link ? "Open Ford's sign-in page again" : "Open Ford's sign-in page"}
+            </button>
+            {link && (
+              <p class="caption">
+                Opened in a new tab. Ford's page is good for <strong>5 minutes</strong>: sign in, pick the vehicle and agree before then, or open it again for a
+                fresh one. If nothing opened,{' '}
+                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                  use this link
+                </a>
+                .
+              </p>
             )}
             <p class="caption">
               After you agree, the browser goes to <code>{REDIRECT_URI}</code>, which shows an empty page or an error. That is expected: leave it open and come
@@ -276,7 +293,7 @@ export function FordSetup({
             <h3>Paste the address</h3>
             <p>
               Copy the whole address from the address bar of the page Ford sent the browser to. It starts with <code>{link?.redirect_uri ?? REDIRECT_URI}</code>{' '}
-              and has <code>?code=…&amp;state=…</code> after it. It stays good for 10 minutes.
+              and has <code>?code=…&amp;state=…</code> after it. It stays good for 10 minutes. If Ford's page was opened more than once, paste the address from the last one.
             </p>
             <label class="field">
               <span>Address the browser went to</span>
