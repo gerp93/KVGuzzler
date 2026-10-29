@@ -804,3 +804,49 @@ main.page-hierarchy-meter > .card.ev {
 .ford-signals code {
   word-break: break-all;
 }
+
+.ford-probe {
+  margin-top: 12px;
+}
+
+.ford-probe > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.probe-row {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.probe-row .ford-state {
+  margin: 0;
+}
+
+.probe-row .ford-state.warn .dot {
+  background: var(--color-accent-red);
+}
+
+.probe-row .ford-state.ok .dot {
+  background: var(--color-accent-green);
+}
+
+.probe-table {
+  display: block;
+  max-height: 14rem;
+  overflow: auto;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+}
+
+.probe-table td {
+  padding: 2px 10px 2px 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.probe-table code {
+  word-break: break-all;
+}

@@ -4,6 +4,7 @@
 // agreeing happen on Ford's own page, and only the address Ford sends the browser to afterwards is pasted back.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
+import { FordProbe } from './FordProbe';
 import type { FordLink, Meter } from './lib';
 
 /** Ford answers one look every 30 seconds; the server refuses one inside that, and the buttons that make a look wait it out. */
@@ -224,6 +225,8 @@ export function FordConnection({ meter, cfg, reload }: { meter: Meter; cfg: Ford
           </table>
         </details>
       )}
+
+      {cfg?.linked && <FordProbe waitLeft={waitLeft} wait={wait} minGap={MIN_CALL_GAP_S} reload={reload} />}
 
       <details class="ford-app" open={!cfg?.configured}>
         <summary>Developer application</summary>

@@ -22,6 +22,7 @@ const (
 	fordRefreshKey = "ford_refresh"
 	fordStatusKey  = "ford_status"
 	fordPendingKey = "ford_pending"
+	fordProbeKey   = "ford_probe"
 
 	// fordLinkValid is how long a started link can be finished: Ford's own one-time code lasts 10 minutes.
 	fordLinkValid = 15 * time.Minute
@@ -344,6 +345,36 @@ func fordFeedError(w http.ResponseWriter, err error) {
 	}
 }
 
+// lastFordProbe answers what the last probe of every Ford endpoint said (an empty one when none was made).
+func (s *Server) lastFordProbe(w http.ResponseWriter, r *http.Request) {
+	out := ford.Probe{Results: []ford.ProbeResult{}}
+	text, ok, err := s.Store.Meta(r.Context(), fordProbeKey)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if ok && text != "" {
+		_ = json.Unmarshal([]byte(text), &out)
+		if out.Results == nil {
+			out.Results = []ford.ProbeResult{}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// probeFord asks every Ford endpoint once, keeps what each said and answers with it. It is a look like any other, so it waits out the 30 seconds.
+func (s *Server) probeFord(w http.ResponseWriter, r *http.Request) {
+	p, err := s.FordFeed().Probe(r.Context())
+	if err != nil {
+		fordFeedError(w, err)
+		return
+	}
+	if text, err := json.Marshal(p); err == nil {
+		_ = s.Store.SetMeta(r.Context(), fordProbeKey, string(text))
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
 // deleteFord removes the setup, the saved permission and the last outcome. The readings already saved stay.
 func (s *Server) deleteFord(w http.ResponseWriter, r *http.Request) {
 	for _, k := range []string{fordConfigKey, fordRefreshKey} {
@@ -354,5 +385,6 @@ func (s *Server) deleteFord(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.Store.SetMeta(r.Context(), fordPendingKey, "")
 	_ = s.Store.SetMeta(r.Context(), fordStatusKey, "")
+	_ = s.Store.SetMeta(r.Context(), fordProbeKey, "")
 	w.WriteHeader(http.StatusNoContent)
 }

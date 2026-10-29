@@ -835,6 +835,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ford/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the last probe of Ford's endpoints said. */
+        get: operations["getFordProbe"];
+        put?: never;
+        /**
+         * Ask every read-only Ford endpoint once and say what each answered.
+         * @description Telemetry, garage, vehicle health alerts, charge schedules, departure times and the wallbox, and the charging-station activity when the wallbox
+         *     lists a station. Only the names of the answers' fields are returned, and the values of those about the vehicle's kind, the battery, charging,
+         *     schedules and alerts: never who the vehicle is or where it is. Nothing is saved but the answer. It is a look like any other, so inside the 30-second
+         *     wait it is refused with 429 without asking Ford.
+         */
+        post: operations["probeFord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/carbon/series": {
         parameters: {
             query?: never;
@@ -1484,6 +1508,25 @@ export interface components {
                 /** @enum {string} */
                 kind: "number" | "string" | "boolean" | "null";
                 value?: string;
+            }[];
+        };
+        FordProbe: {
+            /** Format: date-time */
+            checked_at: string | null;
+            results: {
+                /** @description The endpoint's name, like `electric/charge-schedules`. */
+                endpoint: string;
+                /** @description The HTTP status Ford answered; 0 when it was not asked or not reached (`message` says why). */
+                status: number;
+                ok: boolean;
+                /** @description What Ford said when it did not answer with data. */
+                message?: string;
+                signals?: {
+                    path: string;
+                    /** @enum {string} */
+                    kind: "number" | "string" | "boolean" | "null";
+                    value?: string;
+                }[];
             }[];
         };
         FordUpdate: {
@@ -3229,6 +3272,49 @@ export interface operations {
             };
             409: components["responses"]["Problem"];
             429: components["responses"]["Problem"];
+        };
+    };
+    getFordProbe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The last probe, or an empty one (`checked_at` null, no results) when none was made. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordProbe"];
+                };
+            };
+        };
+    };
+    probeFord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What each endpoint said. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FordProbe"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
         };
     };
     getCarbonSeries: {

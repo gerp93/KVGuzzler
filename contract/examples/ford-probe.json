@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-28T12:00:00Z",
+  "results": [
+    {
+      "endpoint": "garage",
+      "status": 200,
+      "ok": true,
+      "signals": [
+        { "path": "engineType", "kind": "string", "value": "BEV" },
+        { "path": "modelYear", "kind": "string", "value": "2021" }
+      ]
+    },
+    { "endpoint": "electric/departure-times", "status": 403, "ok": false, "message": "insufficient_scope" },
+    { "endpoint": "fccs", "status": 0, "ok": false, "message": "Not asked: the wallbox lists no charging station (only a Ford wallbox has one)." }
+  ]
+}

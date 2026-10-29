@@ -380,9 +380,16 @@ const (
 // valueKept says which members have their value shown: by name, the battery, charging, plug, range, energy and odometer ones.
 var valueKept = regexp.MustCompile(`(?i)battery|charg|plug|range|energy|soc|odometer`)
 
+// neverShown names the members whose value is never copied whatever else the path says: who the vehicle is and where it is or has been (a path like
+// chargeSchedules[0].location.latitude also contains a word that is shown elsewhere).
+var neverShown = regexp.MustCompile(`(?i)location|latitude|longitude|geohash|position|heading|\.name$|nickName|(^|\.)vin$|zipCode|deviceId|vehicleId|color|address`)
+
 // Describe lists the members of a telemetry answer (names, kinds and, for the few about the battery and the odometer, values), so the field that
 // holds a figure can be found without the answer being kept whole. The answer's shape is not documented where this was written from.
-func Describe(body []byte) []Signal {
+func Describe(body []byte) []Signal { return describe(body, valueKept) }
+
+// describe is Describe with the members whose values are shown chosen by keep.
+func describe(body []byte, keep *regexp.Regexp) []Signal {
 	var root any
 	if json.Unmarshal(body, &root) != nil {
 		return nil
@@ -426,7 +433,7 @@ func Describe(body []byte) []Signal {
 			default:
 				s.Kind = "null"
 			}
-			if !valueKept.MatchString(path) || len(s.Value) > maxSignalValue {
+			if !keep.MatchString(path) || neverShown.MatchString(path) || len(s.Value) > maxSignalValue {
 				s.Value = ""
 			}
 			out = append(out, s)
