@@ -3,7 +3,8 @@
 // latest trips) is the card; what is set once (the unit, typed readings, the Ford connection) is behind its Settings button. The sums are the server's.
 import { useRef, useState } from 'preact/hooks';
 import { api } from './api';
-import { dayLabel, formatDistance, formatEfficiency, lowCoverage, stretchLabel, type DistanceUnit, type MeterEv } from './ev';
+import { dayLabel, formatDistance, formatEfficiency, lowCoverage, stretchLabel, whenText, type DistanceUnit, type MeterEv } from './ev';
+import { EvCharges } from './EvCharges';
 import { EvSettings } from './EvSettings';
 import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
 import { useFordWait } from './fordWait';
@@ -50,14 +51,6 @@ export function OdometerNow({ meterId, brief }: { meterId: string; brief?: boole
       {!brief && <span class="caption"> as of {dayLabel(latest.day)}</span>}
     </span>
   );
-}
-
-/** A moment as a short phrase: the time when it was today, else the day and the time. */
-function whenText(iso: string, now: Date = new Date()): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return d.toDateString() === now.toDateString() ? time : `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}, ${time}`;
 }
 
 /** The one line under the card's title that says how the odometer is kept up to date, or nothing when Ford is not set up. */
@@ -212,6 +205,8 @@ export function EvCard({ meter }: { meter: Meter }) {
           )}
         </>
       )}
+
+      {data && <EvCharges meterId={meter.id} />}
 
       {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
       {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}

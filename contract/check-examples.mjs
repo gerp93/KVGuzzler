@@ -23,6 +23,7 @@ const examples = {
   'house-history.json': 'HouseHistory',
   'meter-runs.json': 'MeterRuns',
   'meter-ev.json': 'MeterEv',
+  'ev-charges.json': 'EvCharges',
   'baseload.json': 'BaseLoad',
   'levels.json': 'Levels',
   'anomalies.json': 'Anomalies',

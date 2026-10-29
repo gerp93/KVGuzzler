@@ -362,6 +362,52 @@ func ParseOdometer(body []byte) (Odometer, error) {
 	return first, nil
 }
 
+// Battery is the charge of the vehicle's traction battery, as the car last reported it.
+type Battery struct {
+	// Percent is the state of charge, 0 to 100.
+	Percent float64 `json:"percent"`
+	// At is when the car reported it (Ford's updateTime), which is not when it was asked: a car that sleeps reports now and then. Zero when Ford gave
+	// no readable time.
+	At time.Time `json:"at"`
+}
+
+// batteryMember is the telemetry member that holds the traction battery's charge. The match is on the whole name, never "battery": the 12 V battery's
+// charge (batteryStateOfCharge) sits in the same answer and would read as an almost always full vehicle.
+const batteryMember = "xevbatteryactualstateofcharge"
+
+// ParseBattery finds the traction battery's charge in a telemetry answer. False when the answer has none (the link lacks the evData permission, or the
+// car has not reported one) or the figure is not a percentage.
+func ParseBattery(body []byte) (Battery, bool) {
+	var root struct {
+		Metrics map[string]json.RawMessage `json:"metrics"`
+	}
+	if json.Unmarshal(body, &root) != nil {
+		return Battery{}, false
+	}
+	for name, raw := range root.Metrics {
+		if strings.ToLower(name) != batteryMember {
+			continue
+		}
+		var m struct {
+			Value      any    `json:"value"`
+			UpdateTime string `json:"updateTime"`
+		}
+		if json.Unmarshal(raw, &m) != nil {
+			return Battery{}, false
+		}
+		p, _, ok := number(m.Value)
+		if !ok || p < 0 || p > 100 {
+			return Battery{}, false
+		}
+		b := Battery{Percent: p}
+		if t, err := time.Parse(time.RFC3339, m.UpdateTime); err == nil {
+			b.At = t.UTC()
+		}
+		return b, true
+	}
+	return Battery{}, false
+}
+
 // Signal is one member of a telemetry answer, as the owner is shown it to find which one holds what.
 type Signal struct {
 	// Path is where it is (like "metrics.odometer.value"), Kind what JSON calls it (number, string, boolean, null).

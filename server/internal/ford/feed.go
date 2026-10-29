@@ -26,6 +26,8 @@ type Status struct {
 	Error     string `json:"error,omitempty"`
 	// Signals is what the answer held (names and kinds, values only of the battery and odometer members), so the owner can see where a figure is.
 	Signals []Signal `json:"signals,omitempty"`
+	// Battery is the traction battery's charge in the same answer, when the car reported one: the charge tracker reads it at the start and the end of a charge.
+	Battery *Battery `json:"battery,omitempty"`
 }
 
 // ErrNotSetUp is what a read or a link says when no setup is saved.
@@ -293,6 +295,9 @@ func (f *Feed) readWith(ctx context.Context, cfg Config, access string) (Status,
 	}
 	raw := odo.Value
 	st := Status{OK: true, CheckedAt: now.UTC(), Raw: &raw, Found: odo.Path, Miles: &miles, Day: day, Saved: saved, Signals: Describe(body)}
+	if b, ok := ParseBattery(body); ok {
+		st.Battery = &b
+	}
 	_ = f.Sink.SaveStatus(ctx, st)
 	return st, nil
 }
