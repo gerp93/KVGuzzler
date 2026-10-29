@@ -21,4 +21,15 @@ type FordLink struct {
 	LastFound *string  `json:"last_found"`
 	LastMiles *float64 `json:"last_miles"`
 	LastDay   *string  `json:"last_day"`
+	// ReadWaitSeconds is how long until Ford may be asked again (it allows one look every 30 seconds); left out when it may be asked now.
+	ReadWaitSeconds int `json:"read_wait_seconds,omitempty"`
+	// LastSignals is what the last answer held: every member's path and kind, and the value of the battery and odometer ones.
+	LastSignals []FordSignal `json:"last_signals,omitempty"`
+}
+
+// FordSignal is one member of Ford's telemetry answer.
+type FordSignal struct {
+	Path  string `json:"path"`
+	Kind  string `json:"kind"`
+	Value string `json:"value,omitempty"`
 }

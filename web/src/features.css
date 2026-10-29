@@ -774,3 +774,33 @@ main.page-hierarchy-meter > .card.ev {
 .page-estimator > .card {
   width: min(100%, 40rem);
 }
+
+.ford-signals {
+  margin-top: 12px;
+}
+
+.ford-signals > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.ford-signals table {
+  display: block;
+  max-height: 16rem;
+  overflow: auto;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+}
+
+.ford-signals th,
+.ford-signals td {
+  padding: 2px 10px 2px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ford-signals code {
+  word-break: break-all;
+}

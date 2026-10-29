@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,6 +73,15 @@ func (k fordSink) SaveStatus(ctx context.Context, st ford.Status) error {
 	return k.s.Store.SetMeta(ctx, fordStatusKey, string(body))
 }
 
+// LastLook is when Ford was last asked, from the saved outcome (zero when never), so a restart does not forget it.
+func (k fordSink) LastLook(ctx context.Context) time.Time {
+	st, err := k.s.fordStatus(ctx)
+	if err != nil || st == nil {
+		return time.Time{}
+	}
+	return st.CheckedAt
+}
+
 // SaveOdometer writes the day's reading unless the odometer has not moved since the latest one (a parked car would otherwise add a reading a day
 // that says nothing). The store's own refusals (an odometer only goes up) are the user's to read, so they go back as Ford errors.
 func (k fordSink) SaveOdometer(ctx context.Context, meterID, day string, miles float64) (bool, error) {
@@ -130,9 +140,16 @@ func (s *Server) fordView(ctx context.Context) (model.FordLink, error) {
 			return out, err
 		}
 	}
+	if w := s.FordFeed().Wait(); w > 0 {
+		out.ReadWaitSeconds = int(math.Ceil(w.Seconds()))
+	}
 	st, err := s.fordStatus(ctx)
 	if err != nil || st == nil || !out.Configured {
 		return out, err
+	}
+	// A look made before this server started still counts.
+	if w := ford.MinCallGap - s.now().Sub(st.CheckedAt); w > 0 && int(math.Ceil(w.Seconds())) > out.ReadWaitSeconds {
+		out.ReadWaitSeconds = int(math.Ceil(w.Seconds()))
 	}
 	checked := st.CheckedAt
 	out.LastCheck = &checked
@@ -149,6 +166,9 @@ func (s *Server) fordView(ctx context.Context) (model.FordLink, error) {
 		}
 		if st.Day != "" {
 			out.LastDay = &st.Day
+			for _, sg := range st.Signals {
+				out.LastSignals = append(out.LastSignals, model.FordSignal{Path: sg.Path, Kind: sg.Kind, Value: sg.Value})
+			}
 		}
 	} else {
 		out.LastOutcome = &st.Error
@@ -310,7 +330,11 @@ func (s *Server) readFord(w http.ResponseWriter, r *http.Request) {
 
 func fordFeedError(w http.ResponseWriter, err error) {
 	var fe *ford.Error
+	var soon *ford.TooSoon
 	switch {
+	case errors.As(err, &soon):
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(soon.Wait.Seconds()))))
+		writeProblem(w, http.StatusTooManyRequests, "ford_too_soon", soon.Error())
 	case errors.As(err, &fe):
 		writeProblem(w, http.StatusBadGateway, "ford_refused", fe.Message)
 	case errors.Is(err, ford.ErrNotSetUp):

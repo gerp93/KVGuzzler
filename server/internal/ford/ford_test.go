@@ -446,3 +446,98 @@ func TestWithNoSetupOrNoLinkNothingIsAsked(t *testing.T) {
 		t.Errorf("telemetry %d, statuses %d", fs.telemetry, len(sink.status))
 	}
 }
+
+func TestNoLookIsMadeLessThan30SecondsAfterTheLastWhoeverAsksAndLinkingKeepsItsCode(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	ctx := context.Background()
+
+	if _, err := f.Read(ctx); err != nil {
+		t.Fatalf("first read: %v", err)
+	}
+	if w := f.Wait(); w != MinCallGap {
+		t.Errorf("wait right after a look = %v, want %v", w, MinCallGap)
+	}
+	*now = now.Add(10 * time.Second)
+	var soon *TooSoon
+	if _, err := f.Read(ctx); !errors.As(err, &soon) || soon.Wait != 20*time.Second {
+		t.Fatalf("read 10 s later = %v, want to be told to wait 20 s", err)
+	}
+	if fs.telemetry != 1 || fs.issued != 1 {
+		t.Errorf("Ford was asked during the wait: %d telemetry, %d tokens", fs.telemetry, fs.issued)
+	}
+	// Linking inside the wait is refused before the one-time code is traded, so the code is not used up.
+	if _, err := f.Complete(ctx, "CODE"); !errors.As(err, &soon) {
+		t.Errorf("linking 10 s after a look = %v, want to be told to wait", err)
+	}
+	if fs.issued != 1 {
+		t.Errorf("the code was traded during the wait (%d tokens issued)", fs.issued)
+	}
+	// The failed tries do not push the time back: 30 s after the look it works again.
+	*now = now.Add(20 * time.Second)
+	if _, err := f.Read(ctx); err != nil {
+		t.Errorf("read 30 s after a look: %v", err)
+	}
+	if fs.telemetry != 2 || len(sink.status) != 2 {
+		t.Errorf("telemetry %d, statuses %d; want 2 and 2 (a refused look saves no outcome)", fs.telemetry, len(sink.status))
+	}
+}
+
+// lookSink remembers when Ford was last asked, like the server does across a restart.
+type lookSink struct {
+	*fakeSink
+	at time.Time
+}
+
+func (s *lookSink) LastLook(context.Context) time.Time { return s.at }
+
+func TestALookMadeBeforeARestartStillCounts(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	f.Sink = &lookSink{fakeSink: sink, at: now.Add(-10 * time.Second)}
+	ctx := context.Background()
+
+	var soon *TooSoon
+	if _, err := f.Read(ctx); !errors.As(err, &soon) || soon.Wait != 20*time.Second {
+		t.Fatalf("read after a restart 10 s after a look = %v, want to wait 20 s", err)
+	}
+	if did, _ := f.Step(ctx); did {
+		t.Error("the feed started a look right after a restart inside the wait")
+	}
+	if fs.telemetry != 0 {
+		t.Errorf("Ford was asked %d times", fs.telemetry)
+	}
+	*now = now.Add(MinGap)
+	if did, err := f.Step(ctx); err != nil || !did {
+		t.Errorf("step after the wait = %v, %v; want a read", did, err)
+	}
+}
+
+func TestDescribeNamesEverythingButOnlyShowsTheBatteryAndOdometerValues(t *testing.T) {
+	body := `{"metrics":{"odometer":{"value":93672,"updateTime":"2026-10-28T10:00:00Z"},"xevBatteryStateOfCharge":{"value":63.5},` +
+		`"vin":"1FAKEVIN123","position":{"latitude":44.9,"longitude":-93.2},"ignition":"OFF","charging":true,"gone":null}}`
+	got := map[string]Signal{}
+	for _, s := range Describe([]byte(body)) {
+		got[s.Path] = s
+	}
+	want := map[string]Signal{
+		"metrics.odometer.value":                {Path: "metrics.odometer.value", Kind: "number", Value: "93672"},
+		"metrics.odometer.updateTime":           {Path: "metrics.odometer.updateTime", Kind: "string", Value: "2026-10-28T10:00:00Z"},
+		"metrics.xevBatteryStateOfCharge.value": {Path: "metrics.xevBatteryStateOfCharge.value", Kind: "number", Value: "63.5"},
+		"metrics.vin":                           {Path: "metrics.vin", Kind: "string"},
+		"metrics.position.latitude":             {Path: "metrics.position.latitude", Kind: "number"},
+		"metrics.position.longitude":            {Path: "metrics.position.longitude", Kind: "number"},
+		"metrics.ignition":                      {Path: "metrics.ignition", Kind: "string"},
+		"metrics.charging":                      {Path: "metrics.charging", Kind: "boolean", Value: "true"},
+		"metrics.gone":                          {Path: "metrics.gone", Kind: "null"},
+	}
+	if len(got) != len(want) {
+		t.Errorf("got %d signals, want %d: %v", len(got), len(want), got)
+	}
+	for p, w := range want {
+		if got[p] != w {
+			t.Errorf("%s = %+v, want %+v", p, got[p], w)
+		}
+	}
+	if Describe([]byte("nope")) != nil {
+		t.Error("an answer that is not JSON described something")
+	}
+}

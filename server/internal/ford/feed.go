@@ -3,7 +3,10 @@ package ford
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,6 +24,8 @@ type Status struct {
 	// NeedsLink says the saved permission is gone and the owner has to link the vehicle again.
 	NeedsLink bool   `json:"needs_link,omitempty"`
 	Error     string `json:"error,omitempty"`
+	// Signals is what the answer held (names and kinds, values only of the battery and odometer members), so the owner can see where a figure is.
+	Signals []Signal `json:"signals,omitempty"`
 }
 
 // ErrNotSetUp is what a read or a link says when no setup is saved.
@@ -50,7 +55,17 @@ const (
 	// MinGap is the shortest time between two looks the feed starts by itself: Ford answers one request per 30 seconds per endpoint, so a look
 	// started right after another (linking, then the feed noticing the link) would only be told to slow down.
 	MinGap = time.Minute
+	// MinCallGap is the shortest time between any two looks, however they are started (the feed, "Read now", linking): Ford answers one request per
+	// 30 seconds per endpoint, and a look inside that time is refused here without asking Ford at all.
+	MinCallGap = 30 * time.Second
 )
+
+// TooSoon says a look was not made because Ford was asked less than MinCallGap ago.
+type TooSoon struct{ Wait time.Duration }
+
+func (e *TooSoon) Error() string {
+	return fmt.Sprintf("Ford allows one look every %d seconds: try again in %d.", int(MinCallGap.Seconds()), int(math.Ceil(e.Wait.Seconds())))
+}
 
 // Feed keeps the odometer of an electric vehicle's charging meter up to date from Ford. It follows the saved setup, so linking, changing or
 // removing it takes effect within half a minute. One lock covers every call: Ford replaces the refresh token at each refresh, so two refreshes at
@@ -66,6 +81,54 @@ type Feed struct {
 	nextAt  time.Time
 	hadLink bool
 	readAt  time.Time
+	loaded  bool
+	// lookNs is readAt as Unix nanoseconds, so Wait can be asked while a look is in progress (the lock is held for the whole look).
+	lookNs atomic.Int64
+}
+
+// lastLooker is the optional part of a Sink that remembers when Ford was last asked, so a restart does not forget it.
+type lastLooker interface {
+	LastLook(ctx context.Context) time.Time
+}
+
+// stamp notes that Ford is being asked at t.
+func (f *Feed) stamp(t time.Time) {
+	f.readAt = t
+	f.lookNs.Store(t.UnixNano())
+}
+
+// loadLook takes the time of the last look saved before this server started, once.
+func (f *Feed) loadLook(ctx context.Context) {
+	if f.loaded {
+		return
+	}
+	f.loaded = true
+	if l, ok := f.Sink.(lastLooker); ok {
+		if t := l.LastLook(ctx); t.After(f.readAt) {
+			f.stamp(t)
+		}
+	}
+}
+
+// Wait is how much longer must pass before Ford may be asked again: zero when it may be asked now.
+func (f *Feed) Wait() time.Duration {
+	ns := f.lookNs.Load()
+	if ns == 0 {
+		return 0
+	}
+	if d := MinCallGap - f.now().Sub(time.Unix(0, ns)); d > 0 {
+		return d
+	}
+	return 0
+}
+
+// guard refuses a look less than MinCallGap after the last one. The lock must be held.
+func (f *Feed) guard(ctx context.Context) error {
+	f.loadLook(ctx)
+	if w := f.Wait(); w > 0 {
+		return &TooSoon{Wait: w}
+	}
+	return nil
 }
 
 func (f *Feed) now() time.Time {
@@ -91,6 +154,7 @@ func (f *Feed) Step(ctx context.Context) (bool, error) {
 		f.last = nil
 		return false, err
 	}
+	f.loadLook(ctx)
 	_, linked, err := f.Sink.Refresh(ctx)
 	if err != nil {
 		return false, err
@@ -150,6 +214,11 @@ func (f *Feed) Complete(ctx context.Context, code string) (Status, error) {
 	if cfg == nil {
 		return Status{}, ErrNotSetUp
 	}
+	// Refused before the code is spent: it stays good for 10 minutes, so linking can be tried again.
+	if err := f.guard(ctx); err != nil {
+		return Status{}, err
+	}
+	f.stamp(f.now())
 	tok, err := f.Client.Exchange(ctx, *cfg, code)
 	if err != nil {
 		return Status{}, err
@@ -176,6 +245,9 @@ func (f *Feed) Complete(ctx context.Context, code string) (Status, error) {
 // read refreshes the tokens, reads the odometer and saves it, and saves and returns what happened. An error is only returned for something that is
 // not Ford's doing (the database, a cancelled request); Ford's complaints are in the Status.
 func (f *Feed) read(ctx context.Context, cfg Config) (Status, error) {
+	if err := f.guard(ctx); err != nil {
+		return Status{}, err
+	}
 	refresh, ok, err := f.Sink.Refresh(ctx)
 	if err != nil {
 		return Status{}, err
@@ -183,7 +255,7 @@ func (f *Feed) read(ctx context.Context, cfg Config) (Status, error) {
 	if !ok {
 		return f.fail(ctx, &Error{Message: "The vehicle is not linked yet.", Relink: true})
 	}
-	f.readAt = f.now()
+	f.stamp(f.now())
 	tok, err := f.Client.Refresh(ctx, cfg, refresh)
 	if err != nil {
 		return f.fail(ctx, err)
@@ -198,7 +270,7 @@ func (f *Feed) read(ctx context.Context, cfg Config) (Status, error) {
 }
 
 func (f *Feed) readWith(ctx context.Context, cfg Config, access string) (Status, error) {
-	f.readAt = f.now()
+	f.stamp(f.now())
 	body, err := f.Client.Telemetry(ctx, access)
 	if err != nil {
 		return f.fail(ctx, err)
@@ -220,7 +292,7 @@ func (f *Feed) readWith(ctx context.Context, cfg Config, access string) (Status,
 		return f.fail(ctx, err)
 	}
 	raw := odo.Value
-	st := Status{OK: true, CheckedAt: now.UTC(), Raw: &raw, Found: odo.Path, Miles: &miles, Day: day, Saved: saved}
+	st := Status{OK: true, CheckedAt: now.UTC(), Raw: &raw, Found: odo.Path, Miles: &miles, Day: day, Saved: saved, Signals: Describe(body)}
 	_ = f.Sink.SaveStatus(ctx, st)
 	return st, nil
 }

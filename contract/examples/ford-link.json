@@ -12,5 +12,17 @@
   "last_raw": 20000,
   "last_found": "metrics.odometer.value",
   "last_miles": 12427.4,
-  "last_day": "2026-10-28"
+  "last_day": "2026-10-28",
+  "read_wait_seconds": 12,
+  "last_signals": [
+    {
+      "path": "metrics.odometer.value",
+      "kind": "number",
+      "value": "20000"
+    },
+    {
+      "path": "metrics.vin",
+      "kind": "string"
+    }
+  ]
 }

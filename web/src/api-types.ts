@@ -825,7 +825,8 @@ export interface paths {
         /**
          * Read the odometer from Ford now (the server also reads it by itself four times a day).
          * @description The odometer is saved as the reading of today's local day for the charging meter, unless it has not moved since the latest reading. Ford's
-         *     own limit is one request per 30 seconds. Ford's complaints are in the answer's `last_outcome`, not an error status.
+         *     own limit is one request per 30 seconds, so a read less than 30 seconds after the last look of any kind is refused with 429 without asking
+         *     Ford (`read_wait_seconds` of the setup says how long is left). Ford's complaints are in the answer's `last_outcome`, not an error status.
          */
         post: operations["readFord"];
         delete?: never;
@@ -1475,6 +1476,15 @@ export interface components {
             last_miles: number | null;
             /** @description The local day the reading was saved for. */
             last_day: string | null;
+            /** @description Seconds until Ford may be asked again (it allows one look every 30 seconds, and the server refuses a look inside that time with 429). Left out when it may be asked now. */
+            read_wait_seconds?: number;
+            /** @description What the last answer held, so the field that has a figure can be found. Only the battery, charging, plug, range, energy and odometer members have a value; where the vehicle is and its identity are not copied. */
+            last_signals?: {
+                path: string;
+                /** @enum {string} */
+                kind: "number" | "string" | "boolean" | "null";
+                value?: string;
+            }[];
         };
         FordUpdate: {
             client_id: string;
@@ -3218,6 +3228,7 @@ export interface operations {
                 };
             };
             409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     getCarbonSeries: {
