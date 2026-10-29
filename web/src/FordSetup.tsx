@@ -8,6 +8,9 @@ import type { FordLink, Meter } from './lib';
 
 export type SetupStep = 'register' | 'details' | 'signin' | 'paste';
 
+/** What was typed in the dialog and not finished with, kept by the card so closing the dialog by accident (Escape, a stray click) loses nothing. */
+export type FordDraft = Partial<{ clientId: string; secret: string; authorizeUrl: string; tokenUrl: string; unit: string; pasted: string }>;
+
 /** What Ford's quick-start guide gives as the redirect address to register: nothing listens there, the owner copies the address from the browser. */
 export const REDIRECT_URI = 'http://localhost:8000/callback';
 /** Where the registered application's code is traded for tokens: the same for every owner (Ford's Postman collection). */
@@ -25,6 +28,7 @@ export function FordSetup({
   meter,
   cfg,
   startAt,
+  draft,
   waitLeft,
   wait,
   reload,
@@ -33,6 +37,7 @@ export function FordSetup({
   meter: Meter;
   cfg: FordLink | undefined;
   startAt: SetupStep;
+  draft: { current: FordDraft };
   waitLeft: number;
   wait: (seconds: number) => void;
   reload: () => void;
@@ -41,13 +46,21 @@ export function FordSetup({
   const dialog = useRef<HTMLDialogElement>(null);
   const [step, setStep] = useState<SetupStep>(startAt);
   const [done, setDone] = useState<FordLink>();
-  const [clientId, setClientId] = useState(cfg?.client_id ?? '');
-  const [secret, setSecret] = useState('');
-  const [authorizeUrl, setAuthorizeUrl] = useState(cfg?.authorize_url ?? '');
-  const [tokenUrl, setTokenUrl] = useState(cfg?.token_url || TOKEN_URL);
-  const [unit, setUnit] = useState<string>(cfg?.odometer_unit ?? '');
+  const kept = draft.current;
+  const [clientId, setClientIdNow] = useState(kept.clientId ?? cfg?.client_id ?? '');
+  const [secret, setSecretNow] = useState(kept.secret ?? '');
+  const [authorizeUrl, setAuthorizeUrlNow] = useState(kept.authorizeUrl ?? cfg?.authorize_url ?? '');
+  const [tokenUrl, setTokenUrlNow] = useState(kept.tokenUrl ?? (cfg?.token_url || TOKEN_URL));
+  const [unit, setUnitNow] = useState<string>(kept.unit ?? cfg?.odometer_unit ?? '');
   const [link, setLink] = useState<{ url: string; redirect_uri: string }>();
-  const [pasted, setPasted] = useState('');
+  const [pasted, setPastedNow] = useState(kept.pasted ?? '');
+  // Every field is written to the card's draft as it changes.
+  const setClientId = (v: string) => { draft.current.clientId = v; setClientIdNow(v); };
+  const setSecret = (v: string) => { draft.current.secret = v; setSecretNow(v); };
+  const setAuthorizeUrl = (v: string) => { draft.current.authorizeUrl = v; setAuthorizeUrlNow(v); };
+  const setTokenUrl = (v: string) => { draft.current.tokenUrl = v; setTokenUrlNow(v); };
+  const setUnit = (v: string) => { draft.current.unit = v; setUnitNow(v); };
+  const setPasted = (v: string) => { draft.current.pasted = v; setPastedNow(v); };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
@@ -90,7 +103,9 @@ export function FordSetup({
       .then(
         () => {
           setBusy(false);
-          setSecret('');
+          // Saved: the secret (and the details) are the server's now, nothing is kept here.
+          draft.current = { pasted: draft.current.pasted };
+          setSecretNow('');
           setLink(undefined);
           reload();
           go('signin');
@@ -111,6 +126,7 @@ export function FordSetup({
         setBusy(false);
         setDone(v);
         setLink(undefined);
+        draft.current = {};
         reload();
       },
       (e: Error) => {
@@ -138,9 +154,6 @@ export function FordSetup({
       class="ford-setup"
       aria-labelledby="ford-setup-title"
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialog.current) dialog.current?.close();
-      }}
     >
       <header class="setup-head">
         <h2 id="ford-setup-title">Connect Ford</h2>
