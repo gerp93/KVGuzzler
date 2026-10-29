@@ -56,8 +56,10 @@ func percentile(sorted []float64, p float64) float64 {
 	return sorted[lo] + (sorted[hi]-sorted[lo])*(i-float64(lo))
 }
 
-// Threshold picks the level above which a minute counts as working: a quarter of the way from the meter's resting power (its 10th percentile) up to
-// its working power (its 99th, so a meter that works only a few percent of the time, a water heater, still has one), never below 10 W. A meter that barely changes has no such level: +Inf, so nothing in it is a run.
+// Threshold picks the level above which a minute counts as working: a quarter of the way from the meter's resting power (its median: what it draws
+// for most of the time) up to its working power (its 99th percentile, so a meter that works only a few percent of the time, a water heater, still has one), never below 10 W.
+// The median, not a low percentile: a fridge that cycles between 15 W and 74 W spends more than half its time at 74 W, which is its normal, not work.
+// A meter that barely changes from its usual draw has no such level: +Inf, so nothing in it is a run.
 func Threshold(points []Point) float64 {
 	vals := make([]float64, 0, len(points))
 	for _, p := range points {
@@ -69,7 +71,7 @@ func Threshold(points []Point) float64 {
 		return math.Inf(1)
 	}
 	sort.Float64s(vals)
-	base, peak := percentile(vals, 0.10), percentile(vals, 0.99)
+	base, peak := percentile(vals, 0.5), percentile(vals, 0.99)
 	if peak-base < minSpread {
 		return math.Inf(1)
 	}

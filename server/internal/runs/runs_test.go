@@ -170,6 +170,30 @@ func TestLevelsOfASteadyMeterIsAlwaysResting(t *testing.T) {
 	}
 }
 
+func TestAFridgeThatSpendsMostOfItsTimeRunningRestsAtThatLevel(t *testing.T) {
+	// A kitchen island with a mini fridge: 15 W while the compressor is off (40% of the time), 74 W while it is on (60%). That is its normal
+	// cycle, so 78 W is not "working" and the resting draw is 74 W, not 15 W.
+	var pts []Point
+	start := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	for m := 0; m < 1000; m++ {
+		w := 74.0 + float64(m%5)*0.5
+		if m%10 < 4 {
+			w = 15
+		}
+		pts = append(pts, Point{Minute: start.Add(time.Duration(m) * time.Minute), AvgW: w, MaxW: w, Seconds: 60})
+	}
+	l, ok := LevelsOf(pts)
+	if !ok || l.HasWorking {
+		t.Fatalf("levels = %+v ok=%v, want resting only", l, ok)
+	}
+	if l.RestWatts < 74 || l.RestWatts > 76 {
+		t.Errorf("rest = %v, want about 75", l.RestWatts)
+	}
+	if got := Detect(pts, Threshold(pts), DefaultGapMinutes, DefaultMinMinutes); len(got) != 0 {
+		t.Errorf("a cycling fridge has %d runs, want none", len(got))
+	}
+}
+
 func TestLevelsNeedEnoughHistory(t *testing.T) {
 	var pts []Point
 	start := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)

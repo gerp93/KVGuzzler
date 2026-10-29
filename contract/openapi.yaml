@@ -237,7 +237,7 @@ paths:
       summary: What each meter draws at rest and the level above which it is working, so a table of live readings can show which are working now.
       description: |
         Learned from each meter's last 30 days of recorded minutes, with the same working level the runs use (a quarter of the way from its
-        10th to its 99th percentile, never below 10 W). `rest_watts` is the middle of what it draws below that level. A meter that barely changes
+        median to its 99th percentile, never below 10 W). `rest_watts` is the middle of what it draws below that level. A meter that barely changes
         has no working level (`working_above_watts` is null): it is on, it never works, so it is always resting. A meter with under two hours
         recorded is left out. The answer is kept for a few minutes. Each meter's own, never added to anything.
       responses:
