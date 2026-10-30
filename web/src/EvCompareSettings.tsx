@@ -62,7 +62,6 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
   };
 
   const failed = view?.last_outcome != null && view.last_outcome !== 'Prices saved.';
-  const presets = view?.presets ?? [];
   return (
     <>
       <h3>Gas car comparison</h3>
@@ -89,11 +88,10 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
         </button>
         {view?.area_id != null && (
           <button type="button" onClick={() => void remove()}>
-            Take off
+            Remove
           </button>
         )}
       </form>
-      {presets.length > 0 && <p class="caption">Always compared with gas cars of {presets.join(', ')} miles per gallon; tick which to draw under the chart.</p>}
       {view && !view.key_saved && <p class="caption">The prices come from EIA and need its key: save it under Carbon.</p>}
       {view?.last_outcome != null && (
         <p class={`caption ${failed ? 'bad' : ''}`}>

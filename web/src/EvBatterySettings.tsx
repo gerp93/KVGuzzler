@@ -65,11 +65,10 @@ export function EvBatterySettings({ meterId, reload }: { meterId: string; reload
         </button>
         {saved != null && (
           <button type="button" onClick={() => void remove()}>
-            Take off
+            Remove
           </button>
         )}
       </form>
-      <p class="caption">The usable energy of a full battery, from the car's specification. It turns the battery percentages into kWh, so each charge can show how much of the wall's energy reached the battery.</p>
       {problem && <p class="note error">{problem}</p>}
     </>
   );
