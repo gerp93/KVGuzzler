@@ -169,6 +169,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/ev/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The gas car a charging meter's vehicle is compared with, and the gasoline price area.
+         * @description The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in a gasoline car (its miles per gallon,
+         *     chosen by the owner) at the weekly average retail price of regular gasoline in an area, which EIA publishes for the country, regions, some states
+         *     and big cities. The prices are read with the EIA key saved for the carbon footprint (`key_saved`). 409 when the meter is not marked `ev`.
+         */
+        get: operations["getEvCompare"];
+        /**
+         * Save the gas car's miles per gallon and the price area, and read the area's prices now.
+         * @description The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable): `last_outcome` says what happened and the server tries
+         *     again. 400 for a miles per gallon outside 5 to 200 or an area EIA has no price for.
+         */
+        put: operations["putEvCompare"];
+        post?: never;
+        /** Take the comparison off (the saved prices are kept). */
+        delete: operations["deleteEvCompare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/meters/{meterId}/ev/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What each stretch between odometer readings would have cost in the gas car, against what charging cost.
+         * @description For each stretch of `getMeterEv` the miles are divided by the gas car's miles per gallon and priced at the average of the weekly prices over the
+         *     stretch's days (a day takes the latest week on or before it, and the latest price after the last week). `savings` is the gas car's cost less the
+         *     electric car's cost: negative when the electric car cost more. A stretch with a day before the first price kept, or with no electric cost, has no
+         *     savings and is left out of `totals`. The electric cost is only the energy the meter measured, so charging elsewhere makes the savings look bigger.
+         *     `configured` is false until the comparison is set up. 409 when the meter is not marked `ev`.
+         */
+        get: operations["getEvSavings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/ev/charges": {
         parameters: {
             query?: never;
@@ -1082,6 +1134,69 @@ export interface components {
             /** Format: date */
             day: string;
             miles: number;
+        };
+        EvCompare: {
+            meter_id: string;
+            /** @description The gas car's miles per gallon; null until the comparison is set up. */
+            mpg: number | null;
+            area_id: string | null;
+            area_name: string | null;
+            /** @description The places EIA publishes a weekly gasoline price for. */
+            areas: {
+                id: string;
+                name: string;
+            }[];
+            /** @description Whether the EIA key the prices need (saved under Carbon) is there. */
+            key_saved: boolean;
+            /** Format: date-time */
+            last_check: string | null;
+            /** @description What the last read of the prices said, in words. */
+            last_outcome: string | null;
+            /** @description The Monday of the newest week price kept. */
+            latest_week: string | null;
+            /** @description Dollars per gallon of regular gasoline, a decimal string. */
+            latest_price: string | null;
+        };
+        EvSavings: {
+            meter_id: string;
+            configured: boolean;
+            mpg: number | null;
+            area_name: string | null;
+            /** @description The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart. */
+            prices: {
+                /** Format: date */
+                week: string;
+                dollars: string;
+            }[];
+            /** @description One per pair of neighbouring odometer readings, oldest first. */
+            stretches: {
+                /** Format: date */
+                from_day: string;
+                /** Format: date */
+                to_day: string;
+                miles: number;
+                /** @description What the gas car would have burned over the miles. */
+                gallons: number;
+                /** @description The average of the week prices over the stretch's days; null when a day has no price. */
+                gas_price: string | null;
+                gas_cost: string | null;
+                /** @description What the meter's energy cost, as in `getMeterEv`. */
+                ev_cost: string | null;
+                /** @description Gas cost less electric cost, a decimal string, negative when the electric car cost more. */
+                savings: string | null;
+            }[];
+            /** @description The stretches that have both costs, added up; null when there are none. */
+            totals: {
+                stretches: number;
+                miles: number;
+                gallons: number;
+                gas_cost: string;
+                ev_cost: string;
+                savings: string;
+                gas_cost_per_mile: string | null;
+                ev_cost_per_mile: string | null;
+            } | null;
+            cost_estimated: boolean;
         };
         EvCharges: {
             meter_id: string;
@@ -2258,6 +2373,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeterEv"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getEvCompare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvCompare"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    putEvCompare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    mpg: number;
+                    /** @description One of the `areas` ids. */
+                    area_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvCompare"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteEvCompare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getEvSavings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvSavings"];
                 };
             };
             404: components["responses"]["Problem"];

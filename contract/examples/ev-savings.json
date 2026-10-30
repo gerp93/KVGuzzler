@@ -1,0 +1,17 @@
+{
+  "meter_id": "refoss-192.168.1.88:em2",
+  "configured": true,
+  "mpg": 25,
+  "area_name": "Minnesota",
+  "prices": [
+    { "week": "2026-10-12", "dollars": "4.184" },
+    { "week": "2026-10-19", "dollars": "4.18" },
+    { "week": "2026-10-26", "dollars": "4.146" }
+  ],
+  "stretches": [
+    { "from_day": "2026-10-12", "to_day": "2026-10-19", "miles": 210, "gallons": 8.4, "gas_price": "4.18", "gas_cost": "35.11", "ev_cost": "6.50", "savings": "28.61" },
+    { "from_day": "2026-10-19", "to_day": "2026-10-26", "miles": 185, "gallons": 7.4, "gas_price": "4.16", "gas_cost": "30.78", "ev_cost": null, "savings": null }
+  ],
+  "totals": { "stretches": 1, "miles": 210, "gallons": 8.4, "gas_cost": "35.11", "ev_cost": "6.50", "savings": "28.61", "gas_cost_per_mile": "0.167190", "ev_cost_per_mile": "0.030952" },
+  "cost_estimated": false
+}

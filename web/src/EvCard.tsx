@@ -4,6 +4,7 @@
 import { useRef, useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, formatEfficiency, lowCoverage, mpge, stretchLabel, whenText, type DistanceUnit, type MeterEv } from './ev';
+import { EvSavings } from './EvSavings';
 import { EvTrends } from './EvTrends';
 import { EvCharges } from './EvCharges';
 import { EvSettings } from './EvSettings';
@@ -215,6 +216,8 @@ export function EvCard({ meter }: { meter: Meter }) {
           )}
         </>
       )}
+
+      {data && <EvSavings meterId={meter.id} version={version} unit={unit} onOpenSettings={() => setOpen(true)} />}
 
       {data && <EvCharges meterId={meter.id} />}
 

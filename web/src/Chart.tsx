@@ -102,7 +102,7 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
         cursor: { drag: { x: false, y: false } },
         scales: {
           x: { time: true, range: () => span },
-          y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.05 : 1] },
+          y: { range: (_u, min, max) => [min < 0 ? min * 1.05 : 0, max > 0 ? max * 1.05 : 1] },
         },
         axes: [
           { stroke: text, font: axisFont, grid: { stroke: grid, width: 0.5 }, ticks: { stroke: grid } },

@@ -4,7 +4,7 @@ import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
 import type { MeterRuns } from './runs';
-import type { EvChargesAnswer, MeterEv } from './ev';
+import type { EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -58,6 +58,17 @@ export const api = {
   meterRuns: (meterId: string, from: string, to: string) => request<MeterRuns>(`api/v1/meters/${encodeURIComponent(meterId)}/runs?${q({ from, to })}`),
   /** A charging meter's odometer readings with the miles, energy and cost per mile of each stretch between them. */
   meterEv: (meterId: string) => request<MeterEv>(`api/v1/meters/${encodeURIComponent(meterId)}/ev`),
+  /** The gas car a charging meter's vehicle is compared with, and the gasoline price area. */
+  evCompare: (meterId: string) => request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`),
+  putEvCompare: (meterId: string, mpg: number, areaId: string) =>
+    request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mpg, area_id: areaId }),
+    }),
+  deleteEvCompare: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, { method: 'DELETE' }),
+  /** What each stretch between odometer readings would have cost in the gas car, against what charging cost. */
+  evSavings: (meterId: string) => request<EvSavings>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/savings`),
   /** A charging meter's charges: when each began and ended, its energy and cost, and the car's battery at each end. */
   evCharges: (meterId: string) => request<EvChargesAnswer>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/charges`),
   deleteEvCharge: (meterId: string, chargeId: number) =>
