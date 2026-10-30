@@ -218,7 +218,7 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       format: axisCents,
       yLabel: 'Price per gallon, dollars',
       xLabel: 'Week of',
-      waiting: 'No gas prices yet: they come from EIA with the key saved under Carbon, and are read when the comparison is saved and twice a day.',
+      waiting: 'No gas prices yet: they come from EIA with the EIA key saved in the Connectors tab, and are read when the area is saved there and twice a day.',
     });
   }
   return tabs;

@@ -175,7 +175,7 @@ func (c *Client) Weekly(ctx context.Context, apiKey, area string, fuel Product, 
 	why := message(body, apiKey)
 	switch resp.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return nil, fail("EIA did not accept the key (error %d). Check it under Carbon.%s", resp.StatusCode, why)
+		return nil, fail("EIA did not accept the key (error %d). Check it in the Connectors tab (EIA).%s", resp.StatusCode, why)
 	case http.StatusTooManyRequests:
 		return nil, &Error{Message: "EIA asked for a slower pace. It will be tried again later." + why, RateLimited: true}
 	}

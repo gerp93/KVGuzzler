@@ -1,4 +1,3 @@
-import { CarbonCard } from './CarbonCard';
 import { DatabaseCard } from './DatabaseCard';
 import { RatesCard } from './RatesCard';
 import { THEMES, type Theme } from './lib';
@@ -7,7 +6,6 @@ export function SettingsView({ theme, onTheme }: { theme: Theme; onTheme: (t: Th
   return (
     <>
       <RatesCard />
-      <CarbonCard />
       <DatabaseCard />
       <section class="card">
         <h2>Theme</h2>

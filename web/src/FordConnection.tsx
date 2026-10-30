@@ -1,4 +1,4 @@
-// The Ford connection of an electric vehicle, inside the EV card's settings: whether the odometer is being read from Ford and when, and the buttons that
+// The Ford connection of an electric vehicle, in the Connectors tab: whether the odometer is being read from Ford and when, and the buttons that
 // follow from that. Connecting (registering the application, its details, signing in at Ford) is the dialog of `FordSetup`; nothing is typed here.
 import { useState } from 'preact/hooks';
 import { api } from './api';

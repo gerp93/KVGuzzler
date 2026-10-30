@@ -1,11 +1,12 @@
-// The carbon footprint's setup: the US EIA's free API key (write-only) and your balancing authority's code. Saving takes a reading first and only
-// keeps a setup that got one. The key is kept in a private file on the server and sent to EIA only.
+// The US EIA connection, in the Connectors tab: its free API key (write-only) and your balancing authority's code, which the carbon footprint reads and which the
+// gas and diesel prices on the EV card share the key of. Saving takes a reading first and only keeps a setup that got one. The key is kept in a private file
+// on the server and sent to EIA only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
 import { Hint } from './Hint';
 import type { CarbonConfig } from './lib';
 
-export function CarbonCard() {
+export function EiaCard() {
   const [cfg, setCfg] = useState<CarbonConfig>();
   const [place, setPlace] = useState('');
   const [key, setKey] = useState('');
@@ -48,11 +49,12 @@ export function CarbonCard() {
     );
 
   return (
-    <section class="card">
-      <h2>Carbon footprint</h2>
+    <section class="card page-narrow">
+      <h2>EIA</h2>
       <Hint>
-        Each hour's energy times that hour's grid intensity, from EIA hourly generation by fuel for your balancing authority (US only). Grid average, not
-        marginal. Needs a free EIA API key (eia.gov/opendata), stored on the server and sent to EIA only.
+        Used for the carbon footprint (each hour's energy times that hour's grid intensity, from EIA hourly generation by fuel for your balancing authority, US
+        only, grid average and not marginal) and for the gas and diesel prices on the EV card. Needs a free EIA API key (eia.gov/opendata), stored on the
+        server and sent to EIA only.
       </Hint>
       <label class="field">
         <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>

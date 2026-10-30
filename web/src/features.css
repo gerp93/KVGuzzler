@@ -1358,3 +1358,14 @@ button.setup-open {
   background: var(--color-primary-action);
   border-color: transparent;
 }
+
+/* A card whose heading has a button beside it (Connectors > Devices). */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card-head h2 {
+  margin: 0;
+}

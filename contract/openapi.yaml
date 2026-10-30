@@ -275,12 +275,13 @@ paths:
     get:
       tags: [Read]
       operationId: getEvCompare
-      summary: The gasoline price area a charging meter's vehicle is compared in, and the owner's own gas car if there is one.
+      summary: The house's gasoline price area as a charging meter's vehicle is compared in it, and the owner's own gas car if there is one.
       description: |
         The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in gasoline cars: the `presets` (15 to 40 miles
         per gallon) and, if the owner named one, `custom_mpg`. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
-        for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). Which of the gas cars a page
-        draws is the page's own choice; every one is answered. 409 when the meter is not marked `ev`.
+        for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). The area is the house's
+        (`/api/v1/fuel-prices`), the same for every vehicle; only the own car is the vehicle's. Which of the gas cars a page draws is the page's own choice;
+        every one is answered. 409 when the meter is not marked `ev`.
       parameters:
         - $ref: '#/components/parameters/MeterId'
       responses:
@@ -297,11 +298,12 @@ paths:
     put:
       tags: [Settings]
       operationId: putEvCompare
-      summary: Save the price area and the owner's own gas car, and read the area's prices now.
+      summary: Save the owner's own gas car.
       description: |
-        The area alone is enough: the presets are always compared. The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable):
-        `last_outcome` says what happened and the server tries again. A `custom_mpg` that is one of the presets is not a second comparison. 400 for a miles
-        per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg` included).
+        The presets are always compared; this adds one more. A `custom_mpg` that is one of the presets is not a second comparison. The price area is the house's
+        (`PUT /api/v1/fuel-prices`): it must already be saved, or be named here as `area_id`, which saves it for the house and reads its prices now, as that
+        call does. 400 for no area anywhere, a miles per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg`
+        included).
       parameters:
         - $ref: '#/components/parameters/MeterId'
       requestBody:
@@ -310,12 +312,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [area_id]
               additionalProperties: false
               properties:
                 area_id:
                   type: string
-                  description: One of the `areas` ids.
+                  description: One of the `areas` ids. Optional; saves the house's area.
                 custom_mpg:
                   type: [number, 'null']
                   minimum: 5
@@ -336,7 +337,7 @@ paths:
     delete:
       tags: [Settings]
       operationId: deleteEvCompare
-      summary: Take the comparison off (the saved prices are kept).
+      summary: Take the owner's own gas car off (the house's area and the saved prices are kept).
       parameters:
         - $ref: '#/components/parameters/MeterId'
       responses:
@@ -346,6 +347,56 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+  /api/v1/fuel-prices:
+    get:
+      tags: [Read]
+      operationId: getFuelPrices
+      summary: The house's price area for gasoline and diesel, and what was read for it.
+      description: |
+        Where the house is, as far as fuel prices go: one area for every vehicle. The weekly prices are EIA's, read with the EIA key saved for the carbon
+        footprint (`key_saved`). `area_id` is null until chosen.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuelPrices'
+    put:
+      tags: [Settings]
+      operationId: putFuelPrices
+      summary: Save the house's price area, and read its prices now.
+      description: |
+        The area is kept even when the prices cannot be read (no EIA key yet, EIA not reachable): `last_outcome` says what happened and the server tries again.
+        400 for an area EIA has no price for or any other member.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [area_id]
+              additionalProperties: false
+              properties:
+                area_id:
+                  type: string
+                  description: One of the `areas` ids.
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuelPrices'
+        '400':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: deleteFuelPrices
+      summary: Take the area off, and with it every gas comparison (the prices already read are kept).
+      responses:
+        '204':
+          description: Removed.
   /api/v1/meters/{meterId}/ev/battery:
     get:
       tags: [Read]
@@ -1734,25 +1785,15 @@ components:
         kwh:
           type: [number, 'null']
           description: The battery's usable energy in kWh; null until the owner sets it.
-    EvCompare:
+    FuelPrices:
       type: object
-      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price, latest_diesel_price, diesel_area_name]
+      required: [area_id, area_name, areas, key_saved, last_check, last_outcome, latest_week, latest_price, latest_diesel_price, diesel_area_name]
       properties:
-        meter_id:
-          type: string
         area_id:
           type: [string, 'null']
-          description: The gasoline price area; null until chosen.
+          description: The house's price area; null until chosen.
         area_name:
           type: [string, 'null']
-        custom_mpg:
-          type: [number, 'null']
-          description: The owner's own gas car, in miles per gallon, beside the presets; null when there is none.
-        presets:
-          type: array
-          description: The gas cars every vehicle is compared with, in miles per gallon, lowest first.
-          items:
-            type: number
         areas:
           type: array
           description: The places EIA publishes a weekly gasoline price for.
@@ -1766,7 +1807,7 @@ components:
                 type: string
         key_saved:
           type: boolean
-          description: Whether the EIA key the prices need (saved under Carbon) is there.
+          description: Whether the EIA key the prices need (saved in the Connectors tab) is there.
         last_check:
           type: [string, 'null']
           format: date-time
@@ -1785,6 +1826,23 @@ components:
         diesel_area_name:
           type: [string, 'null']
           description: The area the diesel price is for. EIA publishes weekly diesel for the country, the regions and California only, so any other area's diesel is the price of the region it is in. Null until diesel prices have been read.
+    EvCompare:
+      description: A charging meter's comparison. It carries what the house's price area (`FuelPrices`) says, and the vehicle's own car.
+      allOf:
+        - $ref: '#/components/schemas/FuelPrices'
+        - type: object
+          required: [meter_id, custom_mpg, presets]
+          properties:
+            meter_id:
+              type: string
+            custom_mpg:
+              type: [number, 'null']
+              description: The owner's own gas car, in miles per gallon, beside the presets; null when there is none.
+            presets:
+              type: array
+              description: The gas cars every vehicle is compared with, in miles per gallon, lowest first.
+              items:
+                type: number
     EvSavings:
       type: object
       required: [meter_id, configured, area_name, diesel_area_name, comparisons, prices, diesel_prices, stretches, totals, cost_estimated]

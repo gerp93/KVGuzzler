@@ -1,14 +1,13 @@
-// The gas comparison, in the EV card's settings: the area whose gasoline price is used, and optionally a gas car of the owner's own beside the presets. The
-// presets (15 to 40 miles per gallon) are always compared; which are drawn is ticked under the chart. Saving reads the area's weekly prices from EIA at once,
-// with the key saved under Carbon.
+// The gas car comparison, in the EV card's settings: optionally a gas car of the owner's own beside the presets (15 to 40 miles per gallon, always compared; which
+// are drawn is ticked under the chart). The area whose price is used is the house's, set in the Connectors tab with the EIA key.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
 import { parseMpg, type EvCompare } from './ev';
+import { routePath } from './route';
 
 export function EvCompareSettings({ meterId, reload }: { meterId: string; reload: () => void }) {
   const [view, setView] = useState<EvCompare | undefined>();
   const [mpg, setMpg] = useState('');
-  const [area, setArea] = useState('');
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -17,7 +16,6 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
       (v) => {
         setView(v);
         setMpg(v.custom_mpg != null ? String(v.custom_mpg) : '');
-        setArea(v.area_id ?? '');
       },
       (e: Error) => setProblem(e.message),
     );
@@ -30,13 +28,9 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
       setProblem("Enter the gas car's miles per gallon, a number from 5 to 200, like 27, or leave it empty.");
       return;
     }
-    if (area === '') {
-      setProblem('Pick the area whose gasoline price to use.');
-      return;
-    }
     setSaving(true);
     try {
-      const v = await api.putEvCompare(meterId, area, custom);
+      const v = await api.putEvCompare(meterId, custom);
       setView(v);
       setMpg(v.custom_mpg != null ? String(v.custom_mpg) : '');
       setProblem('');
@@ -48,57 +42,24 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
     }
   };
 
-  const remove = async () => {
-    try {
-      await api.deleteEvCompare(meterId);
-      setView(await api.evCompare(meterId));
-      setMpg('');
-      setArea('');
-      setProblem('');
-      reload();
-    } catch (err) {
-      setProblem((err as Error).message);
-    }
-  };
-
-  const failed = view?.last_outcome != null && view.last_outcome !== 'Prices saved.';
   return (
     <>
       <h3>Gas car comparison</h3>
+      {view && (
+        <p class="caption">
+          {view.area_id == null ? 'Pick the gas price area' : `Prices for ${view.area_name}, set`} in the <a href={routePath('connectors')}>Connectors tab</a>
+          {view.area_id == null ? ' to compare with gas cars.' : '.'}
+        </p>
+      )}
       <form class="ev-form" onSubmit={(e) => void save(e)}>
-        <label class="field">
-          <span>Gas price area</span>
-          <select value={area} onChange={(e) => setArea((e.target as HTMLSelectElement).value)} required>
-            <option value="" disabled>
-              Pick an area
-            </option>
-            {(view?.areas ?? []).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <label class="field">
           <span>Your own gas car, miles per gallon (optional)</span>
           <input type="text" inputMode="decimal" value={mpg} placeholder="27" onInput={(e) => setMpg((e.target as HTMLInputElement).value)} />
         </label>
-        <button type="submit" disabled={saving}>
-          {view?.area_id != null ? 'Save' : 'Compare'}
+        <button type="submit" disabled={saving || view?.area_id == null}>
+          Save
         </button>
-        {view?.area_id != null && (
-          <button type="button" onClick={() => void remove()}>
-            Remove
-          </button>
-        )}
       </form>
-      {view && !view.key_saved && <p class="caption">The prices come from EIA and need its key: save it under Carbon.</p>}
-      {view?.last_outcome != null && (
-        <p class={`caption ${failed ? 'bad' : ''}`}>
-          {view.last_outcome}
-          {!failed && view.latest_price != null && view.latest_week != null ? ` Latest: $${Number(view.latest_price).toFixed(2)} per gallon, week of ${view.latest_week}.` : ''}
-        </p>
-      )}
       {problem && <p class="note error">{problem}</p>}
     </>
   );

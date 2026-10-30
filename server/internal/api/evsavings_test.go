@@ -304,13 +304,119 @@ func TestEachCarsCostIsWhatTheSameMilesWouldHaveCostLessWhatChargingCost(t *test
 		t.Errorf("prices = %+v", got.Prices)
 	}
 
-	// Taking the comparison off.
+	// Taking the vehicle's own car off leaves the house's area, so the comparison stands.
 	if r, _ := send(t, http.MethodDelete, base+"compare", ""); r.StatusCode != http.StatusNoContent {
 		t.Errorf("delete compare: %d", r.StatusCode)
 	}
 	get(t, base+"savings", &got)
+	if !got.Configured || got.Totals == nil {
+		t.Errorf("savings after taking the car off = %+v", got)
+	}
+	// Taking the house's area off takes every comparison off.
+	fuel := strings.TrimSuffix(base, "/meters/"+f.meter+"/ev/") + "/fuel-prices"
+	if r, _ := send(t, http.MethodDelete, fuel, ""); r.StatusCode != http.StatusNoContent {
+		t.Errorf("delete fuel prices: %d", r.StatusCode)
+	}
+	get(t, base+"savings", &got)
 	if got.Configured || got.Totals != nil || len(got.Comparisons) != 0 {
-		t.Errorf("savings after taking the comparison off = %+v", got)
+		t.Errorf("savings after taking the area off = %+v", got)
+	}
+}
+
+func TestTheGasAreaIsTheHousesAndEveryVehicleUsesIt(t *testing.T) {
+	f := newFordTest(t)
+	asked, base := f.gasSetup(t, true)
+	fuel := f.srv.URL + "/api/v1/fuel-prices"
+
+	// No area yet: the places to choose from and the key are known, and a vehicle's own car cannot be saved before there is somewhere to price it.
+	var v compareBody
+	get(t, fuel, &v)
+	if v.AreaID != nil || !v.KeySaved || len(v.Areas) < 20 {
+		t.Fatalf("fuel prices before setup = %+v", v)
+	}
+	if r, _ := send(t, http.MethodPut, base+"compare", `{"custom_mpg":27.5}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("a car with no area: %d, want 400", r.StatusCode)
+	}
+	for name, body := range map[string]string{"unknown area": `{"area_id":"ZZ"}`, "no area": `{}`, "an extra field": `{"area_id":"SMN","mpg":25}`} {
+		if r, _ := send(t, http.MethodPut, fuel, body); r.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: %d, want 400", name, r.StatusCode)
+		}
+	}
+	if len(*asked) != 0 {
+		t.Errorf("EIA was asked for a refused area: %v", *asked)
+	}
+
+	// Saving the area reads its prices of both fuels at once, and the vehicle sees the area without being told.
+	r, body := send(t, http.MethodPut, fuel, `{"area_id":"SMN"}`)
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("fuel prices: %d %s", r.StatusCode, body)
+	}
+	_ = json.Unmarshal([]byte(body), &v)
+	if v.AreaName == nil || *v.AreaName != "Minnesota" || v.LatestPrice == nil || *v.LatestPrice != "4.50" || v.LatestDieselPrice == nil || *v.LatestDieselPrice != "5.20" {
+		t.Errorf("fuel prices after setup = %s", body)
+	}
+	if len(*asked) != 2 {
+		t.Errorf("EIA was asked %v, want gasoline then diesel", *asked)
+	}
+	var c compareBody
+	get(t, base+"compare", &c)
+	if c.AreaName == nil || *c.AreaName != "Minnesota" || c.LatestPrice == nil || *c.LatestPrice != "4.50" {
+		t.Errorf("the vehicle's comparison does not see the house's area: %+v", c)
+	}
+
+	// The vehicle keeps only its own car, and saving it does not touch the area or ask EIA again.
+	r, body = send(t, http.MethodPut, base+"compare", `{"custom_mpg":27.5}`)
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("own car: %d %s", r.StatusCode, body)
+	}
+	_ = json.Unmarshal([]byte(body), &c)
+	if c.CustomMPG == nil || *c.CustomMPG != 27.5 || c.AreaName == nil || *c.AreaName != "Minnesota" {
+		t.Errorf("own car = %s", body)
+	}
+	if len(*asked) != 2 {
+		t.Errorf("EIA was asked again for a car: %v", *asked)
+	}
+
+	// An area chosen again replaces it for the house, whatever the vehicle did.
+	if r, body := send(t, http.MethodPut, fuel, `{"area_id":"NUS"}`); r.StatusCode != http.StatusOK {
+		t.Fatalf("another area: %d %s", r.StatusCode, body)
+	}
+	get(t, base+"compare", &c)
+	if c.AreaID == nil || *c.AreaID != "NUS" || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+		t.Errorf("after another area = %+v", c)
+	}
+
+	// Taking the area off keeps the car for when there is an area again.
+	if r, _ := send(t, http.MethodDelete, fuel, ""); r.StatusCode != http.StatusNoContent {
+		t.Errorf("delete: %d", r.StatusCode)
+	}
+	get(t, fuel, &v)
+	get(t, base+"compare", &c)
+	if v.AreaID != nil || c.AreaID != nil || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+		t.Errorf("after taking the area off = %+v / %+v", v, c)
+	}
+}
+
+func TestAnAreaFromAnOlderVehicleSetupIsTheHousesUntilOneIsSaved(t *testing.T) {
+	f := newFordTest(t)
+	_, base := f.gasSetup(t, true)
+	if err := f.st.SetMeta(context.Background(), evCompareKey+f.meter, `{"area_id":"SMN","custom_mpg":27.5}`); err != nil {
+		t.Fatal(err)
+	}
+	fuel := f.srv.URL + "/api/v1/fuel-prices"
+	var v compareBody
+	get(t, fuel, &v)
+	if v.AreaName == nil || *v.AreaName != "Minnesota" {
+		t.Errorf("the house's area from the older setup = %+v", v)
+	}
+	// Taking the area off takes it off the older setup too, or it would come back.
+	if r, _ := send(t, http.MethodDelete, fuel, ""); r.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete: %d", r.StatusCode)
+	}
+	var c compareBody
+	get(t, base+"compare", &c)
+	if c.AreaID != nil || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+		t.Errorf("after taking the older area off = %+v", c)
 	}
 }
 

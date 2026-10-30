@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { AddPanel } from './AddPanel';
 import { api } from './api';
 import { usePoll } from './hooks';
 import type { Device, Meter } from './lib';
@@ -116,8 +117,10 @@ function DeviceRow({ device, onChanged }: { device: Device; onChanged: () => voi
   );
 }
 
+/** The devices the server polls, in the Connectors tab: each with its address and whether it answers. Adding one is also in the Hierarchy tab. */
 export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
+  const [adding, setAdding] = useState(false);
   const { data: devices, error } = usePoll<Device[]>(api.devices, 5000, [meters.length, rev]);
   const refresh = () => {
     setRev((n) => n + 1);
@@ -125,8 +128,23 @@ export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged:
   };
 
   return (
-    <section class="card wide">
-      <h2>Devices</h2>
+    <section class="card page-narrow">
+      <div class="card-head">
+        <h2>Devices</h2>
+        <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+          ＋ Add
+        </button>
+      </div>
+      {adding && (
+        <AddPanel
+          kinds={['plug', 'refoss']}
+          onAdded={() => {
+            setAdding(false);
+            refresh();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
       {error && <p class="note">{error.message}</p>}
       {devices && devices.length === 0 && <p class="note">No devices yet.</p>}
       {devices && devices.length > 0 && (

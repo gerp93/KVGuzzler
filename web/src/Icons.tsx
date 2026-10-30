@@ -34,6 +34,13 @@ const ICONS = {
       <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-5 6-8 10-10" />
     </Svg>
   ),
+  connectors: (
+    <Svg>
+      <rect x="3" y="9" width="7" height="6" rx="1.5" />
+      <rect x="14" y="9" width="7" height="6" rx="1.5" />
+      <path d="M10 12h4" />
+    </Svg>
+  ),
   settings: (
     <Svg>
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />

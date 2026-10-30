@@ -177,23 +177,52 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The gasoline price area a charging meter's vehicle is compared in, and the owner's own gas car if there is one.
+         * The house's gasoline price area as a charging meter's vehicle is compared in it, and the owner's own gas car if there is one.
          * @description The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in gasoline cars: the `presets` (15 to 40 miles
          *     per gallon) and, if the owner named one, `custom_mpg`. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
-         *     for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). Which of the gas cars a page
-         *     draws is the page's own choice; every one is answered. 409 when the meter is not marked `ev`.
+         *     for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). The area is the house's
+         *     (`/api/v1/fuel-prices`), the same for every vehicle; only the own car is the vehicle's. Which of the gas cars a page draws is the page's own choice;
+         *     every one is answered. 409 when the meter is not marked `ev`.
          */
         get: operations["getEvCompare"];
         /**
-         * Save the price area and the owner's own gas car, and read the area's prices now.
-         * @description The area alone is enough: the presets are always compared. The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable):
-         *     `last_outcome` says what happened and the server tries again. A `custom_mpg` that is one of the presets is not a second comparison. 400 for a miles
-         *     per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg` included).
+         * Save the owner's own gas car.
+         * @description The presets are always compared; this adds one more. A `custom_mpg` that is one of the presets is not a second comparison. The price area is the house's
+         *     (`PUT /api/v1/fuel-prices`): it must already be saved, or be named here as `area_id`, which saves it for the house and reads its prices now, as that
+         *     call does. 400 for no area anywhere, a miles per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg`
+         *     included).
          */
         put: operations["putEvCompare"];
         post?: never;
-        /** Take the comparison off (the saved prices are kept). */
+        /** Take the owner's own gas car off (the house's area and the saved prices are kept). */
         delete: operations["deleteEvCompare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fuel-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The house's price area for gasoline and diesel, and what was read for it.
+         * @description Where the house is, as far as fuel prices go: one area for every vehicle. The weekly prices are EIA's, read with the EIA key saved for the carbon
+         *     footprint (`key_saved`). `area_id` is null until chosen.
+         */
+        get: operations["getFuelPrices"];
+        /**
+         * Save the house's price area, and read its prices now.
+         * @description The area is kept even when the prices cannot be read (no EIA key yet, EIA not reachable): `last_outcome` says what happened and the server tries again.
+         *     400 for an area EIA has no price for or any other member.
+         */
+        put: operations["putFuelPrices"];
+        post?: never;
+        /** Take the area off, and with it every gas comparison (the prices already read are kept). */
+        delete: operations["deleteFuelPrices"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1169,21 +1198,16 @@ export interface components {
             /** @description The battery's usable energy in kWh; null until the owner sets it. */
             kwh: number | null;
         };
-        EvCompare: {
-            meter_id: string;
-            /** @description The gasoline price area; null until chosen. */
+        FuelPrices: {
+            /** @description The house's price area; null until chosen. */
             area_id: string | null;
             area_name: string | null;
-            /** @description The owner's own gas car, in miles per gallon, beside the presets; null when there is none. */
-            custom_mpg: number | null;
-            /** @description The gas cars every vehicle is compared with, in miles per gallon, lowest first. */
-            presets: number[];
             /** @description The places EIA publishes a weekly gasoline price for. */
             areas: {
                 id: string;
                 name: string;
             }[];
-            /** @description Whether the EIA key the prices need (saved under Carbon) is there. */
+            /** @description Whether the EIA key the prices need (saved in the Connectors tab) is there. */
             key_saved: boolean;
             /** Format: date-time */
             last_check: string | null;
@@ -1197,6 +1221,14 @@ export interface components {
             latest_diesel_price: string | null;
             /** @description The area the diesel price is for. EIA publishes weekly diesel for the country, the regions and California only, so any other area's diesel is the price of the region it is in. Null until diesel prices have been read. */
             diesel_area_name: string | null;
+        };
+        /** @description A charging meter's comparison. It carries what the house's price area (`FuelPrices`) says, and the vehicle's own car. */
+        EvCompare: components["schemas"]["FuelPrices"] & {
+            meter_id: string;
+            /** @description The owner's own gas car, in miles per gallon, beside the presets; null when there is none. */
+            custom_mpg: number | null;
+            /** @description The gas cars every vehicle is compared with, in miles per gallon, lowest first. */
+            presets: number[];
         };
         EvSavings: {
             meter_id: string;
@@ -2512,8 +2544,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description One of the `areas` ids. */
-                    area_id: string;
+                    /** @description One of the `areas` ids. Optional; saves the house's area. */
+                    area_id?: string;
                     custom_mpg?: number | null;
                 };
             };
@@ -2553,6 +2585,72 @@ export interface operations {
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getFuelPrices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FuelPrices"];
+                };
+            };
+        };
+    };
+    putFuelPrices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description One of the `areas` ids. */
+                    area_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FuelPrices"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    deleteFuelPrices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getEvBattery: {
