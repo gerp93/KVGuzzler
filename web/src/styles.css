@@ -2125,26 +2125,19 @@ main > * {
     text-align: left;
   }
 
-  /* Settings and Help: forms and prose in columns of a readable width, centred */
-  main.page-settings,
+  /* Help: prose in columns of a readable width, centred (Settings is one centred column like Connectors) */
   main.page-help {
     justify-content: center;
-  }
-
-  main.page-settings {
-    grid-template-columns: repeat(3, minmax(0, 34rem));
   }
 
   main.page-help {
     grid-template-columns: repeat(2, minmax(0, 40rem));
   }
 
-  main.page-settings > *,
   main.page-help > * {
     grid-column: auto;
   }
 
-  main.page-settings > .page-narrow,
   main.page-help > .page-narrow {
     grid-column: 1 / -1;
   }

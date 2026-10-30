@@ -102,20 +102,24 @@ export function RatesCard() {
         />
       </label>
 
-      <label class="field">
-        <span>{cfg.mode === 'bills' ? `Rate for days before the first bill (${currencySymbol(cfg.currency).trim()} per kWh)` : cfg.mode === 'lookup' ? `Rate to use until a published rate is chosen (${currencySymbol(cfg.currency).trim()} per kWh)` : `Rate (${currencySymbol(cfg.currency).trim()} per kWh)`}</span>
-        <input
-          inputMode="decimal"
-          placeholder="0.15"
-          value={cfg.fixed_rate ?? ''}
-          onInput={(e) => {
-            const v = (e.target as HTMLInputElement).value.trim();
-            const { fixed_rate: _drop, ...rest } = cfg;
-            change(v ? { ...rest, fixed_rate: v } : rest);
-          }}
-        />
-      </label>
-      {looksLikeCents && <p class="note">Over 1.00 per kWh. Did you enter cents? 15¢ is 0.15.</p>}
+      {cfg.mode === 'one' && (
+        <>
+          <label class="field">
+            <span>{`Rate (${currencySymbol(cfg.currency).trim()} per kWh)`}</span>
+            <input
+              inputMode="decimal"
+              placeholder="0.15"
+              value={cfg.fixed_rate ?? ''}
+              onInput={(e) => {
+                const v = (e.target as HTMLInputElement).value.trim();
+                const { fixed_rate: _drop, ...rest } = cfg;
+                change(v ? { ...rest, fixed_rate: v } : rest);
+              }}
+            />
+          </label>
+          {looksLikeCents && <p class="note">Over 1.00 per kWh. Did you enter cents? 15¢ is 0.15.</p>}
+        </>
+      )}
 
       {cfg.mode === 'bills' && (
         <>
