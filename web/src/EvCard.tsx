@@ -91,7 +91,12 @@ export function EvCard({ meter }: { meter: Meter }) {
   const readings = data?.readings ?? [];
   const latest = readings[readings.length - 1];
   const sync = syncLine(ford);
-  const openSettings = () => setOpen(true);
+  // The settings are a panel at the foot of the card; the buttons elsewhere that ask for one setting open it and scroll to it.
+  const panel = useRef<HTMLDetailsElement>(null);
+  const openSettings = () => {
+    setOpen(true);
+    setTimeout(() => panel.current?.scrollIntoView({ block: 'start' }), 50);
+  };
   // A car with no odometer reading and no charge yet has nothing to lay out: it is asked to be connected instead.
   const hasContent = readings.length > 0 || (charges?.charges.length ?? 0) > 0;
 
@@ -115,9 +120,6 @@ export function EvCard({ meter }: { meter: Meter }) {
               <span class="caption">as of {dayLabel(latest.day)}</span>
             </div>
           )}
-          <button type="button" class="ev-toggle" aria-expanded={open} aria-controls="ev-settings" onClick={() => setOpen(!open)}>
-            Settings
-          </button>
         </div>
       </header>
       {error && !data && <p class="note error">{error.message}</p>}
@@ -153,11 +155,16 @@ export function EvCard({ meter }: { meter: Meter }) {
               {charges && <EvChargeList data={charges} onRemove={removeCharge} problem={problem} onOpenSettings={openSettings} />}
             </div>
           </div>
-          <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} battery={charges?.battery_kwh != null} />
         </>
       )}
 
-      {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
+      <div class="ev-foot">
+        {data && hasContent && <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} battery={charges?.battery_kwh != null} />}
+        <details class="ev-panel" ref={panel} open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary>Vehicle settings</summary>
+          {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
+        </details>
+      </div>
       {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}
     </section>
   );

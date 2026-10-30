@@ -167,12 +167,20 @@ export function Chart({
                 while (last >= 0 && ys[last] == null) last--;
                 if (last < 0) return;
                 const base = css(l.colorVar);
-                labels.push({ text: l.name, color: l.alpha != null ? (withAlpha(base, Math.max(l.alpha, 0.7)) ?? base) : base, x: u.valToPos(xs[last] as number, 'x', true), y: u.valToPos(ys[last] as number, 'y', true) });
+                // Where the line ends, in canvas pixels: worked out from the plot's own box and scales, so the name always starts just past the end of its line.
+                const sx = u.scales.x;
+                const sy = u.scales.y;
+                if (!sx || !sy || sx.min == null || sx.max == null || sy.min == null || sy.max == null) return;
+                const px = u.bbox.left + (((xs[last] as number) - sx.min) / (sx.max - sx.min)) * u.bbox.width;
+                const py = u.bbox.top + (1 - ((ys[last] as number) - sy.min) / (sy.max - sy.min)) * u.bbox.height;
+                labels.push({ text: l.name, color: l.alpha != null ? (withAlpha(base, Math.max(l.alpha, 0.7)) ?? base) : base, x: px, y: py });
               });
               labels.sort((a, b) => a.y - b.y);
               for (let k = 1; k < labels.length; k++) labels[k]!.y = Math.max(labels[k]!.y, labels[k - 1]!.y + size * 1.3);
               ctx.save();
               ctx.font = `${size}px system-ui, sans-serif`;
+              // uPlot leaves the alignment as the y axis set it (right), which would put each name over the end of its line.
+              ctx.textAlign = 'left';
               ctx.textBaseline = 'middle';
               for (const lab of labels) {
                 ctx.fillStyle = lab.color;
