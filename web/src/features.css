@@ -518,17 +518,29 @@ button.link {
   font-size: clamp(1.15rem, 1.7vw, 1.5rem);
 }
 
-/* How it is all counted, in one closed note at the foot of the card */
-.ev-notes {
+/* The foot of the card: how it is all counted and the vehicle's settings, each a closed panel with a heading line */
+.ev-foot {
   margin-top: 24px;
-  padding-top: 12px;
   border-top: 1px solid var(--color-border);
-  font-size: 0.85rem;
-  color: var(--muted);
 }
 
-.ev-notes summary {
+.ev-foot details {
+  padding: 10px 0;
+}
+
+.ev-foot details + details {
+  border-top: 1px solid var(--color-border);
+}
+
+.ev-foot summary {
   cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.ev-notes {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .ev-notes ul {
@@ -604,10 +616,6 @@ main.page-hierarchy-meter > .card.ev {
   background: var(--color-accent-red);
 }
 
-.ev-toggle[aria-expanded='true'] {
-  background: var(--color-bg-hover);
-}
-
 .ev-empty {
   margin-top: 12px;
 }
@@ -620,14 +628,12 @@ main.page-hierarchy-meter > .card.ev {
   margin-top: 8px;
 }
 
-/* The drawer behind Settings: the display choice and typed readings on one side, the Ford connection on the other */
+/* The vehicle's settings panel: the display choice and typed readings, the battery and the gas comparison, and the Ford connection, side by side when there is room */
 .ev-settings {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   gap: 16px 32px;
-  margin-top: 16px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border);
+  margin-top: 8px;
 }
 
 .ev-set h3 {
