@@ -97,7 +97,7 @@ describe('trendTabs', () => {
     const ids = (t: ReturnType<typeof trendTabs>) => t.map((x) => x.id);
     expect(ids(trendTabs({ ev: ev([]), savings: undefined, charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
     expect(ids(trendTabs({ ev: ev([]), savings: savings({ configured: false }), charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
-    expect(ids(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toEqual(['versus', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
+    expect(ids(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toEqual(['versus', 'permile', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
   });
 
   it('draws a line for each gas car beside charging, each added up from zero', () => {
@@ -144,6 +144,34 @@ describe('trendTabs', () => {
       unit: 'miles',
     }).find((t) => t.id === 'saved')!;
     expect(below.lines[1]!.y[1]).toBe(-5);
+  });
+
+  it('sets charging against each gas car as the cost of a mile, charging first', () => {
+    const totals: EvSavings['totals'] = {
+      stretches: 2,
+      miles: 200,
+      ev_cost: '4.00',
+      ev_cost_per_mile: '0.020000',
+      gas: [
+        { mpg: 20, gallons: 10, gas_cost: '40.00', savings: '36.00', gas_cost_per_mile: '0.200000' },
+        { mpg: 40, gallons: 5, gas_cost: '20.00', savings: '16.00', gas_cost_per_mile: '0.100000' },
+      ],
+    };
+    const tab = (hidden?: number[], unit: 'miles' | 'km' = 'miles') => trendTabs({ ev: ev([]), savings: savings({ totals }), charges: undefined, unit, hidden }).find((t) => t.id === 'permile')!;
+    expect(tab().bars!.map((b) => [b.label, b.value])).toEqual([['Charging', 0.02], ['20 mpg', 0.2], ['40 mpg', 0.1]]);
+    expect(tab().bars![0]!.text).toBe('$0.020/mi');
+    expect(tabReady(tab())).toBe(true);
+    expect(tab().picks).toBe(true);
+    // Only the gas cars ticked, and per kilometer with that unit.
+    expect(tab([20]).bars!.map((b) => b.label)).toEqual(['Charging', '40 mpg']);
+    expect(tab(undefined, 'km').bars![1]!.value).toBeCloseTo(0.2 / 1.609344, 9);
+    expect(tab(undefined, 'km').title).toContain('kilometer');
+    // With no gas car ticked, or no stretch to count, it waits.
+    expect(tabReady(tab([20, 40]))).toBe(false);
+    expect(tab([20, 40]).waiting).toContain('Tick a gas car');
+    const none = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'permile')!;
+    expect(tabReady(none)).toBe(false);
+    expect(none.waiting).toContain('two odometer readings');
   });
 
   it('draws nothing from a week of readings that is not a week yet, and says how far along it is', () => {

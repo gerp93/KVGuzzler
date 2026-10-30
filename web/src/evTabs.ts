@@ -1,10 +1,10 @@
 // The charts of the EV card as tabs of one panel: each is one or more series over time, with the words that say what it is and, while it has too few points to
 // draw, what it is waiting for. Pure, so the choice of tabs and their points is tested apart from the drawing.
-import { efficiencyTrend, gasPriceSeries, inUnit, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
+import { efficiencyTrend, gasPriceSeries, inUnit, KM_PER_MILE, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
 import { cumulativeCosts, gasLineStyle, visibleComparisons } from './evGas';
-import { formatMoney } from './lib';
+import { formatMoney, formatPerMile } from './lib';
 
-export type TabId = 'versus' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
+export type TabId = 'versus' | 'permile' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
 
 /** One line of a tab: its points are the tab's `x`, one value each. */
 export interface TabLine {
@@ -19,6 +19,18 @@ export interface TabLine {
   fill?: boolean;
 }
 
+/** One bar of a tab that compares figures instead of drawing a line over time. */
+export interface TabBar {
+  label: string;
+  /** The figure the bar's length stands for. */
+  value: number;
+  /** A theme custom property for the bar. */
+  colorVar: string;
+  alpha?: number;
+  /** The figure in words, at the bar's end. */
+  text: string;
+}
+
 export interface TrendTab {
   id: TabId;
   /** The tab's name. */
@@ -30,6 +42,8 @@ export interface TrendTab {
   lines: TabLine[];
   /** The span the chart covers: a little more than its points. Null while there are none. */
   domain: [number, number] | null;
+  /** Bars in place of a chart, for a tab that sets figures side by side (a cost per mile): the tab is ready with two of them. */
+  bars?: TabBar[];
   /** Each line is named at its right end instead of in a key (for lines read against each other). */
   endLabels: boolean;
   /** The gas cars to draw can be ticked under this chart. */
@@ -43,7 +57,7 @@ export interface TrendTab {
 /** A line needs two points. */
 export const MIN_POINTS = 2;
 
-export const tabReady = (t: TrendTab): boolean => t.x.length >= MIN_POINTS && t.lines.length > 0;
+export const tabReady = (t: TrendTab): boolean => (t.bars ? t.bars.length >= MIN_POINTS : t.x.length >= MIN_POINTS && t.lines.length > 0);
 
 const DAY_S = 86_400;
 
@@ -92,6 +106,31 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       endLabels: true,
       picks: true,
       format: axisDollars,
+      waiting,
+    });
+    // What a mile costs: charging against each gas car, which needs no history to be worth looking at.
+    const mile = unit === 'km' ? 'kilometer' : 'mile';
+    const perUnit = (perMile: number): number => (unit === 'km' ? perMile / KM_PER_MILE : perMile);
+    const totals = savings.totals;
+    const bars: TabBar[] = [];
+    if (!none && totals?.ev_cost_per_mile != null) {
+      bars.push({ label: 'Charging', value: perUnit(Number(totals.ev_cost_per_mile)), colorVar: '--color-accent-green', text: formatPerMile(totals.ev_cost_per_mile, false, unit) });
+      for (const c of shown) {
+        const g = totals.gas.find((e) => e.mpg === c.mpg);
+        if (g?.gas_cost_per_mile == null) continue;
+        const { colorVar, alpha } = gasLineStyle(c, savings.comparisons);
+        bars.push({ label: `${c.mpg} mpg`, value: perUnit(Number(g.gas_cost_per_mile)), colorVar, alpha, text: formatPerMile(g.gas_cost_per_mile, false, unit) });
+      }
+    }
+    make({
+      id: 'permile',
+      label: 'Cost per mile',
+      title: `What a ${mile} costs: charging against each gas car`,
+      x: [],
+      lines: [],
+      bars,
+      picks: true,
+      format: axisCents,
       waiting,
     });
     make({

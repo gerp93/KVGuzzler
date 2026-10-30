@@ -476,6 +476,47 @@ button.link {
   border-color: var(--color-accent-green);
 }
 
+/* Figures set side by side as bars (the cost of a mile): the label, a bar as long as the figure against the longest, the figure */
+.ev-bars {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-bar {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 6.5rem;
+  align-items: center;
+  gap: 12px;
+}
+
+.ev-bar-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.ev-bar-track {
+  height: 18px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+
+.ev-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 4px;
+}
+
+.ev-bar-value {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 /* The gas cars to compare with, ticked under the chart: each with the look of its line */
 .ev-picks {
   display: flex;
