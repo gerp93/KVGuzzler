@@ -50,6 +50,10 @@ export interface TrendTab {
   picks: boolean;
   /** Writes a value on the vertical axis. One function per tab, so the chart is not rebuilt on every render. */
   format: (v: number) => string;
+  /** What the vertical axis measures, written up its side. */
+  yLabel: string;
+  /** What each point along the horizontal axis stands for, written under it. */
+  xLabel: string;
   /** What the tab is waiting for, said in place of a chart that has too few points. */
   waiting: string;
 }
@@ -106,6 +110,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       endLabels: true,
       picks: true,
       format: axisDollars,
+      yLabel: 'Total cost, dollars',
+      xLabel: 'Date of odometer reading',
       waiting,
     });
     // What a mile costs: charging against each gas car, which needs no history to be worth looking at.
@@ -131,6 +137,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       bars,
       picks: true,
       format: axisCents,
+      yLabel: `Cost per ${mile}, dollars`,
+      xLabel: '',
       waiting,
     });
     make({
@@ -142,6 +150,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       endLabels: true,
       picks: true,
       format: axisDollars,
+      yLabel: 'Saved vs gas car, dollars',
+      xLabel: 'Date of odometer reading',
       waiting,
     });
   }
@@ -156,6 +166,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     x: eff.map((p) => p.x),
     lines: [{ name: 'Efficiency', colorVar: '--color-primary-action', y: eff.map((p) => inUnit(p.milesPerKwh ?? 0, unit)) }],
     format: axisNumber,
+    yLabel: `${unit === 'km' ? 'Kilometers' : 'Miles'} per kWh`,
+    xLabel: 'Week ending',
     waiting: weekWaiting,
   });
   const cost = trend.filter((p) => p.windowCost != null);
@@ -166,6 +178,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     x: cost.map((p) => p.x),
     lines: [{ name: 'Charging cost', colorVar: '--color-accent-blue', y: cost.map((p) => p.windowCost ?? 0) }],
     format: axisWeekCost,
+    yLabel: 'Charging cost per week, dollars',
+    xLabel: 'Week ending',
     waiting: weekWaiting,
   });
 
@@ -179,6 +193,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     x: settled.map((c) => seconds(c.ended_at ?? c.started_at)),
     lines: [{ name: 'Per charge', colorVar: '--color-accent-muted', y: settled.map((c) => (byEfficiency ? (c.efficiency ?? 0) * 100 : (c.kwh_per_pct ?? 0))) }],
     format: byEfficiency ? axisPercent : axisPerPct,
+    yLabel: byEfficiency ? 'Efficiency, percent' : 'kWh per percent gained',
+    xLabel: 'Date the charge ended',
     waiting: "Needs two charges that have the car's battery reading at both ends.",
   });
 
@@ -191,6 +207,8 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
       x: price.x,
       lines: [{ name: 'Gas price', colorVar: '--color-accent-blue', y: price.y }],
       format: axisCents,
+      yLabel: 'Price per gallon, dollars',
+      xLabel: 'Week of',
       waiting: 'No gas prices yet: they come from EIA with the key saved under Carbon, and are read when the comparison is saved and twice a day.',
     });
   }
