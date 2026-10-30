@@ -1,10 +1,10 @@
-// The "+ Add" panel of the Hierarchy tab: a new Shelly plug, a Refoss monitor, a computer or an appliance group. What is added shows up in the
-// tree, and is edited there (the arrow on its row), so nothing about setting it up lives in Settings. The server reads a device once before it
-// keeps it, and only ever reads: it cannot switch a plug or change a monitor.
+// The "+ Add" panel: a new Shelly plug, a Refoss monitor, a computer or an appliance group (the Hierarchy tab offers all four; the Connectors tab only the two
+// devices). What is added shows up in the tree, and is edited there (the arrow on its row), so nothing about setting it up lives in Settings. The server reads a
+// device once before it keeps it, and only ever reads: it cannot switch a plug or change a monitor.
 import { useState } from 'preact/hooks';
 import { api } from './api';
 
-type Kind = 'plug' | 'refoss' | 'computer' | 'group';
+export type Kind = 'plug' | 'refoss' | 'computer' | 'group';
 
 const KINDS: { id: Kind; label: string }[] = [
   { id: 'plug', label: 'Shelly plug' },
@@ -13,8 +13,8 @@ const KINDS: { id: Kind; label: string }[] = [
   { id: 'group', label: 'Appliance group' },
 ];
 
-export function AddPanel({ onAdded, onCancel }: { onAdded: () => void; onCancel: () => void }) {
-  const [kind, setKind] = useState<Kind>('plug');
+export function AddPanel({ onAdded, onCancel, kinds = ['plug', 'refoss', 'computer', 'group'] }: { onAdded: () => void; onCancel: () => void; kinds?: Kind[] }) {
+  const [kind, setKind] = useState<Kind>(kinds[0] ?? 'plug');
   const [host, setHost] = useState('');
   const [name, setName] = useState('');
   const [isPc, setIsPc] = useState(false);
@@ -50,9 +50,9 @@ export function AddPanel({ onAdded, onCancel }: { onAdded: () => void; onCancel:
 
   return (
     <fieldset class="device-form add-panel">
-      <legend>Add to the hierarchy</legend>
+      <legend>{kinds.includes('group') ? 'Add to the hierarchy' : 'Add a device'}</legend>
       <div class="chips" role="group" aria-label="What to add">
-        {KINDS.map((k) => (
+        {KINDS.filter((k) => kinds.includes(k.id)).map((k) => (
           <button key={k.id} type="button" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
             {k.label}
           </button>

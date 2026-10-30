@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks';
 import { batteryText, lowCoverage, pctNote, percentText, perPct, whenText, type EvChargesAnswer } from './ev';
 import { lossTitle } from './evLoss';
 import { formatDuration, formatMoney } from './lib';
+import { routePath } from './route';
 import { Kwh } from './Watts';
 
 /** How many charges are listed before "Show all". */
@@ -105,7 +106,7 @@ export function EvChargeList({ data, onRemove, problem, onOpenSettings }: { data
         </button>
       )}
       {problem && <p class="note error">{problem}</p>}
-      {!data.car_linked && <p class="caption">The battery figures need the car linked to Ford, from Settings.</p>}
+      {!data.car_linked && <p class="caption">The battery figures need the car linked to Ford, in the <a href={routePath('connectors')}>Connectors tab</a>.</p>}
     </section>
   );
 }

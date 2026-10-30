@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordProbe, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordProbe, FuelPrices, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
@@ -68,12 +68,16 @@ export const api = {
     }),
   deleteEvBattery: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/battery`, { method: 'DELETE' }),
   /** The gas car a charging meter's vehicle is compared with, and the gasoline price area. */
+  fuelPrices: () => request<FuelPrices>('api/v1/fuel-prices'),
+  setFuelArea: (areaId: string) =>
+    request<FuelPrices>('api/v1/fuel-prices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area_id: areaId }) }),
+  removeFuelArea: () => request<void>('api/v1/fuel-prices', { method: 'DELETE' }),
   evCompare: (meterId: string) => request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`),
-  putEvCompare: (meterId: string, areaId: string, customMpg: number | null) =>
+  putEvCompare: (meterId: string, customMpg: number | null) =>
     request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ area_id: areaId, custom_mpg: customMpg }),
+      body: JSON.stringify({ custom_mpg: customMpg }),
     }),
   deleteEvCompare: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, { method: 'DELETE' }),
   /** What each stretch between odometer readings would have cost in the gas car, against what charging cost. */

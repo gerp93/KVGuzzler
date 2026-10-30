@@ -1,14 +1,12 @@
 // What is set up once and rarely touched on a charging meter's vehicle card, behind its Settings button: how distances are shown, the odometer
-// readings (typed by hand, or kept by the Ford connection), and the Ford connection itself.
+// readings (typed by hand, or kept by the Ford connection), the battery and the gas cars compared with. The Ford connection itself is in the Connectors tab.
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, parseMiles, toMiles, today, type DistanceUnit, type MeterEv } from './ev';
 import { EvBatterySettings } from './EvBatterySettings';
 import { EvCompareSettings } from './EvCompareSettings';
-import { FordConnection } from './FordConnection';
-import type { SetupStep } from './FordSetup';
 import { useDistanceUnit } from './hooks';
-import type { FordLink, Meter } from './lib';
+import type { Meter } from './lib';
 
 const UNITS: { value: DistanceUnit; label: string }[] = [
   { value: 'miles', label: 'Miles' },
@@ -18,19 +16,11 @@ const UNITS: { value: DistanceUnit; label: string }[] = [
 export function EvSettings({
   meter,
   data,
-  ford,
   reload,
-  waitLeft,
-  wait,
-  onSetup,
 }: {
   meter: Meter;
   data: MeterEv | undefined;
-  ford: FordLink | undefined;
   reload: () => void;
-  waitLeft: number;
-  wait: (seconds: number) => void;
-  onSetup: (step: SetupStep) => void;
 }) {
   const [unit, setUnit] = useDistanceUnit();
   const [day, setDay] = useState(today());
@@ -117,11 +107,6 @@ export function EvSettings({
       <section class="ev-set">
         <EvBatterySettings meterId={meter.id} reload={reload} />
         <EvCompareSettings meterId={meter.id} reload={reload} />
-      </section>
-
-      <section class="ev-set">
-        <h3>Ford connection</h3>
-        <FordConnection cfg={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={onSetup} />
       </section>
     </div>
   );

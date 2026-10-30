@@ -199,7 +199,7 @@ export function FordSetup({
               )}
             </p>
             <p class="caption">
-              Next, open Check all Ford data in the settings to see whether the battery and charging fields come through. Ford allows one look every 30
+              Next, open Check all Ford data under the Ford connection to see whether the battery and charging fields come through. Ford allows one look every 30
               seconds, so it is ready in a moment.
             </p>
           </>

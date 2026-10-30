@@ -1,7 +1,7 @@
 // The card on a charging meter's page, laid out as the questions it answers: a header (is the car being read, and its odometer), four headline tiles (what driving
 // it saved, what a mile costs, how efficiently it uses energy, how much of the wall's energy reaches the battery), then the charts as one tabbed panel with the
 // stretches between odometer readings under it, and the charges as a list beside them. What is set once (the unit, typed readings, the battery's size, the gas car,
-// the Ford connection) is behind the Settings button; how everything is counted is in one note at the foot. The sums are the server's; the pieces only show them.
+// the gas cars) is behind the Settings button; how everything is counted is in one note at the foot. The sums are the server's; the pieces only show them.
 import { useMemo, useRef, useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, whenText, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
@@ -13,10 +13,9 @@ import { EvSettings } from './EvSettings';
 import { trendTabs } from './evTabs';
 import { EvTrendPanel } from './EvTrendPanel';
 import { EvTrips } from './EvTrips';
-import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
-import { useFordWait } from './fordWait';
 import { useDistanceUnit, usePoll, useStored } from './hooks';
 import type { FordLink, Meter } from './lib';
+import { routePath } from './route';
 
 /** The old saved choice of gas cars switched off, as the choices now are saved: what the viewer had ticked stays ticked. */
 function legacyPicks(): string {
@@ -80,16 +79,12 @@ export function EvCard({ meter }: { meter: Meter }) {
   const { data: charges } = usePoll<EvChargesAnswer>(() => api.evCharges(meter.id), 30_000, [meter.id, version]);
   const [unit] = useDistanceUnit();
   const [open, setOpen] = useState(false);
-  // The step of the connecting dialog to open at, or nothing while it is closed.
-  const [setup, setSetup] = useState<SetupStep | null>(null);
   const [problem, setProblem] = useState('');
   // The cars the viewer has ticked, remembered in this browser: the gas cars are drawn unless switched off (so one named later is drawn at first), the diesel ones
   // only when switched on. What was saved before there was diesel is read as the gas cars switched off.
   const [picksText, setPicksText] = useStored('kvg.ev.fuel.picks', legacyPicks());
   const picks = parsePicks(picksText);
   const togglePickKey = (key: string) => setPicksText(JSON.stringify(togglePick(picks, key)));
-  const { waitLeft, wait } = useFordWait(ford);
-  const draft = useRef<FordDraft>({});
   const reload = () => setVersion((v) => v + 1);
 
   const tabs = useMemo(() => (data ? trendTabs({ ev: data, savings, charges, unit, picks }) : []), [data, savings, charges, unit, picksText]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -139,10 +134,10 @@ export function EvCard({ meter }: { meter: Meter }) {
       {data && !hasContent && (
         <div class="ev-empty">
           <p>No odometer reading yet.</p>
-          <p class="caption">Connect the car to Ford to keep it up to date, or type a reading, from Settings.</p>
+          <p class="caption">Connect the car to Ford to keep it up to date, or type a reading in the settings.</p>
           <div class="chips">
             {!ford?.configured && (
-              <button type="button" class="setup-primary" onClick={() => setSetup('register')}>
+              <button type="button" class="setup-primary" onClick={() => (window.location.hash = routePath('connectors'))}>
                 Connect Ford
               </button>
             )}
@@ -174,10 +169,9 @@ export function EvCard({ meter }: { meter: Meter }) {
         {data && hasContent && <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} dieselArea={savings?.diesel_area_name ?? null} battery={charges?.battery_kwh != null} />}
         <details class="ev-panel" ref={panel} open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
           <summary>Vehicle settings</summary>
-          {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
+          {open && <EvSettings meter={meter} data={data} reload={reload} />}
         </details>
       </div>
-      {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}
     </section>
   );
 }

@@ -36,6 +36,7 @@ export type TariffInfo = S['TariffInfo'];
 export type CarbonConfig = S['CarbonConfig'];
 export type CarbonSeries = S['CarbonSeries'];
 export type FordLink = S['FordLink'];
+export type FuelPrices = S['FuelPrices'];
 export type FordUpdate = S['FordUpdate'];
 export type FordLinkStart = S['FordLinkStart'];
 export type FordProbe = S['FordProbe'];

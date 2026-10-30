@@ -1,8 +1,8 @@
-// "Price from a utility's published rate". What it does, in order: you give the free OpenEI key once; you type your address or ZIP code and it lists
-// the residential rates for it; you pick the one your bill names; from then on costs are worked out from that rate. The key is saved on the server
-// (a private file, not the database), never shown again, and sent to api.openei.org only.
+// "Price from a utility's published rate". What it does, in order: the free OpenEI key is given once, in the Connectors tab; you type your address or ZIP code and
+// it lists the residential rates for it; you pick the one your bill names; from then on costs are worked out from that rate.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
+import { routePath } from './route';
 import { TARIFFS_SHOWN, filterTariffs, rateRange, sharedUtility, type TariffCandidate, type TariffInfo } from './lib';
 
 function Notes({ c, fixed = false }: { c: TariffCandidate | TariffInfo; fixed?: boolean }) {
@@ -23,7 +23,6 @@ export function TariffPicker({ current, label, onChoose }: {
   onChoose: (label: string) => void;
 }) {
   const [hasKey, setHasKey] = useState<boolean>();
-  const [key, setKey] = useState('');
   const [address, setAddress] = useState('');
   const [found, setFound] = useState<TariffCandidate[]>();
   const [filter, setFilter] = useState('');
@@ -35,16 +34,6 @@ export function TariffPicker({ current, label, onChoose }: {
   useEffect(() => {
     api.openEi().then((s) => setHasKey(s.has_key), () => setHasKey(false));
   }, []);
-
-  const saveKey = (value: string) =>
-    api.setOpenEiKey(value).then(
-      (s) => {
-        setHasKey(s.has_key);
-        setKey('');
-        setMessage(s.has_key ? 'Key saved.' : 'Key removed.');
-      },
-      (e: Error) => setMessage(e.message),
-    );
 
   const search = () => {
     setBusy(true);
@@ -92,17 +81,9 @@ export function TariffPicker({ current, label, onChoose }: {
       )}
 
       {hasKey === false && (
-        <>
-          <h3>OpenEI key</h3>
-          <p class="caption">Free key from openei.org (Utility Rate Database). Stored on the server and sent to OpenEI only.</p>
-          <label class="field">
-            <span>API key</span>
-            <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
-          </label>
-          <button type="button" disabled={key.trim().length < 8} onClick={() => void saveKey(key.trim())}>
-            Save key
-          </button>
-        </>
+        <p class="note">
+          Looking up a rate needs an OpenEI key. <a href={routePath('connectors')}>Add it in the Connectors tab</a>.
+        </p>
       )}
 
       {hasKey && searching && (
@@ -172,11 +153,6 @@ export function TariffPicker({ current, label, onChoose }: {
           <p class="caption">
             Energy charge only (price per kWh): fixed and demand charges are left out, and only the first usage tier applies. A time-of-day rate becomes one
             price per day, weighted by when the house uses power (last 60 days). Estimates; your bill is exact.
-          </p>
-          <p class="caption">
-            <button type="button" onClick={() => void saveKey('')}>
-              Remove OpenEI key
-            </button>
           </p>
         </details>
       )}

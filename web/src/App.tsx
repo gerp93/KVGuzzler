@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
+import { ConnectorsView } from './ConnectorsView';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
 import { CarbonView } from './CarbonView';
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'history', label: 'History' },
   { id: 'carbon', label: 'Carbon' },
   { id: 'hierarchy', label: 'Hierarchy' },
+  { id: 'connectors', label: 'Connectors' },
   { id: 'settings', label: 'Settings' },
   { id: 'help', label: 'Help' },
 ] as const;
@@ -118,6 +120,8 @@ export function App() {
           <CarbonView meters={meters} />
         ) : active === 'hierarchy' ? (
           <HierarchyView meters={meters} open={route.rest} onChanged={() => setRev((n) => n + 1)} />
+        ) : active === 'connectors' ? (
+          <ConnectorsView meters={meters} onChanged={() => setRev((n) => n + 1)} />
         ) : active === 'help' ? (
           <HelpView />
         ) : (

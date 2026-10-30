@@ -86,7 +86,7 @@ export function CarbonView({ meters }: { meters: Meter[] }) {
       {!whole && <p class="note">The carbon footprint is worked out from the whole house, so it needs a whole-house clamp: mark the main panel's meter as the house in the Hierarchy tab.</p>}
       {whole && grid && !grid.configured && (
         <p class="note">
-          No grid carbon data is set up, so there is no footprint to show. <a href={routePath('settings')}>Set it up in Settings</a> with a free US EIA key and your grid's code.
+          No grid carbon data is set up, so there is no footprint to show. <a href={routePath('connectors')}>Set it up in the Connectors tab</a> with a free US EIA key and your grid's code.
         </p>
       )}
       {error && <p class="note">{error.message}</p>}

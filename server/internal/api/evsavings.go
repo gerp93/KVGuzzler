@@ -14,10 +14,11 @@ import (
 )
 
 // What driving the same miles in a gasoline or a diesel car would have cost, set beside what the meter's energy cost for the electric one. Not one car but
-// several at once: the presets below for each fuel, and optionally one the owner names. The owner says which area's price to use; the weekly prices are EIA's, read
-// with the key saved for the carbon footprint. Which comparisons are drawn is the dashboard's choice (each viewer's own), so the server answers all of them.
+// several at once: the presets below for each fuel, and optionally one the owner names. The owner says which area's price to use, once for the house; the weekly
+// prices are EIA's, read with the key saved for the carbon footprint. Which comparisons are drawn is the dashboard's choice (each viewer's own), so the server answers all of them.
 const (
 	evCompareKey   = "ev_compare:" // + the meter's id
+	fuelAreaKey    = "fuel_area"   // the house's price area: where the house is, not a vehicle's
 	gasStatusKey   = "gas_status:" // + the area's code
 	gasHistory     = 3 * 365 * 24 * time.Hour
 	gasFeedEvery   = 12 * time.Hour
@@ -36,7 +37,8 @@ const (
 // evMPGPresets are the cars every electric vehicle is compared with, in miles per gallon, for each fuel: from a thirsty truck to an economy car.
 var evMPGPresets = []float64{15, 20, 25, 30, 35, 40}
 
-// evCompareSetup is what is saved for a charging meter: the price area and, if the owner named one, a car of their own (compared in each fuel).
+// evCompareSetup is what a charging meter is compared with: the house's price area and, if the owner named one, a car of their own (compared in each fuel). Only
+// the car is saved per meter; a setup saved before the area was the house's still carries its own, used while the house has none.
 type evCompareSetup struct {
 	AreaID    string   `json:"area_id"`
 	CustomMPG *float64 `json:"custom_mpg"`
@@ -45,7 +47,7 @@ type evCompareSetup struct {
 	MPG *float64 `json:"mpg,omitempty"`
 }
 
-// evCompareBody is what the owner sends to set it up.
+// evCompareBody is what the owner sends to set it up. The area is optional: it is the house's (see putFuelPrices), and naming it here saves it there.
 type evCompareBody struct {
 	AreaID    string   `json:"area_id"`
 	CustomMPG *float64 `json:"custom_mpg"`
@@ -60,14 +62,19 @@ type gasStatus struct {
 }
 
 type evCompareView struct {
-	MeterID  string  `json:"meter_id"`
-	AreaID   *string `json:"area_id"`
-	AreaName *string `json:"area_name"`
+	MeterID string `json:"meter_id"`
 	// CustomMPG is the owner's own car, beside the presets; null when there is none.
-	CustomMPG *float64        `json:"custom_mpg"`
-	Presets   []float64       `json:"presets"`
-	Areas     []gasprice.Area `json:"areas"`
-	// KeySaved says the EIA key (saved under Carbon) that the prices need is there.
+	CustomMPG *float64  `json:"custom_mpg"`
+	Presets   []float64 `json:"presets"`
+	fuelPricesView
+}
+
+// fuelPricesView is the house's price area and what was read for it: the answer of the Connectors tab, and the part of a vehicle's comparison that is the house's.
+type fuelPricesView struct {
+	AreaID   *string         `json:"area_id"`
+	AreaName *string         `json:"area_name"`
+	Areas    []gasprice.Area `json:"areas"`
+	// KeySaved says the EIA key (saved in the dashboard's Connectors tab) that the prices need is there.
 	KeySaved    bool       `json:"key_saved"`
 	LastCheck   *time.Time `json:"last_check"`
 	LastOutcome *string    `json:"last_outcome"`
@@ -185,7 +192,62 @@ func (s *Server) gasClient() *gasprice.Client {
 	return &gasprice.Client{}
 }
 
+// houseFuelArea is the price area saved for the house, or "" when there is none.
+func (s *Server) houseFuelArea(ctx context.Context) (string, error) {
+	text, ok, err := s.Store.Meta(ctx, fuelAreaKey)
+	if err != nil || !ok {
+		return "", err
+	}
+	if _, ok := gasprice.AreaName(text); !ok {
+		return "", nil
+	}
+	return text, nil
+}
+
+// fuelArea is the area the house's prices are for: the one saved for the house, else the one a setup saved before the area was the house's still names.
+func (s *Server) fuelArea(ctx context.Context) (string, error) {
+	if area, err := s.houseFuelArea(ctx); err != nil || area != "" {
+		return area, err
+	}
+	ids, err := s.Store.EVMeterIDs(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, id := range ids {
+		if c, err := s.evCompareSaved(ctx, id); err != nil {
+			return "", err
+		} else if c != nil && c.AreaID != "" {
+			return c.AreaID, nil
+		}
+	}
+	return "", nil
+}
+
+// evCompareSetup is a charging meter's comparison: its own car and the house's area. Nil until there is an area.
 func (s *Server) evCompareSetup(ctx context.Context, meterID string) (*evCompareSetup, error) {
+	saved, err := s.evCompareSaved(ctx, meterID)
+	if err != nil {
+		return nil, err
+	}
+	area, err := s.houseFuelArea(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := evCompareSetup{AreaID: area}
+	if saved != nil {
+		out.CustomMPG = saved.CustomMPG
+		if area == "" {
+			out.AreaID = saved.AreaID
+		}
+	}
+	if out.AreaID == "" {
+		return nil, nil
+	}
+	return &out, nil
+}
+
+// evCompareSaved is what is saved for one charging meter: its own car and, in a setup from before the area was the house's, an area. Nil when nothing is.
+func (s *Server) evCompareSaved(ctx context.Context, meterID string) (*evCompareSetup, error) {
 	text, ok, err := s.Store.Meta(ctx, evCompareKey+meterID)
 	if err != nil || !ok || text == "" {
 		return nil, err
@@ -195,7 +257,7 @@ func (s *Server) evCompareSetup(ctx context.Context, meterID string) (*evCompare
 		return nil, nil
 	}
 	if _, ok := gasprice.AreaName(c.AreaID); !ok {
-		return nil, nil
+		c.AreaID = ""
 	}
 	// The one gas car an older setup named becomes the custom one unless it is a preset.
 	if c.CustomMPG == nil && c.MPG != nil {
@@ -230,7 +292,7 @@ func (s *Server) refreshGas(ctx context.Context, area string) error {
 		return err
 	}
 	if cfg == nil {
-		st.Error = "The gas prices come from EIA and need its key: save it under Carbon first."
+		st.Error = "The gas prices come from EIA and need its key: add it in the Connectors tab first."
 	} else {
 		for _, fuel := range []gasprice.Product{gasprice.Gasoline, gasprice.Diesel} {
 			// EIA publishes diesel for the country, the regions and California only: another area's diesel is its region's.
@@ -287,34 +349,64 @@ func (s *Server) RunGasFeed(ctx context.Context, logf func(format string, a ...a
 			logf("gas prices: %v", err)
 			continue
 		}
-		done := map[string]bool{}
+		// The house's area first, then any a vehicle's older setup still names.
+		var areas []string
+		if area, err := s.houseFuelArea(ctx); err != nil {
+			logf("gas prices: %v", err)
+		} else if area != "" {
+			areas = append(areas, area)
+		}
 		for _, id := range ids {
-			c, err := s.evCompareSetup(ctx, id)
-			if err != nil || c == nil || done[c.AreaID] {
+			if c, err := s.evCompareSetup(ctx, id); err == nil && c != nil {
+				areas = append(areas, c.AreaID)
+			}
+		}
+		done := map[string]bool{}
+		for _, area := range areas {
+			if done[area] {
 				continue
 			}
-			done[c.AreaID] = true
-			if err := s.refreshGas(ctx, c.AreaID); err != nil && ctx.Err() == nil {
-				logf("gas prices (%s): %v", c.AreaID, err)
+			done[area] = true
+			if err := s.refreshGas(ctx, area); err != nil && ctx.Err() == nil {
+				logf("gas prices (%s): %v", area, err)
 			}
 		}
 	}
 }
 
 func (s *Server) evCompareView(ctx context.Context, meterID string) (evCompareView, error) {
-	out := evCompareView{MeterID: meterID, Areas: gasprice.Areas, Presets: evMPGPresets}
+	out := evCompareView{MeterID: meterID, Presets: evMPGPresets}
+	c, err := s.evCompareSetup(ctx, meterID)
+	if err != nil {
+		return out, err
+	}
+	area := ""
+	if c != nil {
+		area, out.CustomMPG = c.AreaID, c.CustomMPG
+	} else if saved, err := s.evCompareSaved(ctx, meterID); err != nil {
+		return out, err
+	} else if saved != nil {
+		// A car named before there was an area stays, waiting for one.
+		out.CustomMPG = saved.CustomMPG
+	}
+	out.fuelPricesView, err = s.fuelPricesFor(ctx, area)
+	return out, err
+}
+
+// fuelPricesFor is what is known about an area's prices: the places to choose from, whether the EIA key is there, and what the last read of the area said.
+func (s *Server) fuelPricesFor(ctx context.Context, area string) (fuelPricesView, error) {
+	out := fuelPricesView{Areas: gasprice.Areas}
 	cfg, err := s.LoadCarbonConfig(ctx)
 	if err != nil {
 		return out, err
 	}
 	out.KeySaved = cfg != nil
-	c, err := s.evCompareSetup(ctx, meterID)
-	if err != nil || c == nil {
-		return out, err
+	if area == "" {
+		return out, nil
 	}
-	name, _ := gasprice.AreaName(c.AreaID)
-	out.AreaID, out.AreaName, out.CustomMPG = &c.AreaID, &name, c.CustomMPG
-	if st, err := s.gasStatus(ctx, c.AreaID); err != nil {
+	name, _ := gasprice.AreaName(area)
+	out.AreaID, out.AreaName = &area, &name
+	if st, err := s.gasStatus(ctx, area); err != nil {
 		return out, err
 	} else if st != nil {
 		at := st.CheckedAt
@@ -328,20 +420,20 @@ func (s *Server) evCompareView(ctx context.Context, meterID string) (evCompareVi
 		}
 		out.LastOutcome = &msg
 	}
-	prices, err := s.Store.FuelPrices(ctx, gasprice.Gasoline, c.AreaID)
+	prices, err := s.Store.FuelPrices(ctx, gasprice.Gasoline, area)
 	if err != nil {
 		return out, err
 	}
 	if n := len(prices); n > 0 {
 		out.LatestWeek, out.LatestPrice = &prices[n-1].Week, &prices[n-1].Dollars
 	}
-	diesel, err := s.Store.FuelPrices(ctx, gasprice.Diesel, c.AreaID)
+	diesel, err := s.Store.FuelPrices(ctx, gasprice.Diesel, area)
 	if err != nil {
 		return out, err
 	}
 	if n := len(diesel); n > 0 {
 		out.LatestDieselPrice = &diesel[n-1].Dollars
-		if d, ok := gasprice.DieselArea(c.AreaID); ok {
+		if d, ok := gasprice.DieselArea(area); ok {
 			out.DieselAreaName = &d.Name
 		}
 	}
@@ -375,8 +467,9 @@ func (s *Server) getEvCompare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
-// putEvCompare saves the price area and the owner's own car (optional), and reads the area's prices at once. The setup is kept even when EIA cannot be
-// reached or the key is not saved yet: the answer says what happened, and the feed tries again.
+// putEvCompare saves the owner's own car (optional). The price area is the house's: naming one here saves it for the house and reads its prices at once, as
+// putFuelPrices does, and without one a house area must already be there. The setup is kept even when EIA cannot be reached or the key is not saved yet: the
+// answer says what happened, and the feed tries again.
 func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.evMeterFor(w, r)
 	if !ok {
@@ -386,18 +479,28 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"area_id": "SMN", "custom_mpg": number or null}`)
+		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"custom_mpg": number or null}`)
 		return
 	}
 	if body.CustomMPG != nil && (math.IsNaN(*body.CustomMPG) || *body.CustomMPG < minMPG || *body.CustomMPG > maxMPG) {
 		writeProblem(w, http.StatusBadRequest, "bad_compare", "A car's miles per gallon is a number between 5 and 200.")
 		return
 	}
-	if _, ok := gasprice.AreaName(body.AreaID); !ok {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", "Pick one of the areas EIA publishes a gasoline price for.")
+	area := body.AreaID
+	if area != "" {
+		if _, ok := gasprice.AreaName(area); !ok {
+			writeProblem(w, http.StatusBadRequest, "bad_compare", "Pick one of the areas EIA publishes a gasoline price for.")
+			return
+		}
+	} else if have, err := s.fuelArea(r.Context()); err != nil {
+		serverError(w, err)
+		return
+	} else if have == "" {
+		writeProblem(w, http.StatusBadRequest, "bad_compare", "Pick the area whose gasoline price to use first.")
 		return
 	}
-	text, err := json.Marshal(evCompareSetup{AreaID: body.AreaID, CustomMPG: body.CustomMPG})
+	// The area is the house's: what this meter keeps is its own car.
+	text, err := json.Marshal(evCompareSetup{CustomMPG: body.CustomMPG})
 	if err != nil {
 		serverError(w, err)
 		return
@@ -406,13 +509,96 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	if err := s.refreshGas(r.Context(), body.AreaID); err != nil {
-		serverError(w, err)
-		return
+	if area != "" {
+		if err := s.saveFuelArea(r.Context(), area); err != nil {
+			serverError(w, err)
+			return
+		}
 	}
 	s.getEvCompare(w, r)
 }
 
+// saveFuelArea keeps the house's price area, takes over the one an older setup of a vehicle named, and reads the area's prices at once.
+func (s *Server) saveFuelArea(ctx context.Context, area string) error {
+	if err := s.Store.SetMeta(ctx, fuelAreaKey, area); err != nil {
+		return err
+	}
+	return s.refreshGas(ctx, area)
+}
+
+func (s *Server) getFuelPrices(w http.ResponseWriter, r *http.Request) {
+	area, err := s.fuelArea(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	v, err := s.fuelPricesFor(r.Context(), area)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+// putFuelPrices saves the house's price area and reads its prices at once. The area is kept even when EIA cannot be reached or the key is not saved yet: the
+// answer says what happened, and the feed tries again.
+func (s *Server) putFuelPrices(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AreaID string `json:"area_id"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		writeProblem(w, http.StatusBadRequest, "bad_fuel_area", `send {"area_id": "SMN"}`)
+		return
+	}
+	if _, ok := gasprice.AreaName(body.AreaID); !ok {
+		writeProblem(w, http.StatusBadRequest, "bad_fuel_area", "Pick one of the areas EIA publishes a gasoline price for.")
+		return
+	}
+	if err := s.saveFuelArea(r.Context(), body.AreaID); err != nil {
+		serverError(w, err)
+		return
+	}
+	s.getFuelPrices(w, r)
+}
+
+// deleteFuelPrices takes the area off, and with it every gas comparison; the prices already read are kept.
+func (s *Server) deleteFuelPrices(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := s.Store.SetMeta(ctx, fuelAreaKey, ""); err != nil {
+		serverError(w, err)
+		return
+	}
+	// An older setup of a vehicle may still name an area: that would bring it back.
+	ids, err := s.Store.EVMeterIDs(ctx)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	for _, id := range ids {
+		saved, err := s.evCompareSaved(ctx, id)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if saved == nil || saved.AreaID == "" {
+			continue
+		}
+		text, err := json.Marshal(evCompareSetup{CustomMPG: saved.CustomMPG})
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if err := s.Store.SetMeta(ctx, evCompareKey+id, string(text)); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteEvCompare takes off the owner's own car. The price area is the house's and stays (deleteFuelPrices takes it off).
 func (s *Server) deleteEvCompare(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.evMeterFor(w, r)
 	if !ok {
