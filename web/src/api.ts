@@ -69,11 +69,11 @@ export const api = {
   deleteEvBattery: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/battery`, { method: 'DELETE' }),
   /** The gas car a charging meter's vehicle is compared with, and the gasoline price area. */
   evCompare: (meterId: string) => request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`),
-  putEvCompare: (meterId: string, mpg: number, areaId: string) =>
+  putEvCompare: (meterId: string, areaId: string, customMpg: number | null) =>
     request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mpg, area_id: areaId }),
+      body: JSON.stringify({ area_id: areaId, custom_mpg: customMpg }),
     }),
   deleteEvCompare: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, { method: 'DELETE' }),
   /** What each stretch between odometer readings would have cost in the gas car, against what charging cost. */

@@ -22,19 +22,45 @@ const days = (n: number): EvInterval[] =>
 
 const ev = (intervals: EvInterval[]): MeterEv => ({ meter_id: 'm', readings: [], intervals, totals: null, since_last: null, cost_estimated: false });
 
+/** Two stretches of 100 miles that each cost 2 dollars to charge, against gas cars of 20 and 40 miles per gallon at 4 dollars a gallon. */
+const stretches: EvSavings['stretches'] = [
+  {
+    from_day: '2026-10-01',
+    to_day: '2026-10-05',
+    miles: 100,
+    gas_price: '4.00',
+    ev_cost: '2.00',
+    gas: [
+      { mpg: 20, gallons: 5, gas_cost: '20.00', savings: '18.00' },
+      { mpg: 40, gallons: 2.5, gas_cost: '10.00', savings: '8.00' },
+    ],
+  },
+  {
+    from_day: '2026-10-05',
+    to_day: '2026-10-09',
+    miles: 100,
+    gas_price: '4.00',
+    ev_cost: '2.00',
+    gas: [
+      { mpg: 20, gallons: 5, gas_cost: '20.00', savings: '18.00' },
+      { mpg: 40, gallons: 2.5, gas_cost: '10.00', savings: '8.00' },
+    ],
+  },
+];
+
 const savings = (over: Partial<EvSavings> = {}): EvSavings => ({
   meter_id: 'm',
   configured: true,
-  mpg: 25,
   area_name: 'Minnesota',
+  comparisons: [
+    { mpg: 20, custom: false },
+    { mpg: 40, custom: false },
+  ],
   prices: [
     { week: '2026-10-05', dollars: '4.00' },
     { week: '2026-10-12', dollars: '4.10' },
   ],
-  stretches: [
-    { from_day: '2026-10-01', to_day: '2026-10-05', miles: 100, gallons: 4, gas_price: '4.00', gas_cost: '16.00', ev_cost: '2.00', savings: '14.00' },
-    { from_day: '2026-10-05', to_day: '2026-10-09', miles: 100, gallons: 4, gas_price: '4.00', gas_cost: '16.00', ev_cost: '2.00', savings: '14.00' },
-  ],
+  stretches,
   totals: null,
   cost_estimated: false,
   ...over,
@@ -67,11 +93,57 @@ const charge = (id: number, endedAt: string, kwhPerPct: number | null, efficienc
 const chargesAnswer = (list: EvChargesAnswer['charges'], battery: number | null = null): EvChargesAnswer => ({ meter_id: 'm', car_linked: true, charges: list, consistency: null, battery_kwh: battery, losses: null, cost_estimated: false });
 
 describe('trendTabs', () => {
-  it('offers the efficiency, cost and per-charge tabs without the gas comparison, and the other two with it', () => {
+  it('offers the efficiency, cost and per-charge tabs without the gas comparison, and the gas ones once it is set up', () => {
     const ids = (t: ReturnType<typeof trendTabs>) => t.map((x) => x.id);
     expect(ids(trendTabs({ ev: ev([]), savings: undefined, charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
     expect(ids(trendTabs({ ev: ev([]), savings: savings({ configured: false }), charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
     expect(ids(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toEqual(['versus', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
+  });
+
+  it('draws a line for each gas car beside charging, each added up from zero', () => {
+    const versus = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'versus')!;
+    expect(versus.lines.map((l) => l.name)).toEqual(['20 mpg', '40 mpg', 'Charging']);
+    expect(versus.lines[0]!.y).toEqual([0, 20, 40]);
+    expect(versus.lines[1]!.y).toEqual([0, 10, 20]);
+    expect(versus.lines[2]!.y).toEqual([0, 2, 4]);
+    expect(versus.x.map((s) => new Date(s * 1000).toISOString().slice(0, 10))).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
+    expect(versus.endLabels).toBe(true);
+    expect(versus.picks).toBe(true);
+    expect(versus.lines.every((l) => l.fill === false)).toBe(true);
+    expect(tabReady(versus)).toBe(true);
+  });
+
+  it('makes the charging line the heavy one, and the gas cars one colour at falling strength', () => {
+    const lines = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'versus')!.lines;
+    expect(lines[2]!.width).toBe(3);
+    expect(lines[0]!.colorVar).toBe(lines[1]!.colorVar);
+    expect(lines[0]!.alpha!).toBeGreaterThan(lines[1]!.alpha!);
+  });
+
+  it('leaves out the gas cars the viewer switched off, and waits for one to be ticked when none is left', () => {
+    const one = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles', hidden: [20] }).find((t) => t.id === 'versus')!;
+    expect(one.lines.map((l) => l.name)).toEqual(['40 mpg', 'Charging']);
+    const none = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles', hidden: [20, 40] });
+    for (const id of ['versus', 'saved'] as const) {
+      const tab = none.find((t) => t.id === id)!;
+      expect(tabReady(tab)).toBe(false);
+      expect(tab.waiting).toContain('Tick a gas car');
+    }
+  });
+
+  it('draws what was saved against each gas car, which can be below zero', () => {
+    const saved = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'saved')!;
+    expect(saved.lines.map((l) => l.y)).toEqual([
+      [0, 18, 36],
+      [0, 8, 16],
+    ]);
+    const below = trendTabs({
+      ev: ev([]),
+      savings: savings({ stretches: [{ ...stretches[0]!, gas: [{ mpg: 20, gallons: 5, gas_cost: '20.00', savings: '-3.00' }, { mpg: 40, gallons: 2.5, gas_cost: '10.00', savings: '-5.00' }] }, stretches[1]!] }),
+      charges: undefined,
+      unit: 'miles',
+    }).find((t) => t.id === 'saved')!;
+    expect(below.lines[1]!.y[1]).toBe(-5);
   });
 
   it('draws nothing from a week of readings that is not a week yet, and says how far along it is', () => {
@@ -84,55 +156,38 @@ describe('trendTabs', () => {
   it('draws the efficiency and the cost once the window has filled', () => {
     const [eff, cost] = trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'miles' });
     expect(eff!.x.length).toBe(3); // the 7th, 8th and 9th days complete a week
-    expect(eff!.y[0]).toBeCloseTo(3, 9);
-    expect(cost!.y[0]).toBeCloseTo(10.5, 9);
+    expect(eff!.lines[0]!.y[0]).toBeCloseTo(3, 9);
+    expect(cost!.lines[0]!.y[0]).toBeCloseTo(10.5, 9);
   });
 
   it('shows the efficiency per kilometer with the kilometer unit', () => {
     const [eff] = trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'km' });
-    expect(eff!.y[0]).toBeCloseTo(3 * 1.609344, 6);
+    expect(eff!.lines[0]!.y[0]).toBeCloseTo(3 * 1.609344, 6);
     expect(eff!.title).toContain('kilometers');
   });
 
-  it('draws the gas car and charging against each other from zero, each added up', () => {
-    const versus = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'versus')!;
-    expect(versus.y).toEqual([0, 16, 32]);
-    expect(versus.second?.y).toEqual([0, 2, 4]);
-    expect(versus.x.map((s) => new Date(s * 1000).toISOString().slice(0, 10))).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
-    expect(versus.lineName).toBe('Gas car, 25 mpg');
-    expect(tabReady(versus)).toBe(true);
-  });
-
-  it('opens on the gas car against charging when it can be drawn', () => {
-    expect(firstReady(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toBe('versus');
-  });
-
-  it('adds the savings up and takes the gas prices as they are', () => {
-    const tabs = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' });
-    const saved = tabs.find((t) => t.id === 'saved')!;
-    const gas = tabs.find((t) => t.id === 'gas')!;
-    expect(saved.y).toEqual([14, 28]);
-    expect(gas.y).toEqual([4, 4.1]);
+  it('takes the gas prices as they are', () => {
+    const gas = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'gas')!;
+    expect(gas.lines[0]!.y).toEqual([4, 4.1]);
     expect(gas.title).toContain('Minnesota');
   });
 
   it('plots each settled charge oldest first: its efficiency with the battery size known, else the energy per percent', () => {
     const list = [charge(3, '2026-10-29T03:00:00Z', 1.02, 0.86), charge(2, '2026-10-27T03:00:00Z', null, null), charge(1, '2026-10-25T03:00:00Z', 0.99, 0.89)];
     const without = trendTabs({ ev: ev([]), savings: undefined, charges: chargesAnswer(list), unit: 'miles' }).find((t) => t.id === 'charge')!;
-    expect(without.y).toEqual([0.99, 1.02]);
+    expect(without.lines[0]!.y).toEqual([0.99, 1.02]);
     expect(without.x[0]).toBeLessThan(without.x[1]!);
     const withSize = trendTabs({ ev: ev([]), savings: undefined, charges: chargesAnswer(list, 88), unit: 'miles' }).find((t) => t.id === 'charge')!;
-    expect(withSize.y).toEqual([89, 86]);
+    expect(withSize.lines[0]!.y).toEqual([89, 86]);
     expect(withSize.format(89.4)).toBe('89 %');
   });
 });
 
 describe('firstReady and domainOf', () => {
   it('opens the first tab that has something to draw, else the first', () => {
-    const tabs = trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'miles' });
-    expect(firstReady(tabs)).toBe('efficiency');
-    const none = trendTabs({ ev: ev([]), savings: savings({ configured: false }), charges: undefined, unit: 'miles' });
-    expect(firstReady(none)).toBe('efficiency');
+    expect(firstReady(trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'miles' }))).toBe('efficiency');
+    expect(firstReady(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toBe('versus');
+    expect(firstReady(trendTabs({ ev: ev([]), savings: savings({ configured: false }), charges: undefined, unit: 'miles' }))).toBe('efficiency');
     expect(firstReady([])).toBeUndefined();
   });
 

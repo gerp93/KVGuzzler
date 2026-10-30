@@ -6,6 +6,7 @@ import { useMemo, useRef, useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, whenText, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
 import { EvChargeList } from './EvChargeList';
+import { parseHidden, visibleComparisons } from './evGas';
 import { EvHeadline } from './EvHeadline';
 import { EvNotes } from './EvNotes';
 import { EvSettings } from './EvSettings';
@@ -14,7 +15,7 @@ import { EvTrendPanel } from './EvTrendPanel';
 import { EvTrips } from './EvTrips';
 import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
 import { useFordWait } from './fordWait';
-import { useDistanceUnit, usePoll } from './hooks';
+import { useDistanceUnit, usePoll, useStored } from './hooks';
 import type { FordLink, Meter } from './lib';
 
 /** A meter that is probably the car's charger by its name. */
@@ -71,11 +72,17 @@ export function EvCard({ meter }: { meter: Meter }) {
   // The step of the connecting dialog to open at, or nothing while it is closed.
   const [setup, setSetup] = useState<SetupStep | null>(null);
   const [problem, setProblem] = useState('');
+  // The gas cars the viewer has switched off, remembered in this browser: everything else is drawn, so a car named later is drawn at first.
+  const [hiddenText, setHiddenText] = useStored('kvg.ev.gas.hidden', '[]');
+  const hidden = parseHidden(hiddenText);
+  const togglePick = (mpg: number) => setHiddenText(JSON.stringify(hidden.includes(mpg) ? hidden.filter((m) => m !== mpg) : [...hidden, mpg]));
   const { waitLeft, wait } = useFordWait(ford);
   const draft = useRef<FordDraft>({});
   const reload = () => setVersion((v) => v + 1);
 
-  const tabs = useMemo(() => (data ? trendTabs({ ev: data, savings, charges, unit }) : []), [data, savings, charges, unit]);
+  const tabs = useMemo(() => (data ? trendTabs({ ev: data, savings, charges, unit, hidden }) : []), [data, savings, charges, unit, hiddenText]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comparisons = savings?.comparisons ?? [];
+  const visible = visibleComparisons(comparisons, hidden).map((c) => c.mpg);
   const removeCharge = (id: number) => {
     setProblem('');
     void api.deleteEvCharge(meter.id, id).then(reload, (e: Error) => setProblem(e.message));
@@ -136,10 +143,10 @@ export function EvCard({ meter }: { meter: Meter }) {
 
       {data && hasContent && (
         <>
-          <EvHeadline ev={data} savings={savings} charges={charges} unit={unit} onOpenSettings={openSettings} />
+          <EvHeadline ev={data} savings={savings} charges={charges} unit={unit} visible={visible} onOpenSettings={openSettings} />
           <div class="ev-body">
             <div class="ev-main">
-              <EvTrendPanel tabs={tabs} />
+              <EvTrendPanel tabs={tabs} comparisons={comparisons} hidden={hidden} onTogglePick={togglePick} />
               <EvTrips ev={data} unit={unit} />
             </div>
             <div class="ev-side">

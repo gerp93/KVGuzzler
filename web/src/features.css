@@ -476,6 +476,48 @@ button.link {
   border-color: var(--color-accent-green);
 }
 
+/* The gas cars to compare with, ticked under the chart: each with the look of its line */
+.ev-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 12px;
+}
+
+.ev-picks-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ev-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.ev-pick input {
+  margin: 0;
+}
+
+.ev-swatch {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-accent-red);
+}
+
+.ev-swatch.custom {
+  background: var(--color-accent-blue);
+}
+
+/* A range of savings is two figures: smaller, so it fits the tile */
+.ev-tile .kpi-value.range {
+  font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+}
+
 /* How it is all counted, in one closed note at the foot of the card */
 .ev-notes {
   margin-top: 24px;

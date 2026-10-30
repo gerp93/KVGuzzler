@@ -275,11 +275,12 @@ paths:
     get:
       tags: [Read]
       operationId: getEvCompare
-      summary: The gas car a charging meter's vehicle is compared with, and the gasoline price area.
+      summary: The gasoline price area a charging meter's vehicle is compared in, and the owner's own gas car if there is one.
       description: |
-        The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in a gasoline car (its miles per gallon,
-        chosen by the owner) at the weekly average retail price of regular gasoline in an area, which EIA publishes for the country, regions, some states
-        and big cities. The prices are read with the EIA key saved for the carbon footprint (`key_saved`). 409 when the meter is not marked `ev`.
+        The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in gasoline cars: the `presets` (15 to 40 miles
+        per gallon) and, if the owner named one, `custom_mpg`. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
+        for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). Which of the gas cars a page
+        draws is the page's own choice; every one is answered. 409 when the meter is not marked `ev`.
       parameters:
         - $ref: '#/components/parameters/MeterId'
       responses:
@@ -296,10 +297,11 @@ paths:
     put:
       tags: [Settings]
       operationId: putEvCompare
-      summary: Save the gas car's miles per gallon and the price area, and read the area's prices now.
+      summary: Save the price area and the owner's own gas car, and read the area's prices now.
       description: |
-        The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable): `last_outcome` says what happened and the server tries
-        again. 400 for a miles per gallon outside 5 to 200 or an area EIA has no price for.
+        The area alone is enough: the presets are always compared. The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable):
+        `last_outcome` says what happened and the server tries again. A `custom_mpg` that is one of the presets is not a second comparison. 400 for a miles
+        per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg` included).
       parameters:
         - $ref: '#/components/parameters/MeterId'
       requestBody:
@@ -308,16 +310,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [mpg, area_id]
+              required: [area_id]
               additionalProperties: false
               properties:
-                mpg:
-                  type: number
-                  minimum: 5
-                  maximum: 200
                 area_id:
                   type: string
                   description: One of the `areas` ids.
+                custom_mpg:
+                  type: [number, 'null']
+                  minimum: 5
+                  maximum: 200
       responses:
         '200':
           description: Saved.
@@ -416,13 +418,13 @@ paths:
     get:
       tags: [Read]
       operationId: getEvSavings
-      summary: What each stretch between odometer readings would have cost in the gas car, against what charging cost.
+      summary: What each stretch between odometer readings would have cost in each gas car, against what charging cost.
       description: |
-        For each stretch of `getMeterEv` the miles are divided by the gas car's miles per gallon and priced at the average of the weekly prices over the
-        stretch's days (a day takes the latest week on or before it, and the latest price after the last week). `savings` is the gas car's cost less the
+        For each stretch of `getMeterEv` the miles are divided by each gas car's miles per gallon (`comparisons`) and priced at the average of the weekly prices
+        over the stretch's days (a day takes the latest week on or before it, and the latest price after the last week). `savings` is a gas car's cost less the
         electric car's cost: negative when the electric car cost more. A stretch with a day before the first price kept, or with no electric cost, has no
-        savings and is left out of `totals`. The electric cost is only the energy the meter measured, so charging elsewhere makes the savings look bigger.
-        `configured` is false until the comparison is set up. 409 when the meter is not marked `ev`.
+        savings and is left out of `totals`, for every gas car alike. The electric cost is only the energy the meter measured, so charging elsewhere makes the
+        savings look bigger. `configured` is false until a price area is chosen. 409 when the meter is not marked `ev`.
       parameters:
         - $ref: '#/components/parameters/MeterId'
       responses:
@@ -1734,17 +1736,23 @@ components:
           description: The battery's usable energy in kWh; null until the owner sets it.
     EvCompare:
       type: object
-      required: [meter_id, mpg, area_id, area_name, areas, key_saved, last_check, last_outcome, latest_week, latest_price]
+      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price]
       properties:
         meter_id:
           type: string
-        mpg:
-          type: [number, 'null']
-          description: The gas car's miles per gallon; null until the comparison is set up.
         area_id:
           type: [string, 'null']
+          description: The gasoline price area; null until chosen.
         area_name:
           type: [string, 'null']
+        custom_mpg:
+          type: [number, 'null']
+          description: The owner's own gas car, in miles per gallon, beside the presets; null when there is none.
+        presets:
+          type: array
+          description: The gas cars every vehicle is compared with, in miles per gallon, lowest first.
+          items:
+            type: number
         areas:
           type: array
           description: The places EIA publishes a weekly gasoline price for.
@@ -1773,16 +1781,25 @@ components:
           description: Dollars per gallon of regular gasoline, a decimal string.
     EvSavings:
       type: object
-      required: [meter_id, configured, mpg, area_name, prices, stretches, totals, cost_estimated]
+      required: [meter_id, configured, area_name, comparisons, prices, stretches, totals, cost_estimated]
       properties:
         meter_id:
           type: string
         configured:
           type: boolean
-        mpg:
-          type: [number, 'null']
         area_name:
           type: [string, 'null']
+        comparisons:
+          type: array
+          description: The gas cars compared with, lowest miles per gallon first, made of the presets and the owner's own if there is one. Every `gas` list below is in this order.
+          items:
+            type: object
+            required: [mpg, custom]
+            properties:
+              mpg:
+                type: number
+              custom:
+                type: boolean
         prices:
           type: array
           description: The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart.
@@ -1800,7 +1817,7 @@ components:
           description: One per pair of neighbouring odometer readings, oldest first.
           items:
             type: object
-            required: [from_day, to_day, miles, gallons, gas_price, gas_cost, ev_cost, savings]
+            required: [from_day, to_day, miles, gas_price, ev_cost, gas]
             properties:
               from_day:
                 type: string
@@ -1810,41 +1827,60 @@ components:
                 format: date
               miles:
                 type: number
-              gallons:
-                type: number
-                description: What the gas car would have burned over the miles.
               gas_price:
                 type: [string, 'null']
                 description: The average of the week prices over the stretch's days; null when a day has no price.
-              gas_cost:
-                type: [string, 'null']
               ev_cost:
                 type: [string, 'null']
                 description: What the meter's energy cost, as in `getMeterEv`.
-              savings:
-                type: [string, 'null']
-                description: Gas cost less electric cost, a decimal string, negative when the electric car cost more.
+              gas:
+                type: array
+                description: One per comparison, in the comparisons' order.
+                items:
+                  type: object
+                  required: [mpg, gallons, gas_cost, savings]
+                  properties:
+                    mpg:
+                      type: number
+                    gallons:
+                      type: number
+                      description: What the gas car would have burned over the miles.
+                    gas_cost:
+                      type: [string, 'null']
+                    savings:
+                      type: [string, 'null']
+                      description: Gas cost less electric cost, a decimal string, negative when the electric car cost more.
         totals:
           type: [object, 'null']
           description: The stretches that have both costs, added up; null when there are none.
-          required: [stretches, miles, gallons, gas_cost, ev_cost, savings, gas_cost_per_mile, ev_cost_per_mile]
+          required: [stretches, miles, ev_cost, ev_cost_per_mile, gas]
           properties:
             stretches:
               type: integer
+              description: How many stretches are added up, the same for every gas car.
             miles:
               type: number
-            gallons:
-              type: number
-            gas_cost:
-              type: string
             ev_cost:
               type: string
-            savings:
-              type: string
-            gas_cost_per_mile:
-              type: [string, 'null']
             ev_cost_per_mile:
               type: [string, 'null']
+            gas:
+              type: array
+              description: One per comparison, in the comparisons' order.
+              items:
+                type: object
+                required: [mpg, gallons, gas_cost, savings, gas_cost_per_mile]
+                properties:
+                  mpg:
+                    type: number
+                  gallons:
+                    type: number
+                  gas_cost:
+                    type: string
+                  savings:
+                    type: string
+                  gas_cost_per_mile:
+                    type: [string, 'null']
         cost_estimated:
           type: boolean
     EvCharges:

@@ -21,7 +21,7 @@ export function EvNotes({ areaName, gas, battery }: { areaName: string | null; g
         {gas && (
           <li>
             <strong>Gas prices</strong> are EIA's weekly average for regular gasoline{areaName ? ` in ${areaName}` : ''}, and each stretch is priced at the average over its
-            days. The gas car's upkeep is left out.
+            days. The gas cars' upkeep is left out.
           </li>
         )}
         {battery && (
