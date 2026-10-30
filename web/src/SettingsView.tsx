@@ -7,7 +7,7 @@ export function SettingsView({ theme, onTheme }: { theme: Theme; onTheme: (t: Th
     <>
       <RatesCard />
       <DatabaseCard />
-      <section class="card">
+      <section class="card page-narrow">
         <h2>Theme</h2>
         <label>
           <span class="visually-hidden">Theme</span>

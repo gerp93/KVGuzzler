@@ -7,7 +7,7 @@ import { formatBytes } from './lib';
 export function DatabaseCard() {
   const { data: status } = usePoll(api.status, 60_000, []);
   return (
-    <section class="card">
+    <section class="card page-narrow">
       <h2>Database</h2>
       {status?.database_path ? (
         <Facts
