@@ -157,3 +157,34 @@ export function efficiencyTrend(intervals: EvInterval[], window: number = TREND_
     };
   });
 }
+
+export type EvCompare = components['schemas']['EvCompare'];
+export type EvSavings = components['schemas']['EvSavings'];
+
+/** Seconds since the epoch at noon UTC of a calendar day, so every time zone shows the same date. */
+const noon = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 1000 + 43_200;
+
+/** The savings so far, one point at each odometer reading that closes a stretch with savings (a stretch whose gas price or electric cost is unknown adds nothing). */
+export function cumulativeSavings(stretches: EvSavings['stretches']): { x: number[]; y: number[] } {
+  const x: number[] = [];
+  const y: number[] = [];
+  let sum = 0;
+  for (const s of stretches) {
+    if (s.savings == null) continue;
+    sum += Number(s.savings);
+    x.push(noon(s.to_day));
+    y.push(sum);
+  }
+  return { x, y };
+}
+
+/** The weekly gas prices as a chart line: dollars per gallon at each week's Monday. */
+export function gasPriceSeries(prices: EvSavings['prices']): { x: number[]; y: number[] } {
+  return { x: prices.map((p) => noon(p.week)), y: prices.map((p) => Number(p.dollars)) };
+}
+
+/** A gas car's miles per gallon as typed: a number from 5 to 200, or null. */
+export function parseMpg(text: string): number | null {
+  const n = Number(text.trim().replace(/,/g, ''));
+  return text.trim() !== '' && Number.isFinite(n) && n >= 5 && n <= 200 ? n : null;
+}

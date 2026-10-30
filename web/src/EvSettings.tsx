@@ -3,6 +3,7 @@
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dayLabel, formatDistance, parseMiles, toMiles, today, type DistanceUnit, type MeterEv } from './ev';
+import { EvCompareSettings } from './EvCompareSettings';
 import { FordConnection } from './FordConnection';
 import type { SetupStep } from './FordSetup';
 import { useDistanceUnit } from './hooks';
@@ -110,6 +111,10 @@ export function EvSettings({
             ))}
           </ul>
         )}
+      </section>
+
+      <section class="ev-set">
+        <EvCompareSettings meterId={meter.id} reload={reload} />
       </section>
 
       <section class="ev-set">

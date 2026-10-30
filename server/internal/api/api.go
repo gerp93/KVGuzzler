@@ -20,6 +20,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/devices"
 	"github.com/gerp93/KVGuzzler/server/internal/evcharge"
 	"github.com/gerp93/KVGuzzler/server/internal/ford"
+	"github.com/gerp93/KVGuzzler/server/internal/gasprice"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
 	"github.com/gerp93/KVGuzzler/server/internal/openei"
 	"github.com/gerp93/KVGuzzler/server/internal/pcrelay"
@@ -48,6 +49,8 @@ type Server struct {
 	Lookup openei.Lookup
 	// Carbon reads the grid's carbon intensity; nil means the real sources.
 	Carbon *carbon.Client
+	// Gas reads the weekly gasoline prices from EIA; nil means the real service.
+	Gas *gasprice.Client
 	// Ford reads the vehicle's odometer from Ford; nil means the real service.
 	Ford *ford.Client
 	// DatabasePath is the history database file, reported (read-only) by the status so the dashboard can say where the data lives and
@@ -113,6 +116,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev", s.meterEV)
 	mux.HandleFunc("PUT /api/v1/meters/{meterId}/ev/odometer/{day}", s.putOdometer)
 	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/odometer/{day}", s.deleteOdometer)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev/compare", s.getEvCompare)
+	mux.HandleFunc("PUT /api/v1/meters/{meterId}/ev/compare", s.putEvCompare)
+	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/compare", s.deleteEvCompare)
+	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev/savings", s.getEvSavings)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/ev/charges", s.evCharges)
 	mux.HandleFunc("DELETE /api/v1/meters/{meterId}/ev/charges/{chargeId}", s.deleteEvCharge)
 	mux.HandleFunc("GET /api/v1/tree.csv", s.treeExport)
