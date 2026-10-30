@@ -211,7 +211,7 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     make({
       id: 'gas',
       label: 'Fuel price',
-      title: `Weekly average price per gallon of regular gasoline${showDiesel ? ' and diesel' : ''}${savings.area_name ? `, ${savings.area_name}` : ''}`,
+      title: priceTitle(savings, showDiesel),
       x: price.x,
       lines,
       picks: hasDiesel ? 'diesel-price' : null,
@@ -222,6 +222,14 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     });
   }
   return tabs;
+}
+
+/** What the price chart shows, in words: gasoline for the area and, when ticked, diesel for the area it is read for (its region, if EIA has none for the area). */
+function priceTitle(savings: Pick<EvSavings, 'area_name' | 'diesel_area_name'>, showDiesel: boolean): string {
+  const where = savings.area_name ? ` in ${savings.area_name}` : '';
+  if (!showDiesel) return `Weekly average price per gallon of regular gasoline${where}`;
+  const dieselWhere = savings.diesel_area_name && savings.diesel_area_name !== savings.area_name ? ` in ${savings.diesel_area_name}` : where;
+  return `Weekly average price per gallon of regular gasoline${where} and No. 2 diesel${dieselWhere}`;
 }
 
 /** The tab to open first: the first with enough points to draw, else the first. */

@@ -3,38 +3,130 @@
   "configured": true,
   "area_name": "Minnesota",
   "comparisons": [
-    { "fuel": "gas", "mpg": 20, "custom": false },
-    { "fuel": "gas", "mpg": 27.5, "custom": true },
-    { "fuel": "gas", "mpg": 40, "custom": false },
-    { "fuel": "diesel", "mpg": 25, "custom": false }
+    {
+      "fuel": "gas",
+      "mpg": 20,
+      "custom": false
+    },
+    {
+      "fuel": "gas",
+      "mpg": 27.5,
+      "custom": true
+    },
+    {
+      "fuel": "gas",
+      "mpg": 40,
+      "custom": false
+    },
+    {
+      "fuel": "diesel",
+      "mpg": 25,
+      "custom": false
+    }
   ],
   "prices": [
-    { "week": "2026-10-12", "dollars": "4.184" },
-    { "week": "2026-10-19", "dollars": "4.18" },
-    { "week": "2026-10-26", "dollars": "4.146" }
+    {
+      "week": "2026-10-12",
+      "dollars": "4.184"
+    },
+    {
+      "week": "2026-10-19",
+      "dollars": "4.18"
+    },
+    {
+      "week": "2026-10-26",
+      "dollars": "4.146"
+    }
   ],
   "diesel_prices": [
-    { "week": "2026-10-12", "dollars": "4.62" },
-    { "week": "2026-10-19", "dollars": "4.60" },
-    { "week": "2026-10-26", "dollars": "4.58" }
+    {
+      "week": "2026-10-12",
+      "dollars": "4.62"
+    },
+    {
+      "week": "2026-10-19",
+      "dollars": "4.60"
+    },
+    {
+      "week": "2026-10-26",
+      "dollars": "4.58"
+    }
   ],
   "stretches": [
     {
-      "from_day": "2026-10-12", "to_day": "2026-10-19", "miles": 210, "gas_price": "4.18", "diesel_price": "4.60", "ev_cost": "6.50",
+      "from_day": "2026-10-12",
+      "to_day": "2026-10-19",
+      "miles": 210,
+      "gas_price": "4.18",
+      "diesel_price": "4.60",
+      "ev_cost": "6.50",
       "gas": [
-        { "fuel": "gas", "mpg": 20, "gallons": 10.5, "gas_cost": "43.89", "savings": "37.39" },
-        { "fuel": "gas", "mpg": 27.5, "gallons": 7.636364, "gas_cost": "31.92", "savings": "25.42" },
-        { "fuel": "gas", "mpg": 40, "gallons": 5.25, "gas_cost": "21.945", "savings": "15.445" },
-        { "fuel": "diesel", "mpg": 25, "gallons": 8.4, "gas_cost": "38.64", "savings": "32.14" }
+        {
+          "fuel": "gas",
+          "mpg": 20,
+          "gallons": 10.5,
+          "gas_cost": "43.89",
+          "savings": "37.39"
+        },
+        {
+          "fuel": "gas",
+          "mpg": 27.5,
+          "gallons": 7.636364,
+          "gas_cost": "31.92",
+          "savings": "25.42"
+        },
+        {
+          "fuel": "gas",
+          "mpg": 40,
+          "gallons": 5.25,
+          "gas_cost": "21.945",
+          "savings": "15.445"
+        },
+        {
+          "fuel": "diesel",
+          "mpg": 25,
+          "gallons": 8.4,
+          "gas_cost": "38.64",
+          "savings": "32.14"
+        }
       ]
     },
     {
-      "from_day": "2026-10-19", "to_day": "2026-10-26", "miles": 185, "gas_price": "4.16", "diesel_price": "4.59", "ev_cost": null,
+      "from_day": "2026-10-19",
+      "to_day": "2026-10-26",
+      "miles": 185,
+      "gas_price": "4.16",
+      "diesel_price": "4.59",
+      "ev_cost": null,
       "gas": [
-        { "fuel": "gas", "mpg": 20, "gallons": 9.25, "gas_cost": "38.48", "savings": null },
-        { "fuel": "gas", "mpg": 27.5, "gallons": 6.727273, "gas_cost": "27.98", "savings": null },
-        { "fuel": "gas", "mpg": 40, "gallons": 4.625, "gas_cost": "19.24", "savings": null },
-        { "fuel": "diesel", "mpg": 25, "gallons": 7.4, "gas_cost": "33.97", "savings": null }
+        {
+          "fuel": "gas",
+          "mpg": 20,
+          "gallons": 9.25,
+          "gas_cost": "38.48",
+          "savings": null
+        },
+        {
+          "fuel": "gas",
+          "mpg": 27.5,
+          "gallons": 6.727273,
+          "gas_cost": "27.98",
+          "savings": null
+        },
+        {
+          "fuel": "gas",
+          "mpg": 40,
+          "gallons": 4.625,
+          "gas_cost": "19.24",
+          "savings": null
+        },
+        {
+          "fuel": "diesel",
+          "mpg": 25,
+          "gallons": 7.4,
+          "gas_cost": "33.97",
+          "savings": null
+        }
       ]
     }
   ],
@@ -44,11 +136,40 @@
     "ev_cost": "6.50",
     "ev_cost_per_mile": "0.030952",
     "gas": [
-      { "fuel": "gas", "mpg": 20, "gallons": 10.5, "gas_cost": "43.89", "savings": "37.39", "gas_cost_per_mile": "0.209000" },
-      { "fuel": "gas", "mpg": 27.5, "gallons": 7.636364, "gas_cost": "31.92", "savings": "25.42", "gas_cost_per_mile": "0.152000" },
-      { "fuel": "gas", "mpg": 40, "gallons": 5.25, "gas_cost": "21.945", "savings": "15.445", "gas_cost_per_mile": "0.104500" },
-      { "fuel": "diesel", "mpg": 25, "gallons": 8.4, "gas_cost": "38.64", "savings": "32.14", "gas_cost_per_mile": "0.184000" }
+      {
+        "fuel": "gas",
+        "mpg": 20,
+        "gallons": 10.5,
+        "gas_cost": "43.89",
+        "savings": "37.39",
+        "gas_cost_per_mile": "0.209000"
+      },
+      {
+        "fuel": "gas",
+        "mpg": 27.5,
+        "gallons": 7.636364,
+        "gas_cost": "31.92",
+        "savings": "25.42",
+        "gas_cost_per_mile": "0.152000"
+      },
+      {
+        "fuel": "gas",
+        "mpg": 40,
+        "gallons": 5.25,
+        "gas_cost": "21.945",
+        "savings": "15.445",
+        "gas_cost_per_mile": "0.104500"
+      },
+      {
+        "fuel": "diesel",
+        "mpg": 25,
+        "gallons": 8.4,
+        "gas_cost": "38.64",
+        "savings": "32.14",
+        "gas_cost_per_mile": "0.184000"
+      }
     ]
   },
-  "cost_estimated": false
+  "cost_estimated": false,
+  "diesel_area_name": "Midwest (PADD 2)"
 }

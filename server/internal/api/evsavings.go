@@ -75,6 +75,9 @@ type evCompareView struct {
 	LatestPrice *string    `json:"latest_price"`
 	// LatestDieselPrice is the newest week's diesel price; null when diesel prices have not been read.
 	LatestDieselPrice *string `json:"latest_diesel_price"`
+	// DieselAreaName is the area the diesel price is for: EIA publishes diesel for the country, the regions and California only, so another area's diesel is
+	// its region's.
+	DieselAreaName *string `json:"diesel_area_name"`
 }
 
 // evComparison is one car the electric vehicle is compared with.
@@ -132,6 +135,8 @@ type evSavingsAnswer struct {
 	MeterID    string  `json:"meter_id"`
 	Configured bool    `json:"configured"`
 	AreaName   *string `json:"area_name"`
+	// DieselAreaName is the area the diesel prices are for (the area's region when EIA publishes no diesel for the area itself); null until diesel prices have been read.
+	DieselAreaName *string `json:"diesel_area_name"`
 	// Comparisons are the cars compared with: the gas cars by miles per gallon, lowest first (the presets and the owner's own if there is one), then the diesel
 	// cars the same way, once diesel prices have been read.
 	Comparisons []evComparison   `json:"comparisons"`
@@ -228,7 +233,14 @@ func (s *Server) refreshGas(ctx context.Context, area string) error {
 		st.Error = "The gas prices come from EIA and need its key: save it under Carbon first."
 	} else {
 		for _, fuel := range []gasprice.Product{gasprice.Gasoline, gasprice.Diesel} {
-			prices, err := s.gasClient().Weekly(ctx, cfg.APIKey, area, fuel, s.now().Add(-gasHistory))
+			// EIA publishes diesel for the country, the regions and California only: another area's diesel is its region's.
+			ask := area
+			if fuel == gasprice.Diesel {
+				if d, ok := gasprice.DieselArea(area); ok {
+					ask = d.ID
+				}
+			}
+			prices, err := s.gasClient().Weekly(ctx, cfg.APIKey, ask, fuel, s.now().Add(-gasHistory))
 			var ge *gasprice.Error
 			switch {
 			case err == nil:
@@ -329,6 +341,9 @@ func (s *Server) evCompareView(ctx context.Context, meterID string) (evCompareVi
 	}
 	if n := len(diesel); n > 0 {
 		out.LatestDieselPrice = &diesel[n-1].Dollars
+		if d, ok := gasprice.DieselArea(c.AreaID); ok {
+			out.DieselAreaName = &d.Name
+		}
 	}
 	return out, nil
 }
@@ -474,6 +489,9 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 	dieselOn := len(dieselPrices) > 0
 	comps := evComparisons(c, dieselOn)
 	out.Configured, out.AreaName, out.Comparisons = true, &name, comps
+	if d, ok := gasprice.DieselArea(c.AreaID); ok && dieselOn {
+		out.DieselAreaName = &d.Name
+	}
 	ev, err := s.evAnswer(ctx, id)
 	if err != nil {
 		serverError(w, err)

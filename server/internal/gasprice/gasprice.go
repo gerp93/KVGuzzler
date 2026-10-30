@@ -63,6 +63,29 @@ func AreaName(id string) (string, bool) {
 	return "", false
 }
 
+// dieselAreas are the areas EIA publishes a weekly diesel price for: the country, the regions and California. Every other state and city has gasoline prices
+// only, so its diesel is read for the region it is in.
+var dieselAreas = map[string]bool{"NUS": true, "R10": true, "R20": true, "R30": true, "R40": true, "R50": true, "SCA": true}
+
+// dieselRegion is the region each state and city that has no diesel price of its own belongs to.
+var dieselRegion = map[string]string{
+	"SCO": "R40", "SFL": "R10", "SMA": "R10", "SMN": "R20", "SNY": "R10", "SOH": "R20", "STX": "R30", "SWA": "R50",
+	"YBOS": "R10", "YORD": "R20", "YCLE": "R20", "YDEN": "R40", "Y44HO": "R30", "Y05LA": "SCA", "YMIA": "R10", "Y35NY": "R10", "Y05SF": "SCA", "Y48SE": "R50",
+}
+
+// DieselArea is the area whose diesel price stands for an area's: the area itself when EIA publishes diesel for it, else the region it is in. False for an
+// area EIA does not know.
+func DieselArea(id string) (Area, bool) {
+	if _, ok := AreaName(id); !ok {
+		return Area{}, false
+	}
+	if !dieselAreas[id] {
+		id = dieselRegion[id]
+	}
+	name, ok := AreaName(id)
+	return Area{ID: id, Name: name}, ok
+}
+
 // Price is the average retail price of a gallon of regular gasoline in a week.
 type Price struct {
 	// Week is the day EIA dates the week by, a Monday, `2026-10-26`.

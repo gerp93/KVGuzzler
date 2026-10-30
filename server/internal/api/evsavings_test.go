@@ -48,9 +48,10 @@ type savingsGas struct {
 }
 
 type savingsBody struct {
-	Configured  bool    `json:"configured"`
-	AreaName    *string `json:"area_name"`
-	Comparisons []struct {
+	Configured     bool    `json:"configured"`
+	AreaName       *string `json:"area_name"`
+	DieselAreaName *string `json:"diesel_area_name"`
+	Comparisons    []struct {
 		Fuel   string  `json:"fuel"`
 		MPG    float64 `json:"mpg"`
 		Custom bool    `json:"custom"`
@@ -100,6 +101,7 @@ func (b savingsBody) mpgs(fuel string) []float64 {
 type compareBody struct {
 	AreaID            *string   `json:"area_id"`
 	AreaName          *string   `json:"area_name"`
+	DieselAreaName    *string   `json:"diesel_area_name"`
 	CustomMPG         *float64  `json:"custom_mpg"`
 	Presets           []float64 `json:"presets"`
 	KeySaved          bool      `json:"key_saved"`
@@ -197,10 +199,12 @@ func TestEachCarsCostIsWhatTheSameMilesWouldHaveCostLessWhatChargingCost(t *test
 	if len(*asked) != 2 || !strings.Contains((*asked)[0], "EPMR") || !strings.Contains((*asked)[1], "EPD2D") {
 		t.Errorf("EIA was asked %v, want regular gasoline then No. 2 diesel", *asked)
 	}
-	for _, q := range *asked {
-		if !strings.Contains(q, "facets%5Bduoarea%5D%5B%5D=SMN") {
-			t.Errorf("a request not for Minnesota: %q", q)
-		}
+	// Gasoline is read for Minnesota; EIA publishes no diesel for a state, so diesel is read for the Midwest, the region Minnesota is in.
+	if !strings.Contains((*asked)[0], "facets%5Bduoarea%5D%5B%5D=SMN") || !strings.Contains((*asked)[1], "facets%5Bduoarea%5D%5B%5D=R20") {
+		t.Errorf("the requests %v, want gasoline for Minnesota and diesel for the Midwest", *asked)
+	}
+	if c.DieselAreaName == nil || *c.DieselAreaName != "Midwest (PADD 2)" {
+		t.Errorf("diesel area = %v", deref(c.DieselAreaName))
 	}
 	if strings.Contains(body, eiaKey) {
 		t.Errorf("the answer holds the EIA key: %s", body)
@@ -233,8 +237,8 @@ func TestEachCarsCostIsWhatTheSameMilesWouldHaveCostLessWhatChargingCost(t *test
 			t.Errorf("%v mpg %s is marked custom", comp.MPG, comp.Fuel)
 		}
 	}
-	if len(got.DieselPrices) != 2 || got.DieselPrices[1].Dollars != "5.20" {
-		t.Errorf("diesel prices = %+v", got.DieselPrices)
+	if len(got.DieselPrices) != 2 || got.DieselPrices[1].Dollars != "5.20" || got.DieselAreaName == nil || *got.DieselAreaName != "Midwest (PADD 2)" {
+		t.Errorf("diesel prices = %+v for %v", got.DieselPrices, deref(got.DieselAreaName))
 	}
 	first, second, third := got.Stretches[0], got.Stretches[1], got.Stretches[2]
 	// The stretch before EIA's first week has an electric cost and no fuel figures, for every car.

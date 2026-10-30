@@ -1736,7 +1736,7 @@ components:
           description: The battery's usable energy in kWh; null until the owner sets it.
     EvCompare:
       type: object
-      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price, latest_diesel_price]
+      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price, latest_diesel_price, diesel_area_name]
       properties:
         meter_id:
           type: string
@@ -1782,9 +1782,12 @@ components:
         latest_diesel_price:
           type: [string, 'null']
           description: Dollars per gallon of No. 2 diesel in the newest week, a decimal string; null when diesel prices have not been read.
+        diesel_area_name:
+          type: [string, 'null']
+          description: The area the diesel price is for. EIA publishes weekly diesel for the country, the regions and California only, so any other area's diesel is the price of the region it is in. Null until diesel prices have been read.
     EvSavings:
       type: object
-      required: [meter_id, configured, area_name, comparisons, prices, diesel_prices, stretches, totals, cost_estimated]
+      required: [meter_id, configured, area_name, diesel_area_name, comparisons, prices, diesel_prices, stretches, totals, cost_estimated]
       properties:
         meter_id:
           type: string
@@ -1792,6 +1795,9 @@ components:
           type: boolean
         area_name:
           type: [string, 'null']
+        diesel_area_name:
+          type: [string, 'null']
+          description: The area the diesel prices are for (the area's region when EIA publishes no diesel for the area itself); null until diesel prices have been read.
         comparisons:
           type: array
           description: The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own if there is one) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order.
