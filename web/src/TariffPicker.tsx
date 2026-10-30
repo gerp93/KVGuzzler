@@ -1,8 +1,7 @@
-// "Price from a utility's published rate". What it does, in order: the free OpenEI key is given once, in the Connectors tab; you type your address or ZIP code and
-// it lists the residential rates for it; you pick the one your bill names; from then on costs are worked out from that rate.
-import { useEffect, useState } from 'preact/hooks';
+// "Price from a utility's published rate", in the OpenEI card of the Connectors tab. What it does, in order: you type your address or ZIP code and it lists the
+// residential rates for it; you pick the one your bill names; from then on costs are worked out from that rate. The key is saved in the card above it.
+import { useState } from 'preact/hooks';
 import { api } from './api';
-import { routePath } from './route';
 import { TARIFFS_SHOWN, filterTariffs, rateRange, sharedUtility, type TariffCandidate, type TariffInfo } from './lib';
 
 function Notes({ c, fixed = false }: { c: TariffCandidate | TariffInfo; fixed?: boolean }) {
@@ -15,25 +14,41 @@ function Notes({ c, fixed = false }: { c: TariffCandidate | TariffInfo; fixed?: 
   return bits.length > 0 ? <span class="caption block">{bits.join(' · ')}</span> : null;
 }
 
-export function TariffPicker({ current, label, onChoose }: {
+/** The rate in use: its name, utility and prices, and when it was read. */
+export function CurrentRate({ current, onChange }: { current: TariffInfo; onChange?: () => void }) {
+  return (
+    <div class="current-rate">
+      <p>
+        <strong>{current.name}</strong>
+        <span class="caption block">
+          {current.utility} · {rateRange(current)}
+        </span>
+        <Notes c={current} fixed />
+      </p>
+      <p class="caption">Updated {new Date(current.fetched_at).toLocaleDateString()}</p>
+      {onChange && (
+        <button type="button" onClick={onChange}>
+          Change rate
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function TariffPicker({ current, onChoose }: {
   /** The tariff in use. */
   current: TariffInfo | undefined;
-  /** The label chosen but not saved yet. */
-  label: string | null | undefined;
-  onChoose: (label: string) => void;
+  /** Saves the rate with this label as the price's source; throws the reason when it cannot. */
+  onChoose: (label: string) => Promise<void>;
 }) {
-  const [hasKey, setHasKey] = useState<boolean>();
   const [address, setAddress] = useState('');
   const [found, setFound] = useState<TariffCandidate[]>();
   const [filter, setFilter] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [changing, setChanging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [choosing, setChoosing] = useState('');
   const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    api.openEi().then((s) => setHasKey(s.has_key), () => setHasKey(false));
-  }, []);
 
   const search = () => {
     setBusy(true);
@@ -53,42 +68,34 @@ export function TariffPicker({ current, label, onChoose }: {
     );
   };
 
+  const choose = (label: string) => {
+    setChoosing(label);
+    setMessage('');
+    onChoose(label).then(
+      () => {
+        setChoosing('');
+        setChanging(false);
+        setFound(undefined);
+      },
+      (e: Error) => {
+        setChoosing('');
+        setMessage(e.message);
+      },
+    );
+  };
+
   const matching = found ? filterTariffs(found, filter) : [];
   const listed = showAll || filter.trim() ? matching : matching.slice(0, TARIFFS_SHOWN);
   const utility = found ? sharedUtility(found) : null;
-  const chosenButNotSaved = label && label !== current?.label;
   const searching = !current || changing;
 
   return (
     <div class="tariff">
-      {current && (
-        <div class="current-rate">
-          <h3>Your rate</h3>
-          <p>
-            <strong>{current.name}</strong>
-            <span class="caption block">
-              {current.utility} · {rateRange(current)}
-            </span>
-            <Notes c={current} fixed />
-          </p>
-          <p class="caption">Updated {new Date(current.fetched_at).toLocaleDateString()}</p>
-          {!changing && (
-            <button type="button" onClick={() => setChanging(true)}>
-              Change rate
-            </button>
-          )}
-        </div>
-      )}
+      {current && <CurrentRate current={current} onChange={changing ? undefined : () => setChanging(true)} />}
 
-      {hasKey === false && (
-        <p class="note">
-          Looking up a rate needs an OpenEI key. <a href={routePath('connectors')}>Add it in the Connectors tab</a>.
-        </p>
-      )}
-
-      {hasKey && searching && (
+      {searching && (
         <>
-          <h3>{current ? 'Find a different rate' : 'Find your rate'}</h3>
+          <h4>{current ? 'Find a different rate' : 'Find your rate'}</h4>
           <label class="field">
             <span>Address or ZIP code</span>
             <input value={address} onInput={(e) => setAddress((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && address.trim() && !busy && search()} />
@@ -123,8 +130,8 @@ export function TariffPicker({ current, label, onChoose }: {
                         </span>
                         <Notes c={c} />
                       </span>
-                      <button type="button" aria-pressed={label === c.label} onClick={() => onChoose(c.label)}>
-                        {label === c.label ? 'Chosen' : 'Use this'}
+                      <button type="button" disabled={choosing !== ''} onClick={() => choose(c.label)}>
+                        {choosing === c.label ? 'Saving…' : 'Use this'}
                       </button>
                     </li>
                   ))}
@@ -137,25 +144,27 @@ export function TariffPicker({ current, label, onChoose }: {
               )}
             </>
           )}
+          {changing && (
+            <button type="button" onClick={() => setChanging(false)}>
+              Cancel
+            </button>
+          )}
         </>
       )}
 
-      {chosenButNotSaved && <p class="note">Selected. Save the price to apply it.</p>}
       {message && (
-        <p class="note" role="status">
+        <p class="note error" role="alert">
           {message}
         </p>
       )}
 
-      {hasKey && (
-        <details>
-          <summary>Method</summary>
-          <p class="caption">
-            Energy charge only (price per kWh): fixed and demand charges are left out, and only the first usage tier applies. A time-of-day rate becomes one
-            price per day, weighted by when the house uses power (last 60 days). Estimates; your bill is exact.
-          </p>
-        </details>
-      )}
+      <details>
+        <summary>Method</summary>
+        <p class="caption">
+          Energy charge only (price per kWh): fixed and demand charges are left out, and only the first usage tier applies. A time-of-day rate becomes one
+          price per day, weighted by when the house uses power (last 60 days). Estimates; your bill is exact.
+        </p>
+      </details>
     </div>
   );
 }

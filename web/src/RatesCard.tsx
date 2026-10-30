@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import { TariffPicker } from './TariffPicker';
+import { CurrentRate } from './TariffPicker';
+import { routePath } from './route';
 import { SUSPICIOUSLY_HIGH_RATE, currencySymbol, formatMoney, setCurrencyCode, type Bill, type FixedFee, type RateConfig, type TariffInfo } from './lib';
 
 const blankBill = { start: '', end: '', total: '', kwh: '', fees: [] as { label: string; amount: string }[] };
@@ -102,7 +103,18 @@ export function RatesCard() {
       {looksLikeCents && <p class="note">Over 1.00 per kWh. Did you enter cents? 15¢ is 0.15.</p>}
 
       {cfg.mode === 'lookup' && (
-        <TariffPicker current={tariff} label={cfg.tariff_label} onChoose={(l) => change({ ...cfg, tariff_label: l })} />
+        tariff ? (
+          <>
+            <CurrentRate current={tariff} />
+            <p class="caption">
+              <a href={routePath('connectors')}>Change the rate in the Connectors tab</a>
+            </p>
+          </>
+        ) : (
+          <p class="note">
+            No rate chosen. <a href={routePath('connectors')}>Choose one in the Connectors tab</a>.
+          </p>
+        )
       )}
 
       {cfg.mode === 'bills' && (
