@@ -149,6 +149,7 @@ release, so server/web/viewer/docs-only pushes do not. To force a desktop releas
   everywhere (API paths, `meter_id`, the `meters` table; `store.renameChannelsToMeters` moves an older database on open), because only the embedded
   dashboard reads those endpoints and the PC collector's ingest body never had the word (see `contract/README.md`).
 - **Dashboard text is never first person** (no "my", "our", "I"): a label names what the thing is ("EV charger", "Bills", "Recorded usage"), it does not speak for the user.
+- **Dashboard text is short and plain.** A form is its labelled fields and its buttons, with no paragraph explaining them; a line of text stays only when it says something the user could not see otherwise (a failure, a missing key, what a figure is waiting for). A button names its action in the plain verb: Save, Remove, Connect, Open (never "Take off", "Compare" for a save, or other figures of speech).
 - **"Meter" is the one word** for anything measured, in the tree and in the UI: a circuit, a sub-panel's feed, the whole house, a plug, the PC's wall plug.
   A Refoss clamp socket is an "input" in prose, a Refoss monitor is a device. Do not bring "channel" back.
 - **Refoss monitors** (`internal/refoss`, only the **EM16P** has been seen: `testdata/status-em16p.json` is a real answer, with the network details taken out; a repository
