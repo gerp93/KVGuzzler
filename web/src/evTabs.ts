@@ -1,9 +1,9 @@
 // The charts of the EV card as tabs of one panel: each is one series over time, with the words that say what it is and, while it has too few points to draw,
 // what it is waiting for. Pure, so the choice of tabs and their points is tested apart from the drawing.
-import { cumulativeSavings, efficiencyTrend, gasPriceSeries, inUnit, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
+import { cumulativeCosts, cumulativeSavings, efficiencyTrend, gasPriceSeries, inUnit, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
 import { formatMoney } from './lib';
 
-export type TabId = 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
+export type TabId = 'versus' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
 
 export interface TrendTab {
   id: TabId;
@@ -13,6 +13,10 @@ export interface TrendTab {
   title: string;
   /** A theme custom property for the line. */
   colorVar: string;
+  /** The line's own name when it is not the tab's (the chart's key says it). */
+  lineName?: string;
+  /** A second line over the same points, drawn against the first. */
+  second?: { name: string; colorVar: string; y: number[] };
   /** Seconds since the epoch, one per value. */
   x: number[];
   y: number[];
@@ -58,6 +62,19 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
   };
 
   if (savings?.configured) {
+    const costs = cumulativeCosts(savings.stretches);
+    make({
+      id: 'versus',
+      label: 'Gas vs electric',
+      title: `What a ${savings.mpg} mpg gas car would have cost against what charging cost, added up: the gap between the lines is the savings`,
+      colorVar: '--color-accent-red',
+      lineName: `Gas car, ${savings.mpg} mpg`,
+      x: costs.x,
+      y: costs.gas,
+      second: { name: 'Charging', colorVar: '--color-accent-green', y: costs.ev },
+      format: axisDollars,
+      waiting: 'Needs two odometer readings that the gas prices cover.',
+    });
     const saved = cumulativeSavings(savings.stretches);
     make({
       id: 'saved',
