@@ -3,15 +3,32 @@
   "area_id": "SMN",
   "area_name": "Minnesota",
   "custom_mpg": 27.5,
-  "presets": [15, 20, 25, 30, 35, 40],
+  "presets": [
+    15,
+    20,
+    25,
+    30,
+    35,
+    40
+  ],
   "areas": [
-    { "id": "NUS", "name": "U.S." },
-    { "id": "SMN", "name": "Minnesota" },
-    { "id": "YORD", "name": "Chicago" }
+    {
+      "id": "NUS",
+      "name": "U.S."
+    },
+    {
+      "id": "SMN",
+      "name": "Minnesota"
+    },
+    {
+      "id": "YORD",
+      "name": "Chicago"
+    }
   ],
   "key_saved": true,
   "last_check": "2026-10-30T04:10:00Z",
   "last_outcome": "Prices saved.",
   "latest_week": "2026-10-26",
-  "latest_price": "4.146"
+  "latest_price": "4.146",
+  "latest_diesel_price": "4.58"
 }

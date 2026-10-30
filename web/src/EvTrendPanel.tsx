@@ -4,12 +4,12 @@
 import { useMemo, useState } from 'preact/hooks';
 import { Chart, type Line } from './Chart';
 import { EvBars } from './EvBars';
-import { gasLineStyle, type GasComparison } from './evGas';
+import { compKey, DIESEL_PRICE, gasLineStyle, isShown, type GasComparison, type Picks } from './evGas';
 import { firstReady, tabReady, type TabId, type TrendTab } from './evTabs';
 
 const HEIGHT = 280;
 
-export function EvTrendPanel({ tabs, comparisons, hidden, onTogglePick }: { tabs: TrendTab[]; comparisons: GasComparison[]; hidden: number[]; onTogglePick: (mpg: number) => void }) {
+export function EvTrendPanel({ tabs, comparisons, picks, onTogglePick }: { tabs: TrendTab[]; comparisons: GasComparison[]; picks: Picks; onTogglePick: (key: string) => void }) {
   const [chosen, setChosen] = useState<TabId | null>(null);
   const id = chosen && tabs.some((t) => t.id === chosen) ? chosen : firstReady(tabs);
   const tab = tabs.find((t) => t.id === id);
@@ -18,7 +18,7 @@ export function EvTrendPanel({ tabs, comparisons, hidden, onTogglePick }: { tabs
   const key = tab ? `${tab.id}|${tab.endLabels}|${tab.x.join(',')}|${tab.lines.map((l) => `${l.name}:${l.y.join(',')}`).join('|')}` : '';
   const lines = useMemo<Line[]>(() => {
     if (!tab) return [];
-    return tab.lines.map((l) => ({ name: l.name, colorVar: l.colorVar, x: tab.x, y: l.y, alpha: l.alpha, width: l.width, fill: l.fill }));
+    return tab.lines.map((l) => ({ name: l.name, colorVar: l.colorVar, x: tab.x, y: l.y, alpha: l.alpha, width: l.width, fill: l.fill, dashed: l.dashed }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,27 +49,53 @@ export function EvTrendPanel({ tabs, comparisons, hidden, onTogglePick }: { tabs
           <p>{tab.waiting}</p>
         </div>
       )}
-      {tab.picks && comparisons.length > 0 && (
-        <div class="ev-picks" role="group" aria-label="Gas cars to compare with">
-          <span class="ev-picks-label">Compare with</span>
-          {comparisons.map((c) => {
-            const style = gasLineStyle(c, comparisons);
+      {tab.picks === 'cars' && comparisons.length > 0 && (
+        <div class="ev-pickrows">
+          {(['gas', 'diesel'] as const).map((fuel) => {
+            const cars = comparisons.filter((c) => c.fuel === fuel);
+            if (cars.length === 0) return null;
+            const both = comparisons.some((c) => c.fuel === 'diesel');
             return (
-              <label class="ev-pick" key={c.mpg}>
-                <input
-                  type="checkbox"
-                  checked={!hidden.includes(c.mpg)}
-                  onChange={() => {
-                    // Ticking is done on this chart: it stays open even when the last car is unticked and it has nothing to draw.
-                    setChosen(tab.id);
-                    onTogglePick(c.mpg);
-                  }}
-                />
-                <span class={`ev-swatch${c.custom ? ' custom' : ''}`} style={{ opacity: style.alpha }} aria-hidden="true" />
-                {c.mpg} mpg{c.custom ? ' (yours)' : ''}
-              </label>
+              <div class="ev-picks" role="group" aria-label={`${fuel === 'gas' ? 'Gas' : 'Diesel'} cars to compare with`} key={fuel}>
+                <span class="ev-picks-label">{both ? (fuel === 'gas' ? 'Gas' : 'Diesel') : 'Compare with'}</span>
+                {cars.map((c) => {
+                  const style = gasLineStyle(c, comparisons);
+                  const key = compKey(c);
+                  return (
+                    <label class="ev-pick" key={key}>
+                      <input
+                        type="checkbox"
+                        checked={isShown(c, picks)}
+                        onChange={() => {
+                          // Ticking is done on this chart: it stays open even when the last car is unticked and it has nothing to draw.
+                          setChosen(tab.id);
+                          onTogglePick(key);
+                        }}
+                      />
+                      <span class={`ev-swatch${c.custom ? ' custom' : ''}${c.fuel === 'diesel' ? ' diesel' : ''}`} style={{ opacity: style.alpha }} aria-hidden="true" />
+                      {c.mpg} mpg{c.custom ? ' (yours)' : ''}
+                    </label>
+                  );
+                })}
+              </div>
             );
           })}
+        </div>
+      )}
+      {tab.picks === 'diesel-price' && (
+        <div class="ev-picks">
+          <label class="ev-pick">
+            <input
+              type="checkbox"
+              checked={picks.on.includes(DIESEL_PRICE)}
+              onChange={() => {
+                setChosen(tab.id);
+                onTogglePick(DIESEL_PRICE);
+              }}
+            />
+            <span class="ev-swatch custom diesel" aria-hidden="true" />
+            Diesel
+          </label>
         </div>
       )}
     </section>

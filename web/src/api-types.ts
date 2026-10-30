@@ -1193,18 +1193,31 @@ export interface components {
             latest_week: string | null;
             /** @description Dollars per gallon of regular gasoline, a decimal string. */
             latest_price: string | null;
+            /** @description Dollars per gallon of No. 2 diesel in the newest week, a decimal string; null when diesel prices have not been read. */
+            latest_diesel_price: string | null;
         };
         EvSavings: {
             meter_id: string;
             configured: boolean;
             area_name: string | null;
-            /** @description The gas cars compared with, lowest miles per gallon first, made of the presets and the owner's own if there is one. Every `gas` list below is in this order. */
+            /** @description The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own if there is one) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order. */
             comparisons: {
+                /**
+                 * @description What the car burns, and so which weekly price its miles are priced at.
+                 * @enum {string}
+                 */
+                fuel: "gas" | "diesel";
                 mpg: number;
                 custom: boolean;
             }[];
             /** @description The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart. */
             prices: {
+                /** Format: date */
+                week: string;
+                dollars: string;
+            }[];
+            /** @description The weekly diesel prices over the same stretch of time as `prices`, oldest first; empty until they have been read. */
+            diesel_prices: {
                 /** Format: date */
                 week: string;
                 dollars: string;
@@ -1216,12 +1229,16 @@ export interface components {
                 /** Format: date */
                 to_day: string;
                 miles: number;
-                /** @description The average of the week prices over the stretch's days; null when a day has no price. */
+                /** @description The average of the gasoline week prices over the stretch's days; null when a day has no price. */
                 gas_price: string | null;
+                /** @description The same for diesel; null when a day has no price or diesel prices have not been read. */
+                diesel_price: string | null;
                 /** @description What the meter's energy cost, as in `getMeterEv`. */
                 ev_cost: string | null;
                 /** @description One per comparison, in the comparisons' order. */
                 gas: {
+                    /** @enum {string} */
+                    fuel: "gas" | "diesel";
                     mpg: number;
                     /** @description What the gas car would have burned over the miles. */
                     gallons: number;
@@ -1239,6 +1256,8 @@ export interface components {
                 ev_cost_per_mile: string | null;
                 /** @description One per comparison, in the comparisons' order. */
                 gas: {
+                    /** @enum {string} */
+                    fuel: "gas" | "diesel";
                     mpg: number;
                     gallons: number;
                     gas_cost: string;

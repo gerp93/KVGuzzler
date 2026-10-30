@@ -23,10 +23,18 @@ const Base = "https://api.eia.gov/v2/petroleum/pri/gnd/data/"
 const (
 	timeout = 30 * time.Second
 	maxBody = 4 << 20
-	// product is regular gasoline, all formulations: the grade a typical car takes.
-	product = "EPMR"
 	// maxDollars is a price per gallon no real week comes near: anything above it is not a price.
 	maxDollars = 50
+)
+
+// Product is a fuel EIA publishes a weekly retail price for.
+type Product string
+
+const (
+	// Gasoline is regular gasoline, all formulations: the grade a typical car takes.
+	Gasoline Product = "EPMR"
+	// Diesel is No. 2 diesel, all types.
+	Diesel Product = "EPD2D"
 )
 
 // Area is a place EIA publishes a weekly gasoline price for.
@@ -86,16 +94,16 @@ func (c *Client) base() string {
 	return Base
 }
 
-// Weekly reads an area's regular gasoline prices from the given day on, oldest first.
-func (c *Client) Weekly(ctx context.Context, apiKey, area string, since time.Time) ([]Price, error) {
+// Weekly reads an area's weekly retail prices of a fuel from the given day on, oldest first.
+func (c *Client) Weekly(ctx context.Context, apiKey, area string, fuel Product, since time.Time) ([]Price, error) {
 	if _, ok := AreaName(area); !ok {
-		return nil, fail("EIA has no gasoline price for the area %q.", area)
+		return nil, fail("EIA has no fuel price for the area %q.", area)
 	}
 	q := url.Values{}
 	q.Set("api_key", apiKey)
 	q.Set("frequency", "weekly")
 	q.Set("data[0]", "value")
-	q.Add("facets[product][]", product)
+	q.Add("facets[product][]", string(fuel))
 	q.Add("facets[duoarea][]", area)
 	q.Set("start", since.Format("2006-01-02"))
 	q.Set("sort[0][column]", "period")
@@ -137,7 +145,7 @@ func (c *Client) Weekly(ctx context.Context, apiKey, area string, since time.Tim
 			return nil, err
 		}
 		if len(prices) == 0 {
-			return nil, fail("EIA has no gasoline prices for that area since %s.", since.Format("2006-01-02"))
+			return nil, fail("EIA has no prices for that area since %s.", since.Format("2006-01-02"))
 		}
 		return prices, nil
 	}
