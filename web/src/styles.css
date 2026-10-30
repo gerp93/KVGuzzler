@@ -1955,8 +1955,7 @@ main > * {
 
 .tree-layout,
 .tree-stack,
-.tree-extra,
-.tree-side {
+.tree-extra {
   display: contents;
 }
 
@@ -2032,13 +2031,13 @@ main > * {
 
   /* The hierarchy in two columns: the tree on the left, the devices, computers and groups on the right.
      The last row is the flexible one, so the tree (which spans all of them) never stretches the rows of the cards beside it. */
+  /* The tree and the diagram side by side, always the same height: whichever is shorter grows to the taller one's. */
   .tree-layout {
     display: grid;
     grid-column: 1 / -1;
     grid-template-columns: minmax(0, 68rem) minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto 1fr;
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
   }
 
   .tree-stack {
@@ -2047,29 +2046,16 @@ main > * {
 
   .tree-stack > :first-child {
     grid-column: 1;
-    grid-row: 1 / -1;
   }
 
-  .tree-stack > :not(:first-child) {
-    grid-column: 2;
-  }
-
-  /* Devices, computers and groups side by side, as many across as fit */
   .tree-extra {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
-    gap: 16px;
-    align-items: start;
+    grid-column: 2;
     min-width: 0;
   }
 
-  .tree-layout .tree-extra > .wide {
-    grid-column: auto;
-  }
-
-  /* The diagram is drawn at its own size and needs the width of both columns, or it is scaled down until its text cannot be read */
   .tree-layout .tree-extra > .wide.diagram-card {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   /* A meter, a computer or a group on its own page: the figures across the top, then the cards in columns that fill from the top, each card whole,
@@ -2201,72 +2187,6 @@ main > * {
     --chart: 9;
     --wide: 8;
     --flow: 6;
-  }
-
-  .tree-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-  }
-
-  /* Two columns: the tree, and the devices, computers and groups beside it */
-  .tree-stack {
-    display: grid;
-    gap: 16px;
-    min-width: 0;
-    grid-column: 1;
-    grid-template-columns: minmax(0, 68rem) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .tree-stack > :first-child {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-  }
-
-  .tree-stack > :not(:first-child) {
-    grid-column: 2;
-  }
-}
-
-/* A really wide screen: the hierarchy in three columns, the tree, the diagram, and a slim column of devices, computers and groups. Narrower, the diagram and
-   those cards share the one column beside the tree. */
-@media (min-width: 2100px) {
-  .tree-layout {
-    grid-template-columns: minmax(0, 60rem) minmax(0, 1fr) minmax(19rem, 21rem);
-  }
-
-  .tree-extra {
-    display: contents;
-  }
-
-  .tree-layout .tree-extra > .wide.diagram-card {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .tree-side {
-    display: grid;
-    grid-column: 3;
-    grid-row: 1;
-    align-content: start;
-    gap: 16px;
-    min-width: 0;
-  }
-
-  .tree-layout .tree-side > .wide {
-    grid-column: auto;
-  }
-}
-
-/* Wider still, the one grid is the tree stack's (see above), so it takes the three columns */
-@media (min-width: 3800px) {
-  .tree-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-  }
-
-  .tree-stack {
-    grid-template-columns: minmax(0, 60rem) minmax(0, 1fr) minmax(19rem, 21rem);
   }
 }
 

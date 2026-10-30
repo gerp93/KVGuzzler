@@ -77,6 +77,21 @@ export function RatesCard() {
         </select>
       </label>
 
+      {cfg.mode === 'lookup' && (
+        tariff ? (
+          <>
+            <CurrentRate current={tariff} />
+            <p class="caption">
+              <a href={routePath('connectors')}>Change the rate in the Connectors tab</a>
+            </p>
+          </>
+        ) : (
+          <p class="note">
+            No rate chosen. <a href={routePath('connectors')}>Choose one in the Connectors tab</a>.
+          </p>
+        )
+      )}
+
       <label class="field">
         <span>Currency (three-letter code)</span>
         <input
@@ -101,21 +116,6 @@ export function RatesCard() {
         />
       </label>
       {looksLikeCents && <p class="note">Over 1.00 per kWh. Did you enter cents? 15¢ is 0.15.</p>}
-
-      {cfg.mode === 'lookup' && (
-        tariff ? (
-          <>
-            <CurrentRate current={tariff} />
-            <p class="caption">
-              <a href={routePath('connectors')}>Change the rate in the Connectors tab</a>
-            </p>
-          </>
-        ) : (
-          <p class="note">
-            No rate chosen. <a href={routePath('connectors')}>Choose one in the Connectors tab</a>.
-          </p>
-        )
-      )}
 
       {cfg.mode === 'bills' && (
         <>
