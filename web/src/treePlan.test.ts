@@ -41,7 +41,7 @@ describe('the plan of the Hierarchy tab', () => {
       ['range', 1],
       ['garage', 1],
       ['ev', 2],
-      ['Other (not metered)', 2], // what the garage's feed carries beyond the ev
+      ['Everything else', 2], // what the garage's feed carries beyond the ev
       ['Everything else', 1],
       ['pc', 2],
       ['CPU', 3],
@@ -50,13 +50,13 @@ describe('the plan of the Hierarchy tab', () => {
     ]);
   });
 
-  it('has no "Other (not metered)" under the house: what is left of it is the group', () => {
-    expect(plan().filter((e) => e.kind === 'lump' && e.label === 'Other (not metered)' && e.depth === 1)).toEqual([]);
+  it('has no remainder line of its own under the house: what is left of it is the group', () => {
+    expect(plan().filter((e) => e.kind === 'lump' && e.id.startsWith('rest:') && e.depth === 1)).toEqual([]);
   });
 
   it('says the figures the Live page says: the house less its circuits, and what the plugs leave of that', () => {
     const lumps = plan().filter((e) => e.kind === 'lump');
-    const group = lumps.find((e) => e.label === 'Everything else')!;
+    const group = lumps.find((e) => e.id === 'else')!;
     expect(group).toMatchObject({ watts: 400, kwh: 4, cost: '0.80' });
     const left = lumps.find((e) => e.label === 'Not individually metered')!;
     expect(left).toMatchObject({ watts: 210, kwh: 2 });

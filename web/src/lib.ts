@@ -776,8 +776,9 @@ export function formatBytes(bytes: number): string {
 
 export const PROJECT_URL = 'https://github.com/gerp93/KVGuzzler';
 export const ISSUES_URL = 'https://github.com/gerp93/KVGuzzler/issues';
-/** The viewer's installers are pre-releases tagged viewer-vX.Y.Z (see .github/workflows/release-viewer.yml). */
-export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases?q=viewer-v';
+/** The viewer's installers are pre-releases tagged viewer-vX.Y.Z (see .github/workflows/release-viewer.yml), titled "House Power viewer X.Y.Z". GitHub's release
+ * search does not match the tag text "viewer-v" (it finds nothing), so this searches the title's word: the newest comes first. */
+export const VIEWER_RELEASES_URL = 'https://github.com/gerp93/KVGuzzler/releases?q=viewer';
 
 /** What a looked-up price comes to over a period, in words: the rate and what the period averaged to per kWh. With no energy to average over it says
  * only which rate it is. */

@@ -1,6 +1,6 @@
 // The energy flow chart's data and layout, with no drawing in it. A flow chart is a tree laid out left to right: the whole on the left, its
 // parts to the right, each band as wide as the energy that went through it. The same rule as everywhere else holds: a parent's own reading
-// already contains its children, so what is left over is its own band ("Other (not metered)"); nothing is added twice.
+// already contains its children, so what is left over is its own band ("Everything else"); nothing is added twice.
 import { formatKwh, formatMoney, moneyText, shownMeters, sumMoney, type Meter, type Summary } from './lib';
 import { topLevelMeters } from './measured';
 
@@ -10,9 +10,9 @@ export interface FlowNode {
   /** Energy over the period: the meter's own reading. */
   kwh: number;
   cost: string | null;
-  /** The meter it stands for, or null for a derived line ("Other (not metered)", the whole house). */
+  /** The meter it stands for, or null for a derived line ("Everything else", the whole house). */
   meterId: string | null;
-  /** The line for what a parent's own reading carries beyond its parts ("Other (not metered)"). */
+  /** The line for what a parent's own reading carries beyond its parts ("Everything else"). */
   rest?: boolean;
   /** "Everything else" under the whole house: the house less its circuits, holding the plugs and computers that sit on no clamped circuit. Its own figure already
    * contains them. */
@@ -60,7 +60,7 @@ export function flowTree(meters: Meter[], summary: Summary, rootId?: string, vir
     const own = f?.kwh ?? 0;
     if (children.length > 0) {
       const left = own - children.reduce((t, c) => t + c.kwh, 0);
-      if (left > 0) children.push(rest(m.id, 'Other (not metered)', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
+      if (left > 0) children.push(rest(m.id, 'Everything else', left, moneyLeft(f?.cost, children.map((c) => c.cost))));
     }
     return { id: m.id, label: m.label, kwh: own, cost: f?.cost ?? null, meterId: m.id, children };
   };

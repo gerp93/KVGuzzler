@@ -42,7 +42,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
               <Row key={r.name} name={r.name} watts={r.watts} base={split.baseWatts} />
             ))}
             {split.otherWatts != null && split.otherWatts > 0 && (
-              <Row name="Other (not metered)" watts={split.otherWatts} base={split.baseWatts} />
+              <Row name="Everything else" watts={split.otherWatts} base={split.baseWatts} />
             )}
           </ul>
         )}

@@ -58,7 +58,7 @@ export function planTree({ rows, watts, houseWatts, summary, rests, partsOf }: P
         const title = r.parent.scope === 'mains'
           ? 'What the whole house used that none of the circuits and plugs listed under it accounts for'
           : `What ${r.parent.label} carried beyond the meters listed inside it`;
-        out.push({ kind: 'lump', id: `rest:${r.parent.id}`, label: 'Other (not metered)', title, tag: 'remainder', depth: r.depth + shift, watts: r.watts, kwh: r.kwh, cost: r.cost });
+        out.push({ kind: 'lump', id: `rest:${r.parent.id}`, label: 'Everything else', title, tag: 'remainder', depth: r.depth + shift, watts: r.watts, kwh: r.kwh, cost: r.cost });
       }
     }
   };

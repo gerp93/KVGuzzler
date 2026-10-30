@@ -1,4 +1,4 @@
-// The "Other (not metered)" lines of the Hierarchy tree: under every meter that holds others, what its own reading carries beyond the meters listed inside
+// The "Everything else" lines of the Hierarchy tree: under every meter that holds others, what its own reading carries beyond the meters listed inside
 // it (and, under the whole house, beyond the circuits and plugs listed beneath it). Its energy and cost are the flow chart's own figures for the same
 // period, so the tree and the chart above it never disagree; right now is the meter's draw less what is listed inside it. It is never added to anything.
 import type { FlowNode } from './flow';

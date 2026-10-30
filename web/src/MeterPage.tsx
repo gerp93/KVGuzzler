@@ -1,5 +1,5 @@
 // One meter's page: how much it used over a period, what that cost, its highest draw and carbon, what is inside it (a sub-panel's circuits, a
-// circuit's plugs, nested as wired, with what is left over as "Other (not metered)"), and a chart of it with the meters directly inside it. The
+// circuit's plugs, nested as wired, with what is left over as "Everything else"), and a chart of it with the meters directly inside it. The
 // parent's own reading already contains the ones inside, so none of this is added up.
 import { api } from './api';
 import { Bars } from './Bars';
