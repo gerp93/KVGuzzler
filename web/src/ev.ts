@@ -199,3 +199,23 @@ export function parseKwh(text: string): number | null {
 
 /** A share (0 to 1) as a whole percent: "86 %". */
 export const percentText = (share: number): string => `${Math.round(share * 100)} %`;
+
+/**
+ * What the gas car would have cost and what charging cost, each added up over the odometer readings, so the two can be drawn against each other: the gap
+ * between them is the savings. Only a stretch with both costs known counts (the same as the savings), and the lines start at zero on the day the first such
+ * stretch began.
+ */
+export function cumulativeCosts(stretches: EvSavings['stretches']): { x: number[]; gas: number[]; ev: number[] } {
+  const counted = stretches.filter((s) => s.gas_cost != null && s.ev_cost != null);
+  const first = counted[0];
+  if (!first) return { x: [], gas: [], ev: [] };
+  const x = [noon(first.from_day)];
+  const gas = [0];
+  const ev = [0];
+  for (const s of counted) {
+    x.push(noon(s.to_day));
+    gas.push(gas[gas.length - 1]! + Number(s.gas_cost));
+    ev.push(ev[ev.length - 1]! + Number(s.ev_cost));
+  }
+  return { x, gas, ev };
+}

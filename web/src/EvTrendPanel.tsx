@@ -12,9 +12,14 @@ export function EvTrendPanel({ tabs }: { tabs: TrendTab[] }) {
   const tab = tabs.find((t) => t.id === id);
 
   // The chart is rebuilt when its inputs are different objects, and the page polls: so what it is given is made again only when the points really changed.
-  const key = tab ? `${tab.id}|${tab.x.join(',')}|${tab.y.join(',')}` : '';
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const lines = useMemo<Line[]>(() => (tab ? [{ name: tab.label, colorVar: tab.colorVar, x: tab.x, y: tab.y }] : []), [key]);
+  const key = tab ? `${tab.id}|${tab.x.join(',')}|${tab.y.join(',')}|${tab.second?.y.join(',') ?? ''}` : '';
+  const lines = useMemo<Line[]>(() => {
+    if (!tab) return [];
+    const out: Line[] = [{ name: tab.lineName ?? tab.label, colorVar: tab.colorVar, x: tab.x, y: tab.y }];
+    if (tab.second) out.push({ name: tab.second.name, colorVar: tab.second.colorVar, x: tab.x, y: tab.second.y });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const domain = useMemo(() => tab?.domain ?? [0, 1], [key]) as [number, number];
   if (!tab) return null;

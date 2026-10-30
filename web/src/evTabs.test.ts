@@ -71,7 +71,7 @@ describe('trendTabs', () => {
     const ids = (t: ReturnType<typeof trendTabs>) => t.map((x) => x.id);
     expect(ids(trendTabs({ ev: ev([]), savings: undefined, charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
     expect(ids(trendTabs({ ev: ev([]), savings: savings({ configured: false }), charges: undefined, unit: 'miles' }))).toEqual(['efficiency', 'cost', 'charge']);
-    expect(ids(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toEqual(['saved', 'efficiency', 'cost', 'charge', 'gas']);
+    expect(ids(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toEqual(['versus', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
   });
 
   it('draws nothing from a week of readings that is not a week yet, and says how far along it is', () => {
@@ -92,6 +92,19 @@ describe('trendTabs', () => {
     const [eff] = trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'km' });
     expect(eff!.y[0]).toBeCloseTo(3 * 1.609344, 6);
     expect(eff!.title).toContain('kilometers');
+  });
+
+  it('draws the gas car and charging against each other from zero, each added up', () => {
+    const versus = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }).find((t) => t.id === 'versus')!;
+    expect(versus.y).toEqual([0, 16, 32]);
+    expect(versus.second?.y).toEqual([0, 2, 4]);
+    expect(versus.x.map((s) => new Date(s * 1000).toISOString().slice(0, 10))).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
+    expect(versus.lineName).toBe('Gas car, 25 mpg');
+    expect(tabReady(versus)).toBe(true);
+  });
+
+  it('opens on the gas car against charging when it can be drawn', () => {
+    expect(firstReady(trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' }))).toBe('versus');
   });
 
   it('adds the savings up and takes the gas prices as they are', () => {
