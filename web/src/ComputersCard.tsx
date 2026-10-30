@@ -1,40 +1,19 @@
-// Computers: each is a row with its setup total (the wall plug plus its peripherals, which are separate plugs, so adding them is sound) in the same
-// columns as the tree. The arrow opens what it is made of: its name, its wall plug, its peripherals. The wall plug and a peripheral stay where they
-// are plugged in in the tree; this is only the grouping, like a group.
+// Computers, in the Connectors tab: each PC with the collector that reports its CPU, GPU, memory and programs (whether it is being heard from), and what the
+// computer is made of: its name, its wall plug (the whole PC at the wall) and its peripherals (each a separate plug). The wall plug and a peripheral stay where
+// they are plugged in in the tree; this is only the grouping, like a group. A PC's figures are on its own page. The collector pushes rather than being polled,
+// and where it sends to is set on the PC.
 import { useState } from 'preact/hooks';
+import { AddPanel } from './AddPanel';
 import { api } from './api';
+import { collectorState } from './collector';
 import { usePoll } from './hooks';
-import { Kwh, Watts } from './Watts';
-import { formatMoney, type Computer, type ComputerDetail, type Meter } from './lib';
+import { formatAge, type Computer, type Meter } from './lib';
 import { routePath } from './route';
 
-interface Loaded {
-  computers: Computer[];
-  details: Map<string, ComputerDetail>;
-}
-
-export function ComputersCard({
-  meters, onChanged, watts, from, to,
-}: {
-  meters: Meter[];
-  onChanged: () => void;
-  /** What each meter draws right now, by meter id. */
-  watts: Map<string, number>;
-  /** The period the Energy and Cost columns follow (the one picked at the top of the tab). */
-  from?: string;
-  to?: string;
-}) {
+export function ComputersCard({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   const [rev, setRev] = useState(0);
-  const { data, error } = usePoll<Loaded>(
-    async () => {
-      const computers = await api.computers();
-      const details = new Map<string, ComputerDetail>();
-      if (from && to) await Promise.all(computers.map(async (c) => details.set(c.id, await api.computerDetail(c.id, from, to))));
-      return { computers, details };
-    },
-    30_000,
-    [rev, meters, from, to],
-  );
+  const [adding, setAdding] = useState(false);
+  const { data: computers, error } = usePoll<Computer[]>(api.computers, 5000, [rev, meters]);
   const [message, setMessage] = useState('');
 
   const run = (work: Promise<unknown>) =>
@@ -48,26 +27,33 @@ export function ComputersCard({
     );
 
   return (
-    <section class="card wide">
-      <h2>Computers</h2>
+    <section class="card page-narrow">
+      <div class="card-head">
+        <h2>Computers</h2>
+        <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+          ＋ Add
+        </button>
+      </div>
+      <p class="caption">PCs, their plugs, and the collector that reports what is inside each.</p>
+      {adding && (
+        <AddPanel
+          kinds={['computer']}
+          onAdded={() => {
+            setAdding(false);
+            setRev((n) => n + 1);
+            onChanged();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
       {error && <p class="note">{error.message}</p>}
-      {data && data.computers.length === 0 && <p class="note">No computers yet.</p>}
-      {data && data.computers.length > 0 && (
-        <>
-          <div class="hier-head" aria-hidden="true">
-            <span class="hier-tag" />
-            <span class="num">Power</span>
-            <span class="num">Amps</span>
-            <span class="num">Volts</span>
-            <span class="num">Energy</span>
-            <span class="num">Cost</span>
-          </div>
-          <ul class="hier">
-            {data.computers.map((c) => (
-              <ComputerRow key={c.id} computer={c} detail={data.details.get(c.id)} meters={meters} watts={watts} run={run} />
-            ))}
-          </ul>
-        </>
+      {computers && computers.length === 0 && <p class="note">No computers yet. A PC running the collector adds itself.</p>}
+      {computers && computers.length > 0 && (
+        <ul class="settings devices">
+          {computers.map((c) => (
+            <ComputerRow key={c.id} computer={c} meters={meters} run={run} />
+          ))}
+        </ul>
       )}
       {message && (
         <p class="note error" role="alert">
@@ -78,15 +64,7 @@ export function ComputersCard({
   );
 }
 
-function ComputerRow({
-  computer, detail, meters, watts, run,
-}: {
-  computer: Computer;
-  detail?: ComputerDetail;
-  meters: Meter[];
-  watts: Map<string, number>;
-  run: (work: Promise<unknown>) => void;
-}) {
+function ComputerRow({ computer, meters, run }: { computer: Computer; meters: Meter[]; run: (work: Promise<unknown>) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(computer.name);
   const [confirming, setConfirming] = useState(false);
@@ -96,10 +74,14 @@ function ComputerRow({
   const wallChoices = meters.filter((c) => c.scope === 'pc' && mine(c));
   const peripheralChoices = meters.filter((c) => c.scope === 'plug' && mine(c));
 
-  const plugs = [computer.wall_meter_id, ...computer.peripheral_meter_ids].filter((id): id is string => !!id);
-  const nowParts = plugs.map((id) => watts.get(id)).filter((w): w is number => w !== undefined);
-  const now = nowParts.length > 0 ? nowParts.reduce((t, w) => t + w, 0) : null;
-  const count = plugs.length;
+  const heard = computer.source_id ? collectorState(computer.last_seen, Date.now()) : undefined;
+  const status = !heard
+    ? 'no collector'
+    : heard.state === 'never'
+      ? 'collector has never reported'
+      : heard.state === 'reporting'
+        ? `collector reporting, ${formatAge(heard.ageSeconds)}`
+        : `collector not answering, last heard ${formatAge(heard.ageSeconds)}`;
 
   const setWall = (meterId: string) => {
     // One wall plug per computer: let the old one go first, then tie the new one.
@@ -111,54 +93,45 @@ function ComputerRow({
   };
 
   return (
-    <li class="hier-row">
-      <div class="hier-main">
-        <button type="button" class="twisty" aria-expanded={open} aria-label={`Plugs of ${computer.name}`} onClick={() => setOpen(!open)}>
-          <span aria-hidden="true">▸</span>
-        </button>
-        <span />
-        <span />
-        <label class="grow">
-          <span class="visually-hidden">Name of the computer</span>
-          <input
-            value={name}
-            maxLength={60}
-            onInput={(e) => setName((e.target as HTMLInputElement).value)}
-            onBlur={() => name.trim() && name !== computer.name && run(api.updateComputer(computer.id, { name }))}
-            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-          />
-        </label>
-        <span class="caption hier-tag" title="The wall plug plus the peripherals">
-          setup · {count} {count === 1 ? 'plug' : 'plugs'}
+    <li class="device-row">
+      <div class="device-main">
+        <span class="grow">
+          {heard && <span class={heard.state === 'reporting' ? 'dot on' : 'dot'} role="img" aria-label={heard.state === 'reporting' ? 'reporting' : 'not answering'} />}
+          <a href={routePath('hierarchy', 'computer', computer.id)}>{computer.name}</a> <span class="caption">{status}</span>
         </span>
-        <span class="num hier-watts">{now !== null ? <Watts w={now} /> : ''}</span>
-        <span class="hier-amps" />
-        <span class="hier-volts" />
-        <span class="num hier-energy">{detail?.setup_kwh != null ? <Kwh k={detail.setup_kwh} /> : ''}</span>
-        <span class="num hier-cost">{detail?.setup_cost != null ? formatMoney(detail.setup_cost, detail.cost_estimated) : detail ? '—' : ''}</span>
-        <div class="hier-actions">
-          <a class="button icon" href={routePath('hierarchy', 'computer', computer.id)} title="Open the computer's page" aria-label={`Open ${computer.name}`}>
-            ›
-          </a>
-          {confirming ? (
-            <>
-              <button type="button" onClick={() => run(api.removeComputer(computer.id))}>
-                Remove it
-              </button>
-              <button type="button" onClick={() => setConfirming(false)}>
-                Keep
-              </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => setConfirming(true)} title="Remove the computer (its plugs stay)" aria-label={`Remove ${computer.name}`}>
-              ✕
+        {confirming ? (
+          <>
+            <button type="button" onClick={() => run(api.removeComputer(computer.id))}>
+              Remove it
             </button>
-          )}
-        </div>
+            <button type="button" onClick={() => setConfirming(false)}>
+              Keep
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+              Edit
+            </button>
+            <button type="button" onClick={() => setConfirming(true)} title="Remove the computer (its plugs stay)">
+              Remove
+            </button>
+          </>
+        )}
       </div>
 
       {open && (
-        <div class="hier-panel">
+        <div class="device-edit">
+          <label class="field">
+            <span>Name</span>
+            <input value={name} maxLength={60} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+          </label>
+          <div class="chips">
+            <button type="button" disabled={!name.trim() || name.trim() === computer.name} onClick={() => run(api.updateComputer(computer.id, { name: name.trim() }))}>
+              Save
+            </button>
+          </div>
+
           <label class="field">
             <span>Wall plug (measures the whole PC)</span>
             <select value={computer.wall_meter_id ?? ''} onChange={(e) => setWall((e.target as HTMLSelectElement).value)}>
