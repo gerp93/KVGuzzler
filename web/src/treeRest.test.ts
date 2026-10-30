@@ -20,7 +20,7 @@ const summary: Summary = {
   ],
 } as unknown as Summary;
 
-describe('the "Other (not metered)" lines of the tree', () => {
+describe('the "Everything else" lines of the tree', () => {
   const meters = [m('house', 'mains'), m('dryer', 'circuit'), m('garage', 'circuit'), m('ev', 'circuit', 'garage')];
   const rows = underHouse(arrangeByPanel(shownMeters(meters)));
   const watts = new Map([['house', 8000], ['dryer', 3000], ['garage', 4200], ['ev', 4000]]);

@@ -1336,7 +1336,7 @@ a.button {
 .key-dot.working { background: var(--color-accent-red); }
 .key-dot.resting { background: var(--color-accent-green); }
 
-/* Lines worked out from others (a computer's parts, "Everything else", "Other (not metered)"): read-only, quieter than a meter, and nothing to drag */
+/* Lines worked out from others (a computer's parts, "Everything else"): read-only, quieter than a meter, and nothing to drag */
 .hier-row.virtual .part-name {
   color: var(--muted);
   font-style: italic;

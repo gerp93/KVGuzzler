@@ -359,7 +359,7 @@ function PartRow({ id, part, depth, href, hot, share }: { id: string; part: PcPa
   );
 }
 
-/** A line worked out from others, not a meter: "Everything else" (the house less its circuits), "Not individually metered" inside it, and "Other (not metered)"
+/** A line worked out from others, not a meter: "Everything else" (the house less its circuits), "Not individually metered" inside it, and "Everything else"
  * under a meter that holds others (what its own reading carries beyond what is listed inside it). Read-only, and never added to anything. */
 function LumpLine({ line, hot, share }: { line: LumpEntry; hot: boolean; share: number }) {
   // "Everything else" holds the rows under it, so its name starts at the row's edge (where a meter's arrow is), not in the name column: what is inside it

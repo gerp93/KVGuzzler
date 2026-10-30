@@ -1,6 +1,6 @@
 // The parts of a computer that its own collector reports (CPU, GPU, memory), shown under the computer's wall plug in the hierarchy and in the flow
 // chart. They are not stored meters: they come from the computer's detail for the period. The wall plug's reading already contains them, so what
-// they do not account for (fans, drives, the motherboard, power-supply losses, and any time the sensors were not sampling) is "Other (not metered)":
+// they do not account for (fans, drives, the motherboard, power-supply losses, and any time the sensors were not sampling) is "Everything else":
 // the wall plug less the parts, never the parts added to the wall plug.
 import { api } from './api';
 import { usePoll } from './hooks';
@@ -20,7 +20,7 @@ export interface PcPart {
 
 const money = (kwh: number, rate: number | null) => (rate == null ? null : moneyText(kwh * rate));
 
-/** The parts to show under a computer's wall plug: each sensor (biggest first), then "Other (not metered)". Empty when the computer reports no sensors or has
+/** The parts to show under a computer's wall plug: each sensor (biggest first), then "Everything else". Empty when the computer reports no sensors or has
  * no wall plug. `wallWatts` is the wall plug's reading right now, if known. */
 export function pcParts(detail: ComputerDetail, wallWatts: number | null): PcPart[] {
   const wall = detail.wall;
@@ -36,7 +36,7 @@ export function pcParts(detail: ComputerDetail, wallWatts: number | null): PcPar
   const nowAll = parts.every((p) => p.watts != null);
   parts.push({
     key: 'not-metered',
-    label: 'Other (not metered)',
+    label: 'Everything else',
     kwh: left,
     cost: money(left, rate),
     watts: wallWatts != null && nowAll ? Math.max(0, wallWatts - parts.reduce((t, p) => t + (p.watts ?? 0), 0)) : null,

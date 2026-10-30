@@ -4,7 +4,7 @@ import { EstimatorView } from './EstimatorView';
 import { usePoll, useStored } from './hooks';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { PeriodPicker } from './Periods';
-import { compareOrder, formatMoney, formatWatts, periodRange, sumByTime, type Meter, type PeriodKey, type Summary } from './lib';
+import { compareOrder, formatKwh, formatMoney, formatWatts, periodRange, sumByTime, type Meter, type PeriodKey, type Summary } from './lib';
 
 /** The colours of the compared lines, in the order they were picked (`--series-N`, one per hue, defined in features.css): more than a few can be shown at once. */
 const SERIES = 10;
@@ -13,6 +13,9 @@ const seriesColor = (i: number) => `--series-${(i % SERIES) + 1}`;
 export function HistoryView({ meters }: { meters: Meter[] }) {
   const [period, setPeriod] = useStored('period', '24h');
   const [picked, setPicked] = useStored('chart-meters', '');
+  // The house's own line can be switched off like any other, so it need not be on the grid.
+  const [houseSetting, setHouseSetting] = useStored('chart-house', 'on');
+  const houseOn = houseSetting !== 'off';
   const mains = meters.filter((c) => c.enabled && c.scope === 'mains');
   const others = meters.filter((c) => c.enabled && c.scope !== 'mains');
   const ids = picked.split(',').filter(Boolean);
@@ -37,7 +40,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
     async () => {
       const { from, to } = periodRange(period as PeriodKey, new Date());
       const [house, rest] = await Promise.all([
-        Promise.all(mains.map((m) => api.series(m.id, from, to))),
+        Promise.all((houseOn ? mains : []).map((m) => api.series(m.id, from, to))),
         Promise.all(picks.map((c) => api.series(c.id, from, to))),
       ]);
       const out: Line[] = [];
@@ -47,7 +50,7 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
       return { lines: out, domain: [Date.parse(from) / 1000, Date.parse(to) / 1000] };
     },
     60_000,
-    [period, picks.map((c) => c.id).join(','), meters],
+    [period, picks.map((c) => c.id).join(','), meters, houseOn],
   );
 
   const toggle = (id: string) => {
@@ -67,15 +70,32 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         {data && data.lines.some((l) => l.x.length > 0) ? (
           <Chart lines={data.lines} domain={data.domain} height={tallChartHeight()} />
         ) : (
-          <p class="note">{data ? 'Nothing recorded in this period yet.' : 'Loading…'}</p>
+          <p class="note">{!data ? 'Loading…' : !houseOn && picks.length === 0 ? 'Nothing is switched on. Pick the house or a meter below.' : 'Nothing recorded in this period yet.'}</p>
         )}
         <p class="caption">Average watts per point</p>
       </section>
 
       <section class="card wide aside-card">
-        <h2>Compare with the house</h2>
+        <h2>On the chart</h2>
         <p class="caption">Any of them, biggest user in the period first. Each shows its average draw and cost over the period; one that drew nothing then (0 W) is greyed out.</p>
         <div class="chips">
+          {mains.length > 0 && (
+            <button
+              type="button"
+              class="compare"
+              aria-pressed={houseOn}
+              title="The whole house: the main meters added together"
+              onClick={() => setHouseSetting(houseOn ? 'off' : 'on')}
+            >
+              <span class="compare-name">
+                {houseOn && <i class="swatch" style={{ background: 'var(--color-text)' }} aria-hidden="true" />}
+                House
+              </span>
+              {figures?.house_kwh != null && (
+                <span class="compare-figs">{`${formatKwh(figures.house_kwh)}${figures.house_cost != null ? ` · ${formatMoney(figures.house_cost, figures.cost_estimated ?? false)}` : ''}`}</span>
+              )}
+            </button>
+          )}
           {order.map(({ meter: c, usable, avgWatts, cost, costEstimated, kwh }) => {
             const at = picks.findIndex((x) => x.id === c.id);
             return (

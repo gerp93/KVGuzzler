@@ -1,5 +1,5 @@
 // A list of meters as bars in a table: name, live watts, and (over a period) energy, cost and share, each in a column of its own under a heading. A meter that holds others is followed by the ones
-// inside it and by an "Other (not metered)" line (its figure less theirs). Each real meter opens its own page.
+// inside it and by an "Everything else" line (its figure less theirs). Each real meter opens its own page.
 import { Kwh, Watts } from './Watts';
 import { levelsById, meterState, stateTitle, type Levels } from './levels';
 import { formatMoney, formatShare, moneyText, periodWords, type MeterSummary, type PeriodKey, type Summary } from './lib';
@@ -41,15 +41,15 @@ export function Bars({ rows, of, summary, baseKwh, period, levels }: { rows: Bar
             };
           }
           const share = mine ? formatShare(mine.kwh, baseKwh) : '';
-          const title = r.lump ? r.lump.label : r.remainder ? `Other (not metered) on ${r.meter.label}` : r.meter.label;
+          const title = r.lump ? r.lump.label : r.remainder ? `Everything else on ${r.meter.label}` : r.meter.label;
           const derived = !!(r.lump || r.remainder);
-          // Working or resting right now, by the meter's own learned levels; a derived row (a lump, "Other (not metered)") is no meter and has none.
+          // Working or resting right now, by the meter's own learned levels; a derived row (a lump, "Everything else") is no meter and has none.
           const level = derived ? undefined : byId.get(r.meter.id);
           const state = meterState(level, r.watts);
           return (
             <li key={r.lump ? `lump-${r.lump.label}` : r.remainder ? `rest-${r.meter.id}` : r.meter.id} class={derived ? 'rest' : undefined} style={r.depth ? { paddingLeft: `${r.depth * 1.25}rem` } : undefined}>
               <span class="name" title={title}>
-                {r.lump ? r.lump.label : r.remainder ? 'Other (not metered)' : <a href={meterPath(r.meter)}>{r.meter.label}</a>}
+                {r.lump ? r.lump.label : r.remainder ? 'Everything else' : <a href={meterPath(r.meter)}>{r.meter.label}</a>}
               </span>
               <span class="bar" aria-hidden="true">
                 <i style={{ width: `${of > 0 ? Math.min(100, (r.watts / of) * 100) : 0}%` }} />
