@@ -12,7 +12,6 @@ import { breakerLevel, breakerPercent, formatAmpsOf, formatVolts } from './amps'
 import { BreakerField } from './Breaker';
 import { OdometerNow } from './EvCard';
 import { flowTree } from './flow';
-import { GroupsCard } from './GroupsCard';
 import { ComputerView } from './ComputerView';
 import { GroupView } from './GroupView';
 import { usePoll, useStored } from './hooks';
@@ -577,9 +576,6 @@ function Tree({ meters, onChanged }: { meters: Meter[]; onChanged: () => void })
           <h2>Diagram</h2>
           <HierarchyDiagram entries={entries} watts={watts} figures={figures} stateOf={(id) => meterState(levels.get(id), watts.get(id))} hover={hover} onHover={setHover} />
         </section>
-        <div class="tree-side">
-          <GroupsCard meters={meters} watts={watts} from={summary?.from} to={summary?.to} />
-        </div>
       </div>
         </div>
       </div>
