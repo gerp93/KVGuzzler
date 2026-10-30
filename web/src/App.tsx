@@ -16,9 +16,9 @@ import { SettingsView } from './SettingsView';
 
 const TABS = [
   { id: 'live', label: 'Live' },
+  { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'history', label: 'History' },
   { id: 'carbon', label: 'Carbon' },
-  { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'connectors', label: 'Connectors' },
   { id: 'settings', label: 'Settings' },
   { id: 'help', label: 'Help' },

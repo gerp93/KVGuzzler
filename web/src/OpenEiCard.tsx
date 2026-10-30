@@ -2,6 +2,7 @@
 // saved in a private file on the server, never shown again, and sent to api.openei.org only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
+import { ApiKeyField } from './ApiKeyField';
 
 export function OpenEiCard() {
   const [hasKey, setHasKey] = useState<boolean>();
@@ -34,14 +35,10 @@ export function OpenEiCard() {
     <section class="card page-narrow">
       <h2>Open Energy Information (OpenEI)</h2>
       <p class="caption">Utility electricity rates, for the electricity price. Free key from openei.org.</p>
-      <p class="caption">{hasKey == null ? 'Checking…' : hasKey ? 'A key is saved.' : 'No key saved.'}</p>
-      <label class="field">
-        <span>{hasKey ? 'New API key' : 'API key'}</span>
-        <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
-      </label>
+      <ApiKeyField saved={hasKey} value={key} onInput={setKey} />
       <div class="chips save">
         <button type="button" disabled={busy || key.trim().length < 8} onClick={() => save(key.trim())}>
-          {hasKey ? 'Replace key' : 'Save key'}
+          Save
         </button>
         {hasKey && (
           <button type="button" disabled={busy} onClick={() => save('')}>
