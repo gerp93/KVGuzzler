@@ -197,6 +197,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meterId}/ev/battery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The battery's usable energy in kWh, as the owner set it.
+         * @description It turns the car's battery percentages into energy, so what charging lost (the wall's energy less the battery's) can be worked out in `getEvCharges`.
+         *     Ford's telemetry has a battery capacity member but this car leaves it empty, so the owner says it once, from the car's specification. Nothing is
+         *     assumed: `kwh` is null until it is set and there are no loss figures. 409 when the meter is not marked `ev`.
+         */
+        get: operations["getEvBattery"];
+        /**
+         * Save the battery's usable energy.
+         * @description 400 for a figure outside 10 to 300 kWh.
+         */
+        put: operations["putEvBattery"];
+        post?: never;
+        /** Take the battery's size off (the loss figures go with it). */
+        delete: operations["deleteEvBattery"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meterId}/ev/savings": {
         parameters: {
             query?: never;
@@ -1135,6 +1162,11 @@ export interface components {
             day: string;
             miles: number;
         };
+        EvBattery: {
+            meter_id: string;
+            /** @description The battery's usable energy in kWh; null until the owner sets it. */
+            kwh: number | null;
+        };
         EvCompare: {
             meter_id: string;
             /** @description The gas car's miles per gallon; null until the comparison is set up. */
@@ -1239,6 +1271,14 @@ export interface components {
                 pct_status: "active" | "none" | "waiting" | "early" | "small_gain" | "ok";
                 /** @description Energy at the wall for each percent the battery gained; given only when `pct_status` is `ok`. */
                 kwh_per_pct: number | null;
+                /** @description The energy that reached the battery, the gain times the battery's usable kWh. Null without the battery's size (`getEvBattery`), for a charge with no `kwh_per_pct`, or for one the meter measured under 95 percent of the time. */
+                battery_kwh: number | null;
+                /** @description What the wall gave that the battery did not take (the charger, the battery's heat, keeping the battery and cabin at temperature). Negative when the battery's size is too big for the numbers. */
+                loss_kwh: number | null;
+                /** @description The battery's energy over the wall's, 0 to 1 in a real charge; over 1 means the battery's size is too big. */
+                efficiency: number | null;
+                /** @description The lost energy at the charge's own price, a decimal string; null with no price or a negative loss. */
+                loss_cost: string | null;
             }[];
             /** @description How steady the energy per percent is over the charges that are `ok`. */
             consistency: {
@@ -1247,6 +1287,22 @@ export interface components {
                 kwh_per_pct: number;
                 lowest: number;
                 highest: number;
+            } | null;
+            /** @description The battery's usable energy as the owner set it; null until set. The loss figures need it. */
+            battery_kwh: number | null;
+            /** @description What charging lost over the charges that have a loss figure; null when there are none. */
+            losses: {
+                charges: number;
+                wall_kwh: number;
+                battery_kwh: number;
+                loss_kwh: number;
+                /** @description The battery's energy over the wall's over all of those charges, so a big charge counts for more than a small one. */
+                efficiency: number;
+                /** @description The lowest efficiency of a single charge. */
+                lowest: number;
+                highest: number;
+                /** @description The lost energy's price, a decimal string; null when a charge had no price. */
+                loss_cost: string | null;
             } | null;
             cost_estimated: boolean;
         };
@@ -2437,6 +2493,83 @@ export interface operations {
         };
     };
     deleteEvCompare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getEvBattery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvBattery"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    putEvBattery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meterId: components["parameters"]["MeterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    kwh: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvBattery"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteEvBattery: {
         parameters: {
             query?: never;
             header?: never;

@@ -188,3 +188,14 @@ export function parseMpg(text: string): number | null {
   const n = Number(text.trim().replace(/,/g, ''));
   return text.trim() !== '' && Number.isFinite(n) && n >= 5 && n <= 200 ? n : null;
 }
+
+export type EvBattery = components['schemas']['EvBattery'];
+
+/** A battery's usable energy as typed: a number of kWh from 10 to 300, or null. */
+export function parseKwh(text: string): number | null {
+  const n = Number(text.trim().replace(/,/g, ''));
+  return text.trim() !== '' && Number.isFinite(n) && n >= 10 && n <= 300 ? n : null;
+}
+
+/** A share (0 to 1) as a whole percent: "86 %". */
+export const percentText = (share: number): string => `${Math.round(share * 100)} %`;

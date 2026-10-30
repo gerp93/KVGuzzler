@@ -10,6 +10,7 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/evcharge"
 	"github.com/gerp93/KVGuzzler/server/internal/ford"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/rates"
 )
 
 const (
@@ -53,6 +54,28 @@ type evCharge struct {
 	PctStatus string   `json:"pct_status"`
 	// KWhPerPct is the energy at the wall for each percent the battery gained, given only when PctStatus is "ok".
 	KWhPerPct *float64 `json:"kwh_per_pct"`
+	// BatteryKWh is the energy that reached the battery (the gain times the battery's usable kWh), LossKWh what the wall gave that the battery did not take
+	// (the charger, the battery's heat, keeping the battery and cabin at temperature), Efficiency the first over the wall's energy and LossCost the loss at the
+	// charge's own price. Null without the battery's size, for a charge with no energy per percent, or for one the meter measured under 95 % of the time.
+	BatteryKWh *float64 `json:"battery_kwh"`
+	LossKWh    *float64 `json:"loss_kwh"`
+	Efficiency *float64 `json:"efficiency"`
+	LossCost   *string  `json:"loss_cost"`
+}
+
+// evLosses is what charging lost over the charges that have a loss figure.
+type evLosses struct {
+	Charges    int     `json:"charges"`
+	WallKWh    float64 `json:"wall_kwh"`
+	BatteryKWh float64 `json:"battery_kwh"`
+	LossKWh    float64 `json:"loss_kwh"`
+	// Efficiency is the battery's energy over the wall's, over all of those charges (so a big charge counts for more than a small one); Lowest and Highest are
+	// the extremes of single charges.
+	Efficiency float64 `json:"efficiency"`
+	Lowest     float64 `json:"lowest"`
+	Highest    float64 `json:"highest"`
+	// LossCost is the lost energy's price, null when a charge had no price.
+	LossCost *string `json:"loss_cost"`
 }
 
 // evConsistency is how steady the energy per percent is over the charges that have one.
@@ -68,10 +91,34 @@ type evConsistency struct {
 type evChargesAnswer struct {
 	MeterID string `json:"meter_id"`
 	// CarLinked says the battery's charge can be read for this meter (Ford is linked to it); without it charges have energy and cost but no battery figures.
-	CarLinked     bool           `json:"car_linked"`
-	Charges       []evCharge     `json:"charges"`
-	Consistency   *evConsistency `json:"consistency"`
-	CostEstimated bool           `json:"cost_estimated"`
+	CarLinked   bool           `json:"car_linked"`
+	Charges     []evCharge     `json:"charges"`
+	Consistency *evConsistency `json:"consistency"`
+	// BatteryKWh is the battery's usable energy as the owner set it (null until set); the loss figures need it.
+	BatteryKWh    *float64  `json:"battery_kwh"`
+	Losses        *evLosses `json:"losses"`
+	CostEstimated bool      `json:"cost_estimated"`
+}
+
+// minLossCoverage is the share of a charge the meter must have measured for its loss to be worked out: time it did not answer is not credited, so a charge
+// measured less than this has too little wall energy and would look more efficient than it was.
+const minLossCoverage = 0.95
+
+// addLoss works a charge's loss out of the battery's usable kWh. It needs the energy per percent, so only a settled charge with a real gain has one.
+func addLoss(v *evCharge, capacity float64) {
+	if v.KWhPerPct == nil || v.GainPct == nil || v.KWh <= 0 || v.Coverage < minLossCoverage {
+		return
+	}
+	battery := *v.GainPct * capacity / 100
+	loss := v.KWh - battery
+	eff := battery / v.KWh
+	v.BatteryKWh, v.LossKWh, v.Efficiency = &battery, &loss, &eff
+	if v.Cost != nil && loss >= 0 {
+		if cost, err := rates.ParseMoney(*v.Cost); err == nil {
+			c := cost.Mul(rates.MoneyFromFloat(loss / v.KWh)).String()
+			v.LossCost = &c
+		}
+	}
 }
 
 // EvTracker is the tracker that finds the vehicle's charges; the server's main runs it.
@@ -199,12 +246,41 @@ func (s *Server) evCharges(w http.ResponseWriter, r *http.Request) {
 	out := evChargesAnswer{MeterID: m.ID, Charges: []evCharge{}}
 	out.CarLinked = fordCar{s}.linked(ctx, m.ID) == nil
 	now := s.now()
+	capacity, err := s.evBatteryKWh(ctx, m.ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	out.BatteryKWh = capacity
 	var kwh, gain float64
+	var lossCost rates.Money
+	allPriced := true
 	for _, c := range list {
 		v, err := s.evChargeView(ctx, m, c, now)
 		if err != nil {
 			serverError(w, err)
 			return
+		}
+		if capacity != nil {
+			addLoss(&v, *capacity)
+		}
+		if v.Efficiency != nil {
+			if out.Losses == nil {
+				out.Losses = &evLosses{Lowest: *v.Efficiency, Highest: *v.Efficiency}
+			}
+			l := out.Losses
+			l.Charges++
+			l.WallKWh += v.KWh
+			l.BatteryKWh += *v.BatteryKWh
+			l.LossKWh += *v.LossKWh
+			l.Lowest, l.Highest = math.Min(l.Lowest, *v.Efficiency), math.Max(l.Highest, *v.Efficiency)
+			if v.LossCost != nil {
+				if m, err := rates.ParseMoney(*v.LossCost); err == nil {
+					lossCost = lossCost.Add(m)
+				}
+			} else {
+				allPriced = false
+			}
 		}
 		out.CostEstimated = out.CostEstimated || v.CostEstimated
 		if v.KWhPerPct != nil {
@@ -222,6 +298,13 @@ func (s *Server) evCharges(w http.ResponseWriter, r *http.Request) {
 	}
 	if out.Consistency != nil && gain > 0 {
 		out.Consistency.KWhPerPct = kwh / gain
+	}
+	if l := out.Losses; l != nil {
+		l.Efficiency = l.BatteryKWh / l.WallKWh
+		if allPriced {
+			c := lossCost.String()
+			l.LossCost = &c
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
