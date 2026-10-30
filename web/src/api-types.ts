@@ -1195,11 +1195,15 @@ export interface components {
             latest_price: string | null;
             /** @description Dollars per gallon of No. 2 diesel in the newest week, a decimal string; null when diesel prices have not been read. */
             latest_diesel_price: string | null;
+            /** @description The area the diesel price is for. EIA publishes weekly diesel for the country, the regions and California only, so any other area's diesel is the price of the region it is in. Null until diesel prices have been read. */
+            diesel_area_name: string | null;
         };
         EvSavings: {
             meter_id: string;
             configured: boolean;
             area_name: string | null;
+            /** @description The area the diesel prices are for (the area's region when EIA publishes no diesel for the area itself); null until diesel prices have been read. */
+            diesel_area_name: string | null;
             /** @description The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own if there is one) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order. */
             comparisons: {
                 /**

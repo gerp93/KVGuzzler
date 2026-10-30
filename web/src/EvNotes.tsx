@@ -1,6 +1,6 @@
 // How the EV card's figures are counted, in one place under it instead of a caveat after each figure: what the meter can and cannot see, where the gas prices
 // come from, and what the battery figures rest on. Closed by default; the figures above it do not repeat any of it.
-export function EvNotes({ areaName, gas, diesel, battery }: { areaName: string | null; gas: boolean; diesel: boolean; battery: boolean }) {
+export function EvNotes({ areaName, gas, dieselArea, battery }: { areaName: string | null; gas: boolean; dieselArea: string | null; battery: boolean }) {
   return (
     <details class="ev-notes">
       <summary>How this is counted</summary>
@@ -20,7 +20,8 @@ export function EvNotes({ areaName, gas, diesel, battery }: { areaName: string |
         </li>
         {gas && (
           <li>
-            <strong>Fuel prices</strong> are EIA's weekly average for regular gasoline{diesel ? ' and No. 2 diesel' : ''}{areaName ? ` in ${areaName}` : ''}, and each stretch is priced at the average over its
+            <strong>Fuel prices</strong> are EIA's weekly average for regular gasoline{areaName ? ` in ${areaName}` : ''}
+            {dieselArea ? ` and No. 2 diesel${dieselArea !== areaName ? `, for ${dieselArea} because EIA publishes no diesel price for ${areaName ?? 'this area'}` : ''}` : ''}, and each stretch is priced at the average over its
             days. The gas cars' upkeep is left out.
           </li>
         )}

@@ -37,6 +37,7 @@ const savings = (over: Partial<EvSavings> = {}): EvSavings => ({
   meter_id: 'm',
   configured: true,
   area_name: 'Minnesota',
+  diesel_area_name: 'Midwest (PADD 2)',
   comparisons: [
     { fuel: 'gas', mpg: 20, custom: false },
     { fuel: 'gas', mpg: 40, custom: false },
@@ -189,8 +190,8 @@ describe('the fuel price tab', () => {
     expect(on.lines.map((l) => l.name)).toEqual(['Gas', 'Diesel']);
     expect(on.lines[1]!.y).toEqual([4.8, 4.9]);
     expect(on.lines[1]!.dashed).toBe(true);
-    expect(on.title).toContain('diesel');
-    expect(on.title).toContain('Minnesota');
+    expect(on.title).toBe('Weekly average price per gallon of regular gasoline in Minnesota and No. 2 diesel in Midwest (PADD 2)');
+    expect(off.title).toBe('Weekly average price per gallon of regular gasoline in Minnesota');
   });
 
   it('has no diesel to offer when no diesel prices have been read', () => {

@@ -171,7 +171,7 @@ export function EvCard({ meter }: { meter: Meter }) {
       )}
 
       <div class="ev-foot">
-        {data && hasContent && <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} diesel={(savings?.diesel_prices.length ?? 0) > 0} battery={charges?.battery_kwh != null} />}
+        {data && hasContent && <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} dieselArea={savings?.diesel_area_name ?? null} battery={charges?.battery_kwh != null} />}
         <details class="ev-panel" ref={panel} open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
           <summary>Vehicle settings</summary>
           {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}

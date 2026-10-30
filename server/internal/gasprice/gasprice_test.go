@@ -116,6 +116,31 @@ func TestWeeklySaysSoWhenEIAHasNothing(t *testing.T) {
 	}
 }
 
+func TestEveryAreaHasADieselAreaThatEIAPublishesDieselFor(t *testing.T) {
+	for _, a := range Areas {
+		d, ok := DieselArea(a.ID)
+		if !ok || d.Name == "" {
+			t.Errorf("%s (%s) has no diesel area", a.ID, a.Name)
+			continue
+		}
+		if !dieselAreas[d.ID] {
+			t.Errorf("%s (%s) is given %s, which EIA publishes no diesel for", a.ID, a.Name, d.ID)
+		}
+		if dieselAreas[a.ID] && d.ID != a.ID {
+			t.Errorf("%s has diesel of its own but is given %s", a.ID, d.ID)
+		}
+	}
+	if d, _ := DieselArea("SMN"); d.ID != "R20" || d.Name != "Midwest (PADD 2)" {
+		t.Errorf("Minnesota's diesel = %+v, want the Midwest", d)
+	}
+	if d, _ := DieselArea("SCA"); d.ID != "SCA" {
+		t.Errorf("California's diesel = %+v, want California's own", d)
+	}
+	if _, ok := DieselArea("ZZ"); ok {
+		t.Error("an unknown area has a diesel area")
+	}
+}
+
 func TestEveryAreaHasANameAndAUniqueCode(t *testing.T) {
 	seen := map[string]bool{}
 	for _, a := range Areas {
