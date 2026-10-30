@@ -3,7 +3,7 @@
 // than showing nothing. The gas cars are the ones the viewer has ticked, so a range stands for them. The sums are the server's.
 import type { ComponentChildren } from 'preact';
 import { formatDistance, formatEfficiency, mpge, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
-import { savingsSummary } from './evGas';
+import { fuelWords, savingsSummary } from './evGas';
 import { formatMoney, formatPerMile } from './lib';
 
 function Tile({ tone, label, figure, unit, range, children }: { tone: string; label: string; figure: string; unit?: string; range?: boolean; children?: ComponentChildren }) {
@@ -41,8 +41,8 @@ export function EvHeadline({
   savings: EvSavings | undefined;
   charges: EvChargesAnswer | undefined;
   unit: DistanceUnit;
-  /** The miles per gallon of the gas cars the viewer has ticked. */
-  visible: number[];
+  /** The cars the viewer has ticked, by `compKey`. */
+  visible: string[];
   onOpenSettings: () => void;
 }) {
   const totals = ev.totals;
@@ -61,7 +61,8 @@ export function EvHeadline({
   const hi = sum ? (extra ? -sum.lowest : sum.highest) : 0;
   const isRange = sum != null && Math.abs(hi - lo) >= 0.005;
   const savedFigure = !sum ? '—' : isRange ? `${money(lo)} – ${money(hi)}` : money(lo);
-  const cars = sum ? (sum.count === 1 ? `a ${sum.mpgLow} mpg gas car` : `${sum.count} gas cars, ${sum.mpgLow} to ${sum.mpgHigh} mpg`) : '';
+  const kind = sum ? fuelWords(sum) : 'gas';
+  const cars = sum ? (sum.count === 1 ? `a ${sum.mpgLow} mpg ${kind} car` : `${sum.count} ${kind} cars, ${sum.mpgLow} to ${sum.mpgHigh} mpg`) : '';
 
   const [perMile, perMileUnit] = totals?.cost_per_mile != null ? splitAt(formatPerMile(totals.cost_per_mile, ev.cost_estimated, unit), '/') : ['—', undefined];
   const [eff, effUnit] = totals?.miles_per_kwh != null ? splitAt(formatEfficiency(totals.miles_per_kwh, unit), ' ') : ['—', undefined];
@@ -69,22 +70,22 @@ export function EvHeadline({
 
   return (
     <div class="ev-tiles">
-      <Tile tone="saved" label={extra ? 'Extra cost vs gas' : 'Saved vs gas'} figure={savedFigure} range={isRange}>
+      <Tile tone="saved" label={`${extra ? 'Extra cost' : 'Saved'} vs ${kind}`} figure={savedFigure} range={isRange}>
         {sum ? (
           <>
             <p class="kpi-hint">
               over {formatDistance(sum.miles, unit)} against {cars}
             </p>
             <p class="kpi-hint">
-              charging {money(sum.evCost)} · gas {sum.gasLow === sum.gasHigh ? money(sum.gasLow) : `${money(sum.gasLow)} to ${money(sum.gasHigh)}`}
+              charging {money(sum.evCost)} · {kind} {sum.gasLow === sum.gasHigh ? money(sum.gasLow) : `${money(sum.gasLow)} to ${money(sum.gasHigh)}`}
             </p>
           </>
         ) : savings?.configured && savings.totals ? (
-          <p class="kpi-hint">tick a gas car under the chart to compare with</p>
+          <p class="kpi-hint">tick a car under the chart to compare with</p>
         ) : savings?.configured ? (
           <p class="kpi-hint">needs two odometer readings that the gas prices cover</p>
         ) : (
-          <p class="kpi-hint">{open('Compare with gas cars')}</p>
+          <p class="kpi-hint">{open('Compare with other cars')}</p>
         )}
       </Tile>
 
@@ -92,8 +93,8 @@ export function EvHeadline({
         <p class="kpi-hint">
           {sum
             ? sum.perMileLow === sum.perMileHigh
-              ? `gas car ${perMileOf(sum.perMileLow)}`
-              : `gas cars ${perMileOf(sum.perMileLow).replace(/\/(mi|km)$/, '')} to ${perMileOf(sum.perMileHigh)}`
+              ? `${kind} car ${perMileOf(sum.perMileLow)}`
+              : `${kind} cars ${perMileOf(sum.perMileLow).replace(/\/(mi|km)$/, '')} to ${perMileOf(sum.perMileHigh)}`
             : totals
               ? `over ${formatDistance(totals.miles, unit)}`
               : 'needs two odometer readings'}

@@ -554,6 +554,20 @@ button.link {
   background: var(--color-accent-blue);
 }
 
+/* A diesel car's line is dashed, so its swatch is too */
+.ev-swatch.diesel {
+  background: repeating-linear-gradient(90deg, var(--color-accent-red) 0 5px, transparent 5px 8px);
+}
+
+.ev-swatch.custom.diesel {
+  background: repeating-linear-gradient(90deg, var(--color-accent-blue) 0 5px, transparent 5px 8px);
+}
+
+.ev-pickrows {
+  display: grid;
+  gap: 4px;
+}
+
 /* A range of savings is two figures: smaller, so it fits the tile */
 .ev-tile .kpi-value.range {
   font-size: clamp(1.15rem, 1.7vw, 1.5rem);

@@ -1,7 +1,7 @@
 // The charts of the EV card as tabs of one panel: each is one or more series over time, with the words that say what it is and, while it has too few points to
 // draw, what it is waiting for. Pure, so the choice of tabs and their points is tested apart from the drawing.
 import { efficiencyTrend, gasPriceSeries, inUnit, KM_PER_MILE, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
-import { cumulativeCosts, gasLineStyle, visibleComparisons } from './evGas';
+import { carName, compKey, cumulativeCosts, DIESEL_PRICE, gasLineStyle, visibleComparisons, type Picks } from './evGas';
 import { formatMoney, formatPerMile } from './lib';
 
 export type TabId = 'versus' | 'permile' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
@@ -11,10 +11,12 @@ export interface TabLine {
   name: string;
   /** A theme custom property for the line. */
   colorVar: string;
-  y: number[];
+  /** One value for each of the tab's points; null where the line has none. */
+  y: (number | null)[];
   /** The colour at this strength (0 to 1). */
   alpha?: number;
   width?: number;
+  dashed?: boolean;
   /** No fill under the line, which only the first line of a chart has by default. */
   fill?: boolean;
 }
@@ -46,8 +48,8 @@ export interface TrendTab {
   bars?: TabBar[];
   /** Each line is named at its right end instead of in a key (for lines read against each other). */
   endLabels: boolean;
-  /** The gas cars to draw can be ticked under this chart. */
-  picks: boolean;
+  /** What can be ticked under this chart: the cars to compare with, or the diesel line of the price chart. */
+  picks: 'cars' | 'diesel-price' | null;
   /** Writes a value on the vertical axis. One function per tab, so the chart is not rebuilt on every render. */
   format: (v: number) => string;
   /** What the vertical axis measures, written up its side. */
@@ -87,28 +89,28 @@ const seconds = (iso: string): number => Date.parse(iso) / 1000;
  * The tabs this meter's vehicle can show, in the order they are offered: the ones that need the gas comparison only when it is set up. `hidden` are the gas cars
  * the viewer has switched off; the two tabs that draw a line for each gas car draw the others.
  */
-export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; charges: EvChargesAnswer | undefined; unit: DistanceUnit; hidden?: number[] }): TrendTab[] {
+export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; charges: EvChargesAnswer | undefined; unit: DistanceUnit; picks?: Picks }): TrendTab[] {
   const { ev, savings, charges, unit } = input;
   const tabs: TrendTab[] = [];
-  const make = (t: Omit<TrendTab, 'domain' | 'endLabels' | 'picks'> & { endLabels?: boolean; picks?: boolean }): void => {
-    tabs.push({ endLabels: false, picks: false, ...t, domain: domainOf(t.x) });
+  const make = (t: Omit<TrendTab, 'domain' | 'endLabels' | 'picks'> & { endLabels?: boolean; picks?: TrendTab['picks'] }): void => {
+    tabs.push({ endLabels: false, picks: null, ...t, domain: domainOf(t.x) });
   };
 
   if (savings?.configured && savings.comparisons.length > 0) {
     const costs = cumulativeCosts(savings);
-    const shown = visibleComparisons(savings.comparisons, input.hidden ?? []);
+    const picks = input.picks ?? { off: [], on: [] };
+    const shown = visibleComparisons(savings.comparisons, picks);
     const none = shown.length === 0;
-    const gasLines = (series: Map<number, number[]>): TabLine[] =>
-      shown.map((c) => ({ name: `${c.mpg} mpg`, ...gasLineStyle(c, savings.comparisons), y: series.get(c.mpg) ?? [], fill: false }));
-    const waiting = none ? 'Tick a gas car under the chart to compare with.' : 'Needs two odometer readings that the gas prices cover.';
+    const gasLines = (series: Map<string, number[]>): TabLine[] => shown.map((c) => ({ name: carName(c), ...gasLineStyle(c, savings.comparisons), y: series.get(compKey(c)) ?? [], fill: false }));
+    const waiting = none ? 'Tick a car under the chart to compare with.' : 'Needs two odometer readings that the gas prices cover.';
     make({
       id: 'versus',
       label: 'Gas vs electric',
-      title: 'What each gas car would have cost against what charging cost, added up: the gap between a gas line and the charging line is the savings',
+      title: 'What each car would have cost against what charging cost, added up: the gap between a car and the charging line is the savings',
       x: none ? [] : costs.x,
       lines: none ? [] : [...gasLines(costs.gas), { name: 'Charging', colorVar: '--color-accent-green', y: costs.ev, width: 3, fill: false }],
       endLabels: true,
-      picks: true,
+      picks: 'cars',
       format: axisDollars,
       yLabel: 'Total cost, dollars',
       xLabel: 'Date of odometer reading',
@@ -122,20 +124,20 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     if (!none && totals?.ev_cost_per_mile != null) {
       bars.push({ label: 'Charging', value: perUnit(Number(totals.ev_cost_per_mile)), colorVar: '--color-accent-green', text: formatPerMile(totals.ev_cost_per_mile, false, unit) });
       for (const c of shown) {
-        const g = totals.gas.find((e) => e.mpg === c.mpg);
+        const g = totals.gas.find((e) => e.fuel === c.fuel && e.mpg === c.mpg);
         if (g?.gas_cost_per_mile == null) continue;
         const { colorVar, alpha } = gasLineStyle(c, savings.comparisons);
-        bars.push({ label: `${c.mpg} mpg`, value: perUnit(Number(g.gas_cost_per_mile)), colorVar, alpha, text: formatPerMile(g.gas_cost_per_mile, false, unit) });
+        bars.push({ label: carName(c), value: perUnit(Number(g.gas_cost_per_mile)), colorVar, alpha, text: formatPerMile(g.gas_cost_per_mile, false, unit) });
       }
     }
     make({
       id: 'permile',
       label: 'Cost per mile',
-      title: `What a ${mile} costs: charging against each gas car`,
+      title: `What a ${mile} costs: charging against each car`,
       x: [],
       lines: [],
       bars,
-      picks: true,
+      picks: 'cars',
       format: axisCents,
       yLabel: `Cost per ${mile}, dollars`,
       xLabel: '',
@@ -144,11 +146,11 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     make({
       id: 'saved',
       label: 'Saved',
-      title: 'Saved against each gas car, added up over the odometer readings (below zero where the electric car cost more)',
+      title: 'Saved against each car, added up over the odometer readings (below zero where the electric car cost more)',
       x: none ? [] : costs.x,
       lines: none ? [] : gasLines(costs.saved),
       endLabels: true,
-      picks: true,
+      picks: 'cars',
       format: axisDollars,
       yLabel: 'Saved vs gas car, dollars',
       xLabel: 'Date of odometer reading',
@@ -200,12 +202,19 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
 
   if (savings?.configured) {
     const price = gasPriceSeries(savings.prices);
+    // The diesel line shares the gas weeks (EIA publishes both on the same days) and is drawn only when the viewer has ticked it.
+    const dieselByWeek = new Map(savings.diesel_prices.map((p) => [p.week, Number(p.dollars)]));
+    const hasDiesel = dieselByWeek.size > 0;
+    const showDiesel = hasDiesel && (input.picks ?? { off: [], on: [] }).on.includes(DIESEL_PRICE);
+    const lines: TabLine[] = [{ name: 'Gas', colorVar: '--color-accent-blue', y: price.y }];
+    if (showDiesel) lines.push({ name: 'Diesel', colorVar: '--color-accent-blue', dashed: true, y: savings.prices.map((p) => dieselByWeek.get(p.week) ?? null) });
     make({
       id: 'gas',
-      label: 'Gas price',
-      title: `Weekly average price of regular gasoline per gallon${savings.area_name ? `, ${savings.area_name}` : ''}`,
+      label: 'Fuel price',
+      title: `Weekly average price per gallon of regular gasoline${showDiesel ? ' and diesel' : ''}${savings.area_name ? `, ${savings.area_name}` : ''}`,
       x: price.x,
-      lines: [{ name: 'Gas price', colorVar: '--color-accent-blue', y: price.y }],
+      lines,
+      picks: hasDiesel ? 'diesel-price' : null,
       format: axisCents,
       yLabel: 'Price per gallon, dollars',
       xLabel: 'Week of',

@@ -13,9 +13,9 @@ import (
 	"github.com/gerp93/KVGuzzler/server/internal/rates"
 )
 
-// What driving the same miles in a gasoline car would have cost, set beside what the meter's energy cost for the electric one. Not one gas car but several at
-// once: the presets below, and optionally one the owner names. The owner says which area's price to use; the weekly prices are EIA's, read with the key saved
-// for the carbon footprint. Which comparisons are drawn is the dashboard's choice (each viewer's own), so the server answers all of them.
+// What driving the same miles in a gasoline or a diesel car would have cost, set beside what the meter's energy cost for the electric one. Not one car but
+// several at once: the presets below for each fuel, and optionally one the owner names. The owner says which area's price to use; the weekly prices are EIA's, read
+// with the key saved for the carbon footprint. Which comparisons are drawn is the dashboard's choice (each viewer's own), so the server answers all of them.
 const (
 	evCompareKey   = "ev_compare:" // + the meter's id
 	gasStatusKey   = "gas_status:" // + the area's code
@@ -27,12 +27,16 @@ const (
 	pricesBeforeFirstReading = 14 * 24 * time.Hour
 	// pricesWithoutReadings is how far back the chart goes when there are no readings yet.
 	pricesWithoutReadings = 26 * 7 * 24 * time.Hour
+
+	// The fuels a car can be compared in.
+	fuelGas    = "gas"
+	fuelDiesel = "diesel"
 )
 
-// evMPGPresets are the gas cars every electric vehicle is compared with, in miles per gallon: from a thirsty truck to an economy car.
+// evMPGPresets are the cars every electric vehicle is compared with, in miles per gallon, for each fuel: from a thirsty truck to an economy car.
 var evMPGPresets = []float64{15, 20, 25, 30, 35, 40}
 
-// evCompareSetup is what is saved for a charging meter: the price area and, if the owner named one, a gas car of their own.
+// evCompareSetup is what is saved for a charging meter: the price area and, if the owner named one, a car of their own (compared in each fuel).
 type evCompareSetup struct {
 	AreaID    string   `json:"area_id"`
 	CustomMPG *float64 `json:"custom_mpg"`
@@ -51,13 +55,15 @@ type gasStatus struct {
 	CheckedAt time.Time `json:"checked_at"`
 	OK        bool      `json:"ok"`
 	Error     string    `json:"error,omitempty"`
+	// DieselError is why the diesel prices were not read when the gasoline ones were.
+	DieselError string `json:"diesel_error,omitempty"`
 }
 
 type evCompareView struct {
 	MeterID  string  `json:"meter_id"`
 	AreaID   *string `json:"area_id"`
 	AreaName *string `json:"area_name"`
-	// CustomMPG is the owner's own gas car, beside the presets; null when there is none.
+	// CustomMPG is the owner's own car, beside the presets; null when there is none.
 	CustomMPG *float64        `json:"custom_mpg"`
 	Presets   []float64       `json:"presets"`
 	Areas     []gasprice.Area `json:"areas"`
@@ -67,21 +73,26 @@ type evCompareView struct {
 	LastOutcome *string    `json:"last_outcome"`
 	LatestWeek  *string    `json:"latest_week"`
 	LatestPrice *string    `json:"latest_price"`
+	// LatestDieselPrice is the newest week's diesel price; null when diesel prices have not been read.
+	LatestDieselPrice *string `json:"latest_diesel_price"`
 }
 
-// evComparison is one gas car the electric vehicle is compared with.
+// evComparison is one car the electric vehicle is compared with.
 type evComparison struct {
+	// Fuel is "gas" or "diesel": what the car burns, and so which weekly price its miles are priced at.
+	Fuel   string  `json:"fuel"`
 	MPG    float64 `json:"mpg"`
 	Custom bool    `json:"custom"`
 }
 
-// evSavingsGas is what a stretch's miles would have cost in one gas car.
+// evSavingsGas is what a stretch's miles would have cost in one car (a gas car or a diesel one, as its fuel says).
 type evSavingsGas struct {
-	MPG float64 `json:"mpg"`
-	// Gallons is what the gas car would have burned over the miles.
+	Fuel string  `json:"fuel"`
+	MPG  float64 `json:"mpg"`
+	// Gallons is what the car would have burned over the miles.
 	Gallons float64 `json:"gallons"`
 	GasCost *string `json:"gas_cost"`
-	// Savings is the gas car's cost less the electric car's: negative when the electric car cost more. Null when either cost is unknown.
+	// Savings is the car's cost less the electric car's: negative when the electric car cost more. Null when either cost is unknown.
 	Savings *string `json:"savings"`
 }
 
@@ -89,15 +100,17 @@ type evSavingsStretch struct {
 	FromDay string  `json:"from_day"`
 	ToDay   string  `json:"to_day"`
 	Miles   float64 `json:"miles"`
-	// GasPrice is the average of the week prices over the stretch's days; null when the days are not all covered by a price.
-	GasPrice *string `json:"gas_price"`
-	EvCost   *string `json:"ev_cost"`
+	// GasPrice and DieselPrice are the averages of the week prices over the stretch's days; null when the days are not all covered by a price.
+	GasPrice    *string `json:"gas_price"`
+	DieselPrice *string `json:"diesel_price"`
+	EvCost      *string `json:"ev_cost"`
 	// Gas has one entry for each of the answer's comparisons, in the same order.
 	Gas []evSavingsGas `json:"gas"`
 }
 
-// evTotalsGas is one gas car's cost over the stretches that were counted.
+// evTotalsGas is one car's cost over the stretches that were counted.
 type evTotalsGas struct {
+	Fuel           string  `json:"fuel"`
 	MPG            float64 `json:"mpg"`
 	Gallons        float64 `json:"gallons"`
 	GasCost        string  `json:"gas_cost"`
@@ -106,7 +119,7 @@ type evTotalsGas struct {
 }
 
 type evSavingsTotals struct {
-	// Stretches is how many stretches are added up: only those with both costs known, the same for every gas car.
+	// Stretches is how many stretches are added up: only those with every price and the electric cost known, the same for every car.
 	Stretches     int     `json:"stretches"`
 	Miles         float64 `json:"miles"`
 	EvCost        string  `json:"ev_cost"`
@@ -119,23 +132,34 @@ type evSavingsAnswer struct {
 	MeterID    string  `json:"meter_id"`
 	Configured bool    `json:"configured"`
 	AreaName   *string `json:"area_name"`
-	// Comparisons are the gas cars compared with, by miles per gallon, lowest first: the presets and the owner's own if there is one.
-	Comparisons   []evComparison     `json:"comparisons"`
-	Prices        []gasprice.Price   `json:"prices"`
+	// Comparisons are the cars compared with: the gas cars by miles per gallon, lowest first (the presets and the owner's own if there is one), then the diesel
+	// cars the same way, once diesel prices have been read.
+	Comparisons []evComparison   `json:"comparisons"`
+	Prices      []gasprice.Price `json:"prices"`
+	// DieselPrices are the weekly diesel prices over the same stretch of time; empty until they have been read.
+	DieselPrices  []gasprice.Price   `json:"diesel_prices"`
 	Stretches     []evSavingsStretch `json:"stretches"`
 	Totals        *evSavingsTotals   `json:"totals"`
 	CostEstimated bool               `json:"cost_estimated"`
 }
 
-// evComparisons are the gas cars to compare with: the presets, and the custom one in its place among them.
-func evComparisons(c *evCompareSetup) []evComparison {
-	out := make([]evComparison, 0, len(evMPGPresets)+1)
-	for _, p := range evMPGPresets {
-		out = append(out, evComparison{MPG: p})
+// evComparisons are the cars to compare with: for the gas cars the presets and the custom one in its place among them, and the same for diesel when its
+// prices are known.
+func evComparisons(c *evCompareSetup, diesel bool) []evComparison {
+	one := func(fuel string) []evComparison {
+		out := make([]evComparison, 0, len(evMPGPresets)+1)
+		for _, p := range evMPGPresets {
+			out = append(out, evComparison{Fuel: fuel, MPG: p})
+		}
+		if c != nil && c.CustomMPG != nil {
+			out = append(out, evComparison{Fuel: fuel, MPG: *c.CustomMPG, Custom: true})
+			sort.SliceStable(out, func(i, j int) bool { return out[i].MPG < out[j].MPG })
+		}
+		return out
 	}
-	if c != nil && c.CustomMPG != nil {
-		out = append(out, evComparison{MPG: *c.CustomMPG, Custom: true})
-		sort.SliceStable(out, func(i, j int) bool { return out[i].MPG < out[j].MPG })
+	out := one(fuelGas)
+	if diesel {
+		out = append(out, one(fuelDiesel)...)
 	}
 	return out
 }
@@ -191,8 +215,9 @@ func (s *Server) gasStatus(ctx context.Context, area string) (*gasStatus, error)
 	return &st, nil
 }
 
-// refreshGas reads an area's weekly prices from EIA and keeps them, and keeps what happened. The error is for the server's own trouble; EIA's complaints are
-// in the status.
+// refreshGas reads an area's weekly prices of gasoline and of diesel from EIA and keeps them, and keeps what happened. The error is for the server's own
+// trouble; EIA's complaints are in the status. Gasoline is the one the comparison needs: a diesel price that cannot be read is said apart, and the gasoline
+// comparisons stand without it.
 func (s *Server) refreshGas(ctx context.Context, area string) error {
 	st := gasStatus{CheckedAt: s.now().UTC()}
 	cfg, err := s.LoadCarbonConfig(ctx)
@@ -202,18 +227,29 @@ func (s *Server) refreshGas(ctx context.Context, area string) error {
 	if cfg == nil {
 		st.Error = "The gas prices come from EIA and need its key: save it under Carbon first."
 	} else {
-		prices, err := s.gasClient().Weekly(ctx, cfg.APIKey, area, s.now().Add(-gasHistory))
-		var ge *gasprice.Error
-		switch {
-		case err == nil:
-			if err := s.Store.SaveGasPrices(ctx, area, prices); err != nil {
-				return err
+		for _, fuel := range []gasprice.Product{gasprice.Gasoline, gasprice.Diesel} {
+			prices, err := s.gasClient().Weekly(ctx, cfg.APIKey, area, fuel, s.now().Add(-gasHistory))
+			var ge *gasprice.Error
+			switch {
+			case err == nil:
+				if err := s.Store.SaveFuelPrices(ctx, fuel, area, prices); err != nil {
+					return err
+				}
+				if fuel == gasprice.Gasoline {
+					st.OK = true
+				}
+			case errors.As(err, &ge):
+				if fuel == gasprice.Gasoline {
+					st.Error = ge.Message
+				} else {
+					st.DieselError = ge.Message
+				}
+			default:
+				return err // not EIA's complaint (the request was cancelled)
 			}
-			st.OK = true
-		case errors.As(err, &ge):
-			st.Error = ge.Message
-		default:
-			return err // not EIA's complaint (the request was cancelled)
+			if fuel == gasprice.Gasoline && !st.OK {
+				break // no key that works, or no area: diesel would only say the same
+			}
 		}
 	}
 	body, err := json.Marshal(st)
@@ -272,17 +308,27 @@ func (s *Server) evCompareView(ctx context.Context, meterID string) (evCompareVi
 		at := st.CheckedAt
 		out.LastCheck = &at
 		msg := "Prices saved."
-		if !st.OK {
+		switch {
+		case !st.OK:
 			msg = st.Error
+		case st.DieselError != "":
+			msg = "Gas prices saved. Diesel not read: " + st.DieselError
 		}
 		out.LastOutcome = &msg
 	}
-	prices, err := s.Store.GasPrices(ctx, c.AreaID)
+	prices, err := s.Store.FuelPrices(ctx, gasprice.Gasoline, c.AreaID)
 	if err != nil {
 		return out, err
 	}
 	if n := len(prices); n > 0 {
 		out.LatestWeek, out.LatestPrice = &prices[n-1].Week, &prices[n-1].Dollars
+	}
+	diesel, err := s.Store.FuelPrices(ctx, gasprice.Diesel, c.AreaID)
+	if err != nil {
+		return out, err
+	}
+	if n := len(diesel); n > 0 {
+		out.LatestDieselPrice = &diesel[n-1].Dollars
 	}
 	return out, nil
 }
@@ -314,7 +360,7 @@ func (s *Server) getEvCompare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
-// putEvCompare saves the price area and the owner's own gas car (optional), and reads the area's prices at once. The setup is kept even when EIA cannot be
+// putEvCompare saves the price area and the owner's own car (optional), and reads the area's prices at once. The setup is kept even when EIA cannot be
 // reached or the key is not saved yet: the answer says what happened, and the feed tries again.
 func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.evMeterFor(w, r)
@@ -329,7 +375,7 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.CustomMPG != nil && (math.IsNaN(*body.CustomMPG) || *body.CustomMPG < minMPG || *body.CustomMPG > maxMPG) {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", "A gas car's miles per gallon is a number between 5 and 200.")
+		writeProblem(w, http.StatusBadRequest, "bad_compare", "A car's miles per gallon is a number between 5 and 200.")
 		return
 	}
 	if _, ok := gasprice.AreaName(body.AreaID); !ok {
@@ -404,7 +450,7 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out := evSavingsAnswer{MeterID: id, Comparisons: []evComparison{}, Prices: []gasprice.Price{}, Stretches: []evSavingsStretch{}}
+	out := evSavingsAnswer{MeterID: id, Comparisons: []evComparison{}, Prices: []gasprice.Price{}, DieselPrices: []gasprice.Price{}, Stretches: []evSavingsStretch{}}
 	c, err := s.evCompareSetup(ctx, id)
 	if err != nil {
 		serverError(w, err)
@@ -415,13 +461,19 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name, _ := gasprice.AreaName(c.AreaID)
-	comps := evComparisons(c)
-	out.Configured, out.AreaName, out.Comparisons = true, &name, comps
-	prices, err := s.Store.GasPrices(ctx, c.AreaID)
+	prices, err := s.Store.FuelPrices(ctx, gasprice.Gasoline, c.AreaID)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
+	dieselPrices, err := s.Store.FuelPrices(ctx, gasprice.Diesel, c.AreaID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	dieselOn := len(dieselPrices) > 0
+	comps := evComparisons(c, dieselOn)
+	out.Configured, out.AreaName, out.Comparisons = true, &name, comps
 	ev, err := s.evAnswer(ctx, id)
 	if err != nil {
 		serverError(w, err)
@@ -441,10 +493,18 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		st := evSavingsStretch{FromDay: iv.FromDay, ToDay: iv.ToDay, Miles: iv.Miles, EvCost: iv.Cost, Gas: make([]evSavingsGas, len(comps))}
-		avg, haveGas := averagePrice(prices, from, to)
+		avgGas, haveGas := averagePrice(prices, from, to)
 		if haveGas {
-			p := avg.String()
+			p := avgGas.String()
 			st.GasPrice = &p
+		}
+		var avgDiesel rates.Money
+		haveDiesel := false
+		if dieselOn {
+			if avgDiesel, haveDiesel = averagePrice(dieselPrices, from, to); haveDiesel {
+				p := avgDiesel.String()
+				st.DieselPrice = &p
+			}
 		}
 		var evc rates.Money
 		haveEv := false
@@ -453,22 +513,30 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 				evc, haveEv = m, true
 			}
 		}
+		// A stretch counts when every price and the electric cost are known, so every car's totals cover the same stretches.
+		count := haveEv && haveGas && (!dieselOn || haveDiesel)
 		for j, comp := range comps {
-			g := evSavingsGas{MPG: comp.MPG, Gallons: iv.Miles / comp.MPG}
-			if haveGas {
+			avg, have := avgGas, haveGas
+			if comp.Fuel == fuelDiesel {
+				avg, have = avgDiesel, haveDiesel
+			}
+			g := evSavingsGas{Fuel: comp.Fuel, MPG: comp.MPG, Gallons: iv.Miles / comp.MPG}
+			if have {
 				gas := rates.MoneyFromFloat(g.Gallons).Mul(avg)
 				gc := gas.String()
 				g.GasCost = &gc
 				if haveEv {
 					sv := gas.Sub(evc).String()
 					g.Savings = &sv
+				}
+				if count {
 					gasTotals[j] = gasTotals[j].Add(gas)
 					gallonsTotals[j] += g.Gallons
 				}
 			}
 			st.Gas[j] = g
 		}
-		if haveGas && haveEv {
+		if count {
 			evTotal = evTotal.Add(evc)
 			miles += st.Miles
 			counted++
@@ -482,7 +550,7 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 			t.EvCostPerMile = &e
 		}
 		for j, comp := range comps {
-			g := evTotalsGas{MPG: comp.MPG, Gallons: gallonsTotals[j], GasCost: gasTotals[j].String(), Savings: gasTotals[j].Sub(evTotal).String()}
+			g := evTotalsGas{Fuel: comp.Fuel, MPG: comp.MPG, Gallons: gallonsTotals[j], GasCost: gasTotals[j].String(), Savings: gasTotals[j].Sub(evTotal).String()}
 			if miles > 0 {
 				pm := gasTotals[j].Div(rates.MoneyFromFloat(miles)).String()
 				g.GasCostPerMile = &pm
@@ -502,6 +570,11 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 	for _, p := range prices {
 		if p.Week >= since {
 			out.Prices = append(out.Prices, p)
+		}
+	}
+	for _, p := range dieselPrices {
+		if p.Week >= since {
+			out.DieselPrices = append(out.DieselPrices, p)
 		}
 	}
 	writeJSON(w, http.StatusOK, out)

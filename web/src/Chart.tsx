@@ -9,7 +9,8 @@ export interface Line {
   colorVar: string;
   /** Seconds since the epoch, one per value. */
   x: number[];
-  y: number[];
+  /** One value for each of `x`; null where the line has none, which leaves a gap. */
+  y: (number | null)[];
   /** Drawn dashed: a separate device next to the main lines. */
   dashed?: boolean;
   /** The colour at this strength (0 to 1), so a family of lines of one colour is told apart by how strong each is. */

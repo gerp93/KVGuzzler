@@ -69,7 +69,7 @@ func TestWeeklyAsksForRegularGasolineOfTheAreaFromADayAndNeverShowsTheKey(t *tes
 	}))
 	defer srv.Close()
 	c := &Client{Base: srv.URL}
-	got, err := c.Weekly(context.Background(), key, "SMN", time.Date(2025, 10, 30, 0, 0, 0, 0, time.UTC))
+	got, err := c.Weekly(context.Background(), key, "SMN", Gasoline, time.Date(2025, 10, 30, 0, 0, 0, 0, time.UTC))
 	if err != nil || len(got) != 3 {
 		t.Fatalf("got %v, %v", got, err)
 	}
@@ -80,15 +80,30 @@ func TestWeeklyAsksForRegularGasolineOfTheAreaFromADayAndNeverShowsTheKey(t *tes
 	}
 
 	// A key EIA refuses: said without the key, even though EIA echoed it.
-	_, err = c.Weekly(context.Background(), "WRONG-KEY-XXXXX", "SMN", time.Now())
+	_, err = c.Weekly(context.Background(), "WRONG-KEY-XXXXX", "SMN", Gasoline, time.Now())
 	if err == nil || strings.Contains(err.Error(), "WRONG-KEY-XXXXX") || !strings.Contains(err.Error(), "did not accept the key") {
 		t.Errorf("a refused key: %v", err)
 	}
 }
 
+func TestWeeklyAsksForTheFuelItIsGiven(t *testing.T) {
+	var seen string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.URL.RawQuery
+		_, _ = w.Write([]byte(answer))
+	}))
+	defer srv.Close()
+	if _, err := (&Client{Base: srv.URL}).Weekly(context.Background(), "KEY-KEY-KEY", "SMN", Diesel, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(seen, "facets%5Bproduct%5D%5B%5D=EPD2D") || strings.Contains(seen, "EPMR") {
+		t.Errorf("the request %q is not for No. 2 diesel alone", seen)
+	}
+}
+
 func TestWeeklyRefusesAnAreaEIAHasNoPriceFor(t *testing.T) {
 	c := &Client{Base: "http://127.0.0.1:1"} // never reached
-	if _, err := c.Weekly(context.Background(), "KEY-KEY-KEY", "ZZ", time.Now()); err == nil || !strings.Contains(err.Error(), "no gasoline price") {
+	if _, err := c.Weekly(context.Background(), "KEY-KEY-KEY", "ZZ", Gasoline, time.Now()); err == nil || !strings.Contains(err.Error(), "no fuel price") {
 		t.Errorf("an unknown area: %v", err)
 	}
 }
@@ -96,7 +111,7 @@ func TestWeeklyRefusesAnAreaEIAHasNoPriceFor(t *testing.T) {
 func TestWeeklySaysSoWhenEIAHasNothing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"response":{"data":[]}}`)) }))
 	defer srv.Close()
-	if _, err := (&Client{Base: srv.URL}).Weekly(context.Background(), "KEY-KEY-KEY", "SMN", time.Now()); err == nil {
+	if _, err := (&Client{Base: srv.URL}).Weekly(context.Background(), "KEY-KEY-KEY", "SMN", Gasoline, time.Now()); err == nil {
 		t.Error("an empty answer was taken as prices")
 	}
 }

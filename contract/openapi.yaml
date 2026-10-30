@@ -1736,7 +1736,7 @@ components:
           description: The battery's usable energy in kWh; null until the owner sets it.
     EvCompare:
       type: object
-      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price]
+      required: [meter_id, area_id, area_name, custom_mpg, presets, areas, key_saved, last_check, last_outcome, latest_week, latest_price, latest_diesel_price]
       properties:
         meter_id:
           type: string
@@ -1779,9 +1779,12 @@ components:
         latest_price:
           type: [string, 'null']
           description: Dollars per gallon of regular gasoline, a decimal string.
+        latest_diesel_price:
+          type: [string, 'null']
+          description: Dollars per gallon of No. 2 diesel in the newest week, a decimal string; null when diesel prices have not been read.
     EvSavings:
       type: object
-      required: [meter_id, configured, area_name, comparisons, prices, stretches, totals, cost_estimated]
+      required: [meter_id, configured, area_name, comparisons, prices, diesel_prices, stretches, totals, cost_estimated]
       properties:
         meter_id:
           type: string
@@ -1791,11 +1794,15 @@ components:
           type: [string, 'null']
         comparisons:
           type: array
-          description: The gas cars compared with, lowest miles per gallon first, made of the presets and the owner's own if there is one. Every `gas` list below is in this order.
+          description: The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own if there is one) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order.
           items:
             type: object
-            required: [mpg, custom]
+            required: [fuel, mpg, custom]
             properties:
+              fuel:
+                type: string
+                enum: [gas, diesel]
+                description: What the car burns, and so which weekly price its miles are priced at.
               mpg:
                 type: number
               custom:
@@ -1812,12 +1819,24 @@ components:
                 format: date
               dollars:
                 type: string
+        diesel_prices:
+          type: array
+          description: The weekly diesel prices over the same stretch of time as `prices`, oldest first; empty until they have been read.
+          items:
+            type: object
+            required: [week, dollars]
+            properties:
+              week:
+                type: string
+                format: date
+              dollars:
+                type: string
         stretches:
           type: array
           description: One per pair of neighbouring odometer readings, oldest first.
           items:
             type: object
-            required: [from_day, to_day, miles, gas_price, ev_cost, gas]
+            required: [from_day, to_day, miles, gas_price, diesel_price, ev_cost, gas]
             properties:
               from_day:
                 type: string
@@ -1829,7 +1848,10 @@ components:
                 type: number
               gas_price:
                 type: [string, 'null']
-                description: The average of the week prices over the stretch's days; null when a day has no price.
+                description: The average of the gasoline week prices over the stretch's days; null when a day has no price.
+              diesel_price:
+                type: [string, 'null']
+                description: The same for diesel; null when a day has no price or diesel prices have not been read.
               ev_cost:
                 type: [string, 'null']
                 description: What the meter's energy cost, as in `getMeterEv`.
@@ -1838,8 +1860,11 @@ components:
                 description: One per comparison, in the comparisons' order.
                 items:
                   type: object
-                  required: [mpg, gallons, gas_cost, savings]
+                  required: [fuel, mpg, gallons, gas_cost, savings]
                   properties:
+                    fuel:
+                      type: string
+                      enum: [gas, diesel]
                     mpg:
                       type: number
                     gallons:
@@ -1869,8 +1894,11 @@ components:
               description: One per comparison, in the comparisons' order.
               items:
                 type: object
-                required: [mpg, gallons, gas_cost, savings, gas_cost_per_mile]
+                required: [fuel, mpg, gallons, gas_cost, savings, gas_cost_per_mile]
                 properties:
+                  fuel:
+                    type: string
+                    enum: [gas, diesel]
                   mpg:
                     type: number
                   gallons:
