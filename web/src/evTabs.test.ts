@@ -211,6 +211,45 @@ describe('trendTabs', () => {
   });
 });
 
+describe('the vertical axis of each tab', () => {
+  it('says what its numbers are', () => {
+    const tabs = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' });
+    const label = (id: string) => tabs.find((t) => t.id === id)!.yLabel;
+    expect(label('versus')).toBe('Total cost, dollars');
+    expect(label('saved')).toBe('Saved vs gas car, dollars');
+    expect(label('permile')).toBe('Cost per mile, dollars');
+    expect(label('efficiency')).toBe('Miles per kWh');
+    expect(label('cost')).toBe('Charging cost per week, dollars');
+    expect(label('gas')).toBe('Price per gallon, dollars');
+    expect(label('charge')).toBe('kWh per percent gained');
+  });
+
+  it('follows the unit and the battery size', () => {
+    const tabs = trendTabs({ ev: ev([]), savings: savings(), charges: chargesAnswer([], 88), unit: 'km' });
+    expect(tabs.find((t) => t.id === 'efficiency')!.yLabel).toBe('Kilometers per kWh');
+    expect(tabs.find((t) => t.id === 'permile')!.yLabel).toBe('Cost per kilometer, dollars');
+    expect(tabs.find((t) => t.id === 'charge')!.yLabel).toBe('Efficiency, percent');
+  });
+});
+
+describe('the horizontal axis of each tab', () => {
+  it('says what each point along it stands for', () => {
+    const tabs = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' });
+    const label = (id: string) => tabs.find((t) => t.id === id)!.xLabel;
+    expect(label('versus')).toBe('Date of odometer reading');
+    expect(label('saved')).toBe('Date of odometer reading');
+    expect(label('efficiency')).toBe('Week ending');
+    expect(label('cost')).toBe('Week ending');
+    expect(label('charge')).toBe('Date the charge ended');
+    expect(label('gas')).toBe('Week of');
+  });
+
+  it('is on every tab that draws a chart', () => {
+    const tabs = trendTabs({ ev: ev([]), savings: savings(), charges: undefined, unit: 'miles' });
+    for (const t of tabs.filter((x) => !x.bars)) expect(t.xLabel, t.id).not.toBe('');
+  });
+});
+
 describe('firstReady and domainOf', () => {
   it('opens the first tab that has something to draw, else the first', () => {
     expect(firstReady(trendTabs({ ev: ev(days(9)), savings: undefined, charges: undefined, unit: 'miles' }))).toBe('efficiency');

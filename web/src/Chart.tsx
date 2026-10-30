@@ -97,6 +97,8 @@ export function Chart({
   format = wattsAxis,
   label = 'Power over time',
   endLabels = false,
+  yLabel,
+  xLabel,
 }: {
   lines: Line[];
   domain: [number, number];
@@ -106,6 +108,10 @@ export function Chart({
   label?: string;
   /** Each line is named at its right end, in its own colour, instead of in a key under the chart: for a handful of lines that are read against each other. */
   endLabels?: boolean;
+  /** A title for the vertical axis, written up its side: what the numbers on it are (dollars, miles per kWh). */
+  yLabel?: string;
+  /** A title for the horizontal axis, under it: what each point along it stands for (the day of a reading, the week ending). */
+  xLabel?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
 
@@ -130,7 +136,13 @@ export function Chart({
           y: { range: (_u, min, max) => [min < 0 ? min * 1.05 : 0, max > 0 ? max * 1.05 : 1] },
         },
         axes: [
-          { stroke: text, font: axisFont, grid: { stroke: grid, width: 0.5 }, ticks: { stroke: grid } },
+          {
+            stroke: text,
+            font: axisFont,
+            grid: { stroke: grid, width: 0.5 },
+            ticks: { stroke: grid },
+            ...(xLabel ? { label: xLabel, labelFont: axisFont, labelSize: Math.round(20 * uiScale()) } : {}),
+          },
           {
             stroke: text,
             font: axisFont,
@@ -138,6 +150,7 @@ export function Chart({
             ticks: { stroke: grid },
             values: (_u, v) => v.map(format),
             size: Math.round((el.clientWidth < 420 ? 52 : 64) * uiScale()),
+            ...(yLabel ? { label: yLabel, labelFont: axisFont, labelSize: Math.round(20 * uiScale()) } : {}),
           },
         ],
         series: [
@@ -215,7 +228,7 @@ export function Chart({
       resize.disconnect();
       plot.destroy();
     };
-  }, [lines, domain, shades, height, format, endLabels]);
+  }, [lines, domain, shades, height, format, endLabels, yLabel, xLabel]);
 
   return <div ref={box} class="chart" role="img" aria-label={label} />;
 }

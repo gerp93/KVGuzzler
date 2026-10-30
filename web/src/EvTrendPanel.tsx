@@ -42,7 +42,7 @@ export function EvTrendPanel({ tabs, comparisons, hidden, onTogglePick }: { tabs
         tab.bars ? (
           <EvBars bars={tab.bars} height={HEIGHT} label={tab.title} />
         ) : (
-          <Chart lines={lines} domain={domain} height={HEIGHT} format={tab.format} label={tab.title} endLabels={tab.endLabels} />
+          <Chart lines={lines} domain={domain} height={HEIGHT} format={tab.format} label={tab.title} endLabels={tab.endLabels} yLabel={tab.yLabel} xLabel={tab.xLabel} />
         )
       ) : (
         <div class="ev-waiting" style={{ minHeight: `${HEIGHT}px` }}>
