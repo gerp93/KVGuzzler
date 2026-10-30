@@ -135,6 +135,7 @@ export function DevicesCard({ meters, onChanged }: { meters: Meter[]; onChanged:
           ＋ Add
         </button>
       </div>
+      <p class="caption">Plugs and monitors that measure power.</p>
       {adding && (
         <AddPanel
           kinds={['plug', 'refoss']}

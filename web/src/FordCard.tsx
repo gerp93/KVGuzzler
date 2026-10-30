@@ -26,6 +26,7 @@ export function FordCard({ meters }: { meters: Meter[] }) {
   return (
     <section class="card page-narrow">
       <h2>Ford</h2>
+      <p class="caption">Keeps the car's odometer and battery up to date.</p>
       {cars.length > 1 && (
         <label class="field">
           <span>Odometer of</span>

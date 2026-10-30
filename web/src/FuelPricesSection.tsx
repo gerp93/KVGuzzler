@@ -1,10 +1,11 @@
-// The house's gas and diesel prices, in the Connectors tab: the one area whose weekly price every electric vehicle's gas cars are compared at. The prices are
-// EIA's, read with the key saved under EIA; saving the area reads them at once. The area is where the house is, so it is set here and not on a vehicle.
+// The house's gas and diesel prices, a section of the EIA card in the Connectors tab: the one area whose weekly price every electric vehicle's gas cars are
+// compared at. The prices are EIA's, read with the key saved in the card; saving the area reads them at once. The area is where the house is, so it is set here
+// and not on a vehicle.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
 import type { FuelPrices } from './lib';
 
-export function FuelPricesCard() {
+export function FuelPricesSection() {
   const [view, setView] = useState<FuelPrices>();
   const [area, setArea] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,8 +46,9 @@ export function FuelPricesCard() {
 
   const failed = view?.last_outcome != null && view.last_outcome !== 'Prices saved.';
   return (
-    <section class="card page-narrow">
-      <h2>Gas and diesel prices</h2>
+    <section class="sub">
+      <h3>Gas and diesel prices</h3>
+      <p class="caption">Weekly prices for the gas cars an electric vehicle is compared with.</p>
       <form onSubmit={save}>
         <label class="field">
           <span>Area</span>
@@ -72,7 +74,7 @@ export function FuelPricesCard() {
           )}
         </div>
       </form>
-      {view && !view.key_saved && <p class="caption">The prices need the EIA key above.</p>}
+      {view && !view.key_saved && <p class="caption">Needs the key saved above.</p>}
       {view?.last_outcome != null && (
         <p class={`caption ${failed ? 'bad' : ''}`}>
           {view.last_outcome}

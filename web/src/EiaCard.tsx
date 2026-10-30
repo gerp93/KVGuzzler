@@ -3,7 +3,7 @@
 // on the server and sent to EIA only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import { Hint } from './Hint';
+import { FuelPricesSection } from './FuelPricesSection';
 import type { CarbonConfig } from './lib';
 
 export function EiaCard() {
@@ -50,37 +50,38 @@ export function EiaCard() {
 
   return (
     <section class="card page-narrow">
-      <h2>EIA</h2>
-      <Hint>
-        Used for the carbon footprint (each hour's energy times that hour's grid intensity, from EIA hourly generation by fuel for your balancing authority, US
-        only, grid average and not marginal) and for the gas and diesel prices on the EV card. Needs a free EIA API key (eia.gov/opendata), stored on the
-        server and sent to EIA only.
-      </Hint>
-      <label class="field">
-        <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>
-        <input value={place} placeholder="MISO" onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />
-      </label>
-      <label class="field">
-        <span>EIA API key {cfg?.configured ? '(leave empty to keep the saved one)' : ''}</span>
-        <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
-      </label>
-      <div class="chips save">
-        <button type="button" disabled={busy || !place.trim() || (!key.trim() && !cfg?.configured)} onClick={save}>
-          {busy ? 'Checking…' : 'Save and check'}
-        </button>
-        {cfg?.configured && (
-          <button type="button" onClick={() => void remove()}>
-            Remove
+      <h2>U.S. Energy Information Administration (EIA)</h2>
+      <p class="caption">Grid carbon, and gas and diesel prices. Free key from eia.gov/opendata.</p>
+      <section class="sub">
+        <h3>Grid carbon</h3>
+        <p class="caption">How clean the electricity was each hour, for the carbon footprint.</p>
+        <label class="field">
+          <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>
+          <input value={place} placeholder="MISO" onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />
+        </label>
+        <label class="field">
+          <span>EIA API key {cfg?.configured ? '(leave empty to keep the saved one)' : ''}</span>
+          <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
+        </label>
+        <div class="chips save">
+          <button type="button" disabled={busy || !place.trim() || (!key.trim() && !cfg?.configured)} onClick={save}>
+            {busy ? 'Checking…' : 'Save and check'}
           </button>
+          {cfg?.configured && (
+            <button type="button" onClick={() => void remove()}>
+              Remove
+            </button>
+          )}
+        </div>
+        {message && <p class="note" role="status">{message}</p>}
+        {cfg?.last_outcome && (
+          <p class="caption">
+            Last check{cfg.last_fetch ? ` ${new Date(cfg.last_fetch).toLocaleString()}` : ''}: {cfg.last_outcome}
+            {cfg.last_grams != null ? ` ${Math.round(cfg.last_grams)} g/kWh${cfg.last_hour ? ` for the hour of ${new Date(cfg.last_hour).toLocaleString()}` : ''}.` : ''}
+          </p>
         )}
-      </div>
-      {message && <p class="note" role="status">{message}</p>}
-      {cfg?.last_outcome && (
-        <p class="caption">
-          Last check{cfg.last_fetch ? ` ${new Date(cfg.last_fetch).toLocaleString()}` : ''}: {cfg.last_outcome}
-          {cfg.last_grams != null ? ` ${Math.round(cfg.last_grams)} g/kWh${cfg.last_hour ? ` for the hour of ${new Date(cfg.last_hour).toLocaleString()}` : ''}.` : ''}
-        </p>
-      )}
+      </section>
+      <FuelPricesSection />
     </section>
   );
 }
