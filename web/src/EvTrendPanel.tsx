@@ -3,6 +3,7 @@
 // have the gas cars as checkboxes under them, each with the look of its line.
 import { useMemo, useState } from 'preact/hooks';
 import { Chart, type Line } from './Chart';
+import { EvBars } from './EvBars';
 import { gasLineStyle, type GasComparison } from './evGas';
 import { firstReady, tabReady, type TabId, type TrendTab } from './evTabs';
 
@@ -38,7 +39,11 @@ export function EvTrendPanel({ tabs, comparisons, hidden, onTogglePick }: { tabs
       </div>
       <p class="caption ev-trend-title">{tab.title}</p>
       {tabReady(tab) ? (
-        <Chart lines={lines} domain={domain} height={HEIGHT} format={tab.format} label={tab.title} endLabels={tab.endLabels} />
+        tab.bars ? (
+          <EvBars bars={tab.bars} height={HEIGHT} label={tab.title} />
+        ) : (
+          <Chart lines={lines} domain={domain} height={HEIGHT} format={tab.format} label={tab.title} endLabels={tab.endLabels} />
+        )
       ) : (
         <div class="ev-waiting" style={{ minHeight: `${HEIGHT}px` }}>
           <p>{tab.waiting}</p>
