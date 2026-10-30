@@ -244,6 +244,23 @@ button.link {
   cursor: help;
 }
 
+/* The efficiency and cost charts, side by side when there is room */
+.ev-trends {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 8px 24px;
+  margin-top: 4px;
+}
+
+.ev-trends > div {
+  min-width: 0;
+}
+
+.ev-trend-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 /* The three figures of the card sit in a narrow column: a size that fits the longest of them (a thousand kWh) */
 .ev-figure {
   font-size: clamp(1.4rem, 2.2vw, 2rem);

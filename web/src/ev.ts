@@ -97,3 +97,63 @@ export function pctNote(status: EvCharge['pct_status']): { short: string; long: 
       return { short: '—', long: "The battery charge was not read when this charge began (the car is not linked, or did not answer)." };
   }
 }
+
+/** The energy in a gallon of gasoline by the EPA's reckoning, 33.705 kWh: miles per kWh times it is "miles per gallon equivalent". */
+export const KWH_PER_GALLON_EQUIVALENT = 33.705;
+
+/** Miles per gallon equivalent from miles per kWh at the wall (charging losses included). */
+export const mpge = (milesPerKwh: number): number => milesPerKwh * KWH_PER_GALLON_EQUIVALENT;
+
+/** The days a trend window covers. */
+export const TREND_DAYS = 7;
+
+/** Under this many miles in a window the efficiency is not worked out: a few miles over a day's charge says nothing about the car. */
+export const MIN_TREND_MILES = 15;
+
+export interface TrendPoint {
+  /** The local calendar day the window ends on, `2026-10-26`. */
+  day: string;
+  /** Seconds since the epoch at noon UTC of that day, so every time zone shows the same date. */
+  x: number;
+  /** Miles over the kWh the meter used, over the window; null until the window is full, or with too few miles or no energy. */
+  milesPerKwh: number | null;
+  /** What the meter's energy cost over the window; null until the window is full, or when a day in it has no price. */
+  windowCost: number | null;
+}
+
+const DAY_MS = 86_400_000;
+const dayMs = (day: string): number => Date.parse(`${day}T00:00:00Z`);
+const dayText = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * The car's efficiency and what charging cost, over a rolling window of days ending on each day. A stretch between two odometer readings is shared
+ * evenly over its days (the odometer is only read now and then), and a window adds up the days in it, so a day that is mostly driving and a day that is
+ * mostly charging come out as the week they are part of; a window that is not yet a full week has no figure. The last day is the day before the latest reading: a reading counts as taken at the start of
+ * its day.
+ */
+export function efficiencyTrend(intervals: EvInterval[], window: number = TREND_DAYS): TrendPoint[] {
+  type Day = { day: string; miles: number; kwh: number; cost: number; priced: boolean };
+  const days: Day[] = [];
+  for (const iv of [...intervals].sort((a, b) => a.from_day.localeCompare(b.from_day))) {
+    const from = dayMs(iv.from_day);
+    const n = Math.round((dayMs(iv.to_day) - from) / DAY_MS);
+    if (!(n >= 1)) continue;
+    const cost = iv.cost == null ? null : Number(iv.cost);
+    for (let i = 0; i < n; i++) {
+      days.push({ day: dayText(from + i * DAY_MS), miles: iv.miles / n, kwh: iv.kwh / n, cost: cost == null ? 0 : cost / n, priced: cost != null });
+    }
+  }
+  return days.map((_, k) => {
+    const span = days.slice(Math.max(0, k - window + 1), k + 1);
+    const miles = span.reduce((s, d) => s + d.miles, 0);
+    const kwh = span.reduce((s, d) => s + d.kwh, 0);
+    const full = span.length === window && span.every((d) => d.priced);
+    const day = days[k]!.day;
+    return {
+      day,
+      x: dayMs(day) / 1000 + 43_200,
+      milesPerKwh: span.length === window && miles >= MIN_TREND_MILES && kwh > 0 ? miles / kwh : null,
+      windowCost: full ? span.reduce((s, d) => s + d.cost, 0) : null,
+    };
+  });
+}
