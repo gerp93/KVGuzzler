@@ -162,21 +162,7 @@ export type EvCompare = components['schemas']['EvCompare'];
 export type EvSavings = components['schemas']['EvSavings'];
 
 /** Seconds since the epoch at noon UTC of a calendar day, so every time zone shows the same date. */
-const noon = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 1000 + 43_200;
-
-/** The savings so far, one point at each odometer reading that closes a stretch with savings (a stretch whose gas price or electric cost is unknown adds nothing). */
-export function cumulativeSavings(stretches: EvSavings['stretches']): { x: number[]; y: number[] } {
-  const x: number[] = [];
-  const y: number[] = [];
-  let sum = 0;
-  for (const s of stretches) {
-    if (s.savings == null) continue;
-    sum += Number(s.savings);
-    x.push(noon(s.to_day));
-    y.push(sum);
-  }
-  return { x, y };
-}
+export const noon = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 1000 + 43_200;
 
 /** The weekly gas prices as a chart line: dollars per gallon at each week's Monday. */
 export function gasPriceSeries(prices: EvSavings['prices']): { x: number[]; y: number[] } {
@@ -199,23 +185,3 @@ export function parseKwh(text: string): number | null {
 
 /** A share (0 to 1) as a whole percent: "86 %". */
 export const percentText = (share: number): string => `${Math.round(share * 100)} %`;
-
-/**
- * What the gas car would have cost and what charging cost, each added up over the odometer readings, so the two can be drawn against each other: the gap
- * between them is the savings. Only a stretch with both costs known counts (the same as the savings), and the lines start at zero on the day the first such
- * stretch began.
- */
-export function cumulativeCosts(stretches: EvSavings['stretches']): { x: number[]; gas: number[]; ev: number[] } {
-  const counted = stretches.filter((s) => s.gas_cost != null && s.ev_cost != null);
-  const first = counted[0];
-  if (!first) return { x: [], gas: [], ev: [] };
-  const x = [noon(first.from_day)];
-  const gas = [0];
-  const ev = [0];
-  for (const s of counted) {
-    x.push(noon(s.to_day));
-    gas.push(gas[gas.length - 1]! + Number(s.gas_cost));
-    ev.push(ev[ev.length - 1]! + Number(s.ev_cost));
-  }
-  return { x, gas, ev };
-}

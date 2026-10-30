@@ -1,17 +1,45 @@
 {
   "meter_id": "refoss-192.168.1.88:em2",
   "configured": true,
-  "mpg": 25,
   "area_name": "Minnesota",
+  "comparisons": [
+    { "mpg": 20, "custom": false },
+    { "mpg": 27.5, "custom": true },
+    { "mpg": 40, "custom": false }
+  ],
   "prices": [
     { "week": "2026-10-12", "dollars": "4.184" },
     { "week": "2026-10-19", "dollars": "4.18" },
     { "week": "2026-10-26", "dollars": "4.146" }
   ],
   "stretches": [
-    { "from_day": "2026-10-12", "to_day": "2026-10-19", "miles": 210, "gallons": 8.4, "gas_price": "4.18", "gas_cost": "35.11", "ev_cost": "6.50", "savings": "28.61" },
-    { "from_day": "2026-10-19", "to_day": "2026-10-26", "miles": 185, "gallons": 7.4, "gas_price": "4.16", "gas_cost": "30.78", "ev_cost": null, "savings": null }
+    {
+      "from_day": "2026-10-12", "to_day": "2026-10-19", "miles": 210, "gas_price": "4.18", "ev_cost": "6.50",
+      "gas": [
+        { "mpg": 20, "gallons": 10.5, "gas_cost": "43.89", "savings": "37.39" },
+        { "mpg": 27.5, "gallons": 7.636364, "gas_cost": "31.92", "savings": "25.42" },
+        { "mpg": 40, "gallons": 5.25, "gas_cost": "21.945", "savings": "15.445" }
+      ]
+    },
+    {
+      "from_day": "2026-10-19", "to_day": "2026-10-26", "miles": 185, "gas_price": "4.16", "ev_cost": null,
+      "gas": [
+        { "mpg": 20, "gallons": 9.25, "gas_cost": "38.48", "savings": null },
+        { "mpg": 27.5, "gallons": 6.727273, "gas_cost": "27.98", "savings": null },
+        { "mpg": 40, "gallons": 4.625, "gas_cost": "19.24", "savings": null }
+      ]
+    }
   ],
-  "totals": { "stretches": 1, "miles": 210, "gallons": 8.4, "gas_cost": "35.11", "ev_cost": "6.50", "savings": "28.61", "gas_cost_per_mile": "0.167190", "ev_cost_per_mile": "0.030952" },
+  "totals": {
+    "stretches": 1,
+    "miles": 210,
+    "ev_cost": "6.50",
+    "ev_cost_per_mile": "0.030952",
+    "gas": [
+      { "mpg": 20, "gallons": 10.5, "gas_cost": "43.89", "savings": "37.39", "gas_cost_per_mile": "0.209000" },
+      { "mpg": 27.5, "gallons": 7.636364, "gas_cost": "31.92", "savings": "25.42", "gas_cost_per_mile": "0.152000" },
+      { "mpg": 40, "gallons": 5.25, "gas_cost": "21.945", "savings": "15.445", "gas_cost_per_mile": "0.104500" }
+    ]
+  },
   "cost_estimated": false
 }

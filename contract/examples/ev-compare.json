@@ -1,8 +1,9 @@
 {
   "meter_id": "refoss-192.168.1.88:em2",
-  "mpg": 25,
   "area_id": "SMN",
   "area_name": "Minnesota",
+  "custom_mpg": 27.5,
+  "presets": [15, 20, 25, 30, 35, 40],
   "areas": [
     { "id": "NUS", "name": "U.S." },
     { "id": "SMN", "name": "Minnesota" },

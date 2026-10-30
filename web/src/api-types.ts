@@ -177,16 +177,18 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The gas car a charging meter's vehicle is compared with, and the gasoline price area.
-         * @description The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in a gasoline car (its miles per gallon,
-         *     chosen by the owner) at the weekly average retail price of regular gasoline in an area, which EIA publishes for the country, regions, some states
-         *     and big cities. The prices are read with the EIA key saved for the carbon footprint (`key_saved`). 409 when the meter is not marked `ev`.
+         * The gasoline price area a charging meter's vehicle is compared in, and the owner's own gas car if there is one.
+         * @description The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in gasoline cars: the `presets` (15 to 40 miles
+         *     per gallon) and, if the owner named one, `custom_mpg`. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
+         *     for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). Which of the gas cars a page
+         *     draws is the page's own choice; every one is answered. 409 when the meter is not marked `ev`.
          */
         get: operations["getEvCompare"];
         /**
-         * Save the gas car's miles per gallon and the price area, and read the area's prices now.
-         * @description The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable): `last_outcome` says what happened and the server tries
-         *     again. 400 for a miles per gallon outside 5 to 200 or an area EIA has no price for.
+         * Save the price area and the owner's own gas car, and read the area's prices now.
+         * @description The area alone is enough: the presets are always compared. The setup is kept even when the prices cannot be read (no EIA key yet, EIA not reachable):
+         *     `last_outcome` says what happened and the server tries again. A `custom_mpg` that is one of the presets is not a second comparison. 400 for a miles
+         *     per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg` included).
          */
         put: operations["putEvCompare"];
         post?: never;
@@ -232,12 +234,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * What each stretch between odometer readings would have cost in the gas car, against what charging cost.
-         * @description For each stretch of `getMeterEv` the miles are divided by the gas car's miles per gallon and priced at the average of the weekly prices over the
-         *     stretch's days (a day takes the latest week on or before it, and the latest price after the last week). `savings` is the gas car's cost less the
+         * What each stretch between odometer readings would have cost in each gas car, against what charging cost.
+         * @description For each stretch of `getMeterEv` the miles are divided by each gas car's miles per gallon (`comparisons`) and priced at the average of the weekly prices
+         *     over the stretch's days (a day takes the latest week on or before it, and the latest price after the last week). `savings` is a gas car's cost less the
          *     electric car's cost: negative when the electric car cost more. A stretch with a day before the first price kept, or with no electric cost, has no
-         *     savings and is left out of `totals`. The electric cost is only the energy the meter measured, so charging elsewhere makes the savings look bigger.
-         *     `configured` is false until the comparison is set up. 409 when the meter is not marked `ev`.
+         *     savings and is left out of `totals`, for every gas car alike. The electric cost is only the energy the meter measured, so charging elsewhere makes the
+         *     savings look bigger. `configured` is false until a price area is chosen. 409 when the meter is not marked `ev`.
          */
         get: operations["getEvSavings"];
         put?: never;
@@ -1169,10 +1171,13 @@ export interface components {
         };
         EvCompare: {
             meter_id: string;
-            /** @description The gas car's miles per gallon; null until the comparison is set up. */
-            mpg: number | null;
+            /** @description The gasoline price area; null until chosen. */
             area_id: string | null;
             area_name: string | null;
+            /** @description The owner's own gas car, in miles per gallon, beside the presets; null when there is none. */
+            custom_mpg: number | null;
+            /** @description The gas cars every vehicle is compared with, in miles per gallon, lowest first. */
+            presets: number[];
             /** @description The places EIA publishes a weekly gasoline price for. */
             areas: {
                 id: string;
@@ -1192,8 +1197,12 @@ export interface components {
         EvSavings: {
             meter_id: string;
             configured: boolean;
-            mpg: number | null;
             area_name: string | null;
+            /** @description The gas cars compared with, lowest miles per gallon first, made of the presets and the owner's own if there is one. Every `gas` list below is in this order. */
+            comparisons: {
+                mpg: number;
+                custom: boolean;
+            }[];
             /** @description The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart. */
             prices: {
                 /** Format: date */
@@ -1207,26 +1216,35 @@ export interface components {
                 /** Format: date */
                 to_day: string;
                 miles: number;
-                /** @description What the gas car would have burned over the miles. */
-                gallons: number;
                 /** @description The average of the week prices over the stretch's days; null when a day has no price. */
                 gas_price: string | null;
-                gas_cost: string | null;
                 /** @description What the meter's energy cost, as in `getMeterEv`. */
                 ev_cost: string | null;
-                /** @description Gas cost less electric cost, a decimal string, negative when the electric car cost more. */
-                savings: string | null;
+                /** @description One per comparison, in the comparisons' order. */
+                gas: {
+                    mpg: number;
+                    /** @description What the gas car would have burned over the miles. */
+                    gallons: number;
+                    gas_cost: string | null;
+                    /** @description Gas cost less electric cost, a decimal string, negative when the electric car cost more. */
+                    savings: string | null;
+                }[];
             }[];
             /** @description The stretches that have both costs, added up; null when there are none. */
             totals: {
+                /** @description How many stretches are added up, the same for every gas car. */
                 stretches: number;
                 miles: number;
-                gallons: number;
-                gas_cost: string;
                 ev_cost: string;
-                savings: string;
-                gas_cost_per_mile: string | null;
                 ev_cost_per_mile: string | null;
+                /** @description One per comparison, in the comparisons' order. */
+                gas: {
+                    mpg: number;
+                    gallons: number;
+                    gas_cost: string;
+                    savings: string;
+                    gas_cost_per_mile: string | null;
+                }[];
             } | null;
             cost_estimated: boolean;
         };
@@ -2471,9 +2489,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    mpg: number;
                     /** @description One of the `areas` ids. */
                     area_id: string;
+                    custom_mpg?: number | null;
                 };
             };
         };

@@ -12,6 +12,12 @@ export interface Line {
   y: number[];
   /** Drawn dashed: a separate device next to the main lines. */
   dashed?: boolean;
+  /** The colour at this strength (0 to 1), so a family of lines of one colour is told apart by how strong each is. */
+  alpha?: number;
+  /** The line's width in pixels (2 by default). */
+  width?: number;
+  /** A soft fill under the line: by default only the first solid line has one; false for none. */
+  fill?: boolean;
 }
 
 /** A stretch of the period to shade (seconds since the epoch): a time nothing was being recorded, so no line is drawn across it. */
@@ -83,7 +89,24 @@ export function wattsAxis(w: number): string {
 }
 
 // `format` writes a value on the vertical axis (a chart of something other than power says its own unit) and must be one function, not a new one on each render, for the same reason as `shades`.
-export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeight(), format = wattsAxis, label = 'Power over time' }: { lines: Line[]; domain: [number, number]; shades?: Shade[]; height?: number; format?: (v: number) => string; label?: string }) {
+export function Chart({
+  lines,
+  domain,
+  shades = NO_SHADES,
+  height = defaultHeight(),
+  format = wattsAxis,
+  label = 'Power over time',
+  endLabels = false,
+}: {
+  lines: Line[];
+  domain: [number, number];
+  shades?: Shade[];
+  height?: number;
+  format?: (v: number) => string;
+  label?: string;
+  /** Each line is named at its right end, in its own colour, instead of in a key under the chart: for a handful of lines that are read against each other. */
+  endLabels?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +121,9 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
       {
         width: el.clientWidth || 600,
         height,
-        legend: { show: true },
+        legend: { show: !endLabels },
+        // Room at the right for the names at the ends of the lines.
+        padding: endLabels ? [null, Math.round(76 * uiScale()), null, null] : undefined,
         cursor: { drag: { x: false, y: false } },
         scales: {
           x: { time: true, range: () => span },
@@ -118,13 +143,44 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
         series: [
           {},
           ...lines.map((l, i) => {
-            const stroke = css(l.colorVar);
+            const base = css(l.colorVar);
+            const stroke = l.alpha != null ? (withAlpha(base, l.alpha) ?? base) : base;
             // The first solid line gets a soft fill, so the shape of the day reads at a glance; the rest stay plain lines.
-            const fill = i === 0 && !l.dashed ? withAlpha(stroke, 0.14) : undefined;
-            return { label: l.name, stroke, fill, width: 2, spanGaps: false, dash: l.dashed ? [6, 4] : undefined, points: { size: 5 } };
+            const fill = (l.fill ?? (i === 0 && !l.dashed)) ? withAlpha(base, 0.14) : undefined;
+            return { label: l.name, stroke, fill, width: l.width ?? 2, spanGaps: false, dash: l.dashed ? [6, 4] : undefined, points: { size: 5 } };
           }),
         ],
         hooks: {
+          // Name each line at its right end, in its own colour; names that would overlap are moved apart.
+          draw: [
+            (u: uPlot) => {
+              if (!endLabels) return;
+              const { ctx } = u;
+              const ratio = window.devicePixelRatio || 1;
+              const size = Math.round(12 * uiScale() * ratio);
+              type Label = { text: string; color: string; x: number; y: number };
+              const labels: Label[] = [];
+              lines.forEach((l, i) => {
+                const ys = u.data[i + 1] as (number | null)[];
+                const xs = u.data[0] as number[];
+                let last = ys.length - 1;
+                while (last >= 0 && ys[last] == null) last--;
+                if (last < 0) return;
+                const base = css(l.colorVar);
+                labels.push({ text: l.name, color: l.alpha != null ? (withAlpha(base, Math.max(l.alpha, 0.7)) ?? base) : base, x: u.valToPos(xs[last] as number, 'x', true), y: u.valToPos(ys[last] as number, 'y', true) });
+              });
+              labels.sort((a, b) => a.y - b.y);
+              for (let k = 1; k < labels.length; k++) labels[k]!.y = Math.max(labels[k]!.y, labels[k - 1]!.y + size * 1.3);
+              ctx.save();
+              ctx.font = `${size}px system-ui, sans-serif`;
+              ctx.textBaseline = 'middle';
+              for (const lab of labels) {
+                ctx.fillStyle = lab.color;
+                ctx.fillText(lab.text, lab.x + 8 * ratio, lab.y);
+              }
+              ctx.restore();
+            },
+          ],
           // Shade the times nothing was recorded, behind the lines.
           drawClear: [
             (u: uPlot) => {
@@ -151,7 +207,7 @@ export function Chart({ lines, domain, shades = NO_SHADES, height = defaultHeigh
       resize.disconnect();
       plot.destroy();
     };
-  }, [lines, domain, shades, height, format]);
+  }, [lines, domain, shades, height, format, endLabels]);
 
   return <div ref={box} class="chart" role="img" aria-label={label} />;
 }

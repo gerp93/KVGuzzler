@@ -1,5 +1,6 @@
-// The gas car an electric vehicle is compared with, in the EV card's settings: its miles per gallon and the area whose gasoline price is used. Saving reads the
-// area's weekly prices from EIA at once, with the key saved under Carbon.
+// The gas comparison, in the EV card's settings: the area whose gasoline price is used, and optionally a gas car of the owner's own beside the presets. The
+// presets (15 to 40 miles per gallon) are always compared; which are drawn is ticked under the chart. Saving reads the area's weekly prices from EIA at once,
+// with the key saved under Carbon.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
 import { parseMpg, type EvCompare } from './ev';
@@ -15,7 +16,7 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
     void api.evCompare(meterId).then(
       (v) => {
         setView(v);
-        setMpg(v.mpg != null ? String(v.mpg) : '');
+        setMpg(v.custom_mpg != null ? String(v.custom_mpg) : '');
         setArea(v.area_id ?? '');
       },
       (e: Error) => setProblem(e.message),
@@ -24,9 +25,9 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
 
   const save = async (e: Event) => {
     e.preventDefault();
-    const n = parseMpg(mpg);
-    if (n === null) {
-      setProblem("Enter the gas car's miles per gallon, a number from 5 to 200, like 25.");
+    const custom = mpg.trim() === '' ? null : parseMpg(mpg);
+    if (mpg.trim() !== '' && custom === null) {
+      setProblem("Enter the gas car's miles per gallon, a number from 5 to 200, like 27, or leave it empty.");
       return;
     }
     if (area === '') {
@@ -35,7 +36,9 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
     }
     setSaving(true);
     try {
-      setView(await api.putEvCompare(meterId, n, area));
+      const v = await api.putEvCompare(meterId, area, custom);
+      setView(v);
+      setMpg(v.custom_mpg != null ? String(v.custom_mpg) : '');
       setProblem('');
       reload();
     } catch (err) {
@@ -59,14 +62,11 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
   };
 
   const failed = view?.last_outcome != null && view.last_outcome !== 'Prices saved.';
+  const presets = view?.presets ?? [];
   return (
     <>
       <h3>Gas car comparison</h3>
       <form class="ev-form" onSubmit={(e) => void save(e)}>
-        <label class="field">
-          <span>Gas car miles per gallon</span>
-          <input type="text" inputMode="decimal" value={mpg} placeholder="25" onInput={(e) => setMpg((e.target as HTMLInputElement).value)} required />
-        </label>
         <label class="field">
           <span>Gas price area</span>
           <select value={area} onChange={(e) => setArea((e.target as HTMLSelectElement).value)} required>
@@ -80,15 +80,20 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
             ))}
           </select>
         </label>
+        <label class="field">
+          <span>Your own gas car, miles per gallon (optional)</span>
+          <input type="text" inputMode="decimal" value={mpg} placeholder="27" onInput={(e) => setMpg((e.target as HTMLInputElement).value)} />
+        </label>
         <button type="submit" disabled={saving}>
-          {view?.mpg != null ? 'Save' : 'Compare'}
+          {view?.area_id != null ? 'Save' : 'Compare'}
         </button>
-        {view?.mpg != null && (
+        {view?.area_id != null && (
           <button type="button" onClick={() => void remove()}>
             Take off
           </button>
         )}
       </form>
+      {presets.length > 0 && <p class="caption">Always compared with gas cars of {presets.join(', ')} miles per gallon; tick which to draw under the chart.</p>}
       {view && !view.key_saved && <p class="caption">The prices come from EIA and need its key: save it under Carbon.</p>}
       {view?.last_outcome != null && (
         <p class={`caption ${failed ? 'bad' : ''}`}>
