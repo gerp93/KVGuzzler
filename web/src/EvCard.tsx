@@ -3,7 +3,8 @@
 // latest trips) is the card; what is set once (the unit, typed readings, the Ford connection) is behind its Settings button. The sums are the server's.
 import { useRef, useState } from 'preact/hooks';
 import { api } from './api';
-import { dayLabel, formatDistance, formatEfficiency, lowCoverage, stretchLabel, whenText, type DistanceUnit, type MeterEv } from './ev';
+import { dayLabel, formatDistance, formatEfficiency, lowCoverage, mpge, stretchLabel, whenText, type DistanceUnit, type MeterEv } from './ev';
+import { EvTrends } from './EvTrends';
 import { EvCharges } from './EvCharges';
 import { EvSettings } from './EvSettings';
 import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
@@ -138,6 +139,13 @@ export function EvCard({ meter }: { meter: Meter }) {
                   <p class="big small ev-figure">{totals.miles_per_kwh != null ? formatEfficiency(totals.miles_per_kwh, unit).replace(/ .*$/, '') : '—'}</p>
                   <span class="caption">{unit === 'km' ? 'kilometers' : 'miles'} per kWh at the wall</span>
                 </div>
+                {totals.miles_per_kwh != null && (
+                  <div class="stat">
+                    <span class="caption">MPGe</span>
+                    <p class="big small ev-figure">{mpge(totals.miles_per_kwh).toFixed(0)}</p>
+                    <span class="caption">miles per gallon equivalent</span>
+                  </div>
+                )}
                 <div class="stat">
                   <span class="caption">Energy</span>
                   <p class="big small ev-figure">{formatKwh(totals.kwh).replace(' kWh', '')}</p>
@@ -154,6 +162,8 @@ export function EvCard({ meter }: { meter: Meter }) {
               {data.since_last.cost != null ? ` · ${formatMoney(data.since_last.cost, data.cost_estimated)}` : ''}
             </p>
           )}
+
+          <EvTrends intervals={data.intervals} unit={unit} />
 
           {trips.length > 0 && (
             <>
