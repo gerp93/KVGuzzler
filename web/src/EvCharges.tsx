@@ -3,7 +3,8 @@
 // battery's charge comes from the car (Ford) at each end. The sums are the server's.
 import { useState } from 'preact/hooks';
 import { api } from './api';
-import { batteryText, lowCoverage, pctNote, perPct, whenText, type EvChargesAnswer } from './ev';
+import { batteryText, lowCoverage, pctNote, percentText, perPct, whenText, type EvChargesAnswer } from './ev';
+import { lossTitle } from './evLoss';
 import { usePoll } from './hooks';
 import { formatDuration, formatMoney } from './lib';
 import { Kwh } from './Watts';
@@ -11,9 +12,9 @@ import { Kwh } from './Watts';
 /** How many charges are listed before "Show all". */
 const SHOWN = 6;
 
-export function EvCharges({ meterId }: { meterId: string }) {
+export function EvCharges({ meterId, refresh, onOpenSettings }: { meterId: string; refresh: number; onOpenSettings: () => void }) {
   const [version, setVersion] = useState(0);
-  const { data } = usePoll<EvChargesAnswer>(() => api.evCharges(meterId), 30_000, [meterId, version]);
+  const { data } = usePoll<EvChargesAnswer>(() => api.evCharges(meterId), 30_000, [meterId, version, refresh]);
   const [showAll, setShowAll] = useState(false);
   // The charge whose removal is being confirmed.
   const [removing, setRemoving] = useState<number | null>(null);
@@ -47,22 +48,43 @@ export function EvCharges({ meterId }: { meterId: string }) {
                 <span class="caption">
                   kWh per % · {consistency.charges} {consistency.charges === 1 ? 'charge' : 'charges'}
                 </span>
+                {consistency.charges > 1 && (
+                  <span class="caption">
+                    from {perPct(consistency.lowest)} to {perPct(consistency.highest)}
+                  </span>
+                )}
               </div>
-              {consistency.charges > 1 && (
-                <div class="stat">
-                  <span class="caption">Spread</span>
-                  <p class="big small ev-figure">
-                    {perPct(consistency.lowest)}–{perPct(consistency.highest)}
-                  </p>
-                  <span class="caption">lowest to highest charge</span>
-                </div>
-              )}
               <div class="stat">
                 <span class="caption">Full battery</span>
                 <p class="big small ev-figure">{(consistency.kwh_per_pct * 100).toFixed(1)}</p>
                 <span class="caption">kWh at the wall, 0 to 100 %</span>
               </div>
+              {data.losses && (
+                <>
+                  <div class="stat">
+                    <span class="caption">Charging efficiency</span>
+                    <p class="big small ev-figure">{percentText(data.losses.efficiency)}</p>
+                    <span class="caption">of the wall's energy reached the battery</span>
+                  </div>
+                  <div class="stat">
+                    <span class="caption">Lost charging</span>
+                    <p class="big small ev-figure">{data.losses.loss_kwh.toFixed(1)}</p>
+                    <span class="caption">kWh{data.losses.loss_cost != null ? ` · ${formatMoney(data.losses.loss_cost)}` : ''}</span>
+                  </div>
+                </>
+              )}
             </div>
+          )}
+          {consistency && data.battery_kwh == null && (
+            <p class="caption">
+              Set the battery's usable kWh to see how much of the wall's energy reaches it.{' '}
+              <button type="button" class="small" onClick={onOpenSettings}>
+                Open settings
+              </button>
+            </p>
+          )}
+          {data.losses && data.losses.efficiency > 1 && (
+            <p class="caption bad">More energy reached the battery than the wall gave: the battery's usable kWh is set too high.</p>
           )}
           <div class="ev-trips-wrap">
             <table class="ev-trips">
@@ -75,6 +97,7 @@ export function EvCharges({ meterId }: { meterId: string }) {
                   <th scope="col">Energy</th>
                   <th scope="col">Cost</th>
                   <th scope="col">kWh per %</th>
+                  {data.battery_kwh != null && <th scope="col">Efficiency</th>}
                   <th scope="col">
                     <span class="visually-hidden">Remove</span>
                   </th>
@@ -109,6 +132,9 @@ export function EvCharges({ meterId }: { meterId: string }) {
                           <strong>{perPct(c.kwh_per_pct ?? 0)}</strong>
                         )}
                       </td>
+                      {data.battery_kwh != null && (
+                        <td title={lossTitle(c)}>{c.efficiency != null ? percentText(c.efficiency) : '—'}</td>
+                      )}
                       <td>
                         {c.active ? null : removing === c.id ? (
                           <span class="chips">

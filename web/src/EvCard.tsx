@@ -219,7 +219,7 @@ export function EvCard({ meter }: { meter: Meter }) {
 
       {data && <EvSavings meterId={meter.id} version={version} unit={unit} onOpenSettings={() => setOpen(true)} />}
 
-      {data && <EvCharges meterId={meter.id} />}
+      {data && <EvCharges meterId={meter.id} refresh={version} onOpenSettings={() => setOpen(true)} />}
 
       {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
       {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}

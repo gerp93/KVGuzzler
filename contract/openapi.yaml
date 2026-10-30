@@ -344,6 +344,74 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+  /api/v1/meters/{meterId}/ev/battery:
+    get:
+      tags: [Read]
+      operationId: getEvBattery
+      summary: The battery's usable energy in kWh, as the owner set it.
+      description: |
+        It turns the car's battery percentages into energy, so what charging lost (the wall's energy less the battery's) can be worked out in `getEvCharges`.
+        Ford's telemetry has a battery capacity member but this car leaves it empty, so the owner says it once, from the car's specification. Nothing is
+        assumed: `kwh` is null until it is set and there are no loss figures. 409 when the meter is not marked `ev`.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvBattery'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags: [Settings]
+      operationId: putEvBattery
+      summary: Save the battery's usable energy.
+      description: 400 for a figure outside 10 to 300 kWh.
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kwh]
+              additionalProperties: false
+              properties:
+                kwh:
+                  type: number
+                  minimum: 10
+                  maximum: 300
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvBattery'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: deleteEvBattery
+      summary: Take the battery's size off (the loss figures go with it).
+      parameters:
+        - $ref: '#/components/parameters/MeterId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
   /api/v1/meters/{meterId}/ev/savings:
     get:
       tags: [Read]
@@ -1655,6 +1723,15 @@ components:
           format: date
         miles:
           type: number
+    EvBattery:
+      type: object
+      required: [meter_id, kwh]
+      properties:
+        meter_id:
+          type: string
+        kwh:
+          type: [number, 'null']
+          description: The battery's usable energy in kWh; null until the owner sets it.
     EvCompare:
       type: object
       required: [meter_id, mpg, area_id, area_name, areas, key_saved, last_check, last_outcome, latest_week, latest_price]
@@ -1772,7 +1849,7 @@ components:
           type: boolean
     EvCharges:
       type: object
-      required: [meter_id, car_linked, charges, consistency, cost_estimated]
+      required: [meter_id, car_linked, charges, consistency, battery_kwh, losses, cost_estimated]
       properties:
         meter_id:
           type: string
@@ -1784,7 +1861,7 @@ components:
           description: Newest first.
           items:
             type: object
-            required: [id, started_at, ended_at, active, duration_seconds, kwh, cost, cost_estimated, peak_watts, coverage, start_pct, start_pct_at, end_pct, end_pct_at, gain_pct, pct_status, kwh_per_pct]
+            required: [id, started_at, ended_at, active, duration_seconds, kwh, cost, cost_estimated, peak_watts, coverage, start_pct, start_pct_at, end_pct, end_pct_at, gain_pct, pct_status, kwh_per_pct, battery_kwh, loss_kwh, efficiency, loss_cost]
             properties:
               id:
                 type: integer
@@ -1836,6 +1913,18 @@ components:
               kwh_per_pct:
                 type: [number, 'null']
                 description: Energy at the wall for each percent the battery gained; given only when `pct_status` is `ok`.
+              battery_kwh:
+                type: [number, 'null']
+                description: The energy that reached the battery, the gain times the battery's usable kWh. Null without the battery's size (`getEvBattery`), for a charge with no `kwh_per_pct`, or for one the meter measured under 95 percent of the time.
+              loss_kwh:
+                type: [number, 'null']
+                description: What the wall gave that the battery did not take (the charger, the battery's heat, keeping the battery and cabin at temperature). Negative when the battery's size is too big for the numbers.
+              efficiency:
+                type: [number, 'null']
+                description: The battery's energy over the wall's, 0 to 1 in a real charge; over 1 means the battery's size is too big.
+              loss_cost:
+                type: [string, 'null']
+                description: The lost energy at the charge's own price, a decimal string; null with no price or a negative loss.
         consistency:
           type: [object, 'null']
           description: How steady the energy per percent is over the charges that are `ok`.
@@ -1850,6 +1939,33 @@ components:
               type: number
             highest:
               type: number
+        battery_kwh:
+          type: [number, 'null']
+          description: The battery's usable energy as the owner set it; null until set. The loss figures need it.
+        losses:
+          type: [object, 'null']
+          description: What charging lost over the charges that have a loss figure; null when there are none.
+          required: [charges, wall_kwh, battery_kwh, loss_kwh, efficiency, lowest, highest, loss_cost]
+          properties:
+            charges:
+              type: integer
+            wall_kwh:
+              type: number
+            battery_kwh:
+              type: number
+            loss_kwh:
+              type: number
+            efficiency:
+              type: number
+              description: The battery's energy over the wall's over all of those charges, so a big charge counts for more than a small one.
+            lowest:
+              type: number
+              description: The lowest efficiency of a single charge.
+            highest:
+              type: number
+            loss_cost:
+              type: [string, 'null']
+              description: The lost energy's price, a decimal string; null when a charge had no price.
         cost_estimated:
           type: boolean
     MeterEv:

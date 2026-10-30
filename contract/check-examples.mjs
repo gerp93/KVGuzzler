@@ -25,6 +25,7 @@ const examples = {
   'meter-ev.json': 'MeterEv',
   'ev-charges.json': 'EvCharges',
   'ev-compare.json': 'EvCompare',
+  'ev-battery.json': 'EvBattery',
   'ev-savings.json': 'EvSavings',
   'baseload.json': 'BaseLoad',
   'levels.json': 'Levels',
