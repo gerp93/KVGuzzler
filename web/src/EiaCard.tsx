@@ -3,6 +3,7 @@
 // on the server and sent to EIA only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
+import { ApiKeyField } from './ApiKeyField';
 import { FuelPricesSection } from './FuelPricesSection';
 import type { CarbonConfig } from './lib';
 
@@ -55,17 +56,14 @@ export function EiaCard() {
       <section class="sub">
         <h3>Grid carbon</h3>
         <p class="caption">How clean the electricity was each hour, for the carbon footprint.</p>
+        <ApiKeyField saved={cfg ? cfg.configured : undefined} value={key} onInput={setKey} />
         <label class="field">
           <span>Balancing authority's code (like MISO, PJM, ERCO, CISO)</span>
           <input value={place} placeholder="MISO" onInput={(e) => setPlace((e.target as HTMLInputElement).value)} />
         </label>
-        <label class="field">
-          <span>EIA API key {cfg?.configured ? '(leave empty to keep the saved one)' : ''}</span>
-          <input type="password" autocomplete="off" value={key} onInput={(e) => setKey((e.target as HTMLInputElement).value)} />
-        </label>
         <div class="chips save">
           <button type="button" disabled={busy || !place.trim() || (!key.trim() && !cfg?.configured)} onClick={save}>
-            {busy ? 'Checking…' : 'Save and check'}
+            {busy ? 'Checking…' : 'Save'}
           </button>
           {cfg?.configured && (
             <button type="button" onClick={() => void remove()}>

@@ -6,11 +6,13 @@ import { EiaCard } from './EiaCard';
 import { FordCard } from './FordCard';
 import type { Meter } from './lib';
 import { OpenEiCard } from './OpenEiCard';
+import { PcCollectorCard } from './PcCollectorCard';
 
 export function ConnectorsView({ meters, onChanged }: { meters: Meter[]; onChanged: () => void }) {
   return (
     <>
       <DevicesCard meters={meters} onChanged={onChanged} />
+      <PcCollectorCard />
       <EiaCard />
       <OpenEiCard />
       <FordCard meters={meters} />
