@@ -1,28 +1,24 @@
-// The card on a charging meter's page: the car's odometer, set against what the meter used between readings, so a mile has a price that can be set
-// beside a gas car's. The odometer is kept up to date from Ford, or typed in by hand. What is everyday (the odometer, cost per mile, efficiency, the
-// latest trips) is the card; what is set once (the unit, typed readings, the Ford connection) is behind its Settings button. The sums are the server's.
-import { useRef, useState } from 'preact/hooks';
+// The card on a charging meter's page, laid out as the questions it answers: a header (is the car being read, and its odometer), four headline tiles (what driving
+// it saved, what a mile costs, how efficiently it uses energy, how much of the wall's energy reaches the battery), then the charts as one tabbed panel with the
+// stretches between odometer readings under it, and the charges as a list beside them. What is set once (the unit, typed readings, the battery's size, the gas car,
+// the Ford connection) is behind the Settings button; how everything is counted is in one note at the foot. The sums are the server's; the pieces only show them.
+import { useMemo, useRef, useState } from 'preact/hooks';
 import { api } from './api';
-import { dayLabel, formatDistance, formatEfficiency, lowCoverage, mpge, stretchLabel, whenText, type DistanceUnit, type MeterEv } from './ev';
-import { EvSavings } from './EvSavings';
-import { EvTrends } from './EvTrends';
-import { EvCharges } from './EvCharges';
+import { dayLabel, formatDistance, whenText, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
+import { EvChargeList } from './EvChargeList';
+import { EvHeadline } from './EvHeadline';
+import { EvNotes } from './EvNotes';
 import { EvSettings } from './EvSettings';
+import { trendTabs } from './evTabs';
+import { EvTrendPanel } from './EvTrendPanel';
+import { EvTrips } from './EvTrips';
 import { FordSetup, type FordDraft, type SetupStep } from './FordSetup';
 import { useFordWait } from './fordWait';
 import { useDistanceUnit, usePoll } from './hooks';
-import { formatKwh, formatMoney, formatPerMile, type FordLink, type Meter } from './lib';
-import { Kwh } from './Watts';
-
-/** A cost per distance without its unit, for the big figure (the unit is in the caption under it). */
-const perMile = (m: string | null | undefined, estimated: boolean | undefined, unit: DistanceUnit): string =>
-  formatPerMile(m, estimated, unit).replace(/\/(mi|km)$/, '');
+import type { FordLink, Meter } from './lib';
 
 /** A meter that is probably the car's charger by its name. */
 const LOOKS_LIKE_CHARGER = /\b(ev|tesla|car|charger|charging|vehicle)\b/i;
-
-/** How many trips the card lists before "Show all": one a day adds up. */
-const TRIPS_SHOWN = 6;
 
 /** On the page of a circuit or plug named like a charger and not marked yet: one button that turns on the odometer and the cost per mile. */
 export function EvPrompt({ meter, onChanged }: { meter: Meter; onChanged: () => void }) {
@@ -68,21 +64,30 @@ export function EvCard({ meter }: { meter: Meter }) {
   const [version, setVersion] = useState(0);
   const { data, error } = usePoll<MeterEv>(() => api.meterEv(meter.id), 60_000, [meter.id, version]);
   const { data: ford } = usePoll<FordLink>(() => api.ford(), 60_000, [version]);
+  const { data: savings } = usePoll<EvSavings>(() => api.evSavings(meter.id), 300_000, [meter.id, version]);
+  const { data: charges } = usePoll<EvChargesAnswer>(() => api.evCharges(meter.id), 30_000, [meter.id, version]);
   const [unit] = useDistanceUnit();
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   // The step of the connecting dialog to open at, or nothing while it is closed.
   const [setup, setSetup] = useState<SetupStep | null>(null);
+  const [problem, setProblem] = useState('');
   const { waitLeft, wait } = useFordWait(ford);
   const draft = useRef<FordDraft>({});
   const reload = () => setVersion((v) => v + 1);
 
-  const totals = data?.totals ?? null;
+  const tabs = useMemo(() => (data ? trendTabs({ ev: data, savings, charges, unit }) : []), [data, savings, charges, unit]);
+  const removeCharge = (id: number) => {
+    setProblem('');
+    void api.deleteEvCharge(meter.id, id).then(reload, (e: Error) => setProblem(e.message));
+  };
+
   const readings = data?.readings ?? [];
-  const trips = [...(data?.intervals ?? [])].reverse();
   const latest = readings[readings.length - 1];
   const sync = syncLine(ford);
-  const distanceWord = unit === 'km' ? 'kilometer' : 'mile';
+  const openSettings = () => setOpen(true);
+  // A car with no odometer reading and no charge yet has nothing to lay out: it is asked to be connected instead.
+  const hasContent = readings.length > 0 || (charges?.charges.length ?? 0) > 0;
+
   return (
     <section class="card ev">
       <header class="ev-head">
@@ -95,13 +100,22 @@ export function EvCard({ meter }: { meter: Meter }) {
             </p>
           )}
         </div>
-        <button type="button" class="ev-toggle" aria-expanded={open} aria-controls="ev-settings" onClick={() => setOpen(!open)}>
-          Settings
-        </button>
+        <div class="ev-head-right">
+          {latest && (
+            <div class="ev-odo">
+              <span class="caption">Odometer</span>
+              <strong class="num">{formatDistance(latest.miles, unit)}</strong>
+              <span class="caption">as of {dayLabel(latest.day)}</span>
+            </div>
+          )}
+          <button type="button" class="ev-toggle" aria-expanded={open} aria-controls="ev-settings" onClick={() => setOpen(!open)}>
+            Settings
+          </button>
+        </div>
       </header>
       {error && !data && <p class="note error">{error.message}</p>}
 
-      {data && readings.length === 0 && (
+      {data && !hasContent && (
         <div class="ev-empty">
           <p>No odometer reading yet.</p>
           <p class="caption">Connect the car to Ford to keep it up to date, or type a reading, from Settings.</p>
@@ -112,7 +126,7 @@ export function EvCard({ meter }: { meter: Meter }) {
               </button>
             )}
             {!open && (
-              <button type="button" onClick={() => setOpen(true)}>
+              <button type="button" onClick={openSettings}>
                 Open settings
               </button>
             )}
@@ -120,106 +134,21 @@ export function EvCard({ meter }: { meter: Meter }) {
         </div>
       )}
 
-      {data && readings.length > 0 && (
+      {data && hasContent && (
         <>
-          <div class="ev-figures">
-            <div class="stat ev-odometer">
-              <span class="caption">Odometer</span>
-              <p class="big ev-figure">{latest ? formatDistance(latest.miles, unit) : '—'}</p>
-              <span class="caption">last reading, {latest ? dayLabel(latest.day) : ''}</span>
+          <EvHeadline ev={data} savings={savings} charges={charges} unit={unit} onOpenSettings={openSettings} />
+          <div class="ev-body">
+            <div class="ev-main">
+              <EvTrendPanel tabs={tabs} />
+              <EvTrips ev={data} unit={unit} />
             </div>
-            {totals ? (
-              <>
-                <div class="stat">
-                  <span class="caption">Cost per {distanceWord}</span>
-                  <p class="big small ev-figure">{perMile(totals.cost_per_mile, data.cost_estimated, unit)}</p>
-                  <span class="caption">over {formatDistance(totals.miles, unit)}</span>
-                </div>
-                <div class="stat">
-                  <span class="caption">Efficiency</span>
-                  <p class="big small ev-figure">{totals.miles_per_kwh != null ? formatEfficiency(totals.miles_per_kwh, unit).replace(/ .*$/, '') : '—'}</p>
-                  <span class="caption">{unit === 'km' ? 'kilometers' : 'miles'} per kWh at the wall</span>
-                </div>
-                {totals.miles_per_kwh != null && (
-                  <div class="stat">
-                    <span class="caption">MPGe</span>
-                    <p class="big small ev-figure">{mpge(totals.miles_per_kwh).toFixed(0)}</p>
-                    <span class="caption">miles per gallon equivalent</span>
-                  </div>
-                )}
-                <div class="stat">
-                  <span class="caption">Energy</span>
-                  <p class="big small ev-figure">{formatKwh(totals.kwh).replace(' kWh', '')}</p>
-                  <span class="caption">kWh{totals.cost != null ? ` · ${formatMoney(totals.cost, data.cost_estimated)}` : ''}</span>
-                </div>
-              </>
-            ) : (
-              <p class="note ev-wait">A second odometer reading gives the cost per {distanceWord}.</p>
-            )}
+            <div class="ev-side">
+              {charges && <EvChargeList data={charges} onRemove={removeCharge} problem={problem} onOpenSettings={openSettings} />}
+            </div>
           </div>
-          {data.since_last && (
-            <p class="caption ev-since">
-              Since {dayLabel(data.since_last.from_day)}: <Kwh k={data.since_last.kwh} />
-              {data.since_last.cost != null ? ` · ${formatMoney(data.since_last.cost, data.cost_estimated)}` : ''}
-            </p>
-          )}
-
-          <EvTrends intervals={data.intervals} unit={unit} />
-
-          {trips.length > 0 && (
-            <>
-              <h3 class="ev-sub">Between readings</h3>
-              <div class="ev-trips-wrap">
-                <table class="ev-trips">
-                  <caption class="visually-hidden">Between readings, newest first</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Between</th>
-                      <th scope="col">Distance</th>
-                      <th scope="col">Energy</th>
-                      <th scope="col">Cost</th>
-                      <th scope="col">Per {distanceWord}</th>
-                      <th scope="col">Efficiency</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(showAll ? trips : trips.slice(0, TRIPS_SHOWN)).map((s) => (
-                      <tr key={s.from_day}>
-                        <td>
-                          {stretchLabel(s)}
-                          {lowCoverage(s.coverage) && (
-                            <span class="badge" title={`Measured ${Math.round(s.coverage * 100)}% of these days: energy and cost are understated`}>
-                              {Math.round(s.coverage * 100)}% measured
-                            </span>
-                          )}
-                        </td>
-                        <td>{formatDistance(s.miles, unit)}</td>
-                        <td>
-                          <Kwh k={s.kwh} />
-                        </td>
-                        <td>{s.cost != null ? formatMoney(s.cost, s.cost_estimated) : '—'}</td>
-                        <td>
-                          <strong>{formatPerMile(s.cost_per_mile, s.cost_estimated, unit)}</strong>
-                        </td>
-                        <td>{formatEfficiency(s.miles_per_kwh, unit)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {trips.length > TRIPS_SHOWN && (
-                <button type="button" class="ev-more" onClick={() => setShowAll(!showAll)}>
-                  {showAll ? 'Show fewer' : `Show all ${trips.length}`}
-                </button>
-              )}
-            </>
-          )}
+          <EvNotes areaName={savings?.area_name ?? null} gas={savings?.configured ?? false} battery={charges?.battery_kwh != null} />
         </>
       )}
-
-      {data && <EvSavings meterId={meter.id} version={version} unit={unit} onOpenSettings={() => setOpen(true)} />}
-
-      {data && <EvCharges meterId={meter.id} refresh={version} onOpenSettings={() => setOpen(true)} />}
 
       {open && <EvSettings meter={meter} data={data} ford={ford} reload={reload} waitLeft={waitLeft} wait={wait} onSetup={setSetup} />}
       {setup && <FordSetup meter={meter} cfg={ford} startAt={setup} draft={draft} waitLeft={waitLeft} wait={wait} reload={reload} onClose={() => setSetup(null)} />}

@@ -193,78 +193,312 @@ button.link {
   color: var(--color-accent-blue);
 }
 
-/* The trips between odometer readings, newest first: one row each, the figures in columns */
-.ev-trips-wrap {
-  margin-top: 4px;
+/* The vehicle card's header: its title and how it is kept up to date on the left, the odometer and Settings on the right */
+.ev-head-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ev-odo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+
+.ev-odo strong {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-odo .caption {
+  margin: 0;
+}
+
+/* Four headline tiles in the page's own tile style (design.css), a little smaller: the card's answers, not the page's totals */
+.ev-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 900px) {
+  .ev-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .ev-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ev-tile {
+  padding: 12px 14px 12px 20px;
+  border-radius: 12px;
+}
+
+.ev-tile .kpi-value {
+  font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+}
+
+.ev-tile-saved {
+  --kpi-accent: var(--color-accent-green);
+}
+
+.ev-tile-mile {
+  --kpi-accent: var(--color-accent-blue);
+}
+
+.ev-tile-efficiency {
+  --kpi-accent: var(--color-primary-action);
+}
+
+.ev-tile-loss {
+  --kpi-accent: var(--color-accent-muted);
+}
+
+.ev-tile .kpi-hint.bad {
+  color: var(--color-accent-red);
+}
+
+/* The body: the charts and the stretches in the wide column, the charges in the narrow one beside them (one column when there is not room for both) */
+.ev-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px 32px;
+  margin-top: 24px;
+}
+
+@media (min-width: 1100px) {
+  .ev-body {
+    grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 1fr);
+    align-items: start;
+  }
+}
+
+.ev-main,
+.ev-side {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  min-width: 0;
+}
+
+.ev-section {
+  min-width: 0;
+}
+
+.ev-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+
+.ev-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ev-section-sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ev-trend-title {
+  margin: 0 0 6px;
+}
+
+/* What a chart without enough points is waiting for, in the chart's place and as tall as it, so the panel does not jump when it fills */
+.ev-waiting {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  color: var(--muted);
+}
+
+.ev-waiting p {
+  max-width: 30rem;
+  margin: 0;
+}
+
+/* The stretches between odometer readings, newest first: one row each, the figures in columns */
+.ev-table-wrap {
   overflow-x: auto;
 }
 
-.ev-trips {
+.ev-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
 
-.ev-trips th,
-.ev-trips td {
+.ev-table th,
+.ev-table td {
   padding: 6px 12px 6px 0;
   text-align: right;
   white-space: nowrap;
 }
 
-.ev-trips th:first-child,
-.ev-trips td:first-child {
+.ev-table th:first-child,
+.ev-table td:first-child {
   text-align: left;
 }
 
-.ev-trips th {
+.ev-table th {
   font-size: 0.8rem;
   font-weight: 400;
   color: var(--color-text-muted);
 }
 
-.ev-trips td {
+.ev-table td {
   border-top: 1px solid var(--color-border);
   font-variant-numeric: tabular-nums;
 }
 
-.ev-trips .badge {
+.ev-table .badge {
   margin-left: 8px;
 }
 
-/* A charge that is going on is green, not a warning like the other badge */
-.ev-trips .badge.live {
-  background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
-  border-color: var(--color-accent-green);
+.ev-table .so-far td:first-child,
+.ev-table .so-far td:nth-child(2) {
+  color: var(--color-text-muted);
+}
+
+/* The charges, newest first: two lines each, what began and used on the first and the battery and the result on the second */
+.charge-summary {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.charge-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.charge:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.charge-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.charge-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.charge-used {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.charge-cost {
+  color: var(--color-text-muted);
+}
+
+.charge-detail {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.charge-detail strong {
+  color: var(--color-text);
+}
+
+.charge-result {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 /* Why a charge has no energy per percent: quiet text with the sentence behind it on hover */
 .charge-note {
-  color: var(--color-text-muted);
   cursor: help;
 }
 
-/* The efficiency and cost charts, side by side when there is room */
-.ev-trends {
+.charge-x {
+  height: auto;
+  min-height: 0;
+  padding: 0 6px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  background: transparent;
+  border-color: transparent;
+  opacity: 0.45;
+}
+
+.charge:hover .charge-x,
+.charge-x:focus-visible {
+  opacity: 1;
+}
+
+.charge-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  font-size: 0.85rem;
+}
+
+/* A charge that is going on is green, not a warning like the other badge */
+.badge.live {
+  background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
+  border-color: var(--color-accent-green);
+}
+
+/* How it is all counted, in one closed note at the foot of the card */
+.ev-notes {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ev-notes summary {
+  cursor: pointer;
+}
+
+.ev-notes ul {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: 8px 24px;
-  margin-top: 4px;
+  gap: 6px;
+  max-width: 72rem;
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
 }
 
-.ev-trends > div {
-  min-width: 0;
-}
-
-.ev-trend-note {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
-/* The three figures of the card sit in a narrow column: a size that fits the longest of them (a thousand kWh) */
-.ev-figure {
-  font-size: clamp(1.4rem, 2.2vw, 2rem);
-  white-space: nowrap;
+.ev-notes strong {
+  color: var(--color-text);
 }
 
 .ev-form {
@@ -330,33 +564,6 @@ main.page-hierarchy-meter > .card.ev {
 
 .ev-toggle[aria-expanded='true'] {
   background: var(--color-bg-hover);
-}
-
-.ev-figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: 12px 24px;
-  margin-top: 12px;
-}
-
-.ev-figures .stat .caption {
-  margin: 0;
-}
-
-.ev-wait {
-  align-self: center;
-  margin: 0;
-}
-
-.ev-since {
-  margin: 12px 0 0;
-}
-
-.ev-sub {
-  margin: 16px 0 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
 }
 
 .ev-empty {
