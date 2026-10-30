@@ -1369,3 +1369,13 @@ button.setup-open {
 .card-head h2 {
   margin: 0;
 }
+
+/* A section inside a card (Connectors > EIA): set off from the one above by a line. */
+.card .sub {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+.card .sub h3 {
+  margin-top: 0;
+}

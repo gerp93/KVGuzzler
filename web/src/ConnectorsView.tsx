@@ -4,7 +4,6 @@
 import { DevicesCard } from './DevicesCard';
 import { EiaCard } from './EiaCard';
 import { FordCard } from './FordCard';
-import { FuelPricesCard } from './FuelPricesCard';
 import type { Meter } from './lib';
 import { OpenEiCard } from './OpenEiCard';
 
@@ -13,7 +12,6 @@ export function ConnectorsView({ meters, onChanged }: { meters: Meter[]; onChang
     <>
       <DevicesCard meters={meters} onChanged={onChanged} />
       <EiaCard />
-      <FuelPricesCard />
       <OpenEiCard />
       <FordCard meters={meters} />
     </>

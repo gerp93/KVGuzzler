@@ -2,7 +2,6 @@
 // saved in a private file on the server, never shown again, and sent to api.openei.org only.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
-import { Hint } from './Hint';
 
 export function OpenEiCard() {
   const [hasKey, setHasKey] = useState<boolean>();
@@ -33,11 +32,8 @@ export function OpenEiCard() {
 
   return (
     <section class="card page-narrow">
-      <h2>OpenEI</h2>
-      <Hint>
-        Used by the electricity price when it is set to a utility's published rate. Needs a free key from openei.org (Utility Rate Database), stored on the server
-        and sent to OpenEI only.
-      </Hint>
+      <h2>Open Energy Information (OpenEI)</h2>
+      <p class="caption">Utility electricity rates, for the electricity price. Free key from openei.org.</p>
       <p class="caption">{hasKey == null ? 'Checking…' : hasKey ? 'A key is saved.' : 'No key saved.'}</p>
       <label class="field">
         <span>{hasKey ? 'New API key' : 'API key'}</span>
