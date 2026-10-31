@@ -163,6 +163,57 @@ main > .kpi-notes {
   margin: 10px 0 0;
 }
 
+.running {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
+.running li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.running li > i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent-red);
+  border-radius: 50%;
+  align-self: center;
+}
+
+.running .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.running .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.running .more,
+.running-none {
+  color: var(--muted);
+}
+
+.running-none {
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
 .kpi-notes {
   display: grid;
   gap: 2px;
@@ -387,5 +438,133 @@ main.page-live {
 
   .kpi-hint {
     font-size: 0.88rem;
+  }
+}
+
+/* The wall view (#/wall): one screen, nothing to scroll or click, figures sized by the screen's short side so they read from across a room. */
+.wall {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 2.2vmin;
+  padding: 2.5vmin;
+  overflow: hidden;
+  background: var(--color-bg, var(--color-surface));
+  color: var(--color-text);
+}
+
+.wall-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: clamp(1rem, 3vmin, 2rem);
+  font-weight: 600;
+}
+
+.wall-clock {
+  display: flex;
+  gap: 1.5em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wall-off {
+  color: var(--color-accent-red);
+}
+
+.wall.stale .kpi-value {
+  opacity: 0.55;
+}
+
+.wall .kpi {
+  justify-content: center;
+  gap: 1vmin;
+  padding: 2vmin 2.4vmin 2vmin 3vmin;
+}
+
+.wall .kpi-label {
+  font-size: clamp(0.8rem, 2vmin, 1.3rem);
+}
+
+.wall .kpi-value {
+  font-size: clamp(2.4rem, 11vmin, 8rem);
+}
+
+.wall .kpi-now {
+  grid-column: span 2;
+}
+
+.wall .kpi-now .kpi-value {
+  font-size: clamp(3.5rem, 20vmin, 15rem);
+}
+
+.wall .kpi-energy,
+.wall .kpi-cost {
+  grid-column: span 2;
+  grid-row: 3;
+}
+
+.wall .kpi-now .spark {
+  flex: 1;
+  min-height: 3rem;
+  height: auto;
+  margin: 1vmin 0 0;
+}
+
+.wall-running {
+  grid-column: span 2;
+  min-height: 0;
+  padding: 2vmin 2.4vmin;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.wall-running h2 {
+  margin: 0 0 1vmin;
+  font-size: clamp(0.8rem, 2vmin, 1.3rem);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wall-running .running,
+.wall-running .running-none {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: clamp(1.1rem, 3.6vmin, 2.6rem);
+}
+
+.wall-running .running {
+  gap: 1vmin;
+}
+
+.wall-running .running li > i {
+  width: 0.5em;
+  height: 0.5em;
+}
+
+@media (orientation: portrait) {
+  .wall {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+  }
+
+  .wall .kpi-now,
+  .wall-running,
+  .wall .kpi-energy,
+  .wall .kpi-cost {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .wall .kpi-now .kpi-value {
+    font-size: clamp(3.5rem, 22vmin, 15rem);
   }
 }

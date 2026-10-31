@@ -17,6 +17,7 @@ import { measuredTotals, topLevelMeters } from './measured';
 import { PeriodLoading } from './Loading';
 import { notMeteredRows, unclamped, type BarRow } from './notMetered';
 import { Skeleton } from './Skeleton';
+import { RunningNow } from './RunningNow';
 import { Spark, useTrail } from './Spark';
 import { routePath } from './route';
 import { RateNote } from './RateNote';
@@ -156,6 +157,7 @@ function House({ meters, onAddDevice }: { meters: Meter[]; onAddDevice: () => vo
           }
         >
           <Spark values={trail} label="The last few minutes of the draw" />
+          <RunningNow meters={meters} live={live} levels={levels} />
         </Kpi>
         <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={span} />
         <Kpi

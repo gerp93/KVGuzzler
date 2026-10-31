@@ -2,6 +2,7 @@
 // button, a reload and a copied link all land in the same place.
 //
 //   #/live                                  a tab
+//   #/wall                                  the wall screen: a page of its own, no tabs
 //   #/hierarchy                             the tree
 //   #/hierarchy/meter/<meter id>            one meter
 //   #/hierarchy/computer/<computer id>      one computer
