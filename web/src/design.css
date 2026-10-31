@@ -185,6 +185,10 @@ main > .kpi-notes {
     grid-template-columns: 1.7fr 1fr 1fr 1fr;
     gap: 16px;
   }
+
+  .kpis-five {
+    grid-template-columns: 1.7fr 1fr 1fr 1fr 1fr;
+  }
 }
 
 /* Panels: one surface for a group of related things. The cards put inside one (the insights, the tools) are its sections, divided by a line, not

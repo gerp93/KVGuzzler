@@ -3,6 +3,7 @@
 import type { ComponentChildren } from 'preact';
 import { FigureIcon } from './Icons';
 import { splitFigure } from './figure';
+import { formatCarbon } from './lib';
 
 export type KpiTone = 'now' | 'energy' | 'cost' | 'peak' | 'carbon';
 
@@ -31,6 +32,13 @@ export function Kpi({ label, value, tone, hint, corner, children }: { label: str
   );
 }
 
-export function KpiRow({ children }: { children: ComponentChildren }) {
-  return <div class="kpis">{children}</div>;
+/** `five`: the row has a fifth tile (carbon), which gets a column of its own on a wide screen. */
+export function KpiRow({ children, five }: { children: ComponentChildren; five?: boolean }) {
+  return <div class={five ? 'kpis kpis-five' : 'kpis'}>{children}</div>;
+}
+
+/** The carbon tile of a meter's or computer's page: the amount, and the energy-weighted grid average it came to. Nothing when there is no carbon to show. */
+export function CarbonKpi({ carbonG, kwh }: { carbonG: number | null | undefined; kwh: number | null | undefined }) {
+  if (carbonG == null || kwh == null) return null;
+  return <Kpi tone="carbon" label="Carbon footprint" value={formatCarbon(carbonG)} hint={kwh > 0 ? `${Math.round(carbonG / kwh)} g/kWh grid average` : undefined} />;
 }

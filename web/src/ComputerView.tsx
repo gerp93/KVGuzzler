@@ -4,14 +4,12 @@ import { Chart, lineFrom, wideChartHeight, type Line, type Shade } from './Chart
 import { usePoll, useStored } from './hooks';
 import { EnergyHistory } from './EnergyHistory';
 import { Estimator } from './Estimator';
-import { Facts } from './Facts';
-import { Kpi, KpiRow } from './Kpi';
+import { CarbonKpi, Kpi, KpiRow } from './Kpi';
 import { PcInsides } from './PcInsides';
 import { PcLiveCard } from './PcLiveCard';
-import { RateNote } from './RateNote';
 import { PeriodPicker } from './Periods';
 import {
-  COUNT_PC, carbonFacts, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, periodWords, toggleCount,
+  COUNT_PC, countedTotals, usageBasis, countedWatts, formatKwh, formatMoney, formatWatts, gapShades, isLiveStale, liveSplit, parseCountOff, pcLineStyle, periodRange, periodWords, toggleCount,
   type Meter, type MeterSummary, type ComputerDetail, type PeriodKey,
 } from './lib';
 import { routePath } from './route';
@@ -111,11 +109,12 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
             </div>
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
           </header>
-          <KpiRow>
+          <KpiRow five={counted != null && counted.carbonG != null && counted.kwh != null}>
             <Kpi tone="now" label="Right now" value={nowWatts != null ? formatWatts(nowWatts) : '—'} />
             <Kpi tone="energy" label="Energy" value={(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="peak" label="Highest draw" value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'} hint={peakIsBound ? 'upper bound' : !hasPlugs && !detail.wall?.peak_watts && peak != null ? 'sensors only' : 'peak reading'} />
+            {counted && <CarbonKpi carbonG={counted.carbonG} kwh={counted.kwh} />}
           </KpiRow>
           <div class="kpi-notes">
             {hasPlugs && (
@@ -202,11 +201,6 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
               </p>
             </section>
           )}
-
-          <div class="kpi-notes">
-            {counted && <Facts items={carbonFacts(counted.carbonG, counted.kwh)} table title="Carbon footprint" />}
-            <RateNote kwh={hasPlugs ? counted?.kwh : detail.wall?.kwh} cost={hasPlugs ? counted?.cost : detail.wall?.cost} table title="Electricity price" />
-          </div>
         </>
       )}
     </>
