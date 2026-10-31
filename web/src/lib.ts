@@ -820,14 +820,6 @@ export function formatCarbon(grams: number): string {
   return `≈ ${(grams / 1_000_000).toFixed(1)} t CO₂e`;
 }
 
-/** The carbon figures of a page: the amount and the energy-weighted grid average it came to. Empty when there is no carbon to show. */
-export function carbonFacts(carbonG: number | null | undefined, kwh: number | null | undefined): Fact[] {
-  if (carbonG == null || kwh == null) return [];
-  const facts: Fact[] = [{ label: 'Carbon', value: formatCarbon(carbonG) }];
-  if (kwh > 0) facts.push({ label: 'Grid average', value: `${Math.round(carbonG / kwh)} g/kWh` });
-  return facts;
-}
-
 /** Where a house "my usage" estimate comes from, in words: the window and that every hour is in it. */
 export function houseUsageBasis(use: AverageUse, windowKey: string): string {
   const w = ESTIMATE_WINDOWS.find((x) => x.key === windowKey) ?? ESTIMATE_WINDOWS[1]!;

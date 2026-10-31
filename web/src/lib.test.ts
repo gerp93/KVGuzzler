@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, panelChoices, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, carbonFacts, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, panelChoices, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -494,15 +494,6 @@ describe('the carbon footprint', () => {
 
   it('writes an amount as grams, kilograms or tonnes, always approximate', () => {
     expect([formatCarbon(412), formatCarbon(1240), formatCarbon(15_000), formatCarbon(2_100_000)]).toEqual(['≈ 412 g CO₂e', '≈ 1.24 kg CO₂e', '≈ 15.0 kg CO₂e', '≈ 2.1 t CO₂e']);
-  });
-
-  it('says the amount and the average it came to, and nothing without carbon', () => {
-    expect(carbonFacts(480, 1.2)).toEqual([
-      { label: 'Carbon', value: '≈ 480 g CO₂e' },
-      { label: 'Grid average', value: '400 g/kWh' },
-    ]);
-    expect(carbonFacts(null, 1)).toEqual([]);
-    expect(carbonFacts(5, null)).toEqual([]);
   });
 });
 

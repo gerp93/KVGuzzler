@@ -5,19 +5,17 @@ import { api } from './api';
 import { Bars } from './Bars';
 import { Chart, lineFrom, wideChartHeight, type Line } from './Chart';
 import { FlowChart } from './FlowChart';
-import { Kpi, KpiRow } from './Kpi';
+import { CarbonKpi, Kpi, KpiRow } from './Kpi';
 import { usePoll, useStored } from './hooks';
 import { PeriodPicker } from './Periods';
 import { AnomalyCard } from './AnomalyCard';
 import { BaseLoadCard } from './BaseLoadCard';
 import { CurrentCard } from './Breaker';
 import { EvCard, EvPrompt } from './EvCard';
-import { Facts } from './Facts';
-import { RateNote } from './RateNote';
 import { RunsCard } from './RunsCard';
 import { showRuns, type MeterRuns } from './runs';
 import { Lowest } from './Watts';
-import { carbonFacts, formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
+import { formatKwh, formatMoney, formatWatts, houseShare, nestCircuits, periodRange, periodWords, withDescendants, type Live, type Meter, type PeriodKey, type Row, type Summary } from './lib';
 
 interface Loaded {
   summary: Summary;
@@ -61,7 +59,7 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
   const kwh = mine?.kwh ?? null;
   const houseKwh = data?.summary.house_kwh ?? null;
   const share = mine ? houseShare(mine.kwh, houseKwh) : null;
-  const carbon = carbonFacts(mine?.carbon_g, kwh);
+  const hasCarbon = mine?.carbon_g != null && kwh != null;
   const watts = live?.readings.find((r) => r.meter_id === id)?.watts ?? null;
 
   // What is inside it right now, nested as wired, the meter itself dropped from the list.
@@ -96,11 +94,12 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
             </div>
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
           </header>
-          <KpiRow>
+          <KpiRow five={hasCarbon}>
             <Kpi tone="now" label="Right now" value={formatWatts(watts)} />
             <Kpi tone="energy" label="Energy" value={kwh != null ? formatKwh(kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={mine?.cost != null ? formatMoney(mine.cost, data?.summary.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="peak" label="Highest draw" value={mine?.peak_watts != null ? formatWatts(mine.peak_watts) : '—'} hint={<><Lowest w={mine?.min_watts} />peak reading</>} />
+            <CarbonKpi carbonG={mine?.carbon_g} kwh={kwh} />
           </KpiRow>
           {meter.ev && <EvCard meter={meter} />}
         </>
@@ -139,12 +138,6 @@ export function MeterPage({ id, meters, back, onChanged }: { id: string; meters:
 
       {meter && <AnomalyCard meterId={id} quiet />}
 
-      {meter && (
-        <div class="kpi-notes">
-          <Facts items={carbon} table title="Carbon footprint" />
-          <RateNote kwh={kwh} cost={mine?.cost ?? null} table title="Electricity price" />
-        </div>
-      )}
     </>
   );
 }
