@@ -13,6 +13,7 @@ import { DEFAULT_THEME, isTheme, setCurrencyCode, type Meter } from './lib';
 import { routePath, useRoute } from './route';
 import { Skeleton } from './Skeleton';
 import { SettingsView } from './SettingsView';
+import { WallView } from './WallView';
 
 const TABS = [
   { id: 'live', label: 'Live' },
@@ -49,7 +50,8 @@ export function App() {
     if (!version) return;
     if (firstVersion.current === undefined) firstVersion.current = version;
     else if (version !== firstVersion.current) {
-      if (document.hidden) window.location.reload();
+      // A wall screen is always in view and nobody is typing into it: it reloads at once too.
+      if (document.hidden || route.tab === 'wall') window.location.reload();
       else setStale(true);
     }
   }, [version]);
@@ -70,9 +72,12 @@ export function App() {
   // A new tab starts at its top, and the tab's name is in the browser tab so several open pages can be told apart.
   useEffect(() => {
     window.scrollTo(0, 0);
-    document.title = `${TABS.find((t) => t.id === active)?.label ?? 'Live'} · House power`;
-  }, [active]);
+    document.title = route.tab === 'wall' ? 'Wall · House power' : `${TABS.find((t) => t.id === active)?.label ?? 'Live'} · House power`;
+  }, [active, route.tab]);
   const offline = !mismatch && status.error !== undefined;
+
+  // The wall view is a page of its own: no top bar, no tabs.
+  if (route.tab === 'wall' && !mismatch) return loaded.data ? <WallView meters={meters} /> : <Skeleton />;
 
   return (
     <>
