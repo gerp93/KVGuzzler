@@ -27,6 +27,7 @@ const examples = {
   'ev-compare.json': 'EvCompare',
   'fuel-prices.json': 'FuelPrices',
   'ev-battery.json': 'EvBattery',
+  'history-start.json': 'HistoryStart',
   'ev-savings.json': 'EvSavings',
   'baseload.json': 'BaseLoad',
   'levels.json': 'Levels',

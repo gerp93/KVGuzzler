@@ -29,6 +29,7 @@ ON CONFLICT(hour) DO UPDATE SET grams = excluded.grams, estimated = excluded.est
 
 // QueryCarbon is the intensity of each hour that starts inside [from, to) or is the hour `from` falls in, by the unix second the hour starts.
 func (s *Store) QueryCarbon(ctx context.Context, from, to time.Time) (map[int64]float64, error) {
+	from = s.clip(from)
 	rows, err := s.db.QueryContext(ctx, `SELECT hour, grams FROM carbon_intensity WHERE hour >= ? AND hour < ?`, from.Unix()/3600*3600, to.Unix())
 	if err != nil {
 		return nil, err
@@ -57,6 +58,7 @@ func (s *Store) AverageCarbonEver(ctx context.Context) (float64, bool, error) {
 
 // PcHourlyKWh is the energy the PC's sensors measured in each hour of [from, to), by the unix second the hour starts.
 func (s *Store) PcHourlyKWh(ctx context.Context, sourceID string, from, to time.Time) (map[int64]float64, error) {
+	from = s.clip(from)
 	rows, err := s.db.QueryContext(ctx, `
 SELECT (minute / 3600) * 3600, SUM(avg_w * seconds) FROM pc_minutes
 WHERE source_id = ? AND scope = 'component' AND minute >= ? AND minute < ? GROUP BY 1`, sourceID, from.Unix(), to.Unix())

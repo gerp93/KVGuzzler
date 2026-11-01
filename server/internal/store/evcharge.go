@@ -142,7 +142,7 @@ func unixOrNull(t time.Time) any {
 
 // EvCharges lists a meter's charges, newest first, up to limit.
 func (s *Store) EvCharges(ctx context.Context, meterID string, limit int) ([]model.EvCharge, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+evChargeColumns+` FROM ev_charges WHERE meter_id = ? ORDER BY started_at DESC, id DESC LIMIT ?`, meterID, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+evChargeColumns+` FROM ev_charges WHERE meter_id = ? AND started_at >= ? ORDER BY started_at DESC, id DESC LIMIT ?`, meterID, s.floorUnix(), limit)
 	if err != nil {
 		return nil, err
 	}

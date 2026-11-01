@@ -11,6 +11,7 @@ import (
 
 // MeterMinutes is every recorded minute of one meter in [from, to), in time order, for finding the times it was working (package runs).
 func (s *Store) MeterMinutes(ctx context.Context, meterID string, from, to time.Time) ([]runs.Point, error) {
+	from = s.clip(from)
 	rows, err := s.db.QueryContext(ctx, `SELECT minute, avg_w, max_w, seconds, avg_a, max_a FROM minutes
 WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`, meterID, from.Unix(), to.Unix())
 	if err != nil {
@@ -42,6 +43,7 @@ WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`, meterID, fro
 // watts added together (a meter alone, or the two mains legs together), in time order. A minute where one of them is missing is left out, so the
 // sum is never one leg short.
 func (s *Store) MinuteWatts(ctx context.Context, meterIDs []string, from, to time.Time) ([]float64, error) {
+	from = s.clip(from)
 	if len(meterIDs) == 0 {
 		return nil, nil
 	}
@@ -72,6 +74,7 @@ GROUP BY minute HAVING COUNT(*) = ? ORDER BY minute`, args...)
 // LowestMinuteWatts is the lowest of MinuteWatts: the least the given meters drew together in any whole minute of [from, to), or nil when no minute has
 // every one of them. For the two mains legs it is the house's own lowest minute, not the legs' lowest minutes added.
 func (s *Store) LowestMinuteWatts(ctx context.Context, meterIDs []string, from, to time.Time) (*float64, error) {
+	from = s.clip(from)
 	if len(meterIDs) == 0 {
 		return nil, nil
 	}

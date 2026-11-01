@@ -803,6 +803,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The day history starts on, if the owner set one.
+         * @description A global cutoff: nothing recorded before that day is looked at by any period, not even "all time", and its start counts as the start of history.
+         *     Nothing is deleted. It cuts the meters' minutes, the PC's, and the odometer readings and charges of an electric vehicle.
+         */
+        get: operations["getHistoryStart"];
+        /**
+         * Start history on a day.
+         * @description 400 for something that is not a date, or a day in the future. The day is a day of the server's zone.
+         */
+        put: operations["putHistoryStart"];
+        post?: never;
+        /** Take the cutoff off, so all that was recorded is looked at again. */
+        delete: operations["deleteHistoryStart"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rates": {
         parameters: {
             query?: never;
@@ -1192,6 +1218,18 @@ export interface components {
             /** Format: date */
             day: string;
             miles: number;
+        };
+        HistoryStart: {
+            /**
+             * Format: date
+             * @description The local day history starts on; null when history is not cut.
+             */
+            day: string | null;
+            /**
+             * Format: date-time
+             * @description The first moment anything was recorded, whatever the cutoff says, so the owner can see what a day would leave out; null when nothing was.
+             */
+            recorded_since: string | null;
         };
         EvBattery: {
             meter_id: string;
@@ -3589,6 +3627,72 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getHistoryStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryStart"];
+                };
+            };
+        };
+    };
+    putHistoryStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    day: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryStart"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    deleteHistoryStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getRates: {

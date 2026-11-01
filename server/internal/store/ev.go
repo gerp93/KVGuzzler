@@ -53,7 +53,7 @@ func (s *Store) SetMeterEV(ctx context.Context, id string, ev bool) (model.Meter
 
 // Odometer lists a meter's odometer readings, oldest first.
 func (s *Store) Odometer(ctx context.Context, meterID string) ([]model.OdometerReading, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT day, miles FROM odometer_readings WHERE meter_id = ? ORDER BY day`, meterID)
+	rows, err := s.db.QueryContext(ctx, `SELECT day, miles FROM odometer_readings WHERE meter_id = ? AND day >= ? ORDER BY day`, meterID, s.floorDay())
 	if err != nil {
 		return nil, err
 	}

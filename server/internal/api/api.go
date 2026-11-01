@@ -91,6 +91,13 @@ func (s *Server) dataSince(ctx context.Context) (time.Time, bool) {
 	return t, true
 }
 
+// forgetDataSince drops the remembered first moment of data, so the next ask reads it again (the start of history changed what it is).
+func (s *Server) forgetDataSince() {
+	s.firstMu.Lock()
+	defer s.firstMu.Unlock()
+	s.firstData = time.Time{}
+}
+
 type problem struct {
 	Code             string `json:"code"`
 	Message          string `json:"message"`
@@ -148,6 +155,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/openei", s.getOpenEi)
 	mux.HandleFunc("PUT /api/v1/openei", s.putOpenEi)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
+	mux.HandleFunc("GET /api/v1/history-start", s.getHistoryStart)
+	mux.HandleFunc("PUT /api/v1/history-start", s.putHistoryStart)
+	mux.HandleFunc("DELETE /api/v1/history-start", s.deleteHistoryStart)
 	mux.HandleFunc("GET /api/v1/groups", s.listGroups)
 	mux.HandleFunc("POST /api/v1/groups", s.addGroup)
 	mux.HandleFunc("PATCH /api/v1/groups/{groupId}", s.renameGroup)

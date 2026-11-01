@@ -5,6 +5,7 @@ import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
 import type { MeterRuns } from './runs';
 import type { EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
+import type { components } from './api-types';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -154,6 +155,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** The day history starts on: nothing recorded before it is looked at by any period. */
+  historyStart: () => request<components['schemas']['HistoryStart']>('api/v1/history-start'),
+  putHistoryStart: (day: string) =>
+    request<components['schemas']['HistoryStart']>('api/v1/history-start', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day }) }),
+  deleteHistoryStart: () => request<void>('api/v1/history-start', { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
   carbon: () => request<CarbonConfig>('api/v1/carbon'),
   carbonSeries: (from: string, to: string) => request<CarbonSeries>(`api/v1/carbon/series?${q({ from, to })}`),
