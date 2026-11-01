@@ -696,7 +696,13 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 		if err1 != nil || err2 != nil {
 			continue
 		}
-		st := evSavingsStretch{FromDay: iv.FromDay, ToDay: iv.ToDay, Miles: iv.Miles, EvCost: iv.Cost, Gas: make([]evSavingsGas, len(comps))}
+		// With stretches netted against the battery, only those count, at what their miles used: the others charged energy in one stretch that was driven
+		// in another, and set against these miles they would mislead either way.
+		evCost := iv.Cost
+		if ev.Totals != nil && ev.Totals.Adjusted {
+			evCost = iv.UsedCost
+		}
+		st := evSavingsStretch{FromDay: iv.FromDay, ToDay: iv.ToDay, Miles: iv.Miles, EvCost: evCost, Gas: make([]evSavingsGas, len(comps))}
 		avgGas, haveGas := averagePrice(prices, from, to)
 		if haveGas {
 			p := avgGas.String()
@@ -712,8 +718,8 @@ func (s *Server) getEvSavings(w http.ResponseWriter, r *http.Request) {
 		}
 		var evc rates.Money
 		haveEv := false
-		if iv.Cost != nil {
-			if m, err := rates.ParseMoney(*iv.Cost); err == nil {
+		if evCost != nil {
+			if m, err := rates.ParseMoney(*evCost); err == nil {
 				evc, haveEv = m, true
 			}
 		}

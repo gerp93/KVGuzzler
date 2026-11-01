@@ -10,6 +10,9 @@ const interval = (from: string, to: string, miles: number, kwh: number, cost: st
   cost,
   cost_per_mile: null,
   miles_per_kwh: null,
+  banked_pct: null,
+  used_kwh: null,
+  used_cost: null,
   coverage: 1,
   cost_estimated: false,
 });

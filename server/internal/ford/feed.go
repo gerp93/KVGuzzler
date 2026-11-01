@@ -88,6 +88,12 @@ type Feed struct {
 	lookNs atomic.Int64
 }
 
+// batterySaver is the optional part of a Sink that keeps the battery's charge each look reads, so the energy still in the battery can be told from the
+// energy driven.
+type batterySaver interface {
+	SaveBattery(ctx context.Context, meterID string, b Battery) error
+}
+
 // lastLooker is the optional part of a Sink that remembers when Ford was last asked, so a restart does not forget it.
 type lastLooker interface {
 	LastLook(ctx context.Context) time.Time
@@ -297,6 +303,14 @@ func (f *Feed) readWith(ctx context.Context, cfg Config, access string) (Status,
 	st := Status{OK: true, CheckedAt: now.UTC(), Raw: &raw, Found: odo.Path, Miles: &miles, Day: day, Saved: saved, Signals: Describe(body)}
 	if b, ok := ParseBattery(body); ok {
 		st.Battery = &b
+		if bs, ok := f.Sink.(batterySaver); ok {
+			if b.At.IsZero() {
+				b.At = now.UTC()
+			}
+			if err := bs.SaveBattery(ctx, cfg.MeterID, b); err != nil {
+				return Status{}, err
+			}
+		}
 	}
 	_ = f.Sink.SaveStatus(ctx, st)
 	return st, nil

@@ -96,6 +96,12 @@ type EvCharge struct {
 	EndPctAt   *time.Time `json:"end_pct_at"`
 }
 
+// EvBatteryRead is the traction battery's charge (0 to 100) the car reported at one moment.
+type EvBatteryRead struct {
+	At      time.Time `json:"at"`
+	Percent float64   `json:"percent"`
+}
+
 // OdometerReading is the car's odometer on a local calendar day, as the user typed it.
 type OdometerReading struct {
 	Day   string  `json:"day"`

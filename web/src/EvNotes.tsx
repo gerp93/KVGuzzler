@@ -10,6 +10,12 @@ export function EvNotes({ areaName, gas, dieselArea, battery }: { areaName: stri
           look better than they are for every mile driven on other chargers. Fixed electric fees are left out.
         </li>
         <li>
+          <strong>Charged but not driven.</strong> Energy charged is not driven the same day, so each stretch's energy is cut by what the battery gained over it, from the
+          car's own battery reports (saved at every look and at each charge's start and end), and the miles are set against what is left. A stretch where the battery
+          fell is charged for the energy it drew, at the price that energy was bought at. Only stretches whose battery level is known at both ends are counted once there
+          are any; older ones, from before the battery was saved, keep the energy they measured.
+        </li>
+        <li>
           <strong>Efficiency and cost over time</strong> are a rolling week, made from the odometer readings: the odometer is read now and then, a stretch between two
           readings is shared evenly over its days, and a point appears once a full week is behind it.
         </li>
