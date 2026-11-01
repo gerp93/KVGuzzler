@@ -803,6 +803,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/database/growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the history database's size has changed, and what a month and a year of it come to.
+         * @description The server notes the size of its database file every few hours (the nightly snapshots are copies of it, so they are never read). The estimate is a
+         *     straight line through the readings of the last 14 days, given once they cover at least 3 days; it is read-only, and only an estimate (more meters,
+         *     or a PC that reports its insides, make the real rate higher).
+         */
+        get: operations["getDatabaseGrowth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history-start": {
         parameters: {
             query?: never;
@@ -1218,6 +1240,24 @@ export interface components {
             /** Format: date */
             day: string;
             miles: number;
+        };
+        DatabaseGrowth: {
+            /** @description Every size recorded, oldest first. */
+            points: {
+                /** Format: date-time */
+                at: string;
+                bytes: number;
+            }[];
+            /** @description The database file's size now, without its write-ahead log; null when the server does not know where the file is. */
+            bytes_now: number | null;
+            /** @description The estimated growth in a month; null until the readings cover a few days. */
+            per_month_bytes: number | null;
+            /** @description The size a year from now at that rate; null until `per_month_bytes` is. */
+            in_a_year_bytes: number | null;
+            /** @description How many readings the estimate rests on (those of the last 14 days). */
+            readings: number;
+            /** @description How many days those readings cover; null with fewer than two. */
+            basis_days: number | null;
         };
         HistoryStart: {
             /**
@@ -3627,6 +3667,26 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getDatabaseGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseGrowth"];
+                };
+            };
         };
     };
     getHistoryStart: {

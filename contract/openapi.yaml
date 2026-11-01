@@ -1194,6 +1194,22 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/database/growth:
+    get:
+      tags: [Read]
+      operationId: getDatabaseGrowth
+      summary: How the history database's size has changed, and what a month and a year of it come to.
+      description: |
+        The server notes the size of its database file every few hours (the nightly snapshots are copies of it, so they are never read). The estimate is a
+        straight line through the readings of the last 14 days, given once they cover at least 3 days; it is read-only, and only an estimate (more meters,
+        or a PC that reports its insides, make the real rate higher).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseGrowth'
   /api/v1/history-start:
     get:
       tags: [Settings]
@@ -1824,6 +1840,37 @@ components:
           format: date
         miles:
           type: number
+    DatabaseGrowth:
+      type: object
+      required: [points, bytes_now, per_month_bytes, in_a_year_bytes, readings, basis_days]
+      properties:
+        points:
+          type: array
+          description: Every size recorded, oldest first.
+          items:
+            type: object
+            required: [at, bytes]
+            properties:
+              at:
+                type: string
+                format: date-time
+              bytes:
+                type: integer
+        bytes_now:
+          type: [integer, 'null']
+          description: The database file's size now, without its write-ahead log; null when the server does not know where the file is.
+        per_month_bytes:
+          type: [integer, 'null']
+          description: The estimated growth in a month; null until the readings cover a few days.
+        in_a_year_bytes:
+          type: [integer, 'null']
+          description: The size a year from now at that rate; null until `per_month_bytes` is.
+        readings:
+          type: integer
+          description: How many readings the estimate rests on (those of the last 14 days).
+        basis_days:
+          type: [number, 'null']
+          description: How many days those readings cover; null with fewer than two.
     HistoryStart:
       type: object
       required: [day, recorded_since]
