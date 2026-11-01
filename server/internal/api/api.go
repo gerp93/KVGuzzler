@@ -155,6 +155,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/openei", s.getOpenEi)
 	mux.HandleFunc("PUT /api/v1/openei", s.putOpenEi)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
+	mux.HandleFunc("GET /api/v1/database/growth", s.getDatabaseGrowth)
 	mux.HandleFunc("GET /api/v1/history-start", s.getHistoryStart)
 	mux.HandleFunc("PUT /api/v1/history-start", s.putHistoryStart)
 	mux.HandleFunc("DELETE /api/v1/history-start", s.deleteHistoryStart)

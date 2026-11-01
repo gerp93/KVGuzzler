@@ -6,6 +6,7 @@ import type { Levels } from './levels';
 import type { MeterRuns } from './runs';
 import type { EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 import type { components } from './api-types';
+import type { DatabaseGrowth } from './dbsize';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -155,6 +156,8 @@ export const api = {
       body: JSON.stringify(body),
     }),
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** How the database's size has changed and what a month and a year of it come to. */
+  databaseGrowth: () => request<DatabaseGrowth>('api/v1/database/growth'),
   /** The day history starts on: nothing recorded before it is looked at by any period. */
   historyStart: () => request<components['schemas']['HistoryStart']>('api/v1/history-start'),
   putHistoryStart: (day: string) =>
