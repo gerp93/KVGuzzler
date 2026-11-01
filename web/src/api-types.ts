@@ -1394,20 +1394,33 @@ export interface components {
                 kwh: number;
                 /** @description The energy priced at each local day's rate, a decimal string; null when no price is known. */
                 cost: string | null;
-                /** @description A decimal string; null with no price or no miles. */
+                /** @description A decimal string; null with no price or no miles. Worked out from `used_cost` when there is one. */
                 cost_per_mile: string | null;
+                /** @description Worked out from `used_kwh` when there is one. */
                 miles_per_kwh: number | null;
+                /** @description How much the traction battery's charge rose over the stretch (negative when it fell), when the car's reports say what it held at both ends. Null when they do not. */
+                banked_pct: number | null;
+                /** @description What the miles used: `kwh` less the energy that is still in the battery (`banked_pct` times the wall energy each percent has taken). Null without `banked_pct`. */
+                used_kwh: number | null;
+                /** @description The same, priced, a decimal string. Null without `banked_pct` or a price. */
+                used_cost: string | null;
                 /** @description The share of the stretch the meter was measured. */
                 coverage: number;
                 cost_estimated: boolean;
             }[];
-            /** @description Every stretch added up; null until there are two readings. */
+            /** @description Every stretch added up; null until there are two readings. When some stretches have `used_kwh` only those are added up (`adjusted`), at what their miles used; the others charged energy in one stretch that was driven in another. */
             totals: {
                 miles: number;
                 kwh: number;
                 cost: string | null;
                 cost_per_mile: string | null;
                 miles_per_kwh: number | null;
+                adjusted: boolean;
+                /**
+                 * Format: date
+                 * @description The first stretch counted when `adjusted`; null otherwise.
+                 */
+                from_day: string | null;
             } | null;
             /** @description What the meter has used since the latest reading; null with no readings. */
             since_last: {
@@ -1415,6 +1428,10 @@ export interface components {
                 from_day: string;
                 kwh: number;
                 cost: string | null;
+                /** @description How much the battery's charge rose since the latest reading, when the car's reports cover the time. */
+                banked_pct: number | null;
+                /** @description That rise in kWh at the wall (what went into the battery rather than into driving). */
+                banked_kwh: number | null;
             } | null;
             cost_estimated: boolean;
         };

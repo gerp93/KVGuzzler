@@ -138,9 +138,11 @@ export function efficiencyTrend(intervals: EvInterval[], window: number = TREND_
     const from = dayMs(iv.from_day);
     const n = Math.round((dayMs(iv.to_day) - from) / DAY_MS);
     if (!(n >= 1)) continue;
-    const cost = iv.cost == null ? null : Number(iv.cost);
+    // What the miles used when the battery's charge at both ends is known (energy still in the battery is not driven yet), else what the meter measured.
+    const kwh = iv.used_kwh ?? iv.kwh;
+    const cost = iv.used_cost != null ? Number(iv.used_cost) : iv.cost == null ? null : Number(iv.cost);
     for (let i = 0; i < n; i++) {
-      days.push({ day: dayText(from + i * DAY_MS), miles: iv.miles / n, kwh: iv.kwh / n, cost: cost == null ? 0 : cost / n, priced: cost != null });
+      days.push({ day: dayText(from + i * DAY_MS), miles: iv.miles / n, kwh: kwh / n, cost: cost == null ? 0 : cost / n, priced: cost != null });
     }
   }
   return days.map((_, k) => {

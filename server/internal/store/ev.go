@@ -17,6 +17,15 @@ CREATE TABLE IF NOT EXISTS odometer_readings (
   day      TEXT NOT NULL,
   miles    REAL NOT NULL,
   PRIMARY KEY (meter_id, day)
+) WITHOUT ROWID;
+
+-- What the car said its traction battery held, each time the Ford feed looked (at is when the car reported it, Unix seconds). With the charges' own
+-- start and end reports it says how much of the energy charged is still in the battery rather than driven.
+CREATE TABLE IF NOT EXISTS ev_battery_reads (
+  meter_id TEXT NOT NULL,
+  at       INTEGER NOT NULL,
+  percent  REAL NOT NULL,
+  PRIMARY KEY (meter_id, at)
 ) WITHOUT ROWID;`
 
 // MaxOdometerMiles is the largest odometer reading accepted: a typo, not a car.
@@ -104,4 +113,30 @@ func (s *Store) DeleteOdometer(ctx context.Context, meterID, day string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SaveEvBatteryRead keeps one report of the traction battery's charge (0 to 100) the car made at `at`. A report already kept for that moment stays.
+func (s *Store) SaveEvBatteryRead(ctx context.Context, meterID string, at time.Time, percent float64) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO ev_battery_reads(meter_id, at, percent) VALUES (?, ?, ?)`, meterID, at.Unix(), percent)
+	return err
+}
+
+// EvBatteryReads lists the battery reports kept for a meter, oldest first.
+func (s *Store) EvBatteryReads(ctx context.Context, meterID string) ([]model.EvBatteryRead, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT at, percent FROM ev_battery_reads WHERE meter_id = ? ORDER BY at`, meterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.EvBatteryRead{}
+	for rows.Next() {
+		var at int64
+		var r model.EvBatteryRead
+		if err := rows.Scan(&at, &r.Percent); err != nil {
+			return nil, err
+		}
+		r.At = time.Unix(at, 0).UTC()
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }

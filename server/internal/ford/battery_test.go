@@ -1,6 +1,7 @@
 package ford
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -32,5 +33,33 @@ func TestParseBatteryReadsAFigureWithoutATimeAndRefusesWhatIsNotAPercentage(t *t
 		if b, ok := ParseBattery([]byte(body)); ok {
 			t.Errorf("%s: read %+v", name, b)
 		}
+	}
+}
+
+func TestEveryLookKeepsTheBatterysChargeWithTheTimeTheCarReportedIt(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	fs.battery = `,"xevBatteryActualStateOfCharge":{"value":61.5,"updateTime":"2026-10-29T21:29:49Z"}`
+	if _, err := f.Read(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.batts) != 1 || sink.batts[0].Percent != 61.5 || !sink.batts[0].At.Equal(time.Date(2026, 10, 29, 21, 29, 49, 0, time.UTC)) {
+		t.Fatalf("kept %+v, want 61.5 at the car's own time", sink.batts)
+	}
+	// A car that gave no time is kept at the moment it was asked, and an answer without a battery keeps nothing.
+	*now = now.Add(7 * time.Hour)
+	fs.battery = `,"xevBatteryActualStateOfCharge":{"value":50}`
+	if _, err := f.Read(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.batts) != 2 || sink.batts[1].Percent != 50 || !sink.batts[1].At.Equal(now.UTC()) {
+		t.Fatalf("kept %+v, want the second at the time of the look", sink.batts)
+	}
+	*now = now.Add(7 * time.Hour)
+	fs.battery = ""
+	if _, err := f.Read(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.batts) != 2 {
+		t.Errorf("an answer with no battery kept one: %+v", sink.batts)
 	}
 }

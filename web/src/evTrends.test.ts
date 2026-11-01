@@ -9,6 +9,9 @@ const iv = (from: string, to: string, miles: number, kwh: number, cost: string |
   cost,
   cost_per_mile: null,
   miles_per_kwh: null,
+  banked_pct: null,
+  used_kwh: null,
+  used_cost: null,
   coverage: 1,
   cost_estimated: false,
 });
@@ -30,6 +33,13 @@ describe('efficiencyTrend', () => {
     // 30 miles and 10 kWh a day: the same 3 miles per kWh in any full window. Before the window is full there is none.
     expect(t.slice(0, 2).map((p) => p.milesPerKwh)).toEqual([null, null]);
     expect(t[2]!.milesPerKwh).toBeCloseTo(3, 9);
+  });
+
+  it('uses what the miles used, not what was charged, once the battery at both ends is known', () => {
+    // 20 kWh was charged in the stretch but 15 of it is still in the battery: 5 kWh drove the 30 miles.
+    const t = efficiencyTrend([{ ...iv('2026-10-01', '2026-10-03', 30, 20, '3.00'), banked_pct: 40, used_kwh: 5, used_cost: '0.75' }], 2);
+    expect(t[1]!.milesPerKwh).toBeCloseTo(6, 9);
+    expect(t[1]!.windowCost).toBeCloseTo(0.75, 9);
   });
 
   it('puts the same date on a point in every time zone (noon UTC)', () => {

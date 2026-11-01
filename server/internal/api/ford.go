@@ -102,6 +102,11 @@ func (k fordSink) SaveOdometer(ctx context.Context, meterID, day string, miles f
 	return true, nil
 }
 
+// SaveBattery keeps the battery's charge the car reported, for working out how much of the energy charged is still unspent in it.
+func (k fordSink) SaveBattery(ctx context.Context, meterID string, b ford.Battery) error {
+	return k.s.Store.SaveEvBatteryRead(ctx, meterID, b.At, b.Percent)
+}
+
 // loadFordConfig is the saved setup, or nil when none is set up or what is saved cannot be used.
 func (s *Server) loadFordConfig(ctx context.Context) (*ford.Config, error) {
 	text, ok, err := s.Store.Secret(ctx, fordConfigKey)

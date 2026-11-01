@@ -223,6 +223,7 @@ type fakeSink struct {
 	readings map[string]float64
 	order    []string
 	refuse   error
+	batts    []Battery
 }
 
 func (s *fakeSink) Config(context.Context) (*Config, error) { return s.cfg, nil }
@@ -237,6 +238,10 @@ func (s *fakeSink) SaveRefresh(_ context.Context, t string) error {
 func (s *fakeSink) ClearRefresh(context.Context) error { s.refresh = ""; return nil }
 func (s *fakeSink) SaveStatus(_ context.Context, st Status) error {
 	s.status = append(s.status, st)
+	return nil
+}
+func (s *fakeSink) SaveBattery(_ context.Context, _ string, b Battery) error {
+	s.batts = append(s.batts, b)
 	return nil
 }
 func (s *fakeSink) SaveOdometer(_ context.Context, meter, day string, miles float64) (bool, error) {
@@ -257,7 +262,9 @@ type fordServer struct {
 	last      string
 	odometer  string
 	telemetry int
-	order     *[]string
+	// battery is a member added to the telemetry answer (empty: none).
+	battery string
+	order   *[]string
 	// extra answers other paths with a status and a body; fccs records what it was asked.
 	extra map[string]fakeAnswer
 	fccs  *http.Request
@@ -288,7 +295,7 @@ func newFordServer(t *testing.T, sink *fakeSink) *fordServer {
 		case TelemetryPath:
 			fs.telemetry++
 			*fs.order = append(*fs.order, "telemetry")
-			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + fs.odometer + `}}}`))
+			_, _ = w.Write([]byte(`{"metrics":{"odometer":{"value":` + fs.odometer + `}` + fs.battery + `}}`))
 		default:
 			if r.URL.Path == "/fcon-query/v1/fccs" {
 				fs.fccs = r.Clone(context.Background())

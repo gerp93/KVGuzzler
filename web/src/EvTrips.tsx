@@ -8,6 +8,18 @@ import { Kwh } from './Watts';
 /** How many stretches are listed before "Show all": one a day adds up. */
 const SHOWN = 5;
 
+/** How much of the energy charged went into the battery (or came out of it) rather than into the miles driven in the same days: "battery +36 %". */
+function Banked({ pct, kwh }: { pct: number | null | undefined; kwh?: number | null }) {
+  if (pct == null || Math.abs(pct) < 0.5) return null;
+  const word = `battery ${pct > 0 ? '+' : '−'}${Math.round(Math.abs(pct))} %`;
+  const title = pct > 0 ? 'The battery gained this much, which is charged but not driven yet' : 'The battery lost this much: these miles were driven on energy charged earlier';
+  return (
+    <span class="badge" title={kwh != null ? `${title} (about ${Math.abs(kwh).toFixed(1)} kWh at the wall)` : title}>
+      {word}
+    </span>
+  );
+}
+
 export function EvTrips({ ev, unit }: { ev: MeterEv; unit: DistanceUnit }) {
   const [showAll, setShowAll] = useState(false);
   const trips = [...ev.intervals].reverse();
@@ -41,6 +53,7 @@ export function EvTrips({ ev, unit }: { ev: MeterEv; unit: DistanceUnit }) {
                 <td>so far</td>
                 <td>
                   <Kwh k={since.kwh} />
+                  <Banked pct={since.banked_pct} kwh={since.banked_kwh} />
                 </td>
                 <td>{since.cost != null ? formatMoney(since.cost, ev.cost_estimated) : '—'}</td>
                 <td>—</td>
@@ -60,6 +73,7 @@ export function EvTrips({ ev, unit }: { ev: MeterEv; unit: DistanceUnit }) {
                 <td>{formatDistance(s.miles, unit)}</td>
                 <td>
                   <Kwh k={s.kwh} />
+                  <Banked pct={s.banked_pct} kwh={s.used_kwh != null ? s.kwh - s.used_kwh : null} />
                 </td>
                 <td>{s.cost != null ? formatMoney(s.cost, s.cost_estimated) : '—'}</td>
                 <td>

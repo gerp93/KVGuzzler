@@ -28,6 +28,13 @@ type evInterval struct {
 	// means the cost per mile is too low.
 	Coverage      float64 `json:"coverage"`
 	CostEstimated bool    `json:"cost_estimated"`
+	// BankedPct is how much the battery's charge rose over the stretch (negative when it fell: the miles were driven on energy bought earlier), when the
+	// car's reports say what it held at both ends. UsedKWh and UsedCost are then the stretch's energy and cost less the energy that is still in the battery,
+	// which is what the miles used; the cost per mile and the efficiency are worked out from them. All null for a stretch the reports do not cover, which
+	// keeps the raw figures.
+	BankedPct *float64 `json:"banked_pct"`
+	UsedKWh   *float64 `json:"used_kwh"`
+	UsedCost  *string  `json:"used_cost"`
 }
 
 type evTotals struct {
@@ -36,13 +43,20 @@ type evTotals struct {
 	Cost        *string  `json:"cost"`
 	CostPerMile *string  `json:"cost_per_mile"`
 	MilesPerKWh *float64 `json:"miles_per_kwh"`
+	// Adjusted says the totals are over the stretches whose energy was netted against the battery (kwh and cost are then what the miles used): from
+	// FromDay, the first of them. Without any such stretch they add up every stretch as it was measured.
+	Adjusted bool    `json:"adjusted"`
+	FromDay  *string `json:"from_day"`
 }
 
-// evSince is what the meter has used since the latest reading, which has no miles yet to divide it by.
+// evSince is what the meter has used since the latest reading, which has no miles yet to divide it by. BankedPct and BankedKWh say how much of it went into the
+// battery rather than into driving, when the car's reports cover the time.
 type evSince struct {
-	FromDay string  `json:"from_day"`
-	KWh     float64 `json:"kwh"`
-	Cost    *string `json:"cost"`
+	FromDay   string   `json:"from_day"`
+	KWh       float64  `json:"kwh"`
+	Cost      *string  `json:"cost"`
+	BankedPct *float64 `json:"banked_pct"`
+	BankedKWh *float64 `json:"banked_kwh"`
 }
 
 type evAnswer struct {
@@ -129,9 +143,14 @@ func (s *Server) evAnswer(ctx context.Context, id string) (evAnswer, error) {
 
 	day := func(d string) (time.Time, error) { return time.ParseInLocation("2006-01-02", d, s.Loc) }
 
-	var miles, kwh float64
-	var cost rates.Money
-	allPriced := true
+	// What each stretch measured, kept as it was so the battery can be netted out of it below.
+	type measured struct {
+		from, to time.Time
+		kwh      float64
+		cost     rates.Money
+		priced   bool
+	}
+	var raw []measured
 	for i := 1; i < len(readings); i++ {
 		a, b := readings[i-1], readings[i]
 		from, err := day(a.Day)
@@ -162,21 +181,96 @@ func (s *Server) evAnswer(ctx context.Context, id string) (evAnswer, error) {
 			}
 		}
 		out.CostEstimated = out.CostEstimated || iv.CostEstimated
-		miles += iv.Miles
-		kwh += cs.KWh
-		if cs.Cost == nil {
-			allPriced = false
-		} else {
-			cost = cost.Add(priced.Cost)
-		}
 		out.Intervals = append(out.Intervals, iv)
+		raw = append(raw, measured{from: from, to: to, kwh: cs.KWh, cost: priced.Cost, priced: cs.Cost != nil})
+	}
+
+	// The energy charged in a stretch is not all driven in it: what the battery gained is still unspent. Taken out where the car's reports cover both ends.
+	points, err := s.evSocPoints(ctx, id)
+	if err != nil {
+		return evAnswer{}, err
+	}
+	perPct, chargePrice, havePerPct, err := s.wallKWhPerPct(ctx, m)
+	if err != nil {
+		return evAnswer{}, err
+	}
+	// A price for energy that went into the battery (or came out of it): the stretch's own when it charged any, else what the charges cost on average.
+	priceOf := func(r measured) (rates.Money, bool) {
+		if r.priced && r.kwh > 0 {
+			return r.cost.Div(rates.MoneyFromFloat(r.kwh)), true
+		}
+		if chargePrice != nil {
+			return *chargePrice, true
+		}
+		return rates.Money{}, false
+	}
+	if havePerPct {
+		for i := range out.Intervals {
+			iv, r := &out.Intervals[i], raw[i]
+			pctA, okA := socAt(points, r.from)
+			pctB, okB := socAt(points, r.to)
+			price, havePrice := priceOf(r)
+			if !okA || !okB || !havePrice || !r.priced {
+				continue
+			}
+			banked := pctB - pctA
+			bankedKWh := banked * perPct
+			usedKWh := r.kwh - bankedKWh
+			usedCost := r.cost.Sub(price.MulFloat(bankedKWh))
+			c := usedCost.String()
+			iv.BankedPct, iv.UsedKWh, iv.UsedCost = &banked, &usedKWh, &c
+			iv.CostPerMile, iv.MilesPerKWh = nil, nil
+			if iv.Miles > 0 && usedKWh > 0 {
+				mpk := iv.Miles / usedKWh
+				iv.MilesPerKWh = &mpk
+				if usedCost.Sign() > 0 {
+					p := usedCost.Div(rates.MoneyFromFloat(iv.Miles)).String()
+					iv.CostPerMile = &p
+				}
+			}
+		}
+	}
+
+	// The totals: over the stretches netted against the battery when there are any (the others charge energy in one stretch and drive it in another), else
+	// over every stretch as measured.
+	adjusted := false
+	for _, iv := range out.Intervals {
+		adjusted = adjusted || iv.UsedCost != nil
+	}
+	var miles, kwh float64
+	var cost rates.Money
+	allPriced := true
+	var firstDay *string
+	for i := range out.Intervals {
+		iv := &out.Intervals[i]
+		switch {
+		case adjusted && iv.UsedCost == nil:
+			continue
+		case adjusted:
+			if firstDay == nil {
+				firstDay = &iv.FromDay
+			}
+			miles += iv.Miles
+			kwh += *iv.UsedKWh
+			if c, err := rates.ParseMoney(*iv.UsedCost); err == nil {
+				cost = cost.Add(c)
+			}
+		default:
+			miles += iv.Miles
+			kwh += raw[i].kwh
+			if raw[i].priced {
+				cost = cost.Add(raw[i].cost)
+			} else {
+				allPriced = false
+			}
+		}
 	}
 	if len(readings) >= 2 {
-		t := evTotals{Miles: miles, KWh: kwh}
+		t := evTotals{Miles: miles, KWh: kwh, Adjusted: adjusted, FromDay: firstDay}
 		if allPriced {
 			c := cost.String()
 			t.Cost = &c
-			if miles > 0 && kwh > 0 {
+			if miles > 0 && kwh > 0 && cost.Sign() > 0 {
 				p := cost.Div(rates.MoneyFromFloat(miles)).String()
 				t.CostPerMile = &p
 			}
@@ -198,6 +292,15 @@ func (s *Server) evAnswer(ctx context.Context, id string) (evAnswer, error) {
 				return evAnswer{}, err
 			}
 			out.SinceLast = &evSince{FromDay: readings[n-1].Day, KWh: cs.KWh, Cost: cs.Cost}
+			if havePerPct {
+				pctA, okA := socAt(points, from)
+				pctB, okB := socAt(points, now)
+				if okA && okB {
+					banked := pctB - pctA
+					bankedKWh := banked * perPct
+					out.SinceLast.BankedPct, out.SinceLast.BankedKWh = &banked, &bankedKWh
+				}
+			}
 		}
 	}
 	return out, nil

@@ -2112,7 +2112,7 @@ components:
           description: One per pair of neighbouring readings, oldest first.
           items:
             type: object
-            required: [from_day, to_day, miles, kwh, cost, cost_per_mile, miles_per_kwh, coverage, cost_estimated]
+            required: [from_day, to_day, miles, kwh, cost, cost_per_mile, miles_per_kwh, coverage, cost_estimated, banked_pct, used_kwh, used_cost]
             properties:
               from_day:
                 type: string
@@ -2130,9 +2130,23 @@ components:
                 description: The energy priced at each local day's rate, a decimal string; null when no price is known.
               cost_per_mile:
                 type: [string, 'null']
-                description: A decimal string; null with no price or no miles.
+                description: A decimal string; null with no price or no miles. Worked out from `used_cost` when there is one.
               miles_per_kwh:
                 type: [number, 'null']
+                description: Worked out from `used_kwh` when there is one.
+              banked_pct:
+                type: [number, 'null']
+                description: >-
+                  How much the traction battery's charge rose over the stretch (negative when it fell), when the car's reports say what it held at both
+                  ends. Null when they do not.
+              used_kwh:
+                type: [number, 'null']
+                description: >-
+                  What the miles used: `kwh` less the energy that is still in the battery (`banked_pct` times the wall energy each percent has taken). Null
+                  without `banked_pct`.
+              used_cost:
+                type: [string, 'null']
+                description: The same, priced, a decimal string. Null without `banked_pct` or a price.
               coverage:
                 type: number
                 minimum: 0
@@ -2142,8 +2156,10 @@ components:
                 type: boolean
         totals:
           type: [object, 'null']
-          description: Every stretch added up; null until there are two readings.
-          required: [miles, kwh, cost, cost_per_mile, miles_per_kwh]
+          description: >-
+            Every stretch added up; null until there are two readings. When some stretches have `used_kwh` only those are added up (`adjusted`), at what
+            their miles used; the others charged energy in one stretch that was driven in another.
+          required: [miles, kwh, cost, cost_per_mile, miles_per_kwh, adjusted, from_day]
           properties:
             miles:
               type: number
@@ -2155,10 +2171,16 @@ components:
               type: [string, 'null']
             miles_per_kwh:
               type: [number, 'null']
+            adjusted:
+              type: boolean
+            from_day:
+              type: [string, 'null']
+              format: date
+              description: The first stretch counted when `adjusted`; null otherwise.
         since_last:
           type: [object, 'null']
           description: What the meter has used since the latest reading; null with no readings.
-          required: [from_day, kwh, cost]
+          required: [from_day, kwh, cost, banked_pct, banked_kwh]
           properties:
             from_day:
               type: string
@@ -2167,6 +2189,12 @@ components:
               type: number
             cost:
               type: [string, 'null']
+            banked_pct:
+              type: [number, 'null']
+              description: How much the battery's charge rose since the latest reading, when the car's reports cover the time.
+            banked_kwh:
+              type: [number, 'null']
+              description: That rise in kWh at the wall (what went into the battery rather than into driving).
         cost_estimated:
           type: boolean
     MeterUpdate:
