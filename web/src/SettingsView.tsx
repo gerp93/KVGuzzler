@@ -1,4 +1,5 @@
 import { DatabaseCard } from './DatabaseCard';
+import { HistoryStartCard } from './HistoryStartCard';
 import { RatesCard } from './RatesCard';
 import { THEMES, type Theme } from './lib';
 
@@ -6,6 +7,7 @@ export function SettingsView({ theme, onTheme }: { theme: Theme; onTheme: (t: Th
   return (
     <>
       <RatesCard />
+      <HistoryStartCard />
       <DatabaseCard />
       <section class="card page-narrow">
         <h2>Theme</h2>

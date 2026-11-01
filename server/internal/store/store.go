@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -26,6 +27,8 @@ const joulesPerKWh = 3.6e6
 type Store struct {
 	db      *sql.DB
 	secrets secretFile
+	// floor is where history starts (see floor.go); nil when it is not cut.
+	floor atomic.Pointer[historyFloor]
 }
 
 // Open opens (creating it if needed) the database file at path.
@@ -50,7 +53,12 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db: db, secrets: secretFile{path: filepath.Join(filepath.Dir(path), "secrets.json")}}, nil
+	st := &Store{db: db, secrets: secretFile{path: filepath.Join(filepath.Dir(path), "secrets.json")}}
+	if err := st.loadFloor(context.Background()); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return st, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -498,7 +506,7 @@ type Totals struct {
 // FirstMinute is the first minute a meter has any energy recorded, or false when it has none.
 func (s *Store) FirstMinute(ctx context.Context, meterID string) (time.Time, bool, error) {
 	var first sql.NullInt64
-	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM minutes WHERE meter_id = ?`, meterID).Scan(&first); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM minutes WHERE meter_id = ? AND minute >= ?`, meterID, s.floorUnix()).Scan(&first); err != nil {
 		return time.Time{}, false, err
 	}
 	if !first.Valid {
@@ -510,7 +518,7 @@ func (s *Store) FirstMinute(ctx context.Context, meterID string) (time.Time, boo
 // FirstData is the first minute anything at all was recorded (a meter's, or a PC's sensors'), or false when nothing was.
 func (s *Store) FirstData(ctx context.Context) (time.Time, bool, error) {
 	var first sql.NullInt64
-	if err := s.db.QueryRowContext(ctx, `SELECT MIN(m) FROM (SELECT MIN(minute) AS m FROM minutes UNION ALL SELECT MIN(minute) FROM pc_minutes)`).Scan(&first); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(m) FROM (SELECT MIN(minute) AS m FROM minutes WHERE minute >= ?1 UNION ALL SELECT MIN(minute) FROM pc_minutes WHERE minute >= ?1)`, s.floorUnix()).Scan(&first); err != nil {
 		return time.Time{}, false, err
 	}
 	if !first.Valid {
@@ -521,6 +529,7 @@ func (s *Store) FirstData(ctx context.Context) (time.Time, bool, error) {
 
 // Totals is a meter's energy, highest reading and covered time in [from, to).
 func (s *Store) Totals(ctx context.Context, meterID string, from, to time.Time) (Totals, error) {
+	from = s.clip(from)
 	var ws, peak, secs float64
 	var amps, low sql.NullFloat64
 	err := s.db.QueryRowContext(ctx, `
@@ -547,6 +556,7 @@ type agg struct {
 
 // Series is a meter's power over [from, to), bucketed. A "day" is a day of loc.
 func (s *Store) Series(ctx context.Context, meterID string, from, to time.Time, bucket model.Bucket, loc *time.Location) ([]model.Point, error) {
+	from = s.clip(from)
 	q := `SELECT minute, avg_w * seconds, max_w, seconds, max_a FROM minutes
 WHERE meter_id = ? AND minute >= ? AND minute < ? ORDER BY minute`
 	if bucket != model.BucketMinute {
@@ -669,6 +679,7 @@ func (s *Store) DeviceMeters(ctx context.Context, deviceID string) ([]model.Mete
 // HourlyKWh is the energy the given meters together used in each hour of [from, to), by the unix second the hour starts. Only the
 // meters of one scope should be given (never the house and its circuits together: that would count the same power twice).
 func (s *Store) HourlyKWh(ctx context.Context, meterIDs []string, from, to time.Time) (map[int64]float64, error) {
+	from = s.clip(from)
 	out := map[int64]float64{}
 	if len(meterIDs) == 0 {
 		return out, nil

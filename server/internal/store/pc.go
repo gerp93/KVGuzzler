@@ -158,6 +158,7 @@ WHERE json_extract(excluded.body, '$.at') >= json_extract(pc_live.body, '$.at')`
 // per-program estimates, and the stretches it was not sampling (clipped to the period, with a plug counter's energy shared
 // evenly over the gap so any period gets its share). It is nil when that collector has never reported.
 func (s *Store) PcSourceSummary(ctx context.Context, sourceID string, from, to time.Time) (*model.PcSource, error) {
+	from = s.clip(from)
 	sources, err := s.pcSources(ctx)
 	if err != nil {
 		return nil, err
@@ -354,6 +355,7 @@ WHERE source_id = ? AND end_ts >= ? AND start_ts < ? ORDER BY still DESC, end_ts
 // PcSeries is a PC collector's sensors, wall plug and meters over [from, to), bucketed like Series, with the gaps inside the period.
 // The readings that are parts of a sensor (scope breakdown) are left out: they are not separate lines. Nil when it never reported.
 func (s *Store) PcSeries(ctx context.Context, sourceID string, from, to time.Time, bucket model.Bucket, loc *time.Location) (*model.PcSeries, error) {
+	from = s.clip(from)
 	var known int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pc_sources WHERE source_id = ?`, sourceID).Scan(&known); err != nil {
 		return nil, err
@@ -440,6 +442,7 @@ WHERE source_id = ? AND minute >= ? AND minute < ? AND scope IN ('component', 'w
 
 // PcSensorsKwh is the energy the PC's sensors (the separate pieces of hardware, not the parts inside one) measured over [from, to).
 func (s *Store) PcSensorsKwh(ctx context.Context, sourceID string, from, to time.Time) (float64, error) {
+	from = s.clip(from)
 	var ws sql.NullFloat64
 	err := s.db.QueryRowContext(ctx, `SELECT SUM(avg_w * seconds) FROM pc_minutes WHERE source_id = ? AND scope = 'component' AND minute >= ? AND minute < ?`,
 		sourceID, from.Unix(), to.Unix()).Scan(&ws)
@@ -451,13 +454,14 @@ func (s *Store) PcSensorsKwh(ctx context.Context, sourceID string, from, to time
 
 // PcGaps are the stretches the PC was not recording inside [from, to), clipped to it, with a plug counter's energy shared evenly.
 func (s *Store) PcGaps(ctx context.Context, sourceID string, from, to time.Time) ([]model.PcGap, error) {
+	from = s.clip(from)
 	return s.pcGaps(ctx, sourceID, from.Unix(), to.Unix())
 }
 
 // PcFirstSensorMinute is the first minute the PC's sensors have anything recorded, or false when they have none.
 func (s *Store) PcFirstSensorMinute(ctx context.Context, sourceID string) (time.Time, bool, error) {
 	var first sql.NullInt64
-	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM pc_minutes WHERE source_id = ? AND scope = 'component'`, sourceID).Scan(&first); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT MIN(minute) FROM pc_minutes WHERE source_id = ? AND scope = 'component' AND minute >= ?`, sourceID, s.floorUnix()).Scan(&first); err != nil {
 		return time.Time{}, false, err
 	}
 	if !first.Valid {

@@ -1194,6 +1194,54 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/history-start:
+    get:
+      tags: [Settings]
+      operationId: getHistoryStart
+      summary: The day history starts on, if the owner set one.
+      description: |
+        A global cutoff: nothing recorded before that day is looked at by any period, not even "all time", and its start counts as the start of history.
+        Nothing is deleted. It cuts the meters' minutes, the PC's, and the odometer readings and charges of an electric vehicle.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryStart'
+    put:
+      tags: [Settings]
+      operationId: putHistoryStart
+      summary: Start history on a day.
+      description: 400 for something that is not a date, or a day in the future. The day is a day of the server's zone.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day]
+              additionalProperties: false
+              properties:
+                day:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryStart'
+        '400':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: deleteHistoryStart
+      summary: Take the cutoff off, so all that was recorded is looked at again.
+      responses:
+        '204':
+          description: Removed.
   /api/v1/rates:
     get:
       tags: [Settings]
@@ -1776,6 +1824,18 @@ components:
           format: date
         miles:
           type: number
+    HistoryStart:
+      type: object
+      required: [day, recorded_since]
+      properties:
+        day:
+          type: [string, 'null']
+          format: date
+          description: The local day history starts on; null when history is not cut.
+        recorded_since:
+          type: [string, 'null']
+          format: date-time
+          description: The first moment anything was recorded, whatever the cutoff says, so the owner can see what a day would leave out; null when nothing was.
     EvBattery:
       type: object
       required: [meter_id, kwh]
