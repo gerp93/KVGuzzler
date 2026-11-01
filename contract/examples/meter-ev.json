@@ -6,10 +6,10 @@
     { "day": "2026-10-26", "miles": 19090 }
   ],
   "intervals": [
-    { "from_day": "2026-09-01", "to_day": "2026-10-01", "miles": 515, "kwh": 148.6, "cost": "23.03", "cost_per_mile": "0.044718", "miles_per_kwh": 3.466, "coverage": 1, "cost_estimated": false },
-    { "from_day": "2026-10-01", "to_day": "2026-10-26", "miles": 335, "kwh": 99.2, "cost": "15.38", "cost_per_mile": "0.045910", "miles_per_kwh": 3.377, "coverage": 0.98, "cost_estimated": false }
+    { "from_day": "2026-09-01", "to_day": "2026-10-01", "miles": 515, "kwh": 148.6, "cost": "23.03", "cost_per_mile": "0.044718", "miles_per_kwh": 3.466, "coverage": 1, "cost_estimated": false, "banked_pct": null, "used_kwh": null, "used_cost": null },
+    { "from_day": "2026-10-01", "to_day": "2026-10-26", "miles": 335, "kwh": 99.2, "cost": "15.38", "cost_per_mile": "0.045075", "miles_per_kwh": 3.438, "coverage": 0.98, "cost_estimated": false, "banked_pct": 5, "used_kwh": 97.45, "used_cost": "15.10" }
   ],
-  "totals": { "miles": 850, "kwh": 247.8, "cost": "38.41", "cost_per_mile": "0.045188", "miles_per_kwh": 3.43 },
-  "since_last": { "from_day": "2026-10-26", "kwh": 11.4, "cost": "1.77" },
+  "totals": { "miles": 335, "kwh": 97.45, "cost": "15.10", "cost_per_mile": "0.045075", "miles_per_kwh": 3.438, "adjusted": true, "from_day": "2026-10-01" },
+  "since_last": { "from_day": "2026-10-26", "kwh": 11.4, "cost": "1.77", "banked_pct": 12.5, "banked_kwh": 4.4 },
   "cost_estimated": false
 }
