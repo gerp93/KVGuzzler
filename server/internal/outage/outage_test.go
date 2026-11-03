@@ -12,7 +12,9 @@ import (
 
 var day = time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 
-func at(h, m int) time.Time { return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute) }
+func at(h, m int) time.Time {
+	return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute)
+}
 
 func boot(id string, when time.Time, cause source.BootCause) source.Boot {
 	return source.Boot{DeviceID: id, At: when, Cause: cause}
