@@ -1,12 +1,19 @@
 // The PC right now, as its collector last saw it: what each part is drawing, how much of the whole PC that is, and which programs are
 // causing it. A look is not history: the page asks for a new one every few seconds and says how old the one it shows is.
+import { formatCurrent } from './amps';
 import { Watts } from './Watts';
 import {
-  formatAge, idleText, isLiveStale, liveSplit, programsNow, sharePercent,
-  type PcLive,
+  formatAge, idleText, isLiveStale, liveSplit, plugNamed, programsNow, sharePercent,
+  type PcLive, type Reading,
 } from './lib';
 
-function Row({ name, watts, base, hint }: { name: string; watts: number; base: number; hint?: string }) {
+/** A plug the house server reads, as it reads it now: the PC's amps and volts come from there, the collector's own look has only watts. */
+export interface PlugNow {
+  label: string;
+  reading: Reading | undefined;
+}
+
+function Row({ name, watts, base, hint, current }: { name: string; watts: number; base: number; hint?: string; current?: string | null }) {
   const share = sharePercent(watts, base);
   return (
     <li>
@@ -14,13 +21,17 @@ function Row({ name, watts, base, hint }: { name: string; watts: number; base: n
       <span class="bar" aria-hidden="true">
         <i style={{ width: `${base > 0 ? Math.min(100, (watts / base) * 100) : 0}%` }} />
       </span>
-      <span class="num"><Watts w={watts} /></span>
+      <span class="num">
+        <Watts w={watts} />
+        {current && <span class="live-current">{current}</span>}
+      </span>
       <span class="num cost">{hint ?? (share != null ? `${share}%` : '')}</span>
     </li>
   );
 }
 
-export function PcLiveCard({ live }: { live: PcLive }) {
+/** `wall` is the reading of the PC's own wall plug and `plugs` the plugs beside it, from the house server; each shows its volts and amps under its watts. */
+export function PcLiveCard({ live, wall, plugs = [] }: { live: PcLive; wall?: Reading | undefined; plugs?: PlugNow[] }) {
   const split = liveSplit(live);
   const stale = isLiveStale(live);
   const programs = programsNow(live);
@@ -34,6 +45,7 @@ export function PcLiveCard({ live }: { live: PcLive }) {
           <span class="caption">{stale ? `Not answering: last heard ${formatAge(live.age_seconds ?? 0)}` : `Updated ${formatAge(live.age_seconds ?? 0)}`}</span>
         </div>
         <p class="big small"><Watts w={split.baseWatts} /></p>
+        {split.baseIsWall && formatCurrent(wall) && <p class="live-current now">{formatCurrent(wall)}</p>}
         <p class="caption">{split.baseIsWall ? 'Whole PC at the wall' : 'Sensors only'}</p>
 
         {split.sensors.length > 0 && (
@@ -63,7 +75,14 @@ export function PcLiveCard({ live }: { live: PcLive }) {
             <h3>Other plugs it reads</h3>
             <ul class="bars wide">
               {split.meters.map((r) => (
-                <Row key={r.name} name={r.name} watts={r.watts} base={Math.max(...split.meters.map((m) => m.watts))} hint="separate device" />
+                <Row
+                  key={r.name}
+                  name={r.name}
+                  watts={r.watts}
+                  base={Math.max(...split.meters.map((m) => m.watts))}
+                  hint="separate device"
+                  current={formatCurrent(plugNamed(r.name, plugs)?.reading)}
+                />
               ))}
             </ul>
           </>

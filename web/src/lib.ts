@@ -518,6 +518,21 @@ export function liveSplit(live: Pick<PcLive, 'readings'>): LiveSplit {
   };
 }
 
+/**
+ * The plug a collector's name for a device stands for ("Monitor" for the meter "Monitor (LG 45GS96QB-B.AUS)"): the one whose label is that name, else the one
+ * label that starts with the name or that the name starts with, at a word. Several candidates, or none, say nothing rather than guess which plug it is.
+ */
+export function plugNamed<T extends { label: string }>(name: string, plugs: T[]): T | undefined {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const n = norm(name);
+  if (n === '') return undefined;
+  const exact = plugs.filter((p) => norm(p.label) === n);
+  if (exact.length === 1) return exact[0];
+  const startsAtWord = (long: string, short: string) => long.startsWith(short) && (long.length === short.length || /[\s(\-_:]/.test(long[short.length]!));
+  const near = plugs.filter((p) => startsAtWord(norm(p.label), n) || startsAtWord(n, norm(p.label)));
+  return near.length === 1 && exact.length === 0 ? near[0] : undefined;
+}
+
 /** A share as a whole-number percent; null when there is nothing to share of. */
 export function sharePercent(watts: number, base: number): number | null {
   return base > 0 ? Math.round((watts / base) * 100) : null;
