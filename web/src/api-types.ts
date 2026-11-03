@@ -1252,8 +1252,11 @@ export interface components {
             bytes_now: number | null;
             /** @description The estimated growth in a month; null until the readings cover a few days. */
             per_month_bytes: number | null;
-            /** @description The size a year from now at that rate; null until `per_month_bytes` is. */
-            in_a_year_bytes: number | null;
+            /** @description The size 1, 3, 6 and 12 months from now at that rate, oldest first; empty until `per_month_bytes` is known. */
+            projected: {
+                months: number;
+                bytes: number;
+            }[];
             /** @description How many readings the estimate rests on (those of the last 14 days). */
             readings: number;
             /** @description How many days those readings cover; null with fewer than two. */

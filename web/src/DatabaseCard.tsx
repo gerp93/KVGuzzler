@@ -1,5 +1,5 @@
 // Where the server keeps its history, how big it has grown, and how fast it grows (read-only: the file lives on the box and is backed up or moved there).
-// The growth is the server's estimate from the sizes it has noted: a month's worth, and the size a year from now at that rate.
+// The growth is the server's estimate from the sizes it has noted: a month's worth, and the size 1, 3, 6 and 12 months from now at that rate.
 import { useState } from 'preact/hooks';
 import { api } from './api';
 import { dailySizes } from './dbsize';
@@ -15,7 +15,7 @@ export function DatabaseCard() {
   const { data: growth } = usePoll(api.databaseGrowth, 10 * 60_000, []);
   const [all, setAll] = useState(false);
   const days = growth ? dailySizes(growth.points) : [];
-  const growing = growth?.per_month_bytes != null && growth.in_a_year_bytes != null;
+  const growing = growth?.per_month_bytes != null && growth.projected.length > 0;
   return (
     <section class="card page-narrow">
       <h2>Database</h2>
@@ -27,7 +27,7 @@ export function DatabaseCard() {
             ...(growing
               ? [
                   { label: 'Growth', value: `≈ ${formatBytes(growth.per_month_bytes!)} a month` },
-                  { label: 'In a year', value: `≈ ${formatBytes(growth.in_a_year_bytes!)}` },
+                  ...growth.projected.map((p) => ({ label: `In ${p.months === 12 ? 'a year' : p.months === 1 ? 'a month' : `${p.months} months`}`, value: `≈ ${formatBytes(p.bytes)}` })),
                 ]
               : []),
           ]}

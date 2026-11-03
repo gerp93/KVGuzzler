@@ -1842,7 +1842,7 @@ components:
           type: number
     DatabaseGrowth:
       type: object
-      required: [points, bytes_now, per_month_bytes, in_a_year_bytes, readings, basis_days]
+      required: [points, bytes_now, per_month_bytes, projected, readings, basis_days]
       properties:
         points:
           type: array
@@ -1862,9 +1862,17 @@ components:
         per_month_bytes:
           type: [integer, 'null']
           description: The estimated growth in a month; null until the readings cover a few days.
-        in_a_year_bytes:
-          type: [integer, 'null']
-          description: The size a year from now at that rate; null until `per_month_bytes` is.
+        projected:
+          type: array
+          description: The size 1, 3, 6 and 12 months from now at that rate, oldest first; empty until `per_month_bytes` is known.
+          items:
+            type: object
+            required: [months, bytes]
+            properties:
+              months:
+                type: integer
+              bytes:
+                type: integer
         readings:
           type: integer
           description: How many readings the estimate rests on (those of the last 14 days).
