@@ -8,7 +8,12 @@
   ],
   "bytes_now": 24420352,
   "per_month_bytes": 52428800,
-  "in_a_year_bytes": 639631360,
+  "projected": [
+    { "months": 1, "bytes": 76849152 },
+    { "months": 3, "bytes": 181731072 },
+    { "months": 6, "bytes": 339042304 },
+    { "months": 12, "bytes": 639631360 }
+  ],
   "readings": 5,
   "basis_days": 4
 }
