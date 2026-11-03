@@ -98,6 +98,7 @@ func run(listen, dataDir string, simulate bool, simDays int, loc *time.Location)
 	go apiServer.EvTracker().Run(ctx, log.Printf)
 	go apiServer.RunGasFeed(ctx, log.Printf)
 	go apiServer.RunSizeLog(ctx, log.Printf)
+	go apiServer.RunOutageWatch(ctx, log.Printf)
 	root.Handle("/api/", apiServer.Handler())
 	root.Handle("/", webui.Handler())
 	srv := &http.Server{Addr: listen, Handler: root, ReadHeaderTimeout: 5 * time.Second}

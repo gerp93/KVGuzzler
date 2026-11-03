@@ -1,0 +1,26 @@
+{
+  "outages": [
+    {
+      "id": 2,
+      "kind": "server",
+      "started_at": "2026-11-02T20:47:40Z",
+      "ended_at": "2026-11-02T22:03:00Z",
+      "seconds": 4520,
+      "source": "plugs",
+      "note": "The power was back; nothing was recording."
+    },
+    {
+      "id": 1,
+      "kind": "power",
+      "started_at": "2026-11-02T19:14:00Z",
+      "ended_at": "2026-11-02T20:47:40Z",
+      "seconds": 5620,
+      "source": "plugs",
+      "note": "2 plugs started again when the power came back."
+    }
+  ],
+  "power_seconds": 5620,
+  "server_seconds": 4520,
+  "unknown_seconds": 0,
+  "leeway_seconds": 600
+}

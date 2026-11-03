@@ -3,6 +3,7 @@ import { Chart, lineFrom, tallChartHeight, type Line } from './Chart';
 import { EstimatorView } from './EstimatorView';
 import { usePoll, useStored } from './hooks';
 import { HouseHistoryCard } from './HouseHistoryCard';
+import { OutagesCard } from './OutagesCard';
 import { PeriodPicker } from './Periods';
 import { compareOrder, formatKwh, formatMoney, formatWatts, periodRange, sumByTime, type Meter, type PeriodKey, type Summary } from './lib';
 
@@ -123,6 +124,8 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         <HouseHistoryCard period={period as PeriodKey} />
         <EstimatorView meters={meters} />
       </div>
+
+      <OutagesCard />
     </>
   );
 }

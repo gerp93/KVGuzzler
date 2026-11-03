@@ -1210,6 +1210,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DatabaseGrowth'
+  /api/v1/outages:
+    get:
+      tags: [Read]
+      operationId: listOutages
+      summary: The times nothing in the house was recorded, and why, newest first.
+      description: |
+        Found by the server when it starts again after being away (see `Outage`), or typed in. An outage describes the history and changes no figure in it.
+        The newest 200 are listed, and the totals are over those.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outages'
+    post:
+      tags: [Settings]
+      operationId: addOutage
+      summary: Type in an outage, for instance from the times the Ting app shows.
+      description: 400 for an unknown kind, an end that is not after the start, one in the future or over a month long; 409 when it overlaps another outage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutageInput'
+      responses:
+        '201':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/outages/{outageId}:
+    patch:
+      tags: [Settings]
+      operationId: updateOutage
+      summary: Correct an outage. What is not sent stays; the outage then counts as typed in.
+      parameters:
+        - $ref: '#/components/parameters/OutageId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutageChange'
+      responses:
+        '200':
+          description: The outage as it is now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Settings]
+      operationId: removeOutage
+      summary: Remove an outage from the log.
+      parameters:
+        - $ref: '#/components/parameters/OutageId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
   /api/v1/history-start:
     get:
       tags: [Settings]
@@ -1613,6 +1687,12 @@ components:
       required: true
       schema:
         type: string
+    OutageId:
+      name: outageId
+      in: path
+      required: true
+      schema:
+        type: integer
     GroupId:
       name: groupId
       in: path
@@ -1871,6 +1951,89 @@ components:
         basis_days:
           type: [number, 'null']
           description: How many days those readings cover; null with fewer than two.
+    Outage:
+      type: object
+      required: [id, kind, started_at, ended_at, seconds, source, note]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [power, server, unknown]
+          description: |
+            `power`: the power was out, so the stretch really used nothing. `server`: the power was on but the server was not recording, so what the house used
+            then is missing from the figures. `unknown`: nothing was recorded and the cause could not be told.
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        seconds:
+          type: integer
+        source:
+          type: string
+          enum: [plugs, gap, manual]
+          description: |
+            `plugs`: found by the server, from when its plugs started again (a plug that loses power starts again when it returns, so its uptime says when).
+            `gap`: found by the server, cause not told. `manual`: typed in or corrected by hand.
+        note:
+          type: string
+    Outages:
+      type: object
+      required: [outages, power_seconds, server_seconds, unknown_seconds, leeway_seconds]
+      properties:
+        outages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Outage'
+        power_seconds:
+          type: integer
+          description: The listed outages of kind `power`, added up.
+        server_seconds:
+          type: integer
+          description: The listed outages of kind `server`, added up.
+        unknown_seconds:
+          type: integer
+          description: The listed outages of kind `unknown`, added up.
+        leeway_seconds:
+          type: integer
+          description: |
+            How long after the power returned the server may take to be back before the time is listed as `server` on its own. Plugs start in seconds and the
+            server in a minute or two, so a shorter wait is the end of the outage, not time of its own.
+    OutageInput:
+      type: object
+      required: [kind, started_at, ended_at]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [power, server, unknown]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        note:
+          type: string
+          maxLength: 200
+    OutageChange:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [power, server, unknown]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        note:
+          type: string
+          maxLength: 200
     HistoryStart:
       type: object
       required: [day, recorded_since]

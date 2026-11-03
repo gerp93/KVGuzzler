@@ -7,6 +7,7 @@ import type { MeterRuns } from './runs';
 import type { EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 import type { components } from './api-types';
 import type { DatabaseGrowth } from './dbsize';
+import type { OutageKind, Outage, Outages } from './outages';
 
 /** The contract's major version this dashboard speaks (see contract/openapi.yaml). */
 export const SUPPORTED_API_VERSION = 1;
@@ -156,6 +157,13 @@ export const api = {
       body: JSON.stringify(body),
     }),
   removeComputer: (id: string) => request<void>(`api/v1/computers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** The times nothing in the house was recorded, and why, newest first. */
+  outages: () => request<Outages>('api/v1/outages'),
+  addOutage: (body: { kind: OutageKind; started_at: string; ended_at: string; note: string }) =>
+    request<Outage>('api/v1/outages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  updateOutage: (id: number, body: { kind?: OutageKind; started_at?: string; ended_at?: string; note?: string }) =>
+    request<Outage>(`api/v1/outages/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  removeOutage: (id: number) => request<void>(`api/v1/outages/${id}`, { method: 'DELETE' }),
   /** How the database's size has changed and what a month and a year of it come to. */
   databaseGrowth: () => request<DatabaseGrowth>('api/v1/database/growth'),
   /** The day history starts on: nothing recorded before it is looked at by any period. */

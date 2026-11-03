@@ -961,6 +961,53 @@ main.page-hierarchy-meter > .card.ev {
   grid-column: 1 / -1;
 }
 
+/* The outage log at the foot of the History tab (OutagesCard.tsx) */
+.outage-table th:nth-child(3),
+.outage-table td.outage-what {
+  text-align: left;
+  white-space: normal;
+}
+
+.outage-kind,
+.outage-note {
+  display: block;
+}
+
+.outage-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.outage-actions {
+  display: block;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.outage-table td.outage-what {
+  min-width: 11rem;
+}
+
+.outage-actions button {
+  padding: 2px 8px;
+  font-size: 0.8rem;
+}
+
+.outage-actions button + button {
+  margin-left: 6px;
+}
+
+.outage-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.outage-form .chips {
+  grid-column: 1 / -1;
+}
+
 /* Labelled figures in place of a sentence (Facts.tsx) */
 .facts {
   display: flex;
