@@ -2,8 +2,9 @@
 // network. It is a port of KVGuzzler.Core's ShellyPlug and Source.
 //
 // One plain GET, /rpc/Switch.GetStatus?id=0, answers with the power now (apower) and the plug's own energy counter
-// (aenergy.total). Nothing here can switch the plug: there is exactly one request and it is a read. A plug often has the PC
-// or the fridge plugged into it.
+// (aenergy.total). A second plain GET, /rpc/Sys.GetStatus, says how long the plug has been up and why it last started, which is how
+// the server tells when the power came back after an outage. Nothing here can switch the plug: both requests are reads. A plug often
+// has the PC or the fridge plugged into it.
 package shelly
 
 import (
@@ -22,6 +23,7 @@ import (
 
 	"github.com/gerp93/KVGuzzler/server/internal/hostcheck"
 	"github.com/gerp93/KVGuzzler/server/internal/model"
+	"github.com/gerp93/KVGuzzler/server/internal/source"
 )
 
 const (
@@ -29,6 +31,7 @@ const (
 	MaxWatts = 4000.0
 
 	statusPath = "/rpc/Switch.GetStatus?id=0"
+	sysPath    = "/rpc/Sys.GetStatus"
 	maxBody    = 1 << 20
 	timeout    = 3 * time.Second
 )
@@ -75,6 +78,37 @@ func ParseStatus(body []byte) (Status, error) {
 	return st, nil
 }
 
+// Sys is one Sys.GetStatus answer.
+type Sys struct {
+	// Uptime is how long the plug has been running since it last started.
+	Uptime time.Duration
+	// ResetReason is the reason code of that start (the chip's esp_reset_reason_t: 1 is power applied, 9 a brownout, 3 a software restart); nil when the answer has none.
+	ResetReason *int
+}
+
+// ErrNoUptime means the device answered but said nothing about how long it has been up.
+var ErrNoUptime = errors.New("the device did not say how long it has been up")
+
+// ParseSys reads a Sys.GetStatus answer. A missing reset reason is simply nil; a missing or negative uptime is an error.
+func ParseSys(body []byte) (Sys, error) {
+	var raw map[string]any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&raw); err != nil {
+		return Sys{}, ErrNoUptime
+	}
+	up, ok := number(raw["uptime"])
+	if !ok || up < 0 {
+		return Sys{}, ErrNoUptime
+	}
+	sys := Sys{Uptime: time.Duration(up * float64(time.Second))}
+	if r, ok := number(raw["reset_reason"]); ok && r == math.Trunc(r) && r >= 0 {
+		n := int(r)
+		sys.ResetReason = &n
+	}
+	return sys, nil
+}
+
 // number is v as a finite float64 when it is a JSON number, and not when it is anything else (a string, null, a missing key).
 func number(v any) (float64, bool) {
 	n, ok := v.(json.Number)
@@ -111,35 +145,53 @@ func newWithBase(base, host string, hc *http.Client) *Client {
 
 // Status asks the plug for its status. A plain GET: nothing here can switch the plug.
 func (c *Client) Status(ctx context.Context) (Status, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+statusPath, nil)
+	body, err := c.get(ctx, statusPath)
 	if err != nil {
 		return Status{}, err
+	}
+	return ParseStatus(body)
+}
+
+// Sys asks the plug how long it has been up and why it last started. A plain GET, like Status.
+func (c *Client) Sys(ctx context.Context) (Sys, error) {
+	body, err := c.get(ctx, sysPath)
+	if err != nil {
+		return Sys{}, err
+	}
+	return ParseSys(body)
+}
+
+// get is one GET of path on the plug, with the plug's refusals put in words.
+func (c *Client) get(ctx context.Context, path string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+path, nil)
+	if err != nil {
+		return nil, err
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() == nil && isTimeout(err) {
-			return Status{}, fmt.Errorf("%s did not answer within %.0f seconds. Is the plug on and on the same network?", c.host, timeout.Seconds())
+			return nil, fmt.Errorf("%s did not answer within %.0f seconds. Is the plug on and on the same network?", c.host, timeout.Seconds())
 		}
 		var ue *url.Error
 		if errors.As(err, &ue) {
 			err = ue.Err // the request's own URL is noise here: the host is already named
 		}
-		return Status{}, fmt.Errorf("could not reach %s: %w", c.host, err)
+		return nil, fmt.Errorf("could not reach %s: %w", c.host, err)
 	}
 	defer resp.Body.Close()
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized:
-		return Status{}, errors.New("the plug asks for a password. In the Shelly app, turn off authentication for this plug.")
+		return nil, errors.New("the plug asks for a password. In the Shelly app, turn off authentication for this plug.")
 	case resp.StatusCode == http.StatusNotFound:
-		return Status{}, errors.New("that device does not answer like a Shelly plug (second generation or newer).")
+		return nil, errors.New("that device does not answer like a Shelly plug (second generation or newer).")
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
-		return Status{}, fmt.Errorf("the plug answered with an error (%d).", resp.StatusCode)
+		return nil, fmt.Errorf("the plug answered with an error (%d).", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
-		return Status{}, fmt.Errorf("could not read the plug's answer: %w", err)
+		return nil, fmt.Errorf("could not read the plug's answer: %w", err)
 	}
-	return ParseStatus(body)
+	return body, nil
 }
 
 func isTimeout(err error) bool {
@@ -202,6 +254,29 @@ func (s *Source) Poll(ctx context.Context) ([]model.Reading, error) {
 	}
 	return []model.Reading{{MeterID: s.meter.ID, Watts: st.Watts, Volts: st.Volts, Amps: st.Amps}}, nil
 }
+
+// Boot says when the plug last started, worked out from its uptime and this server's clock (a second or two off at most, the time the question took),
+// and whether power coming back is why. A plug that just lost power starts again when it returns, so this is the moment the power came back.
+func (s *Source) Boot(ctx context.Context) (source.Boot, error) {
+	sys, err := s.client.Sys(ctx)
+	if err != nil {
+		return source.Boot{}, err
+	}
+	cause := source.BootUnknown
+	if r := sys.ResetReason; r != nil {
+		cause = source.BootOther
+		if *r == resetPowerOn || *r == resetBrownout {
+			cause = source.BootPower
+		}
+	}
+	return source.Boot{DeviceID: s.device.ID, Name: s.device.Name, At: time.Now().Add(-sys.Uptime), Cause: cause}, nil
+}
+
+// The reset reasons that mean power was applied (esp_reset_reason_t).
+const (
+	resetPowerOn  = 1
+	resetBrownout = 9
+)
 
 // NewSourceWithBase is NewSource for an address that is not a plain host (a test server with a port). Production code uses
 // NewSource, which only accepts a plain host or IP.

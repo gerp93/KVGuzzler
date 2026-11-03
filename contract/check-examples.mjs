@@ -29,6 +29,7 @@ const examples = {
   'ev-battery.json': 'EvBattery',
   'history-start.json': 'HistoryStart',
   'database-growth.json': 'DatabaseGrowth',
+  'outages.json': 'Outages',
   'ev-savings.json': 'EvSavings',
   'baseload.json': 'BaseLoad',
   'levels.json': 'Levels',

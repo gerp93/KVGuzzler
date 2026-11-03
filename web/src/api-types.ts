@@ -825,6 +825,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/outages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The times nothing in the house was recorded, and why, newest first.
+         * @description Found by the server when it starts again after being away (see `Outage`), or typed in. An outage describes the history and changes no figure in it.
+         *     The newest 200 are listed, and the totals are over those.
+         */
+        get: operations["listOutages"];
+        put?: never;
+        /**
+         * Type in an outage, for instance from the times the Ting app shows.
+         * @description 400 for an unknown kind, an end that is not after the start, one in the future or over a month long; 409 when it overlaps another outage.
+         */
+        post: operations["addOutage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outages/{outageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an outage from the log. */
+        delete: operations["removeOutage"];
+        options?: never;
+        head?: never;
+        /** Correct an outage. What is not sent stays; the outage then counts as typed in. */
+        patch: operations["updateOutage"];
+        trace?: never;
+    };
     "/api/v1/history-start": {
         parameters: {
             query?: never;
@@ -1261,6 +1304,59 @@ export interface components {
             readings: number;
             /** @description How many days those readings cover; null with fewer than two. */
             basis_days: number | null;
+        };
+        Outage: {
+            id: number;
+            /**
+             * @description `power`: the power was out, so the stretch really used nothing. `server`: the power was on but the server was not recording, so what the house used
+             *     then is missing from the figures. `unknown`: nothing was recorded and the cause could not be told.
+             * @enum {string}
+             */
+            kind: "power" | "server" | "unknown";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            ended_at: string;
+            seconds: number;
+            /**
+             * @description `plugs`: found by the server, from when its plugs started again (a plug that loses power starts again when it returns, so its uptime says when).
+             *     `gap`: found by the server, cause not told. `manual`: typed in or corrected by hand.
+             * @enum {string}
+             */
+            source: "plugs" | "gap" | "manual";
+            note: string;
+        };
+        Outages: {
+            outages: components["schemas"]["Outage"][];
+            /** @description The listed outages of kind `power`, added up. */
+            power_seconds: number;
+            /** @description The listed outages of kind `server`, added up. */
+            server_seconds: number;
+            /** @description The listed outages of kind `unknown`, added up. */
+            unknown_seconds: number;
+            /**
+             * @description How long after the power returned the server may take to be back before the time is listed as `server` on its own. Plugs start in seconds and the
+             *     server in a minute or two, so a shorter wait is the end of the outage, not time of its own.
+             */
+            leeway_seconds: number;
+        };
+        OutageInput: {
+            /** @enum {string} */
+            kind: "power" | "server" | "unknown";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            ended_at: string;
+            note?: string;
+        };
+        OutageChange: {
+            /** @enum {string} */
+            kind?: "power" | "server" | "unknown";
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            ended_at?: string;
+            note?: string;
         };
         HistoryStart: {
             /**
@@ -2303,6 +2399,7 @@ export interface components {
     };
     parameters: {
         DeviceId: string;
+        OutageId: number;
         GroupId: string;
         ComputerId: string;
         MeterId: string;
@@ -3690,6 +3787,102 @@ export interface operations {
                     "application/json": components["schemas"]["DatabaseGrowth"];
                 };
             };
+        };
+    };
+    listOutages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Outages"];
+                };
+            };
+        };
+    };
+    addOutage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutageInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Outage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    removeOutage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outageId: components["parameters"]["OutageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateOutage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outageId: components["parameters"]["OutageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutageChange"];
+            };
+        };
+        responses: {
+            /** @description The outage as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Outage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     getHistoryStart: {

@@ -284,6 +284,37 @@ func (c *Collector) Devices() []model.Device {
 	return out
 }
 
+// Boots asks every device that can say when it last started, all at once, and returns the answers of those that did. A device that does not answer is left out.
+func (c *Collector) Boots(ctx context.Context) []source.Boot {
+	c.mu.Lock()
+	var asking []source.Booter
+	for _, st := range c.sources {
+		if b, ok := st.src.(source.Booter); ok {
+			asking = append(asking, b)
+		}
+	}
+	c.mu.Unlock()
+	answers := make([]*source.Boot, len(asking))
+	var wg sync.WaitGroup
+	for i, b := range asking {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if boot, err := b.Boot(ctx); err == nil {
+				answers[i] = &boot
+			}
+		}()
+	}
+	wg.Wait()
+	out := []source.Boot{}
+	for _, a := range answers {
+		if a != nil {
+			out = append(out, *a)
+		}
+	}
+	return out
+}
+
 // LiveReadings is the latest reading of every meter that answered recently.
 func (c *Collector) LiveReadings() []model.Reading {
 	c.mu.Lock()
