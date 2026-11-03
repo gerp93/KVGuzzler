@@ -75,7 +75,7 @@ func TestTheDatabasesOwnSizeIsRecordedOncePerMoment(t *testing.T) {
 	url := f.srv.URL + "/api/v1/database/growth"
 
 	var empty dbGrowth
-	if r := get(t, url, &empty); r.StatusCode != http.StatusOK || len(empty.Points) != 0 || empty.PerMonthBytes != nil || empty.InAYearBytes != nil || empty.BytesNow != nil {
+	if r := get(t, url, &empty); r.StatusCode != http.StatusOK || len(empty.Points) != 0 || empty.PerMonthBytes != nil || len(empty.Projected) != 0 || empty.BytesNow != nil {
 		t.Fatalf("with nothing recorded: %d %+v, want no points and no estimate", r.StatusCode, empty)
 	}
 
@@ -95,7 +95,7 @@ func TestTheDatabasesOwnSizeIsRecordedOncePerMoment(t *testing.T) {
 	}
 }
 
-func TestTheGrowthComesToAMonthAndToTheSizeInAYear(t *testing.T) {
+func TestTheGrowthComesToAMonthAndToTheSizeAhead(t *testing.T) {
 	f := newFordTest(t)
 	ctx := context.Background()
 	url := f.srv.URL + "/api/v1/database/growth"
@@ -116,13 +116,17 @@ func TestTheGrowthComesToAMonthAndToTheSizeInAYear(t *testing.T) {
 	}
 	var got dbGrowth
 	get(t, url, &got)
-	if got.PerMonthBytes == nil || got.InAYearBytes == nil || got.BasisDays == nil || got.Readings != 11 {
+	if got.PerMonthBytes == nil || len(got.Projected) != 4 || got.BasisDays == nil || got.Readings != 11 {
 		t.Fatalf("after ten days: %+v, want an estimate from 11 readings", got)
 	}
 	if want := 2 * mb * 30.4375; math.Abs(float64(*got.PerMonthBytes)-want) > 0.03*want {
 		t.Errorf("a month = %d bytes, want about %.0f", *got.PerMonthBytes, want)
 	}
-	if want := 26*mb + 2*mb*365.25; math.Abs(float64(*got.InAYearBytes)-want) > 0.03*want {
-		t.Errorf("in a year = %d bytes, want about %.0f", *got.InAYearBytes, want)
+	for i, months := range []int{1, 3, 6, 12} {
+		p := got.Projected[i]
+		want := 26*mb + 2*mb*30.4375*float64(months)
+		if p.Months != months || math.Abs(float64(p.Bytes)-want) > 0.03*want {
+			t.Errorf("in %d months = %+v, want %d months and about %.0f bytes", months, p, months, want)
+		}
 	}
 }

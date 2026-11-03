@@ -22,7 +22,6 @@ const (
 	growthMinSpan = 3 * 24 * time.Hour
 	growthMinN    = 3
 	monthSeconds  = 30.4375 * 24 * 3600
-	yearSeconds   = 365.25 * 24 * 3600
 )
 
 type dbSizePoint struct {
@@ -35,13 +34,22 @@ type dbGrowth struct {
 	Points []dbSizePoint `json:"points"`
 	// BytesNow is the database file's size now (without its write-ahead log); null when the server does not know where the file is.
 	BytesNow *int64 `json:"bytes_now"`
-	// PerMonthBytes is the estimated growth in a month, and InAYearBytes the size a year from now at that rate; null until the readings cover a few days.
+	// PerMonthBytes is the estimated growth in a month; null until the readings cover a few days.
 	PerMonthBytes *int64 `json:"per_month_bytes"`
-	InAYearBytes  *int64 `json:"in_a_year_bytes"`
+	// Projected is the size 1, 3, 6 and 12 months from now at that rate; empty until PerMonthBytes is.
+	Projected []dbProjection `json:"projected"`
 	// Readings and BasisDays say what the estimate rests on: how many readings, over how many days.
 	Readings  int      `json:"readings"`
 	BasisDays *float64 `json:"basis_days"`
 }
+
+type dbProjection struct {
+	Months int   `json:"months"`
+	Bytes  int64 `json:"bytes"`
+}
+
+// projectionMonths are how far ahead the size is projected.
+var projectionMonths = []int{1, 3, 6, 12}
 
 // growthRate is the slope, in bytes per second, of a straight line through the readings of the window ending at the latest one, and how many readings and
 // what span of time it is made from. False when there are too few readings, or they cover too little time.
@@ -82,7 +90,7 @@ func (s *Server) dbGrowth(ctx context.Context) (dbGrowth, error) {
 	if err != nil {
 		return dbGrowth{}, err
 	}
-	out := dbGrowth{Points: make([]dbSizePoint, 0, len(sizes))}
+	out := dbGrowth{Points: make([]dbSizePoint, 0, len(sizes)), Projected: []dbProjection{}}
 	for _, p := range sizes {
 		out.Points = append(out.Points, dbSizePoint{At: p.At, Bytes: p.Bytes})
 	}
@@ -109,8 +117,10 @@ func (s *Server) dbGrowth(ctx context.Context) (dbGrowth, error) {
 	if out.BytesNow != nil {
 		now = *out.BytesNow
 	}
-	year := now + int64(math.Round(rate*yearSeconds))
-	out.InAYearBytes = &year
+	// A month is monthSeconds long, so a year is twelve of them (365.25 days).
+	for _, m := range projectionMonths {
+		out.Projected = append(out.Projected, dbProjection{Months: m, Bytes: now + int64(math.Round(rate*monthSeconds*float64(m)))})
+	}
 	return out, nil
 }
 
