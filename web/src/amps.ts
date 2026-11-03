@@ -51,6 +51,12 @@ export function breakerAdvice(peak: number | null, breaker: number | null | unde
   return null;
 }
 
+/** "120 V · 1.3 A": a meter's voltage and current as one line, whichever it reports; null when it reports neither. */
+export function formatCurrent(r: { volts?: number | null | undefined; amps?: number | null | undefined } | null | undefined): string | null {
+  const parts = [r?.volts != null ? formatVolts(r.volts) : null, r?.amps != null ? formatAmps(r.amps) : null].filter((p): p is string => p !== null);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 /** The sizes to choose from: the usual ones (with the bigger ones of a main breaker when `main`), and the one already set if it is not among them. */
 export function breakerOptions(current: number | null | undefined, main = false): number[] {
   const usual = main ? [...BREAKER_SIZES, ...MAIN_SIZES] : BREAKER_SIZES;

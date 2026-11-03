@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectiveDomain } from './Chart';
 import {
-  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, panelChoices, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
+  arrangeByPanel, underHouse, isKilowatts, isKilowattHours, visiblePeriods, type PeriodKey, BASELINE, canHold, clampName, panelChoices, indentTarget, inputName, outdentTarget, shownMeters, usualPartner, filterTariffs, formatRate, rateRange, sharedUtility, houseShare, formatShare, houseUsageBasis, formatCarbon, currencySymbol, setCurrencyCode, tariffFacts, shortUtility, shortRateName, compareOrder, formatBytes, COUNT_PC, countedTotals, countedWatts, estimateLines, parseCountOff, toggleCount, usageBasis, historyDetail, PERIODS, circuitsByWatts, nestCircuits, formatAge, OTHERS, programRows, programSplit, UNATTRIBUTED, gapShades, pcLineStyle, formatDuration, idleText, isLiveStale, liveSplit, plugNamed, programsNow, runDuration, runKwh, sharePercent, formatKwh, formatMoney, formatWatts, moneyText, gapLabel, groupComponents, isTheme, pcSlices, periodRange, splitSummary, sumByTime, unmetered,
   type Meter, type MeterSummary, type PcComponent, type AverageUse, type PcHistoryPeriod, type PcLiveReading, type PcProgramTotal, type Reading, type Series, type Summary,
 } from './lib';
 
@@ -613,5 +613,24 @@ describe('moneyText', () => {
     expect(moneyText(0)).toBe('0.00');
     expect(formatMoney(moneyText(0.0034))).toBe('<$0.01');
     expect(formatMoney(moneyText(1e-17))).toBe('$0.00');
+  });
+});
+
+describe('which plug a collector means by a name', () => {
+  const plugs = [{ label: 'Monitor (LG 45GS96QB-B.AUS)' }, { label: 'Speakers' }];
+  it('finds the one whose label is the name, or starts with it at a word, whatever the case', () => {
+    expect(plugNamed('Speakers', plugs)).toBe(plugs[1]);
+    expect(plugNamed('monitor', plugs)).toBe(plugs[0]);
+    expect(plugNamed('Monitor (LG 45GS96QB-B.AUS) left', plugs)).toBe(plugs[0]);
+  });
+  it('says nothing when none matches, when several could, or at the middle of a word', () => {
+    expect(plugNamed('Heater', plugs)).toBeUndefined();
+    expect(plugNamed('Mon', plugs)).toBeUndefined();
+    expect(plugNamed('Monitor', [{ label: 'Monitor left' }, { label: 'Monitor right' }])).toBeUndefined();
+    expect(plugNamed('', plugs)).toBeUndefined();
+  });
+  it('prefers an exact label over a longer one that starts the same', () => {
+    const two = [{ label: 'Monitor' }, { label: 'Monitor arm' }];
+    expect(plugNamed('Monitor', two)).toBe(two[0]);
   });
 });

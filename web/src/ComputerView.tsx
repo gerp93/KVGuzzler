@@ -1,4 +1,5 @@
 import { api } from './api';
+import { formatCurrent } from './amps';
 import { Skeleton } from './Skeleton';
 import { Chart, lineFrom, wideChartHeight, type Line, type Shade } from './Chart';
 import { usePoll, useStored } from './hooks';
@@ -66,7 +67,8 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
 
   // What each plug draws right now, as the server reads it.
   const { data: plugsNow } = usePoll(() => api.live(), 5_000, []);
-  const plugWatts = (meterId: string) => plugsNow?.readings.find((r) => r.meter_id === meterId)?.watts ?? null;
+  const plugReading = (meterId: string) => plugsNow?.readings.find((r) => r.meter_id === meterId);
+  const plugWatts = (meterId: string) => plugReading(meterId)?.watts ?? null;
 
   // What the figures count: the PC and each plug next to it, until one is switched off (and a new plug counts until it is).
   const [offText, setOffText] = useStored(`count-off-${id}`, '');
@@ -84,6 +86,11 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
   const nowWatts = countedWatts(pcWatts ?? pcLook, plugsList, off);
   const pcWhat = pcWatts != null ? 'the whole PC at the wall' : liveNow && liveSplit(liveNow).baseIsWall ? 'the whole PC at the wall, as it reads it' : 'the sensors added together';
   const nowWhat = [...(off.has(COUNT_PC) ? [] : [pcWhat]), ...(detail?.peripherals ?? []).filter((p) => !off.has(p.meter_id)).map((p) => label(p.meter_id))].join(', ') || 'nothing counted';
+  // Volts and amps are one meter's and never added: the PC's own plug, and each plug beside it, say theirs; the tile says it only while the PC alone is counted.
+  const wallReading = detail?.computer.wall_meter_id != null ? plugReading(detail.computer.wall_meter_id) : undefined;
+  const plugsNowList = (detail?.peripherals ?? []).map((p) => ({ label: label(p.meter_id), reading: plugReading(p.meter_id) }));
+  const pcAlone = !off.has(COUNT_PC) && (detail?.peripherals ?? []).every((p) => off.has(p.meter_id));
+  const nowCurrent = pcAlone ? formatCurrent(wallReading) : null;
   const pcPeak = detail?.wall?.peak_watts ?? detail?.pc?.total_peak_watts ?? null;
   // The sensors' peak stands in for the wall's only when there is no wall plug and nothing else counts.
   const peak = hasPlugs && counted && counted.parts.length > 0 ? counted.peak : pcPeak;
@@ -110,7 +117,7 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
             <PeriodPicker value={period as PeriodKey} onChange={setPeriod} />
           </header>
           <KpiRow five={counted != null && counted.carbonG != null && counted.kwh != null}>
-            <Kpi tone="now" label="Right now" value={nowWatts != null ? formatWatts(nowWatts) : '—'} />
+            <Kpi tone="now" label="Right now" value={nowWatts != null ? formatWatts(nowWatts) : '—'} hint={nowCurrent ? <span class="now-current">{nowCurrent}</span> : undefined} />
             <Kpi tone="energy" label="Energy" value={(hasPlugs ? counted?.kwh : detail.wall?.kwh) != null ? formatKwh(hasPlugs ? counted!.kwh : detail.wall!.kwh) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="cost" label="Cost" value={(hasPlugs ? counted?.cost : detail.wall?.cost) != null ? formatMoney(hasPlugs ? counted!.cost : detail.wall!.cost, detail.cost_estimated) : '—'} hint={periodWords(period as PeriodKey)} />
             <Kpi tone="peak" label="Highest draw" value={peak != null ? `${peakIsBound ? '≤ ' : ''}${formatWatts(peak)}` : '—'} hint={peakIsBound ? 'upper bound' : !hasPlugs && !detail.wall?.peak_watts && peak != null ? 'sensors only' : 'peak reading'} />
@@ -136,7 +143,7 @@ export function ComputerView({ id, meters }: { id: string; meters: Meter[] }) {
             {!hasPlugs && !detail.wall && <p class="caption">No wall plug assigned. Set one under Computers in Hierarchy.</p>}
           </div>
 
-          {liveNow && <PcLiveCard live={liveNow} />}
+          {liveNow && <PcLiveCard live={liveNow} wall={wallReading} plugs={plugsNowList} />}
 
           {detail.peripherals.length > 0 && detail.setup_kwh != null && (
             <section class="card">

@@ -755,6 +755,20 @@ main.page-hierarchy-meter > .card.ev {
 
 
 /* The house's volts and amps under its Right now figure: a size to read from across the room, in the text colour rather than the quiet hint colour */
+/* A meter's volts and amps under its watts in a row, and under the big figure of the PC's Right now card */
+.live-current {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.live-current.now {
+  margin: 0 0 2px;
+  font-size: 1rem;
+}
+
 .kpi-hint .now-current {
   display: block;
   font-size: clamp(1.15rem, 1.6vw, 1.9rem);

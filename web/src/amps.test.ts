@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { BREAKER_SIZES, SUSTAINED_MINUTES, breakerAdvice, breakerLevel, breakerOptions, breakerPercent, breakerVerdict, formatAmps, formatAmpsOf, formatVolts, MAIN_SIZES, sustainedHigh, typicalAmps } from './amps';
+import { BREAKER_SIZES, SUSTAINED_MINUTES, breakerAdvice, breakerLevel, breakerOptions, breakerPercent, breakerVerdict, formatAmps, formatAmpsOf, formatCurrent, formatVolts, MAIN_SIZES, sustainedHigh, typicalAmps } from './amps';
+
+describe('a meter\'s volts and amps as one line', () => {
+  it('says both, volts first', () => {
+    expect(formatCurrent({ volts: 119.6, amps: 1.31 })).toBe('120 V · 1.3 A');
+  });
+  it('says only what the meter reports, and nothing for a meter that reports neither', () => {
+    expect(formatCurrent({ volts: 118, amps: null })).toBe('118 V');
+    expect(formatCurrent({ amps: 0.4 })).toBe('0.4 A');
+    expect(formatCurrent({ volts: null, amps: null })).toBeNull();
+    expect(formatCurrent(undefined)).toBeNull();
+  });
+});
 
 describe('share of a breaker', () => {
   it('is the current over the size, in whole percent', () => {
