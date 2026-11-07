@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -24,6 +25,8 @@ const (
 	gasFeedEvery   = 12 * time.Hour
 	gasFeedFirst   = time.Minute
 	minMPG, maxMPG = 5.0, 200.0
+	// maxCustomCars is how many cars of their own the owner can name.
+	maxCustomCars = 8
 	// pricesBeforeFirstReading is how much of the price history before the first odometer reading is listed for the chart.
 	pricesBeforeFirstReading = 14 * 24 * time.Hour
 	// pricesWithoutReadings is how far back the chart goes when there are no readings yet.
@@ -37,20 +40,27 @@ const (
 // evMPGPresets are the cars every electric vehicle is compared with, in miles per gallon, for each fuel: from a thirsty truck to an economy car.
 var evMPGPresets = []float64{15, 20, 25, 30, 35, 40}
 
-// evCompareSetup is what a charging meter is compared with: the house's price area and, if the owner named one, a car of their own (compared in each fuel). Only
-// the car is saved per meter; a setup saved before the area was the house's still carries its own, used while the house has none.
+// customCar is a car the owner named: its miles per gallon and what it burns, which says which weekly price its miles are priced at.
+type customCar struct {
+	MPG  float64 `json:"mpg"`
+	Fuel string  `json:"fuel"`
+}
+
+// evCompareSetup is what a charging meter is compared with: the house's price area and the cars the owner named, each in its own fuel. Only the cars are saved
+// per meter; a setup saved before the area was the house's still carries its own, used while the house has none.
 type evCompareSetup struct {
-	AreaID    string   `json:"area_id"`
-	CustomMPG *float64 `json:"custom_mpg"`
-	// MPG is what a setup saved before there were presets said (the one gas car compared with). It is read, never written: a figure that is not a preset
-	// becomes the custom one, and one that is a preset is already there.
-	MPG *float64 `json:"mpg,omitempty"`
+	AreaID     string      `json:"area_id"`
+	CustomCars []customCar `json:"custom_cars,omitempty"`
+	// CustomMPG and MPG are what setups saved earlier said: one car, compared in gas (CustomMPG was compared in diesel too). They are read, never written: the
+	// car becomes a gas car of its own unless it is one of the presets.
+	CustomMPG *float64 `json:"custom_mpg,omitempty"`
+	MPG       *float64 `json:"mpg,omitempty"`
 }
 
 // evCompareBody is what the owner sends to set it up. The area is optional: it is the house's (see putFuelPrices), and naming it here saves it there.
 type evCompareBody struct {
-	AreaID    string   `json:"area_id"`
-	CustomMPG *float64 `json:"custom_mpg"`
+	AreaID     string      `json:"area_id"`
+	CustomCars []customCar `json:"custom_cars"`
 }
 
 type gasStatus struct {
@@ -63,9 +73,9 @@ type gasStatus struct {
 
 type evCompareView struct {
 	MeterID string `json:"meter_id"`
-	// CustomMPG is the owner's own car, beside the presets; null when there is none.
-	CustomMPG *float64  `json:"custom_mpg"`
-	Presets   []float64 `json:"presets"`
+	// CustomCars are the owner's own cars, beside the presets; empty when there are none.
+	CustomCars []customCar `json:"custom_cars"`
+	Presets    []float64   `json:"presets"`
 	fuelPricesView
 }
 
@@ -155,16 +165,20 @@ type evSavingsAnswer struct {
 	CostEstimated bool               `json:"cost_estimated"`
 }
 
-// evComparisons are the cars to compare with: for the gas cars the presets and the custom one in its place among them, and the same for diesel when its
-// prices are known.
+// evComparisons are the cars to compare with: for the gas cars the presets and the owner's gas cars in their places among them, and the same for diesel when
+// its prices are known.
 func evComparisons(c *evCompareSetup, diesel bool) []evComparison {
 	one := func(fuel string) []evComparison {
-		out := make([]evComparison, 0, len(evMPGPresets)+1)
+		out := make([]evComparison, 0, len(evMPGPresets)+maxCustomCars)
 		for _, p := range evMPGPresets {
 			out = append(out, evComparison{Fuel: fuel, MPG: p})
 		}
-		if c != nil && c.CustomMPG != nil {
-			out = append(out, evComparison{Fuel: fuel, MPG: *c.CustomMPG, Custom: true})
+		if c != nil {
+			for _, car := range c.CustomCars {
+				if car.Fuel == fuel {
+					out = append(out, evComparison{Fuel: fuel, MPG: car.MPG, Custom: true})
+				}
+			}
 			sort.SliceStable(out, func(i, j int) bool { return out[i].MPG < out[j].MPG })
 		}
 		return out
@@ -172,6 +186,25 @@ func evComparisons(c *evCompareSetup, diesel bool) []evComparison {
 	out := one(fuelGas)
 	if diesel {
 		out = append(out, one(fuelDiesel)...)
+	}
+	return out
+}
+
+// cleanCars keeps the cars that make sense, in the order given: a miles per gallon in range, a known fuel, no car twice and none that is one of the presets
+// (already compared), at most maxCustomCars. Never nil.
+func cleanCars(cars []customCar) []customCar {
+	out := []customCar{}
+	for _, c := range cars {
+		if !(c.MPG >= minMPG && c.MPG <= maxMPG) || (c.Fuel != fuelGas && c.Fuel != fuelDiesel) || isPresetMPG(c.MPG) || len(out) >= maxCustomCars {
+			continue
+		}
+		dup := false
+		for _, o := range out {
+			dup = dup || o == c
+		}
+		if !dup {
+			out = append(out, c)
+		}
 	}
 	return out
 }
@@ -224,7 +257,7 @@ func (s *Server) fuelArea(ctx context.Context) (string, error) {
 }
 
 // keepLegacyArea saves for the house the area an older vehicle setup still names, before that setup is rewritten without it: the vehicle's own car is saved
-// as {custom_mpg} only, so rewriting it would lose the only place the area was kept and every gas comparison would vanish with it.
+// as {custom_cars} only, so rewriting it would lose the only place the area was kept and every gas comparison would vanish with it.
 func (s *Server) keepLegacyArea(ctx context.Context) error {
 	if area, err := s.houseFuelArea(ctx); err != nil || area != "" {
 		return err
@@ -248,7 +281,7 @@ func (s *Server) evCompareSetup(ctx context.Context, meterID string) (*evCompare
 	}
 	out := evCompareSetup{AreaID: area}
 	if saved != nil {
-		out.CustomMPG = saved.CustomMPG
+		out.CustomCars = saved.CustomCars
 		if area == "" {
 			out.AreaID = saved.AreaID
 		}
@@ -272,14 +305,18 @@ func (s *Server) evCompareSaved(ctx context.Context, meterID string) (*evCompare
 	if _, ok := gasprice.AreaName(c.AreaID); !ok {
 		c.AreaID = ""
 	}
-	// The one gas car an older setup named becomes the custom one unless it is a preset.
-	if c.CustomMPG == nil && c.MPG != nil {
-		c.CustomMPG = c.MPG
+	// The one car an older setup named becomes a gas car of its own unless it is a preset.
+	if len(c.CustomCars) == 0 {
+		old := c.CustomMPG
+		if old == nil {
+			old = c.MPG
+		}
+		if old != nil {
+			c.CustomCars = []customCar{{MPG: *old, Fuel: fuelGas}}
+		}
 	}
-	c.MPG = nil
-	if c.CustomMPG != nil && (!(*c.CustomMPG >= minMPG && *c.CustomMPG <= maxMPG) || isPresetMPG(*c.CustomMPG)) {
-		c.CustomMPG = nil
-	}
+	c.CustomMPG, c.MPG = nil, nil
+	c.CustomCars = cleanCars(c.CustomCars)
 	return &c, nil
 }
 
@@ -388,19 +425,19 @@ func (s *Server) RunGasFeed(ctx context.Context, logf func(format string, a ...a
 }
 
 func (s *Server) evCompareView(ctx context.Context, meterID string) (evCompareView, error) {
-	out := evCompareView{MeterID: meterID, Presets: evMPGPresets}
+	out := evCompareView{MeterID: meterID, Presets: evMPGPresets, CustomCars: []customCar{}}
 	c, err := s.evCompareSetup(ctx, meterID)
 	if err != nil {
 		return out, err
 	}
 	area := ""
 	if c != nil {
-		area, out.CustomMPG = c.AreaID, c.CustomMPG
+		area, out.CustomCars = c.AreaID, c.CustomCars
 	} else if saved, err := s.evCompareSaved(ctx, meterID); err != nil {
 		return out, err
 	} else if saved != nil {
 		// A car named before there was an area stays, waiting for one.
-		out.CustomMPG = saved.CustomMPG
+		out.CustomCars = saved.CustomCars
 	}
 	out.fuelPricesView, err = s.fuelPricesFor(ctx, area)
 	return out, err
@@ -489,15 +526,25 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body evCompareBody
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"custom_mpg": number or null}`)
+		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"custom_cars": [{"mpg": 27, "fuel": "gas"}]}`)
 		return
 	}
-	if body.CustomMPG != nil && (math.IsNaN(*body.CustomMPG) || *body.CustomMPG < minMPG || *body.CustomMPG > maxMPG) {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", "A car's miles per gallon is a number between 5 and 200.")
+	if len(body.CustomCars) > maxCustomCars {
+		writeProblem(w, http.StatusBadRequest, "bad_compare", fmt.Sprintf("At most %d cars of your own.", maxCustomCars))
 		return
+	}
+	for _, c := range body.CustomCars {
+		if math.IsNaN(c.MPG) || c.MPG < minMPG || c.MPG > maxMPG {
+			writeProblem(w, http.StatusBadRequest, "bad_compare", "A car's miles per gallon is a number between 5 and 200.")
+			return
+		}
+		if c.Fuel != fuelGas && c.Fuel != fuelDiesel {
+			writeProblem(w, http.StatusBadRequest, "bad_compare", `A car's fuel is "gas" or "diesel".`)
+			return
+		}
 	}
 	area := body.AreaID
 	if area != "" {
@@ -517,7 +564,7 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	text, err := json.Marshal(evCompareSetup{CustomMPG: body.CustomMPG})
+	text, err := json.Marshal(evCompareSetup{CustomCars: cleanCars(body.CustomCars)})
 	if err != nil {
 		serverError(w, err)
 		return
@@ -602,7 +649,7 @@ func (s *Server) deleteFuelPrices(w http.ResponseWriter, r *http.Request) {
 		if saved == nil || saved.AreaID == "" {
 			continue
 		}
-		text, err := json.Marshal(evCompareSetup{CustomMPG: saved.CustomMPG})
+		text, err := json.Marshal(evCompareSetup{CustomCars: saved.CustomCars})
 		if err != nil {
 			serverError(w, err)
 			return

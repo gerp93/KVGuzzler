@@ -102,7 +102,10 @@ type compareBody struct {
 	AreaID            *string   `json:"area_id"`
 	AreaName          *string   `json:"area_name"`
 	DieselAreaName    *string   `json:"diesel_area_name"`
-	CustomMPG         *float64  `json:"custom_mpg"`
+	CustomCars        []struct {
+		MPG  float64 `json:"mpg"`
+		Fuel string  `json:"fuel"`
+	} `json:"custom_cars"`
 	Presets           []float64 `json:"presets"`
 	KeySaved          bool      `json:"key_saved"`
 	LastOutcome       *string   `json:"last_outcome"`
@@ -169,10 +172,14 @@ func TestEachCarsCostIsWhatTheSameMilesWouldHaveCostLessWhatChargingCost(t *test
 
 	// A setup EIA or the user would refuse is refused, and so is the old one-gas-car form.
 	for name, body := range map[string]string{
-		"too few miles per gallon": `{"area_id":"SMN","custom_mpg":2}`,
-		"too many":                 `{"area_id":"SMN","custom_mpg":500}`,
+		"too few miles per gallon": `{"area_id":"SMN","custom_cars":[{"mpg":2,"fuel":"gas"}]}`,
+		"too many":                 `{"area_id":"SMN","custom_cars":[{"mpg":500,"fuel":"diesel"}]}`,
+		"no fuel":                  `{"area_id":"SMN","custom_cars":[{"mpg":25}]}`,
+		"an unknown fuel":          `{"area_id":"SMN","custom_cars":[{"mpg":25,"fuel":"coal"}]}`,
+		"too many cars":            `{"area_id":"SMN","custom_cars":[{"mpg":21,"fuel":"gas"},{"mpg":22,"fuel":"gas"},{"mpg":23,"fuel":"gas"},{"mpg":24,"fuel":"gas"},{"mpg":26,"fuel":"gas"},{"mpg":27,"fuel":"gas"},{"mpg":28,"fuel":"gas"},{"mpg":29,"fuel":"gas"},{"mpg":31,"fuel":"gas"}]}`,
 		"unknown area":             `{"area_id":"ZZ"}`,
-		"no area":                  `{"custom_mpg":25}`,
+		"no area":                  `{"custom_cars":[{"mpg":25,"fuel":"gas"}]}`,
+		"the one-car form":         `{"area_id":"SMN","custom_mpg":25}`,
 		"the old form":             `{"area_id":"SMN","mpg":25}`,
 		"an extra field":           `{"area_id":"SMN","key":"x"}`,
 	} {
@@ -190,7 +197,7 @@ func TestEachCarsCostIsWhatTheSameMilesWouldHaveCostLessWhatChargingCost(t *test
 		t.Fatalf("compare: %d %s", r.StatusCode, body)
 	}
 	_ = json.Unmarshal([]byte(body), &c)
-	if c.AreaName == nil || *c.AreaName != "Minnesota" || c.CustomMPG != nil || c.LatestWeek == nil || *c.LatestWeek != "2026-10-12" || c.LatestPrice == nil || *c.LatestPrice != "4.50" {
+	if c.AreaName == nil || *c.AreaName != "Minnesota" || len(c.CustomCars) != 0 || c.LatestWeek == nil || *c.LatestWeek != "2026-10-12" || c.LatestPrice == nil || *c.LatestPrice != "4.50" {
 		t.Errorf("compare after setup = %s", body)
 	}
 	if c.LatestDieselPrice == nil || *c.LatestDieselPrice != "5.20" || c.LastOutcome == nil || *c.LastOutcome != "Prices saved." {
@@ -334,7 +341,7 @@ func TestTheGasAreaIsTheHousesAndEveryVehicleUsesIt(t *testing.T) {
 	if v.AreaID != nil || !v.KeySaved || len(v.Areas) < 20 {
 		t.Fatalf("fuel prices before setup = %+v", v)
 	}
-	if r, _ := send(t, http.MethodPut, base+"compare", `{"custom_mpg":27.5}`); r.StatusCode != http.StatusBadRequest {
+	if r, _ := send(t, http.MethodPut, base+"compare", `{"custom_cars":[{"mpg":27.5,"fuel":"gas"}]}`); r.StatusCode != http.StatusBadRequest {
 		t.Errorf("a car with no area: %d, want 400", r.StatusCode)
 	}
 	for name, body := range map[string]string{"unknown area": `{"area_id":"ZZ"}`, "no area": `{}`, "an extra field": `{"area_id":"SMN","mpg":25}`} {
@@ -365,12 +372,12 @@ func TestTheGasAreaIsTheHousesAndEveryVehicleUsesIt(t *testing.T) {
 	}
 
 	// The vehicle keeps only its own car, and saving it does not touch the area or ask EIA again.
-	r, body = send(t, http.MethodPut, base+"compare", `{"custom_mpg":27.5}`)
+	r, body = send(t, http.MethodPut, base+"compare", `{"custom_cars":[{"mpg":27.5,"fuel":"gas"}]}`)
 	if r.StatusCode != http.StatusOK {
 		t.Fatalf("own car: %d %s", r.StatusCode, body)
 	}
 	_ = json.Unmarshal([]byte(body), &c)
-	if c.CustomMPG == nil || *c.CustomMPG != 27.5 || c.AreaName == nil || *c.AreaName != "Minnesota" {
+	if len(c.CustomCars) != 1 || c.CustomCars[0].MPG != 27.5 || c.AreaName == nil || *c.AreaName != "Minnesota" {
 		t.Errorf("own car = %s", body)
 	}
 	if len(*asked) != 2 {
@@ -382,7 +389,7 @@ func TestTheGasAreaIsTheHousesAndEveryVehicleUsesIt(t *testing.T) {
 		t.Fatalf("another area: %d %s", r.StatusCode, body)
 	}
 	get(t, base+"compare", &c)
-	if c.AreaID == nil || *c.AreaID != "NUS" || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+	if c.AreaID == nil || *c.AreaID != "NUS" || len(c.CustomCars) != 1 || c.CustomCars[0].MPG != 27.5 {
 		t.Errorf("after another area = %+v", c)
 	}
 
@@ -392,7 +399,7 @@ func TestTheGasAreaIsTheHousesAndEveryVehicleUsesIt(t *testing.T) {
 	}
 	get(t, fuel, &v)
 	get(t, base+"compare", &c)
-	if v.AreaID != nil || c.AreaID != nil || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+	if v.AreaID != nil || c.AreaID != nil || len(c.CustomCars) != 1 || c.CustomCars[0].MPG != 27.5 {
 		t.Errorf("after taking the area off = %+v / %+v", v, c)
 	}
 }
@@ -415,7 +422,7 @@ func TestAnAreaFromAnOlderVehicleSetupIsTheHousesUntilOneIsSaved(t *testing.T) {
 	}
 	var c compareBody
 	get(t, base+"compare", &c)
-	if c.AreaID != nil || c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+	if c.AreaID != nil || len(c.CustomCars) != 1 || c.CustomCars[0].MPG != 27.5 || c.CustomCars[0].Fuel != "gas" {
 		t.Errorf("after taking the older area off = %+v", c)
 	}
 }
@@ -423,7 +430,7 @@ func TestAnAreaFromAnOlderVehicleSetupIsTheHousesUntilOneIsSaved(t *testing.T) {
 func TestSavingOrRemovingTheOwnCarKeepsAnAreaOnlyAnOlderSetupNamed(t *testing.T) {
 	for name, act := range map[string]func(t *testing.T, base string){
 		"saving a car": func(t *testing.T, base string) {
-			if r, body := send(t, http.MethodPut, base+"compare", `{"custom_mpg":18}`); r.StatusCode != http.StatusOK {
+			if r, body := send(t, http.MethodPut, base+"compare", `{"custom_cars":[{"mpg":18,"fuel":"gas"}]}`); r.StatusCode != http.StatusOK {
 				t.Fatalf("own car: %d %s", r.StatusCode, body)
 			}
 		},
@@ -491,39 +498,55 @@ func TestWithoutDieselPricesOnlyTheGasCarsAreComparedAndTheOutcomeSaysSo(t *test
 	}
 }
 
-func TestACarOfTheOwnersOwnTakesItsPlaceAmongThePresetsInEachFuel(t *testing.T) {
+func TestEachCarOfTheOwnersOwnTakesItsPlaceAmongThePresetsOfItsOwnFuel(t *testing.T) {
 	f := newFordTest(t)
 	_, base := f.gasSetup(t, true)
-	_, body := send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_mpg":27.5}`)
+	_, body := send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_cars":[{"mpg":27.5,"fuel":"gas"},{"mpg":22,"fuel":"diesel"},{"mpg":18,"fuel":"gas"}]}`)
 	var c compareBody
 	_ = json.Unmarshal([]byte(body), &c)
-	if c.CustomMPG == nil || *c.CustomMPG != 27.5 {
+	if len(c.CustomCars) != 3 || c.CustomCars[0].MPG != 27.5 || c.CustomCars[1].Fuel != "diesel" || c.CustomCars[2].MPG != 18 {
 		t.Fatalf("compare = %s", body)
 	}
 	f.odometer(t, base, "2026-10-10", 1000)
 	f.odometer(t, base, "2026-10-13", 1090)
 	var got savingsBody
 	get(t, base+"savings", &got)
-	for _, fuel := range []string{"gas", "diesel"} {
-		if m := got.mpgs(fuel); len(m) != 7 || m[0] != 15 || m[3] != 27.5 || m[4] != 30 || m[6] != 40 {
-			t.Fatalf("%s comparisons = %v, want the presets with 27.5 between 25 and 30", fuel, m)
-		}
+	// Each car is in its own fuel only: two gas cars and one diesel one.
+	if m := got.mpgs("gas"); len(m) != 8 || m[0] != 15 || m[1] != 18 || m[2] != 20 || m[3] != 25 || m[4] != 27.5 || m[7] != 40 {
+		t.Fatalf("gas comparisons = %v, want the presets with 18 and 27.5 among them", m)
+	}
+	if m := got.mpgs("diesel"); len(m) != 7 || m[0] != 15 || m[2] != 22 || m[3] != 25 || m[6] != 40 {
+		t.Fatalf("diesel comparisons = %v, want the presets with 22 between 20 and 25", m)
 	}
 	for _, comp := range got.Comparisons {
-		if comp.Custom != (comp.MPG == 27.5) {
+		own := (comp.Fuel == "gas" && (comp.MPG == 27.5 || comp.MPG == 18)) || (comp.Fuel == "diesel" && comp.MPG == 22)
+		if comp.Custom != own {
 			t.Errorf("%v mpg %s has custom = %v", comp.MPG, comp.Fuel, comp.Custom)
 		}
 	}
-	if len(got.Stretches[0].Gas) != 14 || got.Stretches[0].Gas[3].MPG != 27.5 || got.Stretches[0].Gas[10].Fuel != "diesel" || got.Stretches[0].Gas[10].MPG != 27.5 {
-		t.Errorf("a stretch's costs are not in the comparisons' order: %+v", got.Stretches[0].Gas)
+	if len(got.Comparisons) != 15 || len(got.Stretches[0].Gas) != 15 {
+		t.Fatalf("%d comparisons and %d costs in a stretch, want 15", len(got.Comparisons), len(got.Stretches[0].Gas))
+	}
+	for i, comp := range got.Comparisons {
+		if g := got.Stretches[0].Gas[i]; g.Fuel != comp.Fuel || g.MPG != comp.MPG {
+			t.Errorf("a stretch's costs are not in the comparisons' order at %d: %+v against %+v", i, g, comp)
+		}
 	}
 
-	// A custom car that is a preset is not a second line.
-	_, body = send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_mpg":25}`)
+	// The same miles per gallon in the other fuel is another car; a repeat, a preset of the same fuel and a car past the cap are not extra lines.
+	_, body = send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_cars":[{"mpg":18,"fuel":"gas"},{"mpg":18,"fuel":"diesel"},{"mpg":18,"fuel":"gas"},{"mpg":25,"fuel":"gas"},{"mpg":25,"fuel":"diesel"}]}`)
 	_ = json.Unmarshal([]byte(body), &c)
 	get(t, base+"savings", &got)
-	if c.CustomMPG != nil || len(got.Comparisons) != 12 {
-		t.Errorf("a custom 25 mpg: custom %v, %d comparisons", c.CustomMPG, len(got.Comparisons))
+	if len(c.CustomCars) != 2 || len(got.Comparisons) != 14 {
+		t.Errorf("repeats and presets: %d own cars, %d comparisons, want 2 and 14: %s", len(c.CustomCars), len(got.Comparisons), body)
+	}
+
+	// No cars at all is allowed: only the presets are compared.
+	_, body = send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_cars":[]}`)
+	_ = json.Unmarshal([]byte(body), &c)
+	get(t, base+"savings", &got)
+	if len(c.CustomCars) != 0 || len(got.Comparisons) != 12 {
+		t.Errorf("no cars: %d own cars, %d comparisons, want 0 and 12", len(c.CustomCars), len(got.Comparisons))
 	}
 }
 
@@ -540,11 +563,12 @@ func TestASetupSavedWithOneGasCarStillReadsAndKeepsThatCar(t *testing.T) {
 	}
 	var got savingsBody
 	get(t, base+"savings", &got)
-	if !got.Configured || len(got.Comparisons) != 14 {
+	if !got.Configured || len(got.Comparisons) != 13 {
 		t.Fatalf("an older setup with 28 mpg: %+v", got.Comparisons)
 	}
 	for _, comp := range got.Comparisons {
-		if comp.Custom != (comp.MPG == 28) {
+		// The one car an older setup named is a gas car.
+		if comp.Custom != (comp.MPG == 28 && comp.Fuel == "gas") {
 			t.Errorf("%v mpg %s has custom = %v", comp.MPG, comp.Fuel, comp.Custom)
 		}
 	}

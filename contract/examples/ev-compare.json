@@ -2,7 +2,16 @@
   "meter_id": "refoss-192.168.1.88:em2",
   "area_id": "SMN",
   "area_name": "Minnesota",
-  "custom_mpg": 27.5,
+  "custom_cars": [
+    {
+      "mpg": 27.5,
+      "fuel": "gas"
+    },
+    {
+      "mpg": 22,
+      "fuel": "diesel"
+    }
+  ],
   "presets": [
     15,
     20,

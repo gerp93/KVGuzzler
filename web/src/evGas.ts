@@ -65,14 +65,21 @@ export const visibleComparisons = (comps: GasComparison[], picks: Picks): GasCom
 /** A car's name on a line and a bar: "25 mpg", and "25 mpg diesel" for a diesel one. */
 export const carName = (c: { fuel: Fuel; mpg: number }): string => (c.fuel === 'diesel' ? `${c.mpg} mpg diesel` : `${c.mpg} mpg`);
 
+const CUSTOM_COLORS = ['--color-accent-blue', '--color-accent-muted', '--color-text'];
+
 /**
  * How a car's line looks. The presets of a fuel are one colour at falling strength, so the thirstiest car is the strongest line and the economy car the faintest and
- * they read as a family, in an order that never changes whichever are ticked; the owner's own car is a colour of its own. A diesel car is the same look but dashed,
- * so the fuels are told apart by the dash and never by a second colour to match to a key.
+ * they read as a family, in an order that never changes whichever are ticked; the owner's own cars each take a colour of their own, in the order they are listed
+ * (they are named at the end of their lines, so a colour repeating after the few there are is never the only way to tell them apart). A diesel car is the same look
+ * but dashed, so the fuels are told apart by the dash and never by a second colour to match to a key.
  */
 export function gasLineStyle(comp: GasComparison, comps: GasComparison[]): { colorVar: string; alpha: number; width: number; dashed: boolean } {
   const dashed = comp.fuel === 'diesel';
-  if (comp.custom) return { colorVar: '--color-accent-blue', alpha: 1, width: 2, dashed };
+  if (comp.custom) {
+    const own = comps.filter((c) => c.custom);
+    const i = own.findIndex((c) => c.fuel === comp.fuel && c.mpg === comp.mpg);
+    return { colorVar: CUSTOM_COLORS[Math.max(i, 0) % CUSTOM_COLORS.length]!, alpha: 1, width: 2, dashed };
+  }
   const presets = comps.filter((c) => !c.custom && c.fuel === comp.fuel);
   const i = presets.findIndex((c) => c.mpg === comp.mpg);
   const alpha = presets.length > 1 && i >= 0 ? 1 - (0.55 * i) / (presets.length - 1) : 1;

@@ -72,7 +72,7 @@ export function EvTrendPanel({ tabs, comparisons, picks, onTogglePick }: { tabs:
                           onTogglePick(key);
                         }}
                       />
-                      <span class={`ev-swatch${c.custom ? ' custom' : ''}${c.fuel === 'diesel' ? ' diesel' : ''}`} style={{ opacity: style.alpha }} aria-hidden="true" />
+                      <span class={`ev-swatch${c.fuel === 'diesel' ? ' diesel' : ''}`} style={{ '--sw': `var(${style.colorVar})`, opacity: style.alpha }} aria-hidden="true" />
                       {c.mpg} mpg{c.custom ? ' (yours)' : ''}
                     </label>
                   );
@@ -93,7 +93,7 @@ export function EvTrendPanel({ tabs, comparisons, picks, onTogglePick }: { tabs:
                 onTogglePick(DIESEL_PRICE);
               }}
             />
-            <span class="ev-swatch custom diesel" aria-hidden="true" />
+            <span class="ev-swatch diesel" style={{ '--sw': 'var(--color-accent-blue)' }} aria-hidden="true" />
             Diesel
           </label>
         </div>
