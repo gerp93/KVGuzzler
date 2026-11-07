@@ -74,6 +74,15 @@ func (k fordSink) SaveStatus(ctx context.Context, st ford.Status) error {
 	return k.s.Store.SetMeta(ctx, fordStatusKey, string(body))
 }
 
+// LastOutcome is when Ford was last asked and whether it went well, from the saved outcome, so a restart keeps the feed's schedule.
+func (k fordSink) LastOutcome(ctx context.Context) (time.Time, bool, bool) {
+	st, err := k.s.fordStatus(ctx)
+	if err != nil || st == nil {
+		return time.Time{}, false, false
+	}
+	return st.CheckedAt, st.OK, true
+}
+
 // LastLook is when Ford was last asked, from the saved outcome (zero when never), so a restart does not forget it.
 func (k fordSink) LastLook(ctx context.Context) time.Time {
 	st, err := k.s.fordStatus(ctx)
