@@ -223,6 +223,19 @@ func (s *Server) fuelArea(ctx context.Context) (string, error) {
 	return "", nil
 }
 
+// keepLegacyArea saves for the house the area an older vehicle setup still names, before that setup is rewritten without it: the vehicle's own car is saved
+// as {custom_mpg} only, so rewriting it would lose the only place the area was kept and every gas comparison would vanish with it.
+func (s *Server) keepLegacyArea(ctx context.Context) error {
+	if area, err := s.houseFuelArea(ctx); err != nil || area != "" {
+		return err
+	}
+	legacy, err := s.fuelArea(ctx)
+	if err != nil || legacy == "" {
+		return err
+	}
+	return s.Store.SetMeta(ctx, fuelAreaKey, legacy)
+}
+
 // evCompareSetup is a charging meter's comparison: its own car and the house's area. Nil until there is an area.
 func (s *Server) evCompareSetup(ctx context.Context, meterID string) (*evCompareSetup, error) {
 	saved, err := s.evCompareSaved(ctx, meterID)
@@ -499,7 +512,11 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_compare", "Pick the area whose gasoline price to use first.")
 		return
 	}
-	// The area is the house's: what this meter keeps is its own car.
+	// The area is the house's: what this meter keeps is its own car. An area an older setup of it still names is saved for the house first.
+	if err := s.keepLegacyArea(r.Context()); err != nil {
+		serverError(w, err)
+		return
+	}
 	text, err := json.Marshal(evCompareSetup{CustomMPG: body.CustomMPG})
 	if err != nil {
 		serverError(w, err)
@@ -602,6 +619,10 @@ func (s *Server) deleteFuelPrices(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteEvCompare(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.evMeterFor(w, r)
 	if !ok {
+		return
+	}
+	if err := s.keepLegacyArea(r.Context()); err != nil {
+		serverError(w, err)
 		return
 	}
 	if err := s.Store.SetMeta(r.Context(), evCompareKey+id, ""); err != nil {
