@@ -1441,3 +1441,39 @@ button.setup-open {
 .card .sub h3 {
   margin-top: 0;
 }
+
+/* A bill checked against the recording: the figures on one line, a verdict chip, the caveats quiet underneath */
+.recon {
+  margin-top: 0.25rem;
+}
+
+.recon-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.15rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.recon-verdict {
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  box-shadow: inset 0 0 0 1px var(--color-accent-muted);
+}
+
+.recon-verdict.match {
+  background: color-mix(in srgb, var(--color-accent-green) 30%, transparent);
+}
+
+.recon-verdict.close {
+  background: color-mix(in srgb, var(--color-accent-blue) 18%, transparent);
+}
+
+.recon-verdict.differs {
+  background: color-mix(in srgb, var(--color-accent-red) 28%, transparent);
+}
+
+.bill-list li {
+  align-items: flex-start;
+}

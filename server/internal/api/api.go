@@ -159,6 +159,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/rates/reprice", s.reprice)
 	mux.HandleFunc("GET /api/v1/bills", s.getBills)
 	mux.HandleFunc("PUT /api/v1/bills", s.putBills)
+	mux.HandleFunc("GET /api/v1/bills/reconciliation", s.billReconciliation)
 	mux.HandleFunc("GET /api/v1/database/growth", s.getDatabaseGrowth)
 	mux.HandleFunc("GET /api/v1/outages", s.listOutages)
 	mux.HandleFunc("POST /api/v1/outages", s.addOutage)
