@@ -94,7 +94,63 @@ describe('trendTabs', () => {
     const ids = (t: ReturnType<typeof trendTabs>) => t.map((x) => x.id);
     expect(ids(tabsOf({ ...base, savings: undefined }))).toEqual(['efficiency', 'cost', 'charge']);
     expect(ids(tabsOf({ ...base, savings: savings({ configured: false }) }))).toEqual(['efficiency', 'cost', 'charge']);
-    expect(ids(tabsOf({ ...base, savings: savings() }))).toEqual(['versus', 'permile', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
+    expect(ids(tabsOf({ ...base, savings: savings() }))).toEqual(['true', 'truetrend', 'versus', 'permile', 'saved', 'efficiency', 'cost', 'charge', 'gas']);
+  });
+
+  describe('the true cost, charge to charge', () => {
+    const at = (month: number, day: number, hour: number): string => new Date(2026, month - 1, day, hour, 0, 0).toISOString();
+    const answer = (): EvChargesAnswer => ({
+      ...chargesAnswer([charge(2, at(10, 6, 6), 0.5, null), charge(1, at(10, 2, 20), 0.5, null)]),
+      consistency: { charges: 2, kwh_per_pct: 0.5, lowest: 0.5, highest: 0.5 },
+    });
+    // From the evening of 2 Oct to the morning of 6 Oct: 4/24 of a day of 25 miles, three days of 25, and a quarter of a day of 25.
+    const MILES = (25 * 4) / 24 + 25 * 3 + 25 * 0.25;
+
+    it('is the first tab once there are two charges whose ends the car reported, and the gas-vs-electric chart stays as the next one', () => {
+      const tabs = tabsOf({ ...base, savings: savings(), charges: answer() });
+      expect(tabs.slice(0, 3).map((t) => t.id)).toEqual(['true', 'truetrend', 'versus']);
+      expect(firstReady(tabs)).toBe('true');
+      expect(tabReady(tabs.find((t) => t.id === 'versus')!)).toBe(true);
+    });
+
+    it('sets what the miles used against each car for the same miles, as bars', () => {
+      const bars = tabsOf({ ...base, savings: savings(), charges: answer() }).find((t) => t.id === 'true')!.bars!;
+      expect(bars.map((b) => b.label)).toEqual(['Charging', '20 mpg', '40 mpg']);
+      expect(bars[0]!.value).toBeCloseTo(1.5 / MILES, 6); // the battery ended where it began, so all 10 kWh (1.50 dollars) was used
+      expect(bars[1]!.value).toBeCloseTo(0.2, 6); // 4 dollars a gallon at 20 miles per gallon
+      expect(bars[2]!.value).toBeCloseTo(0.1, 6);
+    });
+
+    it('draws what a mile has cost so far at each charge, with nothing before the first mile', () => {
+      const trend = tabsOf({ ...base, savings: savings(), charges: answer() }).find((t) => t.id === 'truetrend')!;
+      expect(trend.lines.map((l) => l.name)).toEqual(['20 mpg', '40 mpg', 'Charging']);
+      expect(trend.lines[2]!.y[0]).toBeNull();
+      expect(trend.lines[2]!.y[1]).toBeCloseTo(1.5 / MILES, 6);
+      expect(trend.x.length).toBe(2);
+      expect(trend.endLabels).toBe(true);
+    });
+
+    it('counts charging the same whichever cars are ticked, and waits when none is', () => {
+      const one = tabsOf({ ...base, savings: savings(), charges: answer(), picks: { off: ['gas:20'], on: [] } }).find((t) => t.id === 'true')!;
+      expect(one.bars![0]!.value).toBeCloseTo(1.5 / MILES, 6);
+      expect(one.bars!.map((b) => b.label)).toEqual(['Charging', '40 mpg']);
+      const none = tabsOf({ ...base, savings: savings(), charges: answer(), picks: { off: ['gas:20', 'gas:40'], on: [] } });
+      for (const id of ['true', 'truetrend'] as const) expect(tabReady(none.find((t) => t.id === id)!)).toBe(false);
+    });
+
+    it('says what it waits for without two charges, and the first ready tab is then the old chart', () => {
+      const tabs = tabsOf({ ...base, savings: savings(), charges: undefined });
+      const t = tabs.find((x) => x.id === 'true')!;
+      expect(tabReady(t)).toBe(false);
+      expect(t.waiting).toMatch(/percent/);
+      expect(firstReady(tabs)).toBe('versus');
+    });
+
+    it('shows the cost per kilometer when the unit is kilometers', () => {
+      const miles = tabsOf({ ...base, savings: savings(), charges: answer() }).find((t) => t.id === 'true')!.bars![1]!.value;
+      const km = tabsOf({ ...base, unit: 'km', savings: savings(), charges: answer() }).find((t) => t.id === 'true')!.bars![1]!.value;
+      expect(km).toBeCloseTo(miles / 1.609344, 9);
+    });
   });
 
   it('draws a line for each gas car beside charging, each added up from zero, and no diesel line until it is ticked', () => {
