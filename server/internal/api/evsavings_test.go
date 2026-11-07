@@ -420,6 +420,41 @@ func TestAnAreaFromAnOlderVehicleSetupIsTheHousesUntilOneIsSaved(t *testing.T) {
 	}
 }
 
+func TestSavingOrRemovingTheOwnCarKeepsAnAreaOnlyAnOlderSetupNamed(t *testing.T) {
+	for name, act := range map[string]func(t *testing.T, base string){
+		"saving a car": func(t *testing.T, base string) {
+			if r, body := send(t, http.MethodPut, base+"compare", `{"custom_mpg":18}`); r.StatusCode != http.StatusOK {
+				t.Fatalf("own car: %d %s", r.StatusCode, body)
+			}
+		},
+		"removing the car": func(t *testing.T, base string) {
+			if r, _ := send(t, http.MethodDelete, base+"compare", ""); r.StatusCode != http.StatusNoContent {
+				t.Fatalf("delete compare: %d", r.StatusCode)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFordTest(t)
+			_, base := f.gasSetup(t, true)
+			// The house never had an area of its own saved: only the vehicle's older setup names it.
+			if err := f.st.SetMeta(context.Background(), evCompareKey+f.meter, `{"area_id":"SMN","custom_mpg":null}`); err != nil {
+				t.Fatal(err)
+			}
+			act(t, base)
+			var v compareBody
+			get(t, f.srv.URL+"/api/v1/fuel-prices", &v)
+			if v.AreaName == nil || *v.AreaName != "Minnesota" {
+				t.Errorf("the area was lost: %+v", v)
+			}
+			var c compareBody
+			get(t, base+"compare", &c)
+			if c.AreaName == nil || *c.AreaName != "Minnesota" {
+				t.Errorf("the vehicle no longer sees the area: %+v", c)
+			}
+		})
+	}
+}
+
 func deref(s *string) string {
 	if s == nil {
 		return "<nil>"
