@@ -1350,6 +1350,9 @@ paths:
       tags: [Settings]
       operationId: setRates
       summary: Replace the rate settings.
+      description: |
+        The finished days are saved at the price they have now before anything changes, so a new price source starts today (see `/rates/frozen`).
+        `bills` is accepted but ignored: bills are kept apart from the source and set with `/bills`.
       requestBody:
         required: true
         content:
@@ -1363,6 +1366,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RateConfig'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/rates/frozen:
+    get:
+      tags: [Settings]
+      operationId: getFrozenPrices
+      summary: Which finished days keep the price they were saved with.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrozenPrices'
+  /api/v1/rates/reprice:
+    post:
+      tags: [Settings]
+      operationId: repricePastDays
+      summary: Price finished days again from the current settings.
+      description: |
+        The only thing that changes the price of a day that is over (besides a bill entered or corrected while prices come from bills). Without `apply`
+        the answer only shows what it would change and what it would do to the house's cost over the range.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepriceRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepriceAnswer'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/bills:
+    get:
+      tags: [Settings]
+      operationId: getBills
+      summary: The electricity bills entered, oldest first.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillList'
+    put:
+      tags: [Settings]
+      operationId: setBills
+      summary: Replace the list of bills.
+      description: |
+        Kept whatever the price comes from. When prices come from the bills, the finished days a new, changed or removed bill covers are priced
+        again; with any other source no price changes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillList'
+      responses:
+        '200':
+          description: The saved bills.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillList'
         '400':
           $ref: '#/components/responses/Problem'
   /api/v1/rates/lookup:
@@ -3058,6 +3130,73 @@ components:
         tariff_label:
           type: [string, 'null']
           description: The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side.
+    BillList:
+      type: object
+      required: [bills]
+      properties:
+        bills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bill'
+    FrozenPrices:
+      type: object
+      required: [days, through, from, by_source]
+      properties:
+        days:
+          type: integer
+          description: How many finished days are saved.
+        through:
+          type: [string, 'null']
+          description: The latest saved day (YYYY-MM-DD); null with none.
+        from:
+          type: [string, 'null']
+          description: The earliest saved day.
+        by_source:
+          type: object
+          description: Saved days counted by the price source that gave them (`one`, `bills`, `lookup`).
+          additionalProperties:
+            type: integer
+    RepriceRequest:
+      type: object
+      required: [from]
+      properties:
+        from:
+          type: string
+          description: First local day (YYYY-MM-DD).
+        to:
+          type: [string, 'null']
+          description: Last local day, inclusive; defaults to yesterday. Today cannot be priced again, it follows the settings already.
+        apply:
+          type: boolean
+          description: Make the change. Without it the answer only shows what it would be.
+    RepriceAnswer:
+      type: object
+      required: [from, to, days, source, kwh, old_cost, new_cost, difference, applied]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        days:
+          type: integer
+          description: How many saved days in the range would change.
+        source:
+          type: string
+          description: The price source they would take their price from.
+        kwh:
+          type: [number, 'null']
+          description: What the house (the mains) used in the range; null with no mains meter.
+        old_cost:
+          type: [string, 'null']
+          description: The house's cost over the range as saved.
+        new_cost:
+          type: [string, 'null']
+          description: The house's cost over the range at the current settings.
+        difference:
+          type: [string, 'null']
+          description: New less old.
+        applied:
+          type: boolean
     OpenEiStatus:
       type: object
       required: [has_key]

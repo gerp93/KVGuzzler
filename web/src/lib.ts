@@ -50,6 +50,9 @@ export type NewDevice = S['NewDevice'];
 export type RateConfig = S['RateConfig'];
 export type Bill = S['Bill'];
 export type FixedFee = S['FixedFee'];
+export type BillList = S['BillList'];
+export type FrozenPrices = S['FrozenPrices'];
+export type RepriceAnswer = S['RepriceAnswer'];
 
 export type PeriodKey = '1h' | '3h' | '8h' | '24h' | '3d' | '7d' | '14d' | '30d' | 'ytd' | '1y' | 'all';
 

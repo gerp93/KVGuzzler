@@ -18,6 +18,8 @@ type Config struct {
 	// grid is big and the profile is learned), so they are filled in by whoever loads the configuration for pricing.
 	Tariff  *Tariff       `json:"-"`
 	Profile *UsageProfile `json:"-"`
+	// Frozen is the price each finished day was saved with (see Schedule.WithFrozen). Like the tariff it is not part of the saved settings.
+	Frozen map[Date]Money `json:"-"`
 }
 
 // DefaultConfig is one rate, none set yet: energy is counted but nothing is priced.
@@ -52,7 +54,14 @@ func (c Config) Normalized() Config {
 	return c
 }
 
-// Schedule is the schedule this configuration describes, with days cut at local midnight in loc.
+// Schedule is the schedule this configuration describes, with days cut at local midnight in loc. A day that is over keeps the price it
+// was saved with (Frozen), so only today and the days to come follow the settings.
 func (c Config) Schedule(loc *time.Location) *Schedule {
+	return c.Live(loc).WithFrozen(c.Frozen)
+}
+
+// Live is the schedule as the settings alone price it, ignoring what finished days were saved with. It is what a day is saved at, and what
+// "re-price" compares the saved days against.
+func (c Config) Live(loc *time.Location) *Schedule {
 	return NewSchedule(c.Mode, c.FixedRate, c.Bills, loc).WithTariff(c.Tariff, c.Profile)
 }
