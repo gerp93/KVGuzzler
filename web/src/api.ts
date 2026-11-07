@@ -1,5 +1,5 @@
 // The house API's client. Paths are relative, so the page works wherever the server serves it from.
-import type { ApplianceGroup, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordProbe, FuelPrices, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
+import type { ApplianceGroup, Bill, BillList, FrozenPrices, RepriceAnswer, CarbonConfig, CarbonSeries, FordLink, FordLinkStart, FordProbe, FuelPrices, FordUpdate, Meter, Computer, ComputerDetail, ComputerEstimate, ComputerHistory, HouseHistory, Device, GroupDetail, Live, NewDevice, OpenEiStatus, PcLive, PcSeries, RateConfig, Series, Status, Summary, TariffCandidate, TariffInfo } from './lib';
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
@@ -172,6 +172,14 @@ export const api = {
     request<components['schemas']['HistoryStart']>('api/v1/history-start', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day }) }),
   deleteHistoryStart: () => request<void>('api/v1/history-start', { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
+  /** The electricity bills entered, kept whatever the price comes from. */
+  bills: () => request<BillList>('api/v1/bills'),
+  setBills: (bills: Bill[]) => request<BillList>('api/v1/bills', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bills }) }),
+  /** Which finished days keep the price they were saved with. */
+  frozenPrices: () => request<FrozenPrices>('api/v1/rates/frozen'),
+  /** Shows what pricing finished days again would change; with `apply` it does it. */
+  reprice: (body: { from: string; to?: string; apply?: boolean }) =>
+    request<RepriceAnswer>('api/v1/rates/reprice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   carbon: () => request<CarbonConfig>('api/v1/carbon'),
   carbonSeries: (from: string, to: string) => request<CarbonSeries>(`api/v1/carbon/series?${q({ from, to })}`),
   /** Saves the source, place and (when given) a new key; the server takes a reading first and only keeps a setup that got one. */

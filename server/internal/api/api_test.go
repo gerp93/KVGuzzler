@@ -275,12 +275,20 @@ func TestRatesDefaultSaveAndRefuse(t *testing.T) {
 		"negative rate":          `{"mode":"one","fixed_rate":"-1"}`,
 		"rate not a decimal":     `{"mode":"one","fixed_rate":"abc"}`,
 		"rate sent as a number":  `{"mode":"one","fixed_rate":0.15}`,
-		"overlapping bills":      `{"mode":"bills","bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500},{"start":"2026-08-31","end":"2026-09-30","total":"100","kwh":500}]}`,
-		"fees swallow the total": `{"mode":"bills","bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500,"fixed_fees":[{"label":"x","amount":"100"}]}]}`,
 		"unknown field":          `{"mode":"one","nonsense":1}`,
 		"bad currency":           `{"mode":"one","currency":"dollars"}`,
 	} {
 		if r, _ := put(t, srv.URL+"/api/v1/rates", body); r.StatusCode != 400 {
+			t.Errorf("%s: status %d, want 400", name, r.StatusCode)
+		}
+	}
+	// Bills have their own endpoint, with the same checks.
+	for name, body := range map[string]string{
+		"overlapping bills":      `{"bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500},{"start":"2026-08-31","end":"2026-09-30","total":"100","kwh":500}]}`,
+		"fees swallow the total": `{"bills":[{"start":"2026-08-01","end":"2026-08-31","total":"100","kwh":500,"fixed_fees":[{"label":"x","amount":"100"}]}]}`,
+		"unknown field":          `{"bills":[],"nonsense":1}`,
+	} {
+		if r, _ := put(t, srv.URL+"/api/v1/bills", body); r.StatusCode != 400 {
 			t.Errorf("%s: status %d, want 400", name, r.StatusCode)
 		}
 	}
@@ -335,8 +343,11 @@ func TestBillPricesAreUsedAndEstimatesAreFlagged(t *testing.T) {
 	q := "?from=" + day.Format(time.RFC3339) + "&to=" + end.Add(time.Minute).Format(time.RFC3339)
 
 	// A bill that ended the day before the data: every day in the period is "after the latest bill", so an estimate.
-	bills := `{"mode":"bills","bills":[{"start":"2026-09-01","end":"2026-10-20","total":"150","kwh":1000}]}`
-	if r, body := put(t, srv.URL+"/api/v1/rates", bills); r.StatusCode != 200 {
+	bills := `{"bills":[{"start":"2026-09-01","end":"2026-10-20","total":"150","kwh":1000}]}`
+	if r, body := put(t, srv.URL+"/api/v1/rates", `{"mode":"bills"}`); r.StatusCode != 200 {
+		t.Fatalf("save: %d %s", r.StatusCode, body)
+	}
+	if r, body := put(t, srv.URL+"/api/v1/bills", bills); r.StatusCode != 200 {
 		t.Fatalf("save: %d %s", r.StatusCode, body)
 	}
 	var sum model.Summary
@@ -349,8 +360,8 @@ func TestBillPricesAreUsedAndEstimatesAreFlagged(t *testing.T) {
 	}
 
 	// A bill that covers the data: not an estimate.
-	covering := `{"mode":"bills","bills":[{"start":"2026-10-01","end":"2026-10-31","total":"150","kwh":1000}]}`
-	put(t, srv.URL+"/api/v1/rates", covering)
+	covering := `{"bills":[{"start":"2026-10-01","end":"2026-10-31","total":"150","kwh":1000}]}`
+	put(t, srv.URL+"/api/v1/bills", covering)
 	get(t, srv.URL+"/api/v1/summary"+q, &sum)
 	if sum.CostEstimated {
 		t.Error("cost_estimated should be false when a bill covers the period")

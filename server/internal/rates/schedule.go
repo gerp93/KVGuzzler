@@ -43,6 +43,9 @@ type Schedule struct {
 	loc     *time.Location
 	tariff  *Tariff
 	profile UsageProfile
+	// frozen is the price a finished day was saved with. A day in it is priced at that, whatever the settings say now, so changing the
+	// price source (or a tariff being read again) cannot change what a day that is over cost.
+	frozen map[Date]Money
 }
 
 func NewSchedule(mode Mode, flat *Money, bills []Bill, loc *time.Location) *Schedule {
@@ -65,8 +68,23 @@ func (s *Schedule) covering(day Date) *Bill {
 	return nil
 }
 
+// WithFrozen makes the days in `frozen` keep the price they were saved with.
+func (s *Schedule) WithFrozen(frozen map[Date]Money) *Schedule {
+	s.frozen = frozen
+	return s
+}
+
+// IsFrozen says whether a day is priced at the price it was saved with.
+func (s *Schedule) IsFrozen(day Date) bool {
+	_, ok := s.frozen[day]
+	return ok
+}
+
 // RateAt is the price of a kWh on a local day, or nil when nothing is known.
 func (s *Schedule) RateAt(day Date) *Money {
+	if m, ok := s.frozen[day]; ok {
+		return &m
+	}
 	if s.usesTariff() {
 		m := s.tariffRate(day)
 		return &m
@@ -92,7 +110,9 @@ func (s *Schedule) RateAt(day Date) *Money {
 }
 
 // IsEstimate is true when the price for this day is a stand-in rather than the price of a bill that covers it.
-func (s *Schedule) IsEstimate(day Date) bool { return s.usesBills() && s.covering(day) == nil }
+func (s *Schedule) IsEstimate(day Date) bool {
+	return !s.IsFrozen(day) && s.usesBills() && s.covering(day) == nil
+}
 
 // StartOf is the instant a local calendar day begins.
 func (s *Schedule) StartOf(day Date) time.Time {

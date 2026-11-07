@@ -155,6 +155,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/openei", s.getOpenEi)
 	mux.HandleFunc("PUT /api/v1/openei", s.putOpenEi)
 	mux.HandleFunc("PUT /api/v1/rates", s.putRates)
+	mux.HandleFunc("GET /api/v1/rates/frozen", s.frozenSummary)
+	mux.HandleFunc("POST /api/v1/rates/reprice", s.reprice)
+	mux.HandleFunc("GET /api/v1/bills", s.getBills)
+	mux.HandleFunc("PUT /api/v1/bills", s.putBills)
 	mux.HandleFunc("GET /api/v1/database/growth", s.getDatabaseGrowth)
 	mux.HandleFunc("GET /api/v1/outages", s.listOutages)
 	mux.HandleFunc("POST /api/v1/outages", s.addOutage)
@@ -1418,8 +1422,20 @@ func (s *Server) computerLive(w http.ResponseWriter, r *http.Request) {
 
 const ratesKey = "rates"
 
-// rateConfig is the saved price settings, or the default (one rate, none set) before any are saved.
+// rateConfig is the saved price settings, or the default (one rate, none set) before any are saved, with the prices the finished days were saved with.
 func (s *Server) rateConfig(ctx context.Context) (rates.Config, error) {
+	cfg, err := s.savedRateConfig(ctx)
+	if err != nil {
+		return rates.Config{}, err
+	}
+	if cfg.Frozen, err = s.frozenPrices(ctx); err != nil {
+		return rates.Config{}, err
+	}
+	return cfg, nil
+}
+
+// savedRateConfig is the settings alone (and the tariff a published-rate source uses), without the saved days.
+func (s *Server) savedRateConfig(ctx context.Context) (rates.Config, error) {
 	text, ok, err := s.Store.Meta(ctx, ratesKey)
 	if err != nil || !ok {
 		return rates.DefaultConfig(), err
@@ -1458,8 +1474,20 @@ func (s *Server) putRates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg = cfg.Normalized()
+	// Bills are kept apart from the price source (see /bills): saving the source never touches them, whatever was sent.
+	old, err := s.savedRateConfig(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	cfg.Bills = old.Bills
 	if err := cfg.Validate(); err != nil {
 		writeProblem(w, http.StatusBadRequest, "bad_rates", err.Error())
+		return
+	}
+	// The days that are over are saved at the price they have now, before anything changes: a new source then starts today.
+	if _, err := s.freezePrices(r.Context(), old); err != nil {
+		serverError(w, err)
 		return
 	}
 	if cfg.Mode == rates.ModeLookup {
@@ -1472,14 +1500,18 @@ func (s *Server) putRates(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	body, err := json.Marshal(cfg)
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-	if err := s.Store.SetMeta(r.Context(), ratesKey, string(body)); err != nil {
+	if err := s.saveRateConfig(r.Context(), cfg); err != nil {
 		serverError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, cfg)
+}
+
+// saveRateConfig keeps the settings.
+func (s *Server) saveRateConfig(ctx context.Context, cfg rates.Config) error {
+	body, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return s.Store.SetMeta(ctx, ratesKey, string(body))
 }

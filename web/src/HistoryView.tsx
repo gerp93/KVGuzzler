@@ -1,4 +1,5 @@
 import { api } from './api';
+import { BillsCard } from './BillsCard';
 import { Chart, lineFrom, tallChartHeight, type Line } from './Chart';
 import { EstimatorView } from './EstimatorView';
 import { usePoll, useStored } from './hooks';
@@ -124,6 +125,8 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         <HouseHistoryCard period={period as PeriodKey} />
         <EstimatorView meters={meters} />
       </div>
+
+      <BillsCard />
 
       <OutagesCard />
     </>

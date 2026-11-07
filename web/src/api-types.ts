@@ -904,8 +904,72 @@ export interface paths {
         };
         /** How the price of a kWh is worked out. */
         get: operations["getRates"];
-        /** Replace the rate settings. */
+        /**
+         * Replace the rate settings.
+         * @description The finished days are saved at the price they have now before anything changes, so a new price source starts today (see `/rates/frozen`).
+         *     `bills` is accepted but ignored: bills are kept apart from the source and set with `/bills`.
+         */
         put: operations["setRates"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rates/frozen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which finished days keep the price they were saved with. */
+        get: operations["getFrozenPrices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rates/reprice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Price finished days again from the current settings.
+         * @description The only thing that changes the price of a day that is over (besides a bill entered or corrected while prices come from bills). Without `apply`
+         *     the answer only shows what it would change and what it would do to the house's cost over the range.
+         */
+        post: operations["repricePastDays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The electricity bills entered, oldest first. */
+        get: operations["getBills"];
+        /**
+         * Replace the list of bills.
+         * @description Kept whatever the price comes from. When prices come from the bills, the finished days a new, changed or removed bill covers are priced
+         *     again; with any other source no price changes.
+         */
+        put: operations["setBills"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1960,6 +2024,46 @@ export interface components {
             bills?: components["schemas"]["Bill"][];
             /** @description The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side. */
             tariff_label?: string | null;
+        };
+        BillList: {
+            bills: components["schemas"]["Bill"][];
+        };
+        FrozenPrices: {
+            /** @description How many finished days are saved. */
+            days: number;
+            /** @description The latest saved day (YYYY-MM-DD); null with none. */
+            through: string | null;
+            /** @description The earliest saved day. */
+            from: string | null;
+            /** @description Saved days counted by the price source that gave them (`one`, `bills`, `lookup`). */
+            by_source: {
+                [key: string]: number;
+            };
+        };
+        RepriceRequest: {
+            /** @description First local day (YYYY-MM-DD). */
+            from: string;
+            /** @description Last local day, inclusive; defaults to yesterday. Today cannot be priced again, it follows the settings already. */
+            to?: string | null;
+            /** @description Make the change. Without it the answer only shows what it would be. */
+            apply?: boolean;
+        };
+        RepriceAnswer: {
+            from: string;
+            to: string;
+            /** @description How many saved days in the range would change. */
+            days: number;
+            /** @description The price source they would take their price from. */
+            source: string;
+            /** @description What the house (the mains) used in the range; null with no mains meter. */
+            kwh: number | null;
+            /** @description The house's cost over the range as saved. */
+            old_cost: string | null;
+            /** @description The house's cost over the range at the current settings. */
+            new_cost: string | null;
+            /** @description New less old. */
+            difference: string | null;
+            applied: boolean;
         };
         OpenEiStatus: {
             has_key: boolean;
@@ -4004,6 +4108,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateConfig"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    getFrozenPrices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrozenPrices"];
+                };
+            };
+        };
+    };
+    repricePastDays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepriceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepriceAnswer"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    getBills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillList"];
+                };
+            };
+        };
+    };
+    setBills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillList"];
+            };
+        };
+        responses: {
+            /** @description The saved bills. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillList"];
                 };
             };
             400: components["responses"]["Problem"];
