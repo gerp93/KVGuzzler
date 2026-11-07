@@ -62,8 +62,15 @@ export function togglePick(picks: Picks, key: string): Picks {
 /** The cars still drawn. */
 export const visibleComparisons = (comps: GasComparison[], picks: Picks): GasComparison[] => comps.filter((c) => isShown(c, picks));
 
-/** A car's name on a line and a bar: "25 mpg", and "25 mpg diesel" for a diesel one. */
-export const carName = (c: { fuel: Fuel; mpg: number }): string => (c.fuel === 'diesel' ? `${c.mpg} mpg diesel` : `${c.mpg} mpg`);
+/** A car's name on a line and a bar: "25 mpg", and "25 mpg diesel" for a diesel one; the name the owner gave one of their own, with "diesel" after it for a diesel one. */
+export const carName = (c: { fuel: Fuel; mpg: number; name?: string }): string => {
+  const diesel = c.fuel === 'diesel';
+  if (c.name) return diesel ? `${c.name} diesel` : c.name;
+  return diesel ? `${c.mpg} mpg diesel` : `${c.mpg} mpg`;
+};
+
+/** A car's label by its checkbox: "25 mpg", or the owner's name for it with its miles per gallon, "Corolla (27 mpg)". */
+export const pickLabel = (c: { mpg: number; name?: string }): string => (c.name ? `${c.name} (${c.mpg} mpg)` : `${c.mpg} mpg`);
 
 const CUSTOM_COLORS = ['--color-accent-blue', '--color-accent-muted', '--color-text'];
 

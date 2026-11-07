@@ -462,6 +462,52 @@ func TestSavingOrRemovingTheOwnCarKeepsAnAreaOnlyAnOlderSetupNamed(t *testing.T)
 	}
 }
 
+func TestAnOwnCarKeepsItsNameAndAComparisonCarriesIt(t *testing.T) {
+	f := newFordTest(t)
+	_, base := f.gasSetup(t, true)
+	_, body := send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_cars":[{"name":"  Corolla ","mpg":33,"fuel":"gas"},{"mpg":22,"fuel":"diesel"},{"name":"Same again","mpg":33,"fuel":"gas"}]}`)
+	var c struct {
+		CustomCars []struct {
+			Name string  `json:"name"`
+			MPG  float64 `json:"mpg"`
+			Fuel string  `json:"fuel"`
+		} `json:"custom_cars"`
+	}
+	_ = json.Unmarshal([]byte(body), &c)
+	// The name is trimmed, is optional, and the repeat of the same fuel and miles per gallon is dropped with its name.
+	if len(c.CustomCars) != 2 || c.CustomCars[0].Name != "Corolla" || c.CustomCars[1].Name != "" || c.CustomCars[1].Fuel != "diesel" {
+		t.Fatalf("cars = %s", body)
+	}
+	f.odometer(t, base, "2026-10-10", 1000)
+	f.odometer(t, base, "2026-10-13", 1090)
+	var got struct {
+		Comparisons []struct {
+			Fuel   string  `json:"fuel"`
+			MPG    float64 `json:"mpg"`
+			Custom bool    `json:"custom"`
+			Name   string  `json:"name"`
+		} `json:"comparisons"`
+	}
+	get(t, base+"savings", &got)
+	named := 0
+	for _, comp := range got.Comparisons {
+		if comp.Name != "" {
+			named++
+			if comp.Name != "Corolla" || comp.MPG != 33 || comp.Fuel != "gas" || !comp.Custom {
+				t.Errorf("a named comparison = %+v", comp)
+			}
+		}
+	}
+	if named != 1 {
+		t.Errorf("%d named comparisons, want 1", named)
+	}
+	// A name past the limit is refused, not cut.
+	long := strings.Repeat("x", 41)
+	if r, _ := send(t, http.MethodPut, base+"compare", `{"area_id":"SMN","custom_cars":[{"name":"`+long+`","mpg":33,"fuel":"gas"}]}`); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("a 41 character name: %d, want 400", r.StatusCode)
+	}
+}
+
 func deref(s *string) string {
 	if s == nil {
 		return "<nil>"

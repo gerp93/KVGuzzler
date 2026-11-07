@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EvSavings } from './ev';
-import { carName, compKey, countedStretches, cumulativeCosts, fuelWords, gasLineStyle, isShown, parsePicks, picksFromOldHidden, savingsSummary, togglePick, visibleComparisons, type GasComparison } from './evGas';
+import { carName, compKey, countedStretches, cumulativeCosts, fuelWords, gasLineStyle, isShown, parsePicks, pickLabel, picksFromOldHidden, savingsSummary, togglePick, visibleComparisons, type GasComparison } from './evGas';
 
 const comps: GasComparison[] = [
   { fuel: 'gas', mpg: 15, custom: false },
@@ -65,6 +65,13 @@ describe('names and looks', () => {
   it('names a diesel car as such', () => {
     expect(carName({ fuel: 'gas', mpg: 25 })).toBe('25 mpg');
     expect(carName({ fuel: 'diesel', mpg: 25 })).toBe('25 mpg diesel');
+  });
+
+  it('calls one of the owners own cars by the name they gave it', () => {
+    expect(carName({ fuel: 'gas', mpg: 33, name: 'Corolla' })).toBe('Corolla');
+    expect(carName({ fuel: 'diesel', mpg: 33, name: 'Corolla' })).toBe('Corolla diesel');
+    expect(pickLabel({ mpg: 33, name: 'Corolla' })).toBe('Corolla (33 mpg)');
+    expect(pickLabel({ mpg: 33 })).toBe('33 mpg');
   });
 
   it('draws the presets of each fuel as one colour at falling strength, the thirstiest car the strongest', () => {

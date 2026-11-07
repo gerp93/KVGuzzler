@@ -4,7 +4,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { Chart, type Line } from './Chart';
 import { EvBars } from './EvBars';
-import { compKey, DIESEL_PRICE, gasLineStyle, isShown, type GasComparison, type Picks } from './evGas';
+import { compKey, DIESEL_PRICE, gasLineStyle, isShown, pickLabel, type GasComparison, type Picks } from './evGas';
 import { firstReady, tabReady, type TabId, type TrendTab } from './evTabs';
 
 const HEIGHT = 280;
@@ -73,7 +73,8 @@ export function EvTrendPanel({ tabs, comparisons, picks, onTogglePick }: { tabs:
                         }}
                       />
                       <span class={`ev-swatch${c.fuel === 'diesel' ? ' diesel' : ''}`} style={{ '--sw': `var(${style.colorVar})`, opacity: style.alpha }} aria-hidden="true" />
-                      {c.mpg} mpg{c.custom ? ' (yours)' : ''}
+                      {pickLabel(c)}
+                      {c.custom && !c.name ? ' (yours)' : ''}
                     </label>
                   );
                 })}

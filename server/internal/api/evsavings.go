@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/gasprice"
@@ -25,8 +26,9 @@ const (
 	gasFeedEvery   = 12 * time.Hour
 	gasFeedFirst   = time.Minute
 	minMPG, maxMPG = 5.0, 200.0
-	// maxCustomCars is how many cars of their own the owner can name.
+	// maxCustomCars is how many cars of their own the owner can name, and maxCarName how long a car's name can be.
 	maxCustomCars = 8
+	maxCarName    = 40
 	// pricesBeforeFirstReading is how much of the price history before the first odometer reading is listed for the chart.
 	pricesBeforeFirstReading = 14 * 24 * time.Hour
 	// pricesWithoutReadings is how far back the chart goes when there are no readings yet.
@@ -40,8 +42,10 @@ const (
 // evMPGPresets are the cars every electric vehicle is compared with, in miles per gallon, for each fuel: from a thirsty truck to an economy car.
 var evMPGPresets = []float64{15, 20, 25, 30, 35, 40}
 
-// customCar is a car the owner named: its miles per gallon and what it burns, which says which weekly price its miles are priced at.
+// customCar is a car the owner named: its miles per gallon and what it burns, which says which weekly price its miles are priced at, and a name of their own
+// for it (optional). The car is told apart by its fuel and miles per gallon; the name only says what to call it.
 type customCar struct {
+	Name string  `json:"name,omitempty"`
 	MPG  float64 `json:"mpg"`
 	Fuel string  `json:"fuel"`
 }
@@ -103,6 +107,8 @@ type evComparison struct {
 	Fuel   string  `json:"fuel"`
 	MPG    float64 `json:"mpg"`
 	Custom bool    `json:"custom"`
+	// Name is what the owner calls one of their own cars; empty for a preset and for a car with no name.
+	Name string `json:"name,omitempty"`
 }
 
 // evSavingsGas is what a stretch's miles would have cost in one car (a gas car or a diesel one, as its fuel says).
@@ -176,7 +182,7 @@ func evComparisons(c *evCompareSetup, diesel bool) []evComparison {
 		if c != nil {
 			for _, car := range c.CustomCars {
 				if car.Fuel == fuel {
-					out = append(out, evComparison{Fuel: fuel, MPG: car.MPG, Custom: true})
+					out = append(out, evComparison{Fuel: fuel, MPG: car.MPG, Custom: true, Name: car.Name})
 				}
 			}
 			sort.SliceStable(out, func(i, j int) bool { return out[i].MPG < out[j].MPG })
@@ -190,17 +196,18 @@ func evComparisons(c *evCompareSetup, diesel bool) []evComparison {
 	return out
 }
 
-// cleanCars keeps the cars that make sense, in the order given: a miles per gallon in range, a known fuel, no car twice and none that is one of the presets
-// (already compared), at most maxCustomCars. Never nil.
+// cleanCars keeps the cars that make sense, in the order given: a miles per gallon in range, a known fuel, no car twice (the same fuel and miles per gallon, the
+// first one's name kept) and none that is one of the presets (already compared), at most maxCustomCars. A name is trimmed. Never nil.
 func cleanCars(cars []customCar) []customCar {
 	out := []customCar{}
 	for _, c := range cars {
-		if !(c.MPG >= minMPG && c.MPG <= maxMPG) || (c.Fuel != fuelGas && c.Fuel != fuelDiesel) || isPresetMPG(c.MPG) || len(out) >= maxCustomCars {
+		c.Name = strings.TrimSpace(c.Name)
+		if !(c.MPG >= minMPG && c.MPG <= maxMPG) || (c.Fuel != fuelGas && c.Fuel != fuelDiesel) || isPresetMPG(c.MPG) || len(out) >= maxCustomCars || len([]rune(c.Name)) > maxCarName {
 			continue
 		}
 		dup := false
 		for _, o := range out {
-			dup = dup || o == c
+			dup = dup || (o.MPG == c.MPG && o.Fuel == c.Fuel)
 		}
 		if !dup {
 			out = append(out, c)
@@ -529,7 +536,7 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
-		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"custom_cars": [{"mpg": 27, "fuel": "gas"}]}`)
+		writeProblem(w, http.StatusBadRequest, "bad_compare", `send {"custom_cars": [{"name": "Corolla", "mpg": 27, "fuel": "gas"}]}`)
 		return
 	}
 	if len(body.CustomCars) > maxCustomCars {
@@ -543,6 +550,10 @@ func (s *Server) putEvCompare(w http.ResponseWriter, r *http.Request) {
 		}
 		if c.Fuel != fuelGas && c.Fuel != fuelDiesel {
 			writeProblem(w, http.StatusBadRequest, "bad_compare", `A car's fuel is "gas" or "diesel".`)
+			return
+		}
+		if n := len([]rune(strings.TrimSpace(c.Name))); n > maxCarName {
+			writeProblem(w, http.StatusBadRequest, "bad_compare", fmt.Sprintf("A car's name is at most %d characters.", maxCarName))
 			return
 		}
 	}

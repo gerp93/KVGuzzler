@@ -2130,6 +2130,10 @@ components:
       required: [mpg, fuel]
       additionalProperties: false
       properties:
+        name:
+          type: string
+          maxLength: 40
+          description: What the owner calls the car; optional. The car is told apart by its fuel and miles per gallon.
         mpg:
           type: number
           minimum: 5
@@ -2166,6 +2170,9 @@ components:
                 type: number
               custom:
                 type: boolean
+              name:
+                type: string
+                description: What the owner calls one of their own cars; left out for a preset and for a car with no name.
         prices:
           type: array
           description: The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart.

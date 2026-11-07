@@ -4,6 +4,7 @@
   "area_name": "Minnesota",
   "custom_cars": [
     {
+      "name": "Corolla",
       "mpg": 27.5,
       "fuel": "gas"
     },
