@@ -99,10 +99,10 @@ func (b savingsBody) mpgs(fuel string) []float64 {
 }
 
 type compareBody struct {
-	AreaID            *string   `json:"area_id"`
-	AreaName          *string   `json:"area_name"`
-	DieselAreaName    *string   `json:"diesel_area_name"`
-	CustomCars        []struct {
+	AreaID         *string `json:"area_id"`
+	AreaName       *string `json:"area_name"`
+	DieselAreaName *string `json:"diesel_area_name"`
+	CustomCars     []struct {
 		MPG  float64 `json:"mpg"`
 		Fuel string  `json:"fuel"`
 	} `json:"custom_cars"`
