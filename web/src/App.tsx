@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api, VersionMismatch } from './api';
+import { AlertBanner } from './AlertBanner';
+import { AlertsView } from './AlertsView';
 import { ConnectorsView } from './ConnectorsView';
 import { HelpView } from './HelpView';
 import { HierarchyView } from './HierarchyView';
@@ -20,6 +22,7 @@ const TABS = [
   { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'history', label: 'History' },
   { id: 'carbon', label: 'Carbon' },
+  { id: 'alerts', label: 'Alerts' },
   { id: 'connectors', label: 'Connectors' },
   { id: 'settings', label: 'Settings' },
   { id: 'help', label: 'Help' },
@@ -37,6 +40,9 @@ export function App() {
   // Bumped after a rename or a show/hide so the meter list is read again.
   const [rev, setRev] = useState(0);
   const status = usePoll(api.status, 10_000, []);
+  // What needs attention, read again every half minute and whenever one is dismissed.
+  const [alertRev, setAlertRev] = useState(0);
+  const alerts = usePoll(api.alerts, 30_000, [alertRev]);
   const loaded = usePoll<Meter[]>(() => api.meters(), 0, [rev]);
   // Every amount is shown in the currency of the saved price settings.
   const rateSettings = usePoll(api.rates, 60_000, [rev]);
@@ -92,6 +98,7 @@ export function App() {
             <a key={t.id} href={routePath(t.id)} aria-current={t.id === active ? 'page' : undefined}>
               <TabIcon name={t.id} />
               <span>{t.label}</span>
+              {t.id === 'alerts' && (alerts.data?.banner.length ?? 0) > 0 && <b class={`tab-badge sev-${alerts.data?.worst ?? 'info'}`}>{alerts.data?.banner.length}</b>}
             </a>
           ))}
         </nav>
@@ -102,6 +109,7 @@ export function App() {
           Server not answering{status.error ? ` (${status.error.message})` : ''}. Showing the last data; retrying.
         </p>
       )}
+      <AlertBanner banner={alerts.data?.banner ?? []} onChanged={() => setAlertRev((n) => n + 1)} />
       {stale && (
         <p class="update-banner" role="status">
           A new version of this page is ready.
@@ -123,6 +131,8 @@ export function App() {
           <HistoryView meters={meters} />
         ) : active === 'carbon' ? (
           <CarbonView meters={meters} />
+        ) : active === 'alerts' ? (
+          <AlertsView answer={alerts.data} onChanged={() => setAlertRev((n) => n + 1)} />
         ) : active === 'hierarchy' ? (
           <HierarchyView meters={meters} open={route.rest} onChanged={() => setRev((n) => n + 1)} />
         ) : active === 'connectors' ? (
@@ -130,7 +140,7 @@ export function App() {
         ) : active === 'help' ? (
           <HelpView />
         ) : (
-          <SettingsView theme={theme} onTheme={setThemeName} />
+          <SettingsView theme={theme} onTheme={setThemeName} meters={meters} />
         )}
         {status.data && status.data.notes.length > 0 && active !== 'live' && (
           <section class="card warn">

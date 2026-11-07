@@ -4,6 +4,7 @@ import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
 import type { BillReconciliation } from './reconcile';
+import type { AlertPattern, AlertRule, AlertRuleChange, AlertsAnswer, Digest } from './alerts';
 import type { MeterRuns } from './runs';
 import type { CustomCar, EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 import type { components } from './api-types';
@@ -173,6 +174,22 @@ export const api = {
     request<components['schemas']['HistoryStart']>('api/v1/history-start', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day }) }),
   deleteHistoryStart: () => request<void>('api/v1/history-start', { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
+  /** What needs attention: the banner, the last month's alerts. */
+  alerts: () => request<AlertsAnswer>('api/v1/alerts'),
+  dismissAlert: (id: number) => request<void>(`api/v1/alerts/${id}/ack`, { method: 'POST' }),
+  dismissAllAlerts: () => request<void>('api/v1/alerts/ack', { method: 'POST' }),
+  alertRules: () => request<{ rules: AlertRule[] }>('api/v1/alert-rules'),
+  addAlertRule: (body: AlertRuleChange) =>
+    request<AlertRule>('api/v1/alert-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  updateAlertRule: (id: string, body: AlertRuleChange) =>
+    request<AlertRule>(`api/v1/alert-rules/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  removeAlertRule: (id: string) => request<void>(`api/v1/alert-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** What a meter's usual pattern looks like (from `watts`, or from its own readings when 0). */
+  alertPattern: (meterId: string, watts: number, days: number) =>
+    request<AlertPattern>(`api/v1/alert-rules/pattern?${q({ meter_id: meterId, watts: watts > 0 ? String(watts) : undefined, days: String(days) })}`),
+  digests: () => request<{ digests: Digest[] }>('api/v1/digests'),
+  makeDigest: (kind: 'daily' | 'weekly') =>
+    request<Digest>('api/v1/digests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind }) }),
   /** The electricity bills entered, kept whatever the price comes from. */
   bills: () => request<BillList>('api/v1/bills'),
   setBills: (bills: Bill[]) => request<BillList>('api/v1/bills', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bills }) }),

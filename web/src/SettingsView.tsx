@@ -1,12 +1,14 @@
+import { AlertRulesCard } from './AlertRulesCard';
 import { DatabaseCard } from './DatabaseCard';
 import { HistoryStartCard } from './HistoryStartCard';
 import { RatesCard } from './RatesCard';
-import { THEMES, type Theme } from './lib';
+import { THEMES, type Meter, type Theme } from './lib';
 
-export function SettingsView({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
+export function SettingsView({ theme, onTheme, meters }: { theme: Theme; onTheme: (t: Theme) => void; meters: Meter[] }) {
   return (
     <>
       <RatesCard />
+      <AlertRulesCard meters={meters} />
       <HistoryStartCard />
       <DatabaseCard />
       <section class="card page-narrow">
