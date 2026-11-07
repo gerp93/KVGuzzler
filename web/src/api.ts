@@ -4,6 +4,7 @@ import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
 import type { BillReconciliation } from './reconcile';
+import type { Standby } from './standby';
 import type { AlertPattern, AlertRule, AlertRuleChange, AlertsAnswer, Digest } from './alerts';
 import type { MeterRuns } from './runs';
 import type { CustomCar, EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
@@ -174,6 +175,8 @@ export const api = {
     request<components['schemas']['HistoryStart']>('api/v1/history-start', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day }) }),
   deleteHistoryStart: () => request<void>('api/v1/history-start', { method: 'DELETE' }),
   rates: () => request<RateConfig>('api/v1/rates'),
+  /** What each appliance draws when it is doing nothing, against the stretch before (or the days after and before `change`). */
+  standby: (days: number, change?: string) => request<Standby>(`api/v1/standby?${q({ days: String(days), change })}`),
   /** What needs attention: the banner, the last month's alerts. */
   alerts: () => request<AlertsAnswer>('api/v1/alerts'),
   dismissAlert: (id: number) => request<void>(`api/v1/alerts/${id}/ack`, { method: 'POST' }),

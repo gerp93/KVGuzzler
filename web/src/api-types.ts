@@ -999,6 +999,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/standby": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What each appliance draws when it is doing nothing, against the stretch before.
+         * @description Each appliance's always-on power (the 5th percentile of its minute averages) over the last `days` days, a year of it in energy and money, and the same
+         *     over the `days` before. With `change` the two stretches are the `days` after that day and the `days` before it, so what unplugging something did shows.
+         *     Every figure is that meter's own floor: never added to the others or to the house's.
+         */
+        get: operations["getStandby"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history-start": {
         parameters: {
             query?: never;
@@ -2337,6 +2359,34 @@ export interface components {
         };
         Digests: {
             digests: components["schemas"]["Digest"][];
+        };
+        StandbyPart: {
+            meter_id: string;
+            label: string;
+            watts: number;
+            prev_watts: number | null;
+            /** @description Watts less prev_watts; 0 for a move under half a watt. */
+            change_watts: number | null;
+            kwh_per_year: number;
+            cost_per_year: string | null;
+            change_cost_per_year: string | null;
+        };
+        Standby: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            prev_from: string;
+            /** Format: date-time */
+            prev_to: string;
+            change: string | null;
+            house_watts: number | null;
+            house_prev_watts: number | null;
+            rate: string | null;
+            rate_estimated: boolean;
+            /** @description Biggest floor first. */
+            parts: components["schemas"]["StandbyPart"][];
         };
         BillList: {
             bills: components["schemas"]["Bill"][];
@@ -4588,6 +4638,32 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getStandby: {
+        parameters: {
+            query?: {
+                /** @description Length of each stretch, 3 to 180 (default 30). */
+                days?: number;
+                /** @description A local day before today (YYYY-MM-DD) to split the two stretches at. */
+                change?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Standby"];
+                };
+            };
+            400: components["responses"]["Problem"];
         };
     };
     getHistoryStart: {
