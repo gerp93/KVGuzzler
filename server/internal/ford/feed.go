@@ -84,6 +84,8 @@ type Feed struct {
 	hadLink bool
 	readAt  time.Time
 	loaded  bool
+	// restored says nextAt came from the outcome saved before this server started, so the first step is not taken for news.
+	restored bool
 	// lookNs is readAt as Unix nanoseconds, so Wait can be asked while a look is in progress (the lock is held for the whole look).
 	lookNs atomic.Int64
 }
@@ -99,6 +101,13 @@ type lastLooker interface {
 	LastLook(ctx context.Context) time.Time
 }
 
+// lastOutcomer is the optional part of a Sink that remembers how the last look went, so a restart keeps the schedule too: a restart is not a reason to ask
+// Ford again before the next look was due (or before the wait after a failure has passed).
+type lastOutcomer interface {
+	// LastOutcome is when Ford was last asked and whether that went well; found is false when it never was.
+	LastOutcome(ctx context.Context) (at time.Time, ok bool, found bool)
+}
+
 // stamp notes that Ford is being asked at t.
 func (f *Feed) stamp(t time.Time) {
 	f.readAt = t
@@ -111,6 +120,15 @@ func (f *Feed) loadLook(ctx context.Context) {
 		return
 	}
 	f.loaded = true
+	if o, ok := f.Sink.(lastOutcomer); ok {
+		if at, good, found := o.LastOutcome(ctx); found && !at.IsZero() {
+			wait := Interval
+			if !good {
+				wait = RetryAfterError
+			}
+			f.nextAt, f.restored = at.Add(wait), true
+		}
+	}
 	if l, ok := f.Sink.(lastLooker); ok {
 		if t := l.LastLook(ctx); t.After(f.readAt) {
 			f.stamp(t)
@@ -167,6 +185,13 @@ func (f *Feed) Step(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// The first step after a start would take the setup for news (nothing was seen before): with a saved outcome it is the same setup as then, so the schedule
+	// kept from it decides.
+	if f.restored && f.last == nil {
+		c := *cfg
+		f.last, f.hadLink = &c, linked
+	}
+	f.restored = false
 	changed := f.last == nil || *f.last != *cfg || linked != f.hadLink
 	// Too soon after the last look: nothing is noted as seen, so a changed setup is still looked at once the gap has passed.
 	if linked && f.now().Sub(f.readAt) < MinGap {

@@ -534,6 +534,67 @@ func TestALookMadeBeforeARestartStillCounts(t *testing.T) {
 	}
 }
 
+// outcomeSink remembers how the last look went, like the server does across a restart.
+type outcomeSink struct {
+	*fakeSink
+	at    time.Time
+	ok    bool
+	found bool
+}
+
+func (s *outcomeSink) LastLook(context.Context) time.Time { return s.at }
+func (s *outcomeSink) LastOutcome(context.Context) (time.Time, bool, bool) {
+	return s.at, s.ok, s.found
+}
+
+func TestARestartKeepsTheScheduleAfterAGoodLook(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	f.Sink = &outcomeSink{fakeSink: sink, at: now.Add(-10 * time.Minute), ok: true, found: true}
+	ctx := context.Background()
+	// The last look was 10 minutes before the restart and went well: the next is not due for two hours, however often the server starts.
+	for i := 0; i < 3; i++ {
+		if did, err := f.Step(ctx); err != nil || did {
+			t.Fatalf("step %d after a restart = %v, %v; want no look", i, did, err)
+		}
+		*now = now.Add(time.Minute)
+	}
+	if fs.telemetry != 0 {
+		t.Fatalf("Ford was asked %d times", fs.telemetry)
+	}
+	*now = now.Add(Interval - 10*time.Minute)
+	if did, err := f.Step(ctx); err != nil || !did {
+		t.Errorf("step once the interval has passed = %v, %v; want a read", did, err)
+	}
+}
+
+func TestARestartKeepsTheWaitAfterAFailedLook(t *testing.T) {
+	f, sink, fs, now := feedFor(t)
+	f.Sink = &outcomeSink{fakeSink: sink, at: now.Add(-5 * time.Minute), ok: false, found: true}
+	ctx := context.Background()
+	if did, err := f.Step(ctx); err != nil || did {
+		t.Fatalf("step after a restart following a refused look = %v, %v; want no look", did, err)
+	}
+	*now = now.Add(RetryAfterError - 6*time.Minute)
+	if did, _ := f.Step(ctx); did {
+		t.Error("looked again before the wait after a failure had passed")
+	}
+	*now = now.Add(2 * time.Minute)
+	if did, err := f.Step(ctx); err != nil || !did {
+		t.Errorf("step once the wait has passed = %v, %v; want a read", did, err)
+	}
+	if fs.telemetry != 1 {
+		t.Errorf("Ford was asked %d times, want 1", fs.telemetry)
+	}
+}
+
+func TestAServerThatNeverLookedAtFordLooksAtOnce(t *testing.T) {
+	f, sink, _, _ := feedFor(t)
+	f.Sink = &outcomeSink{fakeSink: sink}
+	if did, err := f.Step(context.Background()); err != nil || !did {
+		t.Errorf("first step with nothing saved = %v, %v; want a read", did, err)
+	}
+}
+
 func TestDescribeNamesEverythingButOnlyShowsTheBatteryAndOdometerValues(t *testing.T) {
 	body := `{"metrics":{"odometer":{"value":93672,"updateTime":"2026-10-28T10:00:00Z"},"xevBatteryStateOfCharge":{"value":63.5},` +
 		`"vin":"1FAKEVIN123","position":{"latitude":44.9,"longitude":-93.2},"ignition":"OFF","charging":true,"gone":null}}`
