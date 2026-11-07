@@ -29,6 +29,11 @@ const ICONS = {
       <path d="M12 8v4M6 16v-4h12v4" />
     </Svg>
   ),
+  alerts: (
+    <Svg>
+      <path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4" />
+    </Svg>
+  ),
   carbon: (
     <Svg>
       <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-5 6-8 10-10" />

@@ -74,6 +74,15 @@ type Server struct {
 	// evTracker finds the charges of the electric vehicle (see evcharges.go), made on first use.
 	evOnce    sync.Once
 	evTracker *evcharge.Tracker
+
+	// Notifiers are told of each alert as it opens (see alerteval.go); none means alerts are only shown in the dashboard.
+	Notifiers []Notifier
+
+	// What the alert engine remembers between looks: when each rule last looked, how many looks in a row an open alert's condition has been missing, and when it started.
+	alertMu    sync.Mutex
+	alertLast  map[string]time.Time
+	alertMiss  map[string]int
+	alertStart time.Time
 }
 
 // dataSince is when anything was first recorded, for the dashboard to hide the periods longer than the history; false when nothing is recorded yet.
@@ -160,6 +169,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/bills", s.getBills)
 	mux.HandleFunc("PUT /api/v1/bills", s.putBills)
 	mux.HandleFunc("GET /api/v1/bills/reconciliation", s.billReconciliation)
+	mux.HandleFunc("GET /api/v1/alerts", s.listAlerts)
+	mux.HandleFunc("POST /api/v1/alerts/ack", s.ackAllAlerts)
+	mux.HandleFunc("POST /api/v1/alerts/{alertId}/ack", s.ackAlert)
+	mux.HandleFunc("GET /api/v1/alert-rules", s.listAlertRules)
+	mux.HandleFunc("POST /api/v1/alert-rules", s.addAlertRule)
+	mux.HandleFunc("GET /api/v1/alert-rules/pattern", s.alertPattern)
+	mux.HandleFunc("PATCH /api/v1/alert-rules/{ruleId}", s.updateAlertRule)
+	mux.HandleFunc("DELETE /api/v1/alert-rules/{ruleId}", s.deleteAlertRule)
+	mux.HandleFunc("GET /api/v1/digests", s.listDigests)
+	mux.HandleFunc("POST /api/v1/digests", s.makeDigestNow)
 	mux.HandleFunc("GET /api/v1/database/growth", s.getDatabaseGrowth)
 	mux.HandleFunc("GET /api/v1/outages", s.listOutages)
 	mux.HandleFunc("POST /api/v1/outages", s.addOutage)

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"sort"
 	"strconv"
@@ -60,21 +62,33 @@ func (s *Server) anomalies(w http.ResponseWriter, r *http.Request) {
 		days = n
 	}
 	only := r.URL.Query().Get("meter_id")
-	on, byID, err := s.enabledMeters(r.Context())
-	if err != nil {
+	out, err := s.anomalyDays(r.Context(), days, only)
+	switch {
+	case errors.Is(err, errNoSuchMeter):
+		writeProblem(w, http.StatusNotFound, "unknown_meter", "no such meter")
+	case err != nil:
 		serverError(w, err)
-		return
+	default:
+		writeJSON(w, http.StatusOK, out)
+	}
+}
+
+var errNoSuchMeter = errors.New("no such meter")
+
+// anomalyDays finds the unusual days of the last `days` complete days, for the house and every shown meter (or only for the meter `only`).
+func (s *Server) anomalyDays(ctx context.Context, days int, only string) (anomalyAnswer, error) {
+	on, byID, err := s.enabledMeters(ctx)
+	if err != nil {
+		return anomalyAnswer{}, err
 	}
 	if only != "" {
 		if _, ok := byID[only]; !ok || !byID[only].Enabled {
-			writeProblem(w, http.StatusNotFound, "unknown_meter", "no such meter")
-			return
+			return anomalyAnswer{}, errNoSuchMeter
 		}
 	}
-	cfg, err := s.rateConfig(r.Context())
+	cfg, err := s.rateConfig(ctx)
 	if err != nil {
-		serverError(w, err)
-		return
+		return anomalyAnswer{}, err
 	}
 	schedule := cfg.Schedule(s.Loc)
 
@@ -86,7 +100,7 @@ func (s *Server) anomalies(w http.ResponseWriter, r *http.Request) {
 	perDay := func(ids []string) ([]anomaly.Day, error) {
 		sum := map[rates.Date]float64{}
 		for _, id := range ids {
-			points, err := s.Store.Series(r.Context(), id, readFrom, readTo, model.BucketDay, s.Loc)
+			points, err := s.Store.Series(ctx, id, readFrom, readTo, model.BucketDay, s.Loc)
 			if err != nil {
 				return nil, err
 			}
@@ -127,8 +141,7 @@ func (s *Server) anomalies(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(mains) > 0 && only == "" {
 		if err := add("", "House", mains, minHouseExtraKWh); err != nil {
-			serverError(w, err)
-			return
+			return anomalyAnswer{}, err
 		}
 	}
 	for _, m := range on {
@@ -136,8 +149,7 @@ func (s *Server) anomalies(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if err := add(m.ID, m.Label, []string{m.ID}, minMeterExtraKWh); err != nil {
-			serverError(w, err)
-			return
+			return anomalyAnswer{}, err
 		}
 	}
 
@@ -237,5 +249,5 @@ func (s *Server) anomalies(w http.ResponseWriter, r *http.Request) {
 		}
 		return out.Days[i].ExtraKWh > out.Days[j].ExtraKWh
 	})
-	writeJSON(w, http.StatusOK, out)
+	return out, nil
 }

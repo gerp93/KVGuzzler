@@ -1286,6 +1286,180 @@ paths:
           description: Removed.
         '404':
           $ref: '#/components/responses/Problem'
+  /api/v1/alerts:
+    get:
+      tags: [Alerts]
+      operationId: getAlerts
+      summary: What needs attention.
+      description: |
+        `banner` is what has not been dismissed (worst first); `alerts` the last month's, open ones included. A condition (a device not answering) opens an
+        alert when it first holds and closes it when it stops; an event (an outage, an unusual day, a summary made) is raised once, already closed, and stays on
+        the banner until it is dismissed.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerts'
+  /api/v1/alerts/ack:
+    post:
+      tags: [Alerts]
+      operationId: dismissAllAlerts
+      summary: Dismiss every alert from the banner.
+      responses:
+        '204':
+          description: Dismissed.
+  /api/v1/alerts/{alertId}/ack:
+    post:
+      tags: [Alerts]
+      operationId: dismissAlert
+      summary: Dismiss one alert from the banner. It stays in the list while its condition holds.
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '204':
+          description: Dismissed.
+  /api/v1/alert-rules:
+    get:
+      tags: [Alerts]
+      operationId: getAlertRules
+      summary: Every alert rule, the built-in ones first.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRules'
+    post:
+      tags: [Alerts]
+      operationId: addAlertRule
+      summary: Make a rule about one meter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleChange'
+      responses:
+        '201':
+          description: The rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/alert-rules/pattern:
+    get:
+      tags: [Alerts]
+      operationId: getAlertPattern
+      summary: What a meter's usual pattern looks like, for a rule that holds it to that pattern.
+      parameters:
+        - name: meter_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: watts
+          in: query
+          description: The power above which the meter is working; without it, one is picked from the meter's own minutes.
+          schema:
+            type: number
+        - name: days
+          in: query
+          description: How many days to learn from, 7 to 90 (default 30).
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPattern'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/alert-rules/{ruleId}:
+    patch:
+      tags: [Alerts]
+      operationId: updateAlertRule
+      summary: Change a rule. What is not sent stays.
+      description: A built-in rule's switch, severity and settings; anything of a rule of the owner's own.
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleChange'
+      responses:
+        '200':
+          description: The rule as it is now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Alerts]
+      operationId: removeAlertRule
+      summary: Remove a rule of the owner's own, with the alerts it raised. A built-in rule can only be switched off.
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/digests:
+    get:
+      tags: [Alerts]
+      operationId: getDigests
+      summary: The summaries of days and weeks, newest first.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Digests'
+    post:
+      tags: [Alerts]
+      operationId: makeDigest
+      summary: Make the summary of the latest complete day or week now. One already made is returned as it is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [daily, weekly]
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Digest'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
   /api/v1/history-start:
     get:
       tags: [Settings]
@@ -1772,6 +1946,18 @@ components:
   parameters:
     DeviceId:
       name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    AlertId:
+      name: alertId
+      in: path
+      required: true
+      schema:
+        type: integer
+    RuleId:
+      name: ruleId
       in: path
       required: true
       schema:
@@ -3145,6 +3331,311 @@ components:
         tariff_label:
           type: [string, 'null']
           description: The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side.
+    Alert:
+      type: object
+      required: [id, rule_id, severity, title, detail, opened_at, updated_at, cleared_at, acked_at, active]
+      properties:
+        id:
+          type: integer
+        rule_id:
+          type: string
+        severity:
+          type: string
+          enum: [info, warn, urgent]
+        title:
+          type: string
+        detail:
+          type: string
+        meter_id:
+          type: string
+        link:
+          type: string
+          description: A dashboard address (`#/...`) where the thing can be looked at.
+        opened_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        cleared_at:
+          type: [string, 'null']
+          format: date-time
+        acked_at:
+          type: [string, 'null']
+          format: date-time
+        active:
+          type: boolean
+          description: The condition still holds. An event is never active.
+    Alerts:
+      type: object
+      required: [banner, alerts, active_count, worst]
+      properties:
+        banner:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+        active_count:
+          type: integer
+        worst:
+          type: string
+          description: The highest severity on the banner; empty with none.
+    AlertWatch:
+      type: object
+      description: Which departures from a meter's usual pattern are watched.
+      properties:
+        overdue:
+          type: boolean
+        too_often:
+          type: boolean
+        too_long:
+          type: boolean
+        rest:
+          type: boolean
+        margin:
+          type: number
+          description: How far past the usual counts (1.25 is a quarter more than the longest wait seen); 0 is the default.
+    AlertParams:
+      type: object
+      description: The numbers a rule is given. Which of them a rule uses is fixed by its kind.
+      properties:
+        op:
+          type: string
+          enum: [above, below]
+        watts:
+          type: number
+        minutes:
+          type: integer
+        hours:
+          type: number
+        percent:
+          type: number
+        days:
+          type: integer
+        watch:
+          $ref: '#/components/schemas/AlertWatch'
+    AlertRuleField:
+      type: object
+      required: [key, label, unit, min, max, step]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        unit:
+          type: string
+        min:
+          type: number
+        max:
+          type: number
+        step:
+          type: number
+    AlertRule:
+      type: object
+      required: [id, builtin, kind, name, enabled, severity, params, open]
+      properties:
+        id:
+          type: string
+        builtin:
+          type: boolean
+        kind:
+          type: string
+          description: A built-in rule's id, or `level`, `quiet`, `long` or `pattern` for the owner's own.
+        name:
+          type: string
+        help:
+          type: string
+        enabled:
+          type: boolean
+        meter_id:
+          type: string
+        meter_label:
+          type: string
+        severity:
+          type: string
+          enum: [info, warn, urgent]
+        params:
+          $ref: '#/components/schemas/AlertParams'
+        fields:
+          type: array
+          description: A built-in rule's settings, so they can be shown without knowing the rule.
+          items:
+            $ref: '#/components/schemas/AlertRuleField'
+        open:
+          type: integer
+          description: How many alerts of the rule hold now.
+    AlertRules:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertRule'
+    AlertRuleChange:
+      type: object
+      description: A new rule needs `kind`, `meter_id` and `params`. When changing one, only what is sent changes.
+      properties:
+        kind:
+          type: string
+          enum: [level, quiet, long, pattern]
+        meter_id:
+          type: string
+        name:
+          type: string
+        enabled:
+          type: boolean
+        severity:
+          type: string
+          enum: ['', info, warn, urgent]
+        params:
+          $ref: '#/components/schemas/AlertParams'
+    AlertPattern:
+      type: object
+      required: [ok, level_watts, suggested, rest_watts, runs, days, gap_median_hours, gap_max_hours, overdue_after_hours, run_median_minutes, run_max_minutes, peak_median_watts, most_per_day, last_run_at, hours_since_last_run]
+      properties:
+        ok:
+          type: boolean
+          description: There is a pattern to hold the meter to.
+        why:
+          type: string
+          enum: [no_data, no_spikes, too_few_runs]
+          description: What is missing when there is none.
+        level_watts:
+          type: number
+        suggested:
+          type: boolean
+        rest_watts:
+          type: number
+        runs:
+          type: integer
+        days:
+          type: number
+        gap_median_hours:
+          type: number
+        gap_max_hours:
+          type: number
+        overdue_after_hours:
+          type: number
+        run_median_minutes:
+          type: integer
+        run_max_minutes:
+          type: integer
+        peak_median_watts:
+          type: number
+        most_per_day:
+          type: integer
+        last_run_at:
+          type: [string, 'null']
+          format: date-time
+        hours_since_last_run:
+          type: [number, 'null']
+    DigestMeter:
+      type: object
+      required: [meter_id, label, kwh, cost, prev_kwh, change_kwh, share]
+      properties:
+        meter_id:
+          type: string
+        label:
+          type: string
+        kwh:
+          type: number
+        cost:
+          type: [string, 'null']
+        prev_kwh:
+          type: number
+        change_kwh:
+          type: number
+        share:
+          type: [number, 'null']
+    DigestBody:
+      type: object
+      required: [kind, from, to, kwh, cost, cost_estimated, prev_kwh, prev_cost, change_share, coverage, top, biggest_rise, base_watts, base_prev_watts, outages, unusual_days, alerts]
+      properties:
+        kind:
+          type: string
+          enum: [daily, weekly]
+        from:
+          type: string
+        to:
+          type: string
+        kwh:
+          type: number
+        cost:
+          type: [string, 'null']
+        cost_estimated:
+          type: boolean
+        prev_kwh:
+          type: [number, 'null']
+        prev_cost:
+          type: [string, 'null']
+        change_share:
+          type: [number, 'null']
+        coverage:
+          type: [number, 'null']
+        top:
+          type: array
+          items:
+            $ref: '#/components/schemas/DigestMeter'
+        biggest_rise:
+          oneOf:
+            - $ref: '#/components/schemas/DigestMeter'
+            - type: 'null'
+        base_watts:
+          type: [number, 'null']
+        base_prev_watts:
+          type: [number, 'null']
+        outages:
+          type: object
+          required: [power_seconds, server_seconds, unknown_seconds]
+          properties:
+            power_seconds:
+              type: integer
+            server_seconds:
+              type: integer
+            unknown_seconds:
+              type: integer
+        unusual_days:
+          type: integer
+        alerts:
+          type: object
+          required: [info, warn, urgent]
+          properties:
+            info:
+              type: integer
+            warn:
+              type: integer
+            urgent:
+              type: integer
+    Digest:
+      type: object
+      required: [id, kind, from, to, created_at, body]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [daily, weekly]
+        from:
+          type: string
+        to:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        body:
+          $ref: '#/components/schemas/DigestBody'
+    Digests:
+      type: object
+      required: [digests]
+      properties:
+        digests:
+          type: array
+          items:
+            $ref: '#/components/schemas/Digest'
     BillList:
       type: object
       required: [bills]

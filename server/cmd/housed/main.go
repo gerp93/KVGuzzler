@@ -93,6 +93,7 @@ func run(listen, dataDir string, simulate bool, simDays int, loc *time.Location)
 	root := http.NewServeMux()
 	apiServer := &api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version, DatabasePath: dbPath, Lookup: &openei.Client{HTTP: &http.Client{}}}
 	go apiServer.RunPriceFreeze(ctx, log.Printf)
+	go apiServer.RunAlerts(ctx, log.Printf)
 	go apiServer.RunRatesRefresh(ctx, time.Hour, log.Printf)
 	go apiServer.CarbonFeed().Run(ctx, log.Printf)
 	go apiServer.FordFeed().Run(ctx, log.Printf)
