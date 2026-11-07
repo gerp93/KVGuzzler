@@ -1072,7 +1072,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Read the odometer from Ford now (the server also reads it by itself four times a day).
+         * Read the odometer from Ford now (the server also reads it by itself every two hours).
          * @description The odometer is saved as the reading of today's local day for the charging meter, unless it has not moved since the latest reading. Ford's
          *     own limit is one request per 30 seconds, so a read less than 30 seconds after the last look of any kind is refused with 429 without asking
          *     Ford (`read_wait_seconds` of the setup says how long is left). Ford's complaints are in the answer's `last_outcome`, not an error status.

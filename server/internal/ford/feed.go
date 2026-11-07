@@ -47,9 +47,9 @@ type Sink interface {
 }
 
 const (
-	// Interval is how often the odometer is read after a good read: four times a day, so one failed look never skips a day, and a refresh token
+	// Interval is how often the odometer is read after a good read: every two hours (twelve times a day), so one failed look never skips a day, the saved battery percent has a report every couple of hours to work out the charge between, and a refresh token
 	// (30 days) is always renewed long before it lapses.
-	Interval = 6 * time.Hour
+	Interval = 2 * time.Hour
 	// RetryAfterError is how long to wait after something went wrong. Ford may disable a client that retries hard, so it is slow.
 	RetryAfterError = time.Hour
 	// CheckEvery is how often the setup and the clock are looked at.
