@@ -4,7 +4,7 @@ import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
 import type { MeterRuns } from './runs';
-import type { EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
+import type { CustomCar, EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 import type { components } from './api-types';
 import type { DatabaseGrowth } from './dbsize';
 import type { OutageKind, Outage, Outages } from './outages';
@@ -70,17 +70,17 @@ export const api = {
       body: JSON.stringify({ kwh }),
     }),
   deleteEvBattery: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/battery`, { method: 'DELETE' }),
-  /** The gas car a charging meter's vehicle is compared with, and the gasoline price area. */
+  /** The cars of their own a charging meter's vehicle is compared with, and the gasoline price area. */
   fuelPrices: () => request<FuelPrices>('api/v1/fuel-prices'),
   setFuelArea: (areaId: string) =>
     request<FuelPrices>('api/v1/fuel-prices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area_id: areaId }) }),
   removeFuelArea: () => request<void>('api/v1/fuel-prices', { method: 'DELETE' }),
   evCompare: (meterId: string) => request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`),
-  putEvCompare: (meterId: string, customMpg: number | null) =>
+  putEvCompare: (meterId: string, customCars: CustomCar[]) =>
     request<EvCompare>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ custom_mpg: customMpg }),
+      body: JSON.stringify({ custom_cars: customCars }),
     }),
   deleteEvCompare: (meterId: string) => request<void>(`api/v1/meters/${encodeURIComponent(meterId)}/ev/compare`, { method: 'DELETE' }),
   /** What each stretch between odometer readings would have cost in the gas car, against what charging cost. */

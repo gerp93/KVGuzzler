@@ -177,24 +177,25 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The house's gasoline price area as a charging meter's vehicle is compared in it, and the owner's own gas car if there is one.
+         * The house's gasoline price area as a charging meter's vehicle is compared in it, and the owner's own cars.
          * @description The comparison sets the cost of the electric vehicle's miles beside what the same miles would have cost in gasoline cars: the `presets` (15 to 40 miles
-         *     per gallon) and, if the owner named one, `custom_mpg`. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
+         *     per gallon, for each fuel) and the owner's own `custom_cars`, each in the fuel it burns. The price is the weekly average retail price of regular gasoline in an area, which EIA publishes
          *     for the country, regions, some states and big cities, read with the EIA key saved for the carbon footprint (`key_saved`). The area is the house's
          *     (`/api/v1/fuel-prices`), the same for every vehicle; only the own car is the vehicle's. Which of the gas cars a page draws is the page's own choice;
          *     every one is answered. 409 when the meter is not marked `ev`.
          */
         get: operations["getEvCompare"];
         /**
-         * Save the owner's own gas car.
-         * @description The presets are always compared; this adds one more. A `custom_mpg` that is one of the presets is not a second comparison. The price area is the house's
+         * Save the owner's own cars.
+         * @description The presets are always compared; this adds the owner's own cars, up to 8, each with the fuel it burns (a car is compared in that fuel only). A car that is
+         *     one of the presets of its fuel, or that is named twice, is not a second comparison. The list replaces the one saved. The price area is the house's
          *     (`PUT /api/v1/fuel-prices`): it must already be saved, or be named here as `area_id`, which saves it for the house and reads its prices now, as that
-         *     call does. 400 for no area anywhere, a miles per gallon outside 5 to 200, an area EIA has no price for, or any other member (an older client's `mpg`
-         *     included).
+         *     call does. 400 for no area anywhere, a miles per gallon outside 5 to 200, a fuel that is not `gas` or `diesel`, more than 8 cars, an area EIA has no
+         *     price for, or any other member (an older client's `custom_mpg` or `mpg` included).
          */
         put: operations["putEvCompare"];
         post?: never;
-        /** Take the owner's own gas car off (the house's area and the saved prices are kept). */
+        /** Take the owner's own cars off (the house's area and the saved prices are kept). */
         delete: operations["deleteEvCompare"];
         options?: never;
         head?: never;
@@ -1402,10 +1403,18 @@ export interface components {
         /** @description A charging meter's comparison. It carries what the house's price area (`FuelPrices`) says, and the vehicle's own car. */
         EvCompare: components["schemas"]["FuelPrices"] & {
             meter_id: string;
-            /** @description The owner's own gas car, in miles per gallon, beside the presets; null when there is none. */
-            custom_mpg: number | null;
-            /** @description The gas cars every vehicle is compared with, in miles per gallon, lowest first. */
+            /** @description The owner's own cars, in the order they were saved, beside the presets; empty when there are none. */
+            custom_cars: components["schemas"]["EvCustomCar"][];
+            /** @description The cars every vehicle is compared with, in miles per gallon, lowest first, in each fuel. */
             presets: number[];
+        };
+        EvCustomCar: {
+            mpg: number;
+            /**
+             * @description What the car burns, and so which weekly price its miles are priced at.
+             * @enum {string}
+             */
+            fuel: "gas" | "diesel";
         };
         EvSavings: {
             meter_id: string;
@@ -1413,7 +1422,7 @@ export interface components {
             area_name: string | null;
             /** @description The area the diesel prices are for (the area's region when EIA publishes no diesel for the area itself); null until diesel prices have been read. */
             diesel_area_name: string | null;
-            /** @description The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own if there is one) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order. */
+            /** @description The cars compared with, the gas cars lowest miles per gallon first (the presets and the owner's own gas cars) and then the diesel cars the same way, once diesel prices have been read. Every `gas` list below is in this order. */
             comparisons: {
                 /**
                  * @description What the car burns, and so which weekly price its miles are priced at.
@@ -2741,7 +2750,7 @@ export interface operations {
                 "application/json": {
                     /** @description One of the `areas` ids. Optional; saves the house's area. */
                     area_id?: string;
-                    custom_mpg?: number | null;
+                    custom_cars?: components["schemas"]["EvCustomCar"][];
                 };
             };
         };

@@ -161,6 +161,8 @@ export function efficiencyTrend(intervals: EvInterval[], window: number = TREND_
 }
 
 export type EvCompare = components['schemas']['EvCompare'];
+/** A car of the owner's own: its miles per gallon and what it burns. */
+export type CustomCar = components['schemas']['EvCustomCar'];
 export type EvSavings = components['schemas']['EvSavings'];
 
 /** Seconds since the epoch at noon UTC of a calendar day, so every time zone shows the same date. */

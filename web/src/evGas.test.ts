@@ -88,6 +88,20 @@ describe('names and looks', () => {
   it('gives the owners own car a colour of its own at full strength', () => {
     expect(gasLineStyle(comps[3]!, comps)).toEqual({ colorVar: '--color-accent-blue', alpha: 1, width: 2, dashed: false });
   });
+
+  it('gives each of several own cars a colour of its own, in the order listed, dashed for a diesel one', () => {
+    const own: GasComparison[] = [
+      { fuel: 'gas', mpg: 18, custom: true },
+      { fuel: 'gas', mpg: 27.5, custom: true },
+      { fuel: 'diesel', mpg: 22, custom: true },
+      { fuel: 'diesel', mpg: 30, custom: true },
+      { fuel: 'diesel', mpg: 33, custom: true },
+    ];
+    const all = [...comps.filter((c) => !c.custom), ...own];
+    const looks = own.map((c) => gasLineStyle(c, all));
+    expect(looks.map((l) => l.colorVar)).toEqual(['--color-accent-blue', '--color-accent-muted', '--color-text', '--color-accent-blue', '--color-accent-muted']);
+    expect(looks.map((l) => l.dashed)).toEqual([false, false, true, true, true]);
+  });
 });
 
 describe('countedStretches', () => {
