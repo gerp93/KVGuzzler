@@ -270,13 +270,13 @@ func TestRatesDefaultSaveAndRefuse(t *testing.T) {
 	}
 
 	for name, body := range map[string]string{
-		"lookup is not built":    `{"mode":"lookup"}`,
-		"unknown mode":           `{"mode":"free"}`,
-		"negative rate":          `{"mode":"one","fixed_rate":"-1"}`,
-		"rate not a decimal":     `{"mode":"one","fixed_rate":"abc"}`,
-		"rate sent as a number":  `{"mode":"one","fixed_rate":0.15}`,
-		"unknown field":          `{"mode":"one","nonsense":1}`,
-		"bad currency":           `{"mode":"one","currency":"dollars"}`,
+		"lookup is not built":   `{"mode":"lookup"}`,
+		"unknown mode":          `{"mode":"free"}`,
+		"negative rate":         `{"mode":"one","fixed_rate":"-1"}`,
+		"rate not a decimal":    `{"mode":"one","fixed_rate":"abc"}`,
+		"rate sent as a number": `{"mode":"one","fixed_rate":0.15}`,
+		"unknown field":         `{"mode":"one","nonsense":1}`,
+		"bad currency":          `{"mode":"one","currency":"dollars"}`,
 	} {
 		if r, _ := put(t, srv.URL+"/api/v1/rates", body); r.StatusCode != 400 {
 			t.Errorf("%s: status %d, want 400", name, r.StatusCode)
