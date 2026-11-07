@@ -1409,6 +1409,8 @@ export interface components {
             presets: number[];
         };
         EvCustomCar: {
+            /** @description What the owner calls the car; optional. The car is told apart by its fuel and miles per gallon. */
+            name?: string;
             mpg: number;
             /**
              * @description What the car burns, and so which weekly price its miles are priced at.
@@ -1431,6 +1433,8 @@ export interface components {
                 fuel: "gas" | "diesel";
                 mpg: number;
                 custom: boolean;
+                /** @description What the owner calls one of their own cars; left out for a preset and for a car with no name. */
+                name?: string;
             }[];
             /** @description The weekly prices from a little before the first odometer reading (the last half year when there are none), oldest first, for a chart. */
             prices: {

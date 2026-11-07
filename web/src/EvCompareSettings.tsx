@@ -1,5 +1,5 @@
-// The car comparison, in the EV card's settings: any number of cars of the owner's own (up to the server's limit), each with its miles per gallon and what it burns,
-// beside the presets (15 to 40 miles per gallon, in both fuels, always compared; which are drawn is ticked under the chart). The area whose price is used is the
+// The car comparison, in the EV card's settings: any number of cars of the owner's own (up to the server's limit), each with a name (optional), its miles per gallon
+// and what it burns, beside the presets (15 to 40 miles per gallon, in both fuels, always compared; which are drawn is ticked under the chart). The area whose price is used is the
 // house's, set in the Connectors tab with the EIA key.
 import { useEffect, useState } from 'preact/hooks';
 import { api } from './api';
@@ -8,14 +8,17 @@ import { routePath } from './route';
 
 const MAX_CARS = 8;
 
+const MAX_NAME = 40;
+
 interface Row {
   key: number;
+  name: string;
   mpg: string;
   fuel: CustomCar['fuel'];
 }
 
 let nextKey = 1;
-const rowsOf = (cars: CustomCar[]): Row[] => cars.map((c) => ({ key: nextKey++, mpg: String(c.mpg), fuel: c.fuel }));
+const rowsOf = (cars: CustomCar[]): Row[] => cars.map((c) => ({ key: nextKey++, name: c.name ?? '', mpg: String(c.mpg), fuel: c.fuel }));
 
 export function EvCompareSettings({ meterId, reload }: { meterId: string; reload: () => void }) {
   const [view, setView] = useState<EvCompare | undefined>();
@@ -45,7 +48,8 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
         setProblem("Enter each car's miles per gallon, a number from 5 to 200, like 27, or remove the row.");
         return;
       }
-      cars.push({ mpg, fuel: r.fuel });
+      const name = r.name.trim();
+      cars.push(name === '' ? { mpg, fuel: r.fuel } : { name, mpg, fuel: r.fuel });
     }
     setSaving(true);
     try {
@@ -74,6 +78,10 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
         {rows.map((r) => (
           <div class="ev-carrow" key={r.key}>
             <label class="field">
+              <span>Name</span>
+              <input type="text" value={r.name} maxLength={MAX_NAME} placeholder="Optional" onInput={(e) => change(r.key, { name: (e.target as HTMLInputElement).value })} />
+            </label>
+            <label class="field">
               <span>Miles per gallon</span>
               <input type="text" inputMode="decimal" value={r.mpg} placeholder="27" onInput={(e) => change(r.key, { mpg: (e.target as HTMLInputElement).value })} />
             </label>
@@ -90,7 +98,7 @@ export function EvCompareSettings({ meterId, reload }: { meterId: string; reload
           </div>
         ))}
         <div class="chips save">
-          <button type="button" disabled={rows.length >= MAX_CARS} onClick={() => setRows((rs) => [...rs, { key: nextKey++, mpg: '', fuel: 'gas' }])}>
+          <button type="button" disabled={rows.length >= MAX_CARS} onClick={() => setRows((rs) => [...rs, { key: nextKey++, name: '', mpg: '', fuel: 'gas' }])}>
             Add car
           </button>
           <button type="submit" disabled={saving || view?.area_id == null}>
