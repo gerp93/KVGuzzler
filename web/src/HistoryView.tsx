@@ -6,6 +6,7 @@ import { usePoll, useStored } from './hooks';
 import { HouseHistoryCard } from './HouseHistoryCard';
 import { OutagesCard } from './OutagesCard';
 import { PeriodPicker } from './Periods';
+import { StandbyCard } from './StandbyCard';
 import { compareOrder, formatKwh, formatMoney, formatWatts, periodRange, sumByTime, type Meter, type PeriodKey, type Summary } from './lib';
 
 /** The colours of the compared lines, in the order they were picked (`--series-N`, one per hue, defined in features.css): more than a few can be shown at once. */
@@ -125,6 +126,8 @@ export function HistoryView({ meters }: { meters: Meter[] }) {
         <HouseHistoryCard period={period as PeriodKey} />
         <EstimatorView meters={meters} />
       </div>
+
+      <StandbyCard />
 
       <BillsCard />
 

@@ -1288,7 +1288,7 @@ paths:
           $ref: '#/components/responses/Problem'
   /api/v1/alerts:
     get:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: getAlerts
       summary: What needs attention.
       description: |
@@ -1304,7 +1304,7 @@ paths:
                 $ref: '#/components/schemas/Alerts'
   /api/v1/alerts/ack:
     post:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: dismissAllAlerts
       summary: Dismiss every alert from the banner.
       responses:
@@ -1312,7 +1312,7 @@ paths:
           description: Dismissed.
   /api/v1/alerts/{alertId}/ack:
     post:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: dismissAlert
       summary: Dismiss one alert from the banner. It stays in the list while its condition holds.
       parameters:
@@ -1322,7 +1322,7 @@ paths:
           description: Dismissed.
   /api/v1/alert-rules:
     get:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: getAlertRules
       summary: Every alert rule, the built-in ones first.
       responses:
@@ -1333,7 +1333,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlertRules'
     post:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: addAlertRule
       summary: Make a rule about one meter.
       requestBody:
@@ -1353,7 +1353,7 @@ paths:
           $ref: '#/components/responses/Problem'
   /api/v1/alert-rules/pattern:
     get:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: getAlertPattern
       summary: What a meter's usual pattern looks like, for a rule that holds it to that pattern.
       parameters:
@@ -1383,7 +1383,7 @@ paths:
           $ref: '#/components/responses/Problem'
   /api/v1/alert-rules/{ruleId}:
     patch:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: updateAlertRule
       summary: Change a rule. What is not sent stays.
       description: A built-in rule's switch, severity and settings; anything of a rule of the owner's own.
@@ -1407,7 +1407,7 @@ paths:
         '404':
           $ref: '#/components/responses/Problem'
     delete:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: removeAlertRule
       summary: Remove a rule of the owner's own, with the alerts it raised. A built-in rule can only be switched off.
       parameters:
@@ -1419,7 +1419,7 @@ paths:
           $ref: '#/components/responses/Problem'
   /api/v1/digests:
     get:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: getDigests
       summary: The summaries of days and weeks, newest first.
       parameters:
@@ -1435,7 +1435,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Digests'
     post:
-      tags: [Alerts]
+      tags: [Settings]
       operationId: makeDigest
       summary: Make the summary of the latest complete day or week now. One already made is returned as it is.
       requestBody:
@@ -1459,6 +1459,35 @@ paths:
         '400':
           $ref: '#/components/responses/Problem'
         '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/standby:
+    get:
+      tags: [Read]
+      operationId: getStandby
+      summary: What each appliance draws when it is doing nothing, against the stretch before.
+      description: |
+        Each appliance's always-on power (the 5th percentile of its minute averages) over the last `days` days, a year of it in energy and money, and the same
+        over the `days` before. With `change` the two stretches are the `days` after that day and the `days` before it, so what unplugging something did shows.
+        Every figure is that meter's own floor: never added to the others or to the house's.
+      parameters:
+        - name: days
+          in: query
+          description: Length of each stretch, 3 to 180 (default 30).
+          schema:
+            type: integer
+        - name: change
+          in: query
+          description: A local day before today (YYYY-MM-DD) to split the two stretches at.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Standby'
+        '400':
           $ref: '#/components/responses/Problem'
   /api/v1/history-start:
     get:
@@ -3636,6 +3665,58 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Digest'
+    StandbyPart:
+      type: object
+      required: [meter_id, label, watts, prev_watts, change_watts, kwh_per_year, cost_per_year, change_cost_per_year]
+      properties:
+        meter_id:
+          type: string
+        label:
+          type: string
+        watts:
+          type: number
+        prev_watts:
+          type: [number, 'null']
+        change_watts:
+          type: [number, 'null']
+          description: Watts less prev_watts; 0 for a move under half a watt.
+        kwh_per_year:
+          type: number
+        cost_per_year:
+          type: [string, 'null']
+        change_cost_per_year:
+          type: [string, 'null']
+    Standby:
+      type: object
+      required: [from, to, prev_from, prev_to, change, house_watts, house_prev_watts, rate, rate_estimated, parts]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        prev_from:
+          type: string
+          format: date-time
+        prev_to:
+          type: string
+          format: date-time
+        change:
+          type: [string, 'null']
+        house_watts:
+          type: [number, 'null']
+        house_prev_watts:
+          type: [number, 'null']
+        rate:
+          type: [string, 'null']
+        rate_estimated:
+          type: boolean
+        parts:
+          type: array
+          description: Biggest floor first.
+          items:
+            $ref: '#/components/schemas/StandbyPart'
     BillList:
       type: object
       required: [bills]

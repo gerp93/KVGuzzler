@@ -149,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/levels", s.levels)
 	mux.HandleFunc("GET /api/v1/meters/{meterId}/baseload", s.meterBaseLoad)
 	mux.HandleFunc("GET /api/v1/baseload", s.houseBaseLoad)
+	mux.HandleFunc("GET /api/v1/standby", s.standby)
 	mux.HandleFunc("GET /api/v1/live", s.live)
 	mux.HandleFunc("GET /api/v1/series", s.series)
 	mux.HandleFunc("GET /api/v1/summary", s.summary)
