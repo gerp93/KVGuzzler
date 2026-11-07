@@ -869,6 +869,136 @@ export interface paths {
         patch: operations["updateOutage"];
         trace?: never;
     };
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What needs attention.
+         * @description `banner` is what has not been dismissed (worst first); `alerts` the last month's, open ones included. A condition (a device not answering) opens an
+         *     alert when it first holds and closes it when it stops; an event (an outage, an unusual day, a summary made) is raised once, already closed, and stays on
+         *     the banner until it is dismissed.
+         */
+        get: operations["getAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss every alert from the banner. */
+        post: operations["dismissAllAlerts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{alertId}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss one alert from the banner. It stays in the list while its condition holds. */
+        post: operations["dismissAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every alert rule, the built-in ones first. */
+        get: operations["getAlertRules"];
+        put?: never;
+        /** Make a rule about one meter. */
+        post: operations["addAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-rules/pattern": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a meter's usual pattern looks like, for a rule that holds it to that pattern. */
+        get: operations["getAlertPattern"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a rule of the owner's own, with the alerts it raised. A built-in rule can only be switched off. */
+        delete: operations["removeAlertRule"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a rule. What is not sent stays.
+         * @description A built-in rule's switch, severity and settings; anything of a rule of the owner's own.
+         */
+        patch: operations["updateAlertRule"];
+        trace?: never;
+    };
+    "/api/v1/digests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The summaries of days and weeks, newest first. */
+        get: operations["getDigests"];
+        put?: never;
+        /** Make the summary of the latest complete day or week now. One already made is returned as it is. */
+        post: operations["makeDigest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history-start": {
         parameters: {
             query?: never;
@@ -2046,6 +2176,168 @@ export interface components {
             /** @description The looked-up tariff in use (lookup mode); the rate grid itself is kept server-side. */
             tariff_label?: string | null;
         };
+        Alert: {
+            id: number;
+            rule_id: string;
+            /** @enum {string} */
+            severity: "info" | "warn" | "urgent";
+            title: string;
+            detail: string;
+            meter_id?: string;
+            /** @description A dashboard address (`#/...`) where the thing can be looked at. */
+            link?: string;
+            /** Format: date-time */
+            opened_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            cleared_at: string | null;
+            /** Format: date-time */
+            acked_at: string | null;
+            /** @description The condition still holds. An event is never active. */
+            active: boolean;
+        };
+        Alerts: {
+            banner: components["schemas"]["Alert"][];
+            alerts: components["schemas"]["Alert"][];
+            active_count: number;
+            /** @description The highest severity on the banner; empty with none. */
+            worst: string;
+        };
+        /** @description Which departures from a meter's usual pattern are watched. */
+        AlertWatch: {
+            overdue?: boolean;
+            too_often?: boolean;
+            too_long?: boolean;
+            rest?: boolean;
+            /** @description How far past the usual counts (1.25 is a quarter more than the longest wait seen); 0 is the default. */
+            margin?: number;
+        };
+        /** @description The numbers a rule is given. Which of them a rule uses is fixed by its kind. */
+        AlertParams: {
+            /** @enum {string} */
+            op?: "above" | "below";
+            watts?: number;
+            minutes?: number;
+            hours?: number;
+            percent?: number;
+            days?: number;
+            watch?: components["schemas"]["AlertWatch"];
+        };
+        AlertRuleField: {
+            key: string;
+            label: string;
+            unit: string;
+            min: number;
+            max: number;
+            step: number;
+        };
+        AlertRule: {
+            id: string;
+            builtin: boolean;
+            /** @description A built-in rule's id, or `level`, `quiet`, `long` or `pattern` for the owner's own. */
+            kind: string;
+            name: string;
+            help?: string;
+            enabled: boolean;
+            meter_id?: string;
+            meter_label?: string;
+            /** @enum {string} */
+            severity: "info" | "warn" | "urgent";
+            params: components["schemas"]["AlertParams"];
+            /** @description A built-in rule's settings, so they can be shown without knowing the rule. */
+            fields?: components["schemas"]["AlertRuleField"][];
+            /** @description How many alerts of the rule hold now. */
+            open: number;
+        };
+        AlertRules: {
+            rules: components["schemas"]["AlertRule"][];
+        };
+        /** @description A new rule needs `kind`, `meter_id` and `params`. When changing one, only what is sent changes. */
+        AlertRuleChange: {
+            /** @enum {string} */
+            kind?: "level" | "quiet" | "long" | "pattern";
+            meter_id?: string;
+            name?: string;
+            enabled?: boolean;
+            /** @enum {string} */
+            severity?: "" | "info" | "warn" | "urgent";
+            params?: components["schemas"]["AlertParams"];
+        };
+        AlertPattern: {
+            /** @description There is a pattern to hold the meter to. */
+            ok: boolean;
+            /**
+             * @description What is missing when there is none.
+             * @enum {string}
+             */
+            why?: "no_data" | "no_spikes" | "too_few_runs";
+            level_watts: number;
+            suggested: boolean;
+            rest_watts: number;
+            runs: number;
+            days: number;
+            gap_median_hours: number;
+            gap_max_hours: number;
+            overdue_after_hours: number;
+            run_median_minutes: number;
+            run_max_minutes: number;
+            peak_median_watts: number;
+            most_per_day: number;
+            /** Format: date-time */
+            last_run_at: string | null;
+            hours_since_last_run: number | null;
+        };
+        DigestMeter: {
+            meter_id: string;
+            label: string;
+            kwh: number;
+            cost: string | null;
+            prev_kwh: number;
+            change_kwh: number;
+            share: number | null;
+        };
+        DigestBody: {
+            /** @enum {string} */
+            kind: "daily" | "weekly";
+            from: string;
+            to: string;
+            kwh: number;
+            cost: string | null;
+            cost_estimated: boolean;
+            prev_kwh: number | null;
+            prev_cost: string | null;
+            change_share: number | null;
+            coverage: number | null;
+            top: components["schemas"]["DigestMeter"][];
+            biggest_rise: components["schemas"]["DigestMeter"] | null;
+            base_watts: number | null;
+            base_prev_watts: number | null;
+            outages: {
+                power_seconds: number;
+                server_seconds: number;
+                unknown_seconds: number;
+            };
+            unusual_days: number;
+            alerts: {
+                info: number;
+                warn: number;
+                urgent: number;
+            };
+        };
+        Digest: {
+            id: number;
+            /** @enum {string} */
+            kind: "daily" | "weekly";
+            from: string;
+            to: string;
+            /** Format: date-time */
+            created_at: string;
+            body: components["schemas"]["DigestBody"];
+        };
+        Digests: {
+            digests: components["schemas"]["Digest"][];
+        };
         BillList: {
             bills: components["schemas"]["Bill"][];
         };
@@ -2580,6 +2872,8 @@ export interface components {
     };
     parameters: {
         DeviceId: string;
+        AlertId: number;
+        RuleId: string;
         OutageId: number;
         GroupId: string;
         ComputerId: string;
@@ -4063,6 +4357,236 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alerts"];
+                };
+            };
+        };
+    };
+    dismissAllAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    dismissAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alertId: components["parameters"]["AlertId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRules"];
+                };
+            };
+        };
+    };
+    addAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleChange"];
+            };
+        };
+        responses: {
+            /** @description The rule. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    getAlertPattern: {
+        parameters: {
+            query: {
+                meter_id: string;
+                /** @description The power above which the meter is working; without it, one is picked from the meter's own minutes. */
+                watts?: number;
+                /** @description How many days to learn from, 7 to 90 (default 30). */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertPattern"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    removeAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: components["parameters"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: components["parameters"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleChange"];
+            };
+        };
+        responses: {
+            /** @description The rule as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getDigests: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Digests"];
+                };
+            };
+        };
+    };
+    makeDigest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "daily" | "weekly";
+                };
+            };
+        };
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Digest"];
+                };
+            };
+            400: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
         };
     };
