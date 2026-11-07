@@ -3,6 +3,7 @@ import type { ApplianceGroup, Bill, BillList, FrozenPrices, RepriceAnswer, Carbo
 import type { Anomalies } from './anomalies';
 import type { BaseLoad } from './baseload';
 import type { Levels } from './levels';
+import type { BillReconciliation } from './reconcile';
 import type { MeterRuns } from './runs';
 import type { CustomCar, EvBattery, EvChargesAnswer, EvCompare, EvSavings, MeterEv } from './ev';
 import type { components } from './api-types';
@@ -175,6 +176,8 @@ export const api = {
   /** The electricity bills entered, kept whatever the price comes from. */
   bills: () => request<BillList>('api/v1/bills'),
   setBills: (bills: Bill[]) => request<BillList>('api/v1/bills', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bills }) }),
+  /** Each bill checked against what the house recorded over the same days. */
+  billReconciliation: () => request<BillReconciliation>('api/v1/bills/reconciliation'),
   /** Which finished days keep the price they were saved with. */
   frozenPrices: () => request<FrozenPrices>('api/v1/rates/frozen'),
   /** Shows what pricing finished days again would change; with `apply` it does it. */

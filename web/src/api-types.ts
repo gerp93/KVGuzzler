@@ -977,6 +977,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bills/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Each bill checked against what the house recorded over the same days.
+         * @description The house is the mains meters added together. A check of the recording: it changes no figure. The utility's own meter reads and day
+         *     boundaries differ from the recording's, so a small difference is expected.
+         */
+        get: operations["getBillReconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rates/lookup": {
         parameters: {
             query?: never;
@@ -2027,6 +2048,49 @@ export interface components {
         };
         BillList: {
             bills: components["schemas"]["Bill"][];
+        };
+        BillReconciliation: {
+            /** @description Where the price of a kWh comes from now (`one`, `bills`, `lookup`). */
+            price_source: string;
+            /** @description Whether the house has a mains meter to check bills against. */
+            have_house: boolean;
+            /** @description Newest bill first. */
+            bills: components["schemas"]["BillCheck"][];
+            /** @description The middle of recorded over billed across the fully recorded bills (1 is exact); null with fewer than two. */
+            typical_share: number | null;
+            typical_bills: number;
+        };
+        BillCheck: {
+            start: string;
+            end: string;
+            days: number;
+            billed_kwh: number;
+            billed_total: components["schemas"]["Money"];
+            billed_fixed: components["schemas"]["Money"];
+            billed_variable: components["schemas"]["Money"];
+            billed_price: components["schemas"]["Money"];
+            /** @description What the house recorded over the bill's days; null when nothing was recorded then or the house has no mains meter. */
+            recorded_kwh: number | null;
+            /** @description The share (0 to 1) of the period the house was recorded for. */
+            coverage: number | null;
+            /** @description Recorded less billed. */
+            diff_kwh: number | null;
+            /** @description The difference as a share of the billed kWh; negative when less was recorded than billed. */
+            diff_share: number | null;
+            /** @description The recorded energy at the prices the days were saved with; null with no price. */
+            recorded_cost: string | null;
+            /** @description Recorded cost less the bill's variable charge. */
+            diff_cost: string | null;
+            recorded_price: string | null;
+            /** @enum {string|null} */
+            verdict: "match" | "close" | "differs" | null;
+            /** @description The bill's last day has not ended, so the recording so far is only part of it. */
+            in_progress: boolean;
+            outages: {
+                power_seconds: number;
+                server_seconds: number;
+                unknown_seconds: number;
+            };
         };
         FrozenPrices: {
             /** @description How many finished days are saved. */
@@ -4201,6 +4265,26 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    getBillReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillReconciliation"];
+                };
+            };
         };
     };
     lookupRates: {

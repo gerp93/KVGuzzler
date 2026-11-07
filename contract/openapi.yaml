@@ -1437,6 +1437,21 @@ paths:
                 $ref: '#/components/schemas/BillList'
         '400':
           $ref: '#/components/responses/Problem'
+  /api/v1/bills/reconciliation:
+    get:
+      tags: [Settings]
+      operationId: getBillReconciliation
+      summary: Each bill checked against what the house recorded over the same days.
+      description: |
+        The house is the mains meters added together. A check of the recording: it changes no figure. The utility's own meter reads and day
+        boundaries differ from the recording's, so a small difference is expected.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillReconciliation'
   /api/v1/rates/lookup:
     get:
       tags: [Settings]
@@ -3138,6 +3153,82 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Bill'
+    BillReconciliation:
+      type: object
+      required: [price_source, have_house, bills, typical_share, typical_bills]
+      properties:
+        price_source:
+          type: string
+          description: Where the price of a kWh comes from now (`one`, `bills`, `lookup`).
+        have_house:
+          type: boolean
+          description: Whether the house has a mains meter to check bills against.
+        bills:
+          type: array
+          description: Newest bill first.
+          items:
+            $ref: '#/components/schemas/BillCheck'
+        typical_share:
+          type: [number, 'null']
+          description: The middle of recorded over billed across the fully recorded bills (1 is exact); null with fewer than two.
+        typical_bills:
+          type: integer
+    BillCheck:
+      type: object
+      required: [start, end, days, billed_kwh, billed_total, billed_fixed, billed_variable, billed_price, recorded_kwh, coverage, diff_kwh, diff_share, recorded_cost, diff_cost, recorded_price, verdict, in_progress, outages]
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+        days:
+          type: integer
+        billed_kwh:
+          type: number
+        billed_total:
+          $ref: '#/components/schemas/Money'
+        billed_fixed:
+          $ref: '#/components/schemas/Money'
+        billed_variable:
+          $ref: '#/components/schemas/Money'
+        billed_price:
+          $ref: '#/components/schemas/Money'
+        recorded_kwh:
+          type: [number, 'null']
+          description: What the house recorded over the bill's days; null when nothing was recorded then or the house has no mains meter.
+        coverage:
+          type: [number, 'null']
+          description: The share (0 to 1) of the period the house was recorded for.
+        diff_kwh:
+          type: [number, 'null']
+          description: Recorded less billed.
+        diff_share:
+          type: [number, 'null']
+          description: The difference as a share of the billed kWh; negative when less was recorded than billed.
+        recorded_cost:
+          type: [string, 'null']
+          description: The recorded energy at the prices the days were saved with; null with no price.
+        diff_cost:
+          type: [string, 'null']
+          description: Recorded cost less the bill's variable charge.
+        recorded_price:
+          type: [string, 'null']
+        verdict:
+          type: [string, 'null']
+          enum: [match, close, differs, null]
+        in_progress:
+          type: boolean
+          description: The bill's last day has not ended, so the recording so far is only part of it.
+        outages:
+          type: object
+          required: [power_seconds, server_seconds, unknown_seconds]
+          properties:
+            power_seconds:
+              type: integer
+            server_seconds:
+              type: integer
+            unknown_seconds:
+              type: integer
     FrozenPrices:
       type: object
       required: [days, through, from, by_source]
