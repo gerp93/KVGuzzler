@@ -3,7 +3,7 @@
 // charges, where the car reported its battery's charge. Between two of them the battery's own change is taken out of what was bought, so what is left is what
 // the miles driven in between used; the gas cars are priced for the same miles. Pure, so it is tested apart from the drawing; the prices are the server's.
 import type { EvCharge, EvChargesAnswer, EvSavings } from './ev';
-import { compKey } from './evGas';
+import { compKey, type SavingsSummary } from './evGas';
 
 type GasComparison = EvSavings['comparisons'][number];
 type Stretch = EvSavings['stretches'][number];
@@ -152,3 +152,47 @@ export function trueCost(input: { charges: EvChargesAnswer | undefined; savings:
 
 /** A cost over miles at each point of a running total; null while no mile is driven (nothing to divide by). */
 export const perMileSoFar = (cost: number[], miles: number[]): (number | null)[] => cost.map((c, i) => (miles[i]! > 0 ? c / miles[i]! : null));
+
+/** Everything the counted cycles add up to. */
+export interface TrueTotals {
+  miles: number;
+  /** What the wall gave for those miles, cut at the battery's change. */
+  usedKwh: number;
+  /** What `usedKwh` cost. */
+  evCost: number;
+  /** What each gas car would have burned over the same miles, by `compKey`. */
+  gas: Map<string, number>;
+}
+
+/** The counted cycles added up; null when none is counted or no mile was driven in them (nothing to divide by). */
+export function trueTotals(t: TrueCost): TrueTotals | null {
+  const miles = t.cycles.reduce((s, c) => s + c.miles, 0);
+  if (t.reason != null || miles <= 0) return null;
+  const gas = new Map<string, number>();
+  for (const [k, line] of t.cumulative.gas) gas.set(k, line[line.length - 1] ?? 0);
+  return { miles, usedKwh: t.cycles.reduce((s, c) => s + c.usedKwh, 0), evCost: t.cumulative.ev[t.cumulative.ev.length - 1] ?? 0, gas };
+}
+
+/** What the headline tiles say over the cars drawn, from the counted cycles: the same shape as the stretch-based summary, so the tiles read either. `visible` are the `compKey`s drawn. */
+export function trueSummary(t: TrueCost, comparisons: GasComparison[], visible: string[]): SavingsSummary | null {
+  const totals = trueTotals(t);
+  const cars = comparisons.filter((c) => visible.includes(compKey(c)) && totals?.gas.has(compKey(c)));
+  if (!totals || cars.length === 0) return null;
+  const gas = cars.map((c) => totals.gas.get(compKey(c))!);
+  const mpgs = cars.map((c) => c.mpg);
+  return {
+    count: cars.length,
+    gasCount: cars.filter((c) => c.fuel === 'gas').length,
+    dieselCount: cars.filter((c) => c.fuel === 'diesel').length,
+    lowest: Math.min(...gas) - totals.evCost,
+    highest: Math.max(...gas) - totals.evCost,
+    mpgLow: Math.min(...mpgs),
+    mpgHigh: Math.max(...mpgs),
+    gasLow: Math.min(...gas),
+    gasHigh: Math.max(...gas),
+    perMileLow: Math.min(...gas) / totals.miles,
+    perMileHigh: Math.max(...gas) / totals.miles,
+    evCost: totals.evCost,
+    miles: totals.miles,
+  };
+}

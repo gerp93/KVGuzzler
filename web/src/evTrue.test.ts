@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EvCharge, EvChargesAnswer, EvSavings } from './ev';
-import { dayPosition, hasEndLevel, perMileSoFar, trueCost } from './evTrue';
+import { dayPosition, hasEndLevel, perMileSoFar, trueCost, trueSummary, trueTotals } from './evTrue';
 
 /** A moment on this device's own clock, as the server would send it. */
 const at = (month: number, day: number, hour = 0): string => new Date(2026, month - 1, day, hour, 0, 0).toISOString();
@@ -157,5 +157,59 @@ describe('dayPosition', () => {
 describe('perMileSoFar', () => {
   it('divides each running total by the miles so far, and has nothing before the first mile', () => {
     expect(perMileSoFar([0, 3, 10], [0, 100, 200])).toEqual([null, 0.03, 0.05]);
+  });
+});
+
+describe('trueTotals and trueSummary', () => {
+  const two = (): EvSavings =>
+    savings({
+      comparisons: [
+        { fuel: 'gas', mpg: 20, custom: false },
+        { fuel: 'gas', mpg: 40, custom: false },
+      ],
+      stretches: stretches().map((s) => ({ ...s, gas: [...s.gas, { fuel: 'gas' as const, mpg: 40, gallons: 0, gas_cost: String(Number(s.gas[0]!.gas_cost) / 2), savings: null }] })),
+    });
+  // 120 miles; 30 kWh bought and 10 percent gained at 1 kWh each: 20 kWh used, 3 dollars at the charge's 15 cents.
+  const truth = () => trueCost({ charges: answer([first(), charge({ id: 2, ended: at(11, 1, 6), kwh: 30, cost: '4.50', endPct: 90 })]), savings: two() });
+
+  it('adds the counted cycles up: miles, the energy the miles used, what it cost and what each car would have burned', () => {
+    const t = trueTotals(truth())!;
+    expect(t.miles).toBeCloseTo(120, 6);
+    expect(t.usedKwh).toBeCloseTo(20, 9);
+    expect(t.evCost).toBeCloseTo(3, 9);
+    expect(t.gas.get('gas:20')).toBeCloseTo(24, 6);
+    expect(t.gas.get('gas:40')).toBeCloseTo(12, 6);
+  });
+
+  it('has no totals without a counted cycle', () => {
+    expect(trueTotals(trueCost({ charges: answer([first()]), savings: two() }))).toBeNull();
+  });
+
+  it('gives the headline tile its range over the cars drawn, in the same shape as the stretch summary', () => {
+    const s = trueSummary(truth(), two().comparisons, ['gas:20', 'gas:40'])!;
+    expect(s.count).toBe(2);
+    expect(s.lowest).toBeCloseTo(9, 6); // 12 of gas less 3 of charging
+    expect(s.highest).toBeCloseTo(21, 6);
+    expect(s.perMileLow).toBeCloseTo(0.1, 6);
+    expect(s.perMileHigh).toBeCloseTo(0.2, 6);
+    expect(s.gasLow).toBeCloseTo(12, 6);
+    expect(s.gasHigh).toBeCloseTo(24, 6);
+    expect(s.mpgLow).toBe(20);
+    expect(s.mpgHigh).toBe(40);
+    expect(s.evCost).toBeCloseTo(3, 9);
+    expect(s.miles).toBeCloseTo(120, 6);
+  });
+
+  it('follows the cars ticked, and says nothing when none is', () => {
+    const one = trueSummary(truth(), two().comparisons, ['gas:40'])!;
+    expect(one.count).toBe(1);
+    expect(one.lowest).toBeCloseTo(one.highest, 9);
+    expect(one.evCost).toBeCloseTo(3, 9); // charging is the same whichever cars are ticked
+    expect(trueSummary(truth(), two().comparisons, [])).toBeNull();
+  });
+
+  it('can be negative where the electric car cost more', () => {
+    const pricey = trueCost({ charges: answer([first(), charge({ id: 2, ended: at(11, 1, 6), kwh: 30, cost: '30.00', endPct: 90 })]), savings: two() });
+    expect(trueSummary(pricey, two().comparisons, ['gas:40'])!.highest).toBeLessThan(0);
   });
 });
