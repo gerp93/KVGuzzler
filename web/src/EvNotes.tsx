@@ -16,6 +16,13 @@ export function EvNotes({ areaName, gas, dieselArea, battery }: { areaName: stri
           are any; older ones, from before the battery was saved, keep the energy they measured.
         </li>
         <li>
+          <strong>True cost</strong> cuts every figure at the same moments: the ends of charges, where the car reported its battery. Between two of them what the miles
+          used is what the wall gave less what the battery gained (or plus what it lost), at what each percent costs, and each gas car is priced for the same miles, so
+          neither car is credited for fuel it only bought. Miles are shared evenly over each day, so a charge's end is placed to the nearest part of a day. A stretch is
+          left out when a price, the odometer or the battery report is missing, and miles since the latest charge wait for the next one. The Gas vs electric, Cost per mile
+          and Saved charts count what charging bought, stretch by stretch, so they run ahead of the miles and are only fair at the charges. The tiles above use the true cost once it can be worked out.
+        </li>
+        <li>
           <strong>Efficiency and cost over time</strong> are a rolling week, made from the odometer readings: the odometer is read now and then, a stretch between two
           readings is shared evenly over its days, and a point appears once a full week is behind it.
         </li>

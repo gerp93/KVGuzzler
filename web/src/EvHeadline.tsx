@@ -1,9 +1,12 @@
 // The four answers the EV card exists to give, as tiles in the dashboard's own tile style: what driving this car saved against gas cars, what a mile costs
 // (beside the gas cars'), how efficiently it uses the energy, and how much of the wall's energy reaches the battery. Each says what it is waiting for rather
-// than showing nothing. The gas cars are the ones the viewer has ticked, so a range stands for them. The sums are the server's.
+// than showing nothing. The gas cars are the ones the viewer has ticked, so a range stands for them. The figures are the charge-to-charge ones (`evTrue.ts`) once two
+// charges have the car's battery reported, and the server's stretch sums until then.
 import type { ComponentChildren } from 'preact';
+import { useMemo } from 'preact/hooks';
 import { formatDistance, formatEfficiency, mpge, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
 import { fuelWords, savingsSummary } from './evGas';
+import { trueCost, trueSummary, trueTotals } from './evTrue';
 import { formatMoney, formatPerMile } from './lib';
 
 function Tile({ tone, label, figure, unit, range, children }: { tone: string; label: string; figure: string; unit?: string; range?: boolean; children?: ComponentChildren }) {
@@ -46,7 +49,12 @@ export function EvHeadline({
   onOpenSettings: () => void;
 }) {
   const totals = ev.totals;
-  const sum = savingsSummary(savings?.totals ?? null, visible);
+  // Charge to charge when it can be worked out, else by stretch between odometer readings (which runs ahead of the miles: charging is bought before it is driven).
+  const truth = useMemo(() => trueCost({ charges, savings }), [charges, savings]);
+  const trueTot = trueTotals(truth);
+  const byCharge = trueTot != null;
+  const trueSum = byCharge ? trueSummary(truth, savings?.comparisons ?? [], visible) : null;
+  const sum = trueSum ?? savingsSummary(savings?.totals ?? null, visible);
   const losses = charges?.losses ?? null;
   const open = (text: string) => (
     <button type="button" class="small" onClick={onOpenSettings}>
@@ -64,8 +72,12 @@ export function EvHeadline({
   const kind = sum ? fuelWords(sum) : 'gas';
   const cars = sum ? (sum.count === 1 ? `a ${sum.mpgLow} mpg ${kind} car` : `${sum.count} ${kind} cars, ${sum.mpgLow} to ${sum.mpgHigh} mpg`) : '';
 
-  const [perMile, perMileUnit] = totals?.cost_per_mile != null ? splitAt(formatPerMile(totals.cost_per_mile, ev.cost_estimated, unit), '/') : ['—', undefined];
-  const [eff, effUnit] = totals?.miles_per_kwh != null ? splitAt(formatEfficiency(totals.miles_per_kwh, unit), ' ') : ['—', undefined];
+  const estimated = byCharge ? (charges?.cost_estimated ?? false) : ev.cost_estimated;
+  const perMileText = byCharge ? formatPerMile(String(trueTot.evCost / trueTot.miles), estimated, unit) : totals?.cost_per_mile != null ? formatPerMile(totals.cost_per_mile, estimated, unit) : null;
+  const [perMile, perMileUnit] = perMileText != null ? splitAt(perMileText, '/') : ['—', undefined];
+  const milesPerKwh = byCharge && trueTot.usedKwh > 0 ? trueTot.miles / trueTot.usedKwh : byCharge ? null : (totals?.miles_per_kwh ?? null);
+  const [eff, effUnit] = milesPerKwh != null ? splitAt(formatEfficiency(milesPerKwh, unit), ' ') : ['—', undefined];
+  const counted = byCharge ? trueTot.miles : (totals?.miles ?? 0);
   const perMileOf = (n: number): string => formatPerMile(String(n), false, unit);
 
   return (
@@ -76,6 +88,7 @@ export function EvHeadline({
             <p class="kpi-hint">
               over {formatDistance(sum.miles, unit)} against {cars}
             </p>
+            {trueSum == null && <p class="kpi-hint">by stretch, not yet charge to charge</p>}
             <p class="kpi-hint">
               charging {money(sum.evCost)} · {kind} {sum.gasLow === sum.gasHigh ? money(sum.gasLow) : `${money(sum.gasLow)} to ${money(sum.gasHigh)}`}
             </p>
@@ -95,14 +108,14 @@ export function EvHeadline({
             ? sum.perMileLow === sum.perMileHigh
               ? `${kind} car ${perMileOf(sum.perMileLow)}`
               : `${kind} cars ${perMileOf(sum.perMileLow).replace(/\/(mi|km)$/, '')} to ${perMileOf(sum.perMileHigh)}`
-            : totals
-              ? `over ${formatDistance(totals.miles, unit)}`
+            : counted > 0
+              ? `over ${formatDistance(counted, unit)}`
               : 'needs two odometer readings'}
         </p>
       </Tile>
 
       <Tile tone="efficiency" label="Efficiency" figure={eff} unit={effUnit}>
-        <p class="kpi-hint">{totals?.miles_per_kwh != null ? `${mpge(totals.miles_per_kwh).toFixed(0)} MPGe, miles per gallon equivalent` : 'needs two odometer readings'}</p>
+        <p class="kpi-hint">{milesPerKwh != null ? `${mpge(milesPerKwh).toFixed(0)} MPGe, miles per gallon equivalent` : 'needs two odometer readings'}</p>
       </Tile>
 
       <Tile tone="loss" label="Charging efficiency" figure={losses ? String(Math.round(losses.efficiency * 100)) : '—'} unit={losses ? '%' : undefined}>
