@@ -2,9 +2,10 @@
 // draw, what it is waiting for. Pure, so the choice of tabs and their points is tested apart from the drawing.
 import { efficiencyTrend, gasPriceSeries, inUnit, KM_PER_MILE, TREND_DAYS, type DistanceUnit, type EvChargesAnswer, type EvSavings, type MeterEv } from './ev';
 import { carName, compKey, cumulativeCosts, DIESEL_PRICE, gasLineStyle, visibleComparisons, type Picks } from './evGas';
+import { perMileSoFar, trueCost } from './evTrue';
 import { formatMoney, formatPerMile } from './lib';
 
-export type TabId = 'versus' | 'permile' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
+export type TabId = 'true' | 'truetrend' | 'versus' | 'permile' | 'saved' | 'efficiency' | 'cost' | 'charge' | 'gas';
 
 /** One line of a tab: its points are the tab's `x`, one value each. */
 export interface TabLine {
@@ -103,6 +104,57 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     const none = shown.length === 0;
     const gasLines = (series: Map<string, number[]>): TabLine[] => shown.map((c) => ({ name: carName(c), ...gasLineStyle(c, savings.comparisons), y: series.get(compKey(c)) ?? [], fill: false }));
     const waiting = none ? 'Tick a car under the chart to compare with.' : 'Needs two odometer readings that the gas prices cover.';
+
+    // The truest figure, charge to charge: what the miles used (the battery's own change taken out of what was bought) against each car for the same miles.
+    const truth = trueCost({ charges, savings });
+    const trueWaiting = none ? waiting : (truth.reason ?? waiting);
+    const trueMile = unit === 'km' ? 'kilometer' : 'mile';
+    const trueUnit = (perMile: number): number => (unit === 'km' ? perMile / KM_PER_MILE : perMile);
+    const cum = truth.cumulative;
+    const lastMiles = cum.miles[cum.miles.length - 1] ?? 0;
+    const trueBars: TabBar[] = [];
+    if (!none && truth.reason == null && lastMiles > 0) {
+      const evPer = cum.ev[cum.ev.length - 1]! / lastMiles;
+      trueBars.push({ label: 'Charging', value: trueUnit(evPer), colorVar: '--color-accent-green', text: formatPerMile(String(evPer), false, unit) });
+      for (const c of shown) {
+        const per = cum.gas.get(compKey(c))![cum.at.length - 1]! / lastMiles;
+        const { colorVar, alpha } = gasLineStyle(c, savings.comparisons);
+        trueBars.push({ label: carName(c), value: trueUnit(per), colorVar, alpha, text: formatPerMile(String(per), false, unit) });
+      }
+    }
+    make({
+      id: 'true',
+      label: 'True cost',
+      title: `What a ${trueMile} cost, charge to charge: the energy the miles used, from the car's own battery reports, against each car for the same miles`,
+      x: [],
+      lines: [],
+      bars: trueBars,
+      picks: 'cars',
+      format: axisCents,
+      yLabel: `Cost per ${trueMile}, dollars`,
+      xLabel: '',
+      waiting: trueWaiting,
+    });
+    const perUnitList = (v: (number | null)[]): (number | null)[] => v.map((n) => (n == null ? null : trueUnit(n)));
+    make({
+      id: 'truetrend',
+      label: 'Cost so far',
+      title: `Cost per ${trueMile} from the first charge to each later one: it settles as more charges are counted`,
+      x: none || truth.reason != null ? [] : cum.at,
+      lines:
+        none || truth.reason != null
+          ? []
+          : [
+              ...shown.map((c) => ({ name: carName(c), ...gasLineStyle(c, savings.comparisons), y: perUnitList(perMileSoFar(cum.gas.get(compKey(c)) ?? [], cum.miles)), fill: false })),
+              { name: 'Charging', colorVar: '--color-accent-green', y: perUnitList(perMileSoFar(cum.ev, cum.miles)), width: 3, fill: false },
+            ],
+      endLabels: true,
+      picks: 'cars',
+      format: axisCents,
+      yLabel: `Cost per ${trueMile} so far, dollars`,
+      xLabel: 'End of the charge',
+      waiting: trueWaiting,
+    });
     make({
       id: 'versus',
       label: 'Gas vs electric',
