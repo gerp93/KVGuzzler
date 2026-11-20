@@ -138,7 +138,7 @@ export function trendTabs(input: { ev: MeterEv; savings: EvSavings | undefined; 
     const perUnitList = (v: (number | null)[]): (number | null)[] => v.map((n) => (n == null ? null : trueUnit(n)));
     make({
       id: 'truetrend',
-      label: 'Cost so far',
+      label: 'Per mile so far',
       title: `Cost per ${trueMile} from the first charge to each later one: it settles as more charges are counted`,
       x: none || truth.reason != null ? [] : cum.at,
       lines:
