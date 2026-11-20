@@ -92,6 +92,9 @@ func run(listen, dataDir string, simulate bool, simDays int, loc *time.Location)
 
 	root := http.NewServeMux()
 	apiServer := &api.Server{Store: st, Collector: col, Devices: mgr, Loc: loc, Version: version, DatabasePath: dbPath, Lookup: &openei.Client{HTTP: &http.Client{}}}
+	if err := apiServer.MigrateOdometerDays(ctx); err != nil {
+		log.Printf("odometer readings: %v", err)
+	}
 	go apiServer.RunPriceFreeze(ctx, log.Printf)
 	go apiServer.RunAlerts(ctx, log.Printf)
 	go apiServer.RunRatesRefresh(ctx, time.Hour, log.Printf)
