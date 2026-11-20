@@ -224,8 +224,9 @@ func TestLinkingAVehicleReadsItsOdometerIntoTheChargingMeterAndKeepsTheSecretsPr
 	}
 	var ev evBody
 	get(t, evURL, &ev)
-	if len(ev.Readings) != 1 || ev.Readings[0].Day != "2026-10-22" || ev.Readings[0].Miles != 12427.4 {
-		t.Fatalf("readings = %+v, want the odometer in miles", ev.Readings)
+	// A look is not a reading yet: a reading is the odometer at the start of its day, so the day's last look waits until the day is over.
+	if len(ev.Readings) != 0 {
+		t.Fatalf("readings = %+v, want none until the day is over", ev.Readings)
 	}
 	// The code exchange used the client's own credentials and the registered redirect.
 	form := f.ford.forms[len(f.ford.forms)-1]
@@ -240,14 +241,31 @@ func TestLinkingAVehicleReadsItsOdometerIntoTheChargingMeterAndKeepsTheSecretsPr
 		t.Errorf("the database file holds a secret (%v)", err)
 	}
 
-	// The next day the odometer moved: a second reading, and the refresh token was replaced and the new one used.
+	// The next day the first look saves what the last look of the day before found, as the reading of the start of this day; the refresh token was
+	// replaced and the new one used.
 	*f.clock = f.clock.Add(24 * time.Hour)
 	f.ford.odometer = "20100"
 	if r, body := send(t, http.MethodPost, base+"/read", ""); r.StatusCode != http.StatusOK {
 		t.Fatalf("read: %d %s", r.StatusCode, body)
 	}
 	get(t, evURL, &ev)
-	if want, _ := (ford.Odometer{Value: 20100}).Miles(ford.Kilometers); len(ev.Readings) != 2 || ev.Readings[1].Day != "2026-10-23" || ev.Readings[1].Miles != want {
+	if len(ev.Readings) != 1 || ev.Readings[0].Day != "2026-10-23" || ev.Readings[0].Miles != 12427.4 {
+		t.Errorf("readings = %+v, want the first day's odometer dated the day after", ev.Readings)
+	}
+	// Looking again within the day changes nothing saved: the day's last look is held until the day is over.
+	*f.clock = f.clock.Add(2 * time.Hour)
+	f.ford.odometer = "20120"
+	send(t, http.MethodPost, base+"/read", "")
+	get(t, evURL, &ev)
+	if len(ev.Readings) != 1 {
+		t.Errorf("a second look of the day saved a reading: %+v", ev.Readings)
+	}
+
+	// The day after, the odometer as the day ended is the reading of the start of that day.
+	*f.clock = f.clock.Add(22 * time.Hour)
+	send(t, http.MethodPost, base+"/read", "")
+	get(t, evURL, &ev)
+	if want, _ := (ford.Odometer{Value: 20120}).Miles(ford.Kilometers); len(ev.Readings) != 2 || ev.Readings[1].Day != "2026-10-24" || ev.Readings[1].Miles != want {
 		t.Errorf("readings = %+v", ev.Readings)
 	}
 

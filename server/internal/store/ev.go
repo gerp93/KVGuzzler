@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gerp93/KVGuzzler/server/internal/model"
@@ -101,6 +103,91 @@ func (s *Store) SetOdometer(ctx context.Context, meterID, day string, miles floa
 	_, err = s.db.ExecContext(ctx, `INSERT INTO odometer_readings(meter_id, day, miles) VALUES (?, ?, ?)
 ON CONFLICT(meter_id, day) DO UPDATE SET miles = excluded.miles`, meterID, day, miles)
 	return err
+}
+
+// PendingOdometer is the latest odometer the Ford feed looked at that is not yet a reading: the last look of a local day, kept until the day is over,
+// because only then is it the odometer at the start of the next day (which is what a reading's day means). False when there is none.
+func (s *Store) PendingOdometer(ctx context.Context, meterID string) (day string, miles float64, ok bool, err error) {
+	v, ok, err := s.Meta(ctx, "odometer_pending:"+meterID)
+	if err != nil || !ok {
+		return "", 0, false, err
+	}
+	d, m, found := strings.Cut(v, " ")
+	if !found {
+		return "", 0, false, nil
+	}
+	miles, perr := strconv.ParseFloat(m, 64)
+	if perr != nil {
+		return "", 0, false, nil
+	}
+	return d, miles, true, nil
+}
+
+// SetPendingOdometer keeps the odometer the feed has just looked at, for the local day it was seen on (see PendingOdometer).
+func (s *Store) SetPendingOdometer(ctx context.Context, meterID, day string, miles float64) error {
+	return s.SetMeta(ctx, "odometer_pending:"+meterID, day+" "+strconv.FormatFloat(miles, 'f', -1, 64))
+}
+
+// ShiftOdometerDays moves a meter's readings from `since` on one day later, for readings the Ford feed saved when a day's reading was still the last look
+// of that day (the odometer at the day's end, not its start). A reading dated `today` or later is a look of a day that is not over: it is removed and
+// returned as the pending look instead. It returns how many readings moved.
+func (s *Store) ShiftOdometerDays(ctx context.Context, meterID, since, today string) (moved int, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(ctx, `SELECT day, miles FROM odometer_readings WHERE meter_id = ? AND day >= ? ORDER BY day DESC`, meterID, since)
+	if err != nil {
+		return 0, err
+	}
+	type row struct {
+		day   string
+		miles float64
+	}
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.day, &r.miles); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		all = append(all, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	var intraday *row
+	for _, r := range all { // newest first, so a day's new date is never one that still holds a reading
+		if r.day >= today {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM odometer_readings WHERE meter_id = ? AND day = ?`, meterID, r.day); err != nil {
+				return 0, err
+			}
+			if r.day == today {
+				c := r
+				intraday = &c
+			}
+			continue
+		}
+		t, err := time.Parse("2006-01-02", r.day)
+		if err != nil {
+			continue
+		}
+		next := t.AddDate(0, 0, 1).Format("2006-01-02")
+		if _, err := tx.ExecContext(ctx, `UPDATE odometer_readings SET day = ? WHERE meter_id = ? AND day = ?`, next, meterID, r.day); err != nil {
+			return 0, err
+		}
+		moved++
+	}
+	if intraday != nil {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO meta(key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value`, "odometer_pending:"+meterID, intraday.day+" "+strconv.FormatFloat(intraday.miles, 'f', -1, 64)); err != nil {
+			return 0, err
+		}
+	}
+	return moved, tx.Commit()
 }
 
 // DeleteOdometer removes the reading of a day; ErrNotFound when there is none.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -92,23 +93,76 @@ func (k fordSink) LastLook(ctx context.Context) time.Time {
 	return st.CheckedAt
 }
 
-// SaveOdometer writes the day's reading unless the odometer has not moved since the latest one (a parked car would otherwise add a reading a day
-// that says nothing). The store's own refusals (an odometer only goes up) are the user's to read, so they go back as Ford errors.
+// SaveOdometer keeps what a look found. A reading's day is the day whose **start** it is the odometer at (a stretch runs from the start of one reading's
+// day to the start of the next's, and the energy it is set against is measured over those days), so a look is not saved under its own day: the last look
+// of a day, taken near its end, is the odometer at the start of the next day. The look is kept as pending, and the first look of a later day saves the
+// pending one as the reading for the day after the one it was seen on. Saving a look under its own day (and overwriting it at each look of the day) made
+// every day's drive be set against the day before's charging. A reading is not written when the odometer has not moved since the latest one (a parked
+// car would otherwise add a reading a day that says nothing). The store's own refusals (an odometer only goes up) are the user's to read, so they go
+// back as Ford errors.
 func (k fordSink) SaveOdometer(ctx context.Context, meterID, day string, miles float64) (bool, error) {
+	pendDay, pendMiles, havePending, err := k.s.Store.PendingOdometer(ctx, meterID)
+	if err != nil {
+		return false, err
+	}
 	readings, err := k.s.Store.Odometer(ctx, meterID)
 	if err != nil {
 		return false, err
 	}
-	if n := len(readings); n > 0 && readings[n-1].Day != day && math.Abs(readings[n-1].Miles-miles) < 0.05 {
-		return false, nil
+	// An odometer only goes up: a figure below the last one known is said, and not kept.
+	known := 0.0
+	if n := len(readings); n > 0 {
+		known = readings[n-1].Miles
 	}
-	if err := k.s.Store.SetOdometer(ctx, meterID, day, miles); err != nil {
-		if errors.Is(err, store.ErrInvalid) || errors.Is(err, store.ErrNotFound) {
-			return false, &ford.Error{Message: "Not saved: " + err.Error()}
+	if havePending && pendMiles > known {
+		known = pendMiles
+	}
+	if miles < known-0.05 {
+		return false, &ford.Error{Message: fmt.Sprintf("Not saved: the odometer read %.0f miles, below the %.0f miles before it: an odometer only goes up.", miles, known)}
+	}
+	saved := false
+	if havePending && pendDay < day {
+		t, err := time.Parse("2006-01-02", pendDay)
+		if err == nil {
+			next := t.AddDate(0, 0, 1).Format("2006-01-02")
+			moved := len(readings) == 0 || math.Abs(readings[len(readings)-1].Miles-pendMiles) >= 0.05
+			if moved {
+				if err := k.s.Store.SetOdometer(ctx, meterID, next, pendMiles); err != nil {
+					if errors.Is(err, store.ErrInvalid) || errors.Is(err, store.ErrNotFound) {
+						return false, &ford.Error{Message: "Not saved: " + err.Error()}
+					}
+					return false, err
+				}
+				saved = true
+			}
 		}
+	}
+	if err := k.s.Store.SetPendingOdometer(ctx, meterID, day, miles); err != nil {
 		return false, err
 	}
-	return true, nil
+	return saved, nil
+}
+
+// fordReadingsSince is the first local day the Ford feed saved a reading on this install (it was linked on 2026-10-28; the readings before were typed).
+const fordReadingsSince = "2026-10-28"
+
+// MigrateOdometerDays moves the readings the Ford feed saved before a reading meant the odometer at the start of its day one day later, once: each of
+// them was the last look of its day, which is the odometer at the start of the next day. It does nothing where Ford is not set up, and is run by the
+// server's main before the feed starts.
+func (s *Server) MigrateOdometerDays(ctx context.Context) error {
+	const done = "odometer_end_of_day_shifted"
+	if _, ok, err := s.Store.Meta(ctx, done); err != nil || ok {
+		return err
+	}
+	if cfg, err := s.loadFordConfig(ctx); err != nil {
+		return err
+	} else if cfg != nil && cfg.MeterID != "" {
+		today := s.now().In(s.Loc).Format("2006-01-02")
+		if _, err := s.Store.ShiftOdometerDays(ctx, cfg.MeterID, fordReadingsSince, today); err != nil {
+			return err
+		}
+	}
+	return s.Store.SetMeta(ctx, done, "1")
 }
 
 // SaveBattery keeps the battery's charge the car reported, for working out how much of the energy charged is still unspent in it.
