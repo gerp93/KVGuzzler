@@ -172,6 +172,11 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet.
 
 - Move the vendored `KvgDbLocation` pin from KVG_Standards `main` to a tag once KVG_Standards cuts one
   (`scripts/update-kvg-dblocation.sh <tag>`).
+- **Secrets (KVG_Standards `secrets.md`, known gap):** the OpenEI API key is saved in the settings database and
+  the carbon (Electricity Maps / EIA) key in plain-text `carbon.json`. The standard wants user-entered keys
+  encrypted with the OS secret store, in a file of their own outside the SQLite database, failing closed when
+  no real encryption is available. .NET has no shared helper yet, so do not hand-roll one here: it needs the
+  "New tech stacks" process in KVG_Standards first (design approved by the owner), then wiring in.
 - First release: confirm the Windows `Setup.exe`, the Linux AppImage, and a self-update from N to
   N+1 on both (see KVG_Standards' `dotnet-avalonia.md`, "Not yet verified"). Nothing here has been
   run on Windows.
